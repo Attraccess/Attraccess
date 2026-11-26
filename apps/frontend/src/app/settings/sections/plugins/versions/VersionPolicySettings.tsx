@@ -46,7 +46,7 @@ export function VersionPolicySettings({ packageName, fallbackSpec }: Props) {
       <p className="text-sm text-muted">{t('versionManagement.settingsDescription')}</p>
       <TextField value={requestedSpec} onChange={setRequestedSpec}>
         <Label>{t('versionManagement.spec')}</Label>
-        <Input placeholder="^1.2.0 or latest" />
+        <Input />
         <Description>{t('versionManagement.specDescription')}</Description>
       </TextField>
       <Select

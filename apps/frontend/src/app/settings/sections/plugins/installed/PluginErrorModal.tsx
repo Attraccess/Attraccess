@@ -2,7 +2,7 @@ import { StatusDialog } from '@attraccess/plugins-frontend-ui';
 import { useGetPluginSystemStatus, useRetryPlugin } from '@attraccess/react-query-client';
 import { useState } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
-import { getServerInstanceId, waitForServerRestart } from '../../../../../components/PluginRestartBanner/serverRestart';
+import { restartServerAndReload } from '../../../../../utils/serverRestart';
 import type { FailedPlugin } from '../types';
 import { usePluginsTranslations } from '../usePluginsTranslations';
 
@@ -29,12 +29,11 @@ export function PluginErrorModal({ failedPlugin, onClose, onRemove }: Props) {
 
     setIsRetrying(true);
     try {
-      const getPluginSystemStatus = async () => (await refetchPluginSystemStatus()).data;
-      const previousInstanceId = await getServerInstanceId(getPluginSystemStatus);
-      await retryFailedPlugin({ path: { pluginId: failedPlugin.id } });
-      toast.success({ title: t('status.retrySuccess') });
-      await waitForServerRestart(previousInstanceId, getPluginSystemStatus);
-      window.location.reload();
+      await restartServerAndReload(
+        async () => (await refetchPluginSystemStatus()).data,
+        () => retryFailedPlugin({ path: { pluginId: failedPlugin.id } }),
+        () => toast.success({ title: t('status.retrySuccess') }),
+      );
       onClose();
     } catch {
       toast.error({ title: t('status.retryError') });

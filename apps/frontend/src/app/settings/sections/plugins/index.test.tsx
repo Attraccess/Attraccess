@@ -776,6 +776,7 @@ describe('PluginsSection', () => {
     expect(hoisted.statusRefetchMock.mock.invocationCallOrder[0]).toBeLessThan(
       hoisted.retryMutateAsyncMock.mock.invocationCallOrder[0],
     );
+    await waitFor(() => expect(hoisted.reloadPage).toHaveBeenCalledOnce());
   });
 
   it('keeps the retry action pending while it waits for the restarted server', async () => {

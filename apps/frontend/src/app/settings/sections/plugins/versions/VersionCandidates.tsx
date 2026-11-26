@@ -6,6 +6,8 @@ import { usePluginsTranslations } from '../usePluginsTranslations';
 
 interface Props {
   versions: InstalledPluginVersionDto[];
+  /** While the first load runs there is nothing to list, and no "no versions" either. */
+  isLoading: boolean;
   selectedVersion: InstalledPluginVersionDto | null;
   onSelect: (candidate: InstalledPluginVersionDto) => void;
 }
@@ -20,10 +22,11 @@ const isOlderIncompatible = (candidate: InstalledPluginVersionDto) =>
  * The published versions as a single choice. The installed and incompatible ones are listed, disabled, with why.
  * Older incompatible versions stay folded away until asked for, so they do not bury the choices and the settings.
  */
-export function VersionCandidates({ versions, selectedVersion, onSelect }: Props) {
+export function VersionCandidates({ versions, isLoading, selectedVersion, onSelect }: Props) {
   const { t } = usePluginsTranslations();
   const formatDate = useDateTimeFormatter({ showTime: false });
   const [showOlderIncompatible, setShowOlderIncompatible] = useState(false);
+  if (versions.length === 0 && isLoading) return null;
   if (versions.length === 0) return <p className="text-sm text-muted">{t('versionManagement.noVersions')}</p>;
   const olderIncompatibleCount = versions.filter(isOlderIncompatible).length;
   const shownVersions = showOlderIncompatible ? versions : versions.filter((entry) => !isOlderIncompatible(entry));
@@ -42,7 +45,9 @@ export function VersionCandidates({ versions, selectedVersion, onSelect }: Props
             candidate.direction === 'current'
               ? t('versionManagement.installedNow')
               : !candidate.compatible
-                ? t('versionManagement.notCompatible', { reason: candidate.reason ?? '' })
+                ? candidate.reason
+                  ? t('versionManagement.notCompatible', { reason: candidate.reason })
+                  : t('versionManagement.notCompatibleNoReason')
                 : null;
           return (
             <Radio
@@ -63,7 +68,9 @@ export function VersionCandidates({ versions, selectedVersion, onSelect }: Props
                       {t(`versionManagement.direction.${candidate.direction}`)}
                     </Chip>
                     {candidate.publishedAt ? (
-                      <span className="text-xs text-muted">{formatDate(candidate.publishedAt)}</span>
+                      <span className="text-xs text-muted">
+                        {t('versionManagement.published', { date: formatDate(candidate.publishedAt) })}
+                      </span>
                     ) : null}
                   </div>
                   {reason ? <Description className="break-words">{reason}</Description> : null}

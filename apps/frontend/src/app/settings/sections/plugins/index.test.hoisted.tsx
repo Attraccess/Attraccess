@@ -190,6 +190,8 @@ export function resetTestFixture() {
   hoisted.pluginSystemStatus = { disabled: false, instanceId: 'original-instance' };
   hoisted.deleteOptions = undefined;
   hoisted.reloadPage.mockReset();
+  // A removal leaves a note for the reloaded page (removalNotice); it must not reach the next test.
+  sessionStorage.clear();
   hoisted.statusRefetchMock.mockResolvedValue({ data: hoisted.pluginSystemStatus });
   hoisted.retryMutateAsyncMock.mockResolvedValue({ ok: true });
   hoisted.checkAllInstalledPackagesMock.mockResolvedValue([]);

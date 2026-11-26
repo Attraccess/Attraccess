@@ -5,8 +5,7 @@ import { useGetPluginSystemStatus, useRestartPluginSystem } from '@attraccess/re
 import { RotateCw } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToastMessage } from '../toastProvider';
-import { reloadPage } from '../../utils/reloadPage';
-import { getServerInstanceId, waitForServerRestart } from './serverRestart';
+import { restartServerAndReload } from '../../utils/serverRestart';
 import en from './en.json';
 import de from './de.json';
 
@@ -36,11 +35,10 @@ export function PluginRestartBanner() {
   const restart = async () => {
     setIsRestarting(true);
     try {
-      const getStatus = async () => (await refetch()).data;
-      const previousInstanceId = await getServerInstanceId(getStatus);
-      await requestRestart({});
-      await waitForServerRestart(previousInstanceId, getStatus);
-      reloadPage();
+      await restartServerAndReload(
+        async () => (await refetch()).data,
+        () => requestRestart({}),
+      );
     } catch {
       toast.error({ title: t('restartError'), description: t('restartErrorDescription') });
       setIsRestarting(false);
@@ -51,7 +49,8 @@ export function PluginRestartBanner() {
     <Alert
       status="warning"
       role="status"
-      className="rounded-none border-b border-warning/40 bg-warning-soft shadow-none"
+      // Wraps on a phone, so the button moves below the text instead of squeezing it.
+      className="flex-wrap rounded-none border-b border-warning/40 bg-warning-soft shadow-none"
       data-cy="plugin-restart-banner"
     >
       <AlertStatusIcon status="warning" />

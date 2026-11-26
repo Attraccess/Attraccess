@@ -181,7 +181,7 @@
     },
     "delete": {
       "title": "Plugin removed",
-      "description": "The plugin stays active until Attraccess restarts; use “Restart now” in the banner."
+      "description": "The change takes effect after Attraccess restarts; use “Restart now” in the banner."
     }
   },
   "versionManagement": {
@@ -224,6 +224,7 @@
     "updateTo": "Update to {{version}}",
     "downgradeTo": "Downgrade to {{version}}",
     "notCompatible": "Not compatible: {{reason}}",
+    "notCompatibleNoReason": "Not compatible with this Attraccess version",
     "installedNow": "Installed now",
     "showOlderIncompatible": "Show {{count}} older incompatible versions",
     "hideOlderIncompatible": "Hide older incompatible versions",

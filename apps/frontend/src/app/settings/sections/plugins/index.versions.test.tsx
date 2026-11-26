@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 // Register the shared API mocks before loading the component's feature modules.
-import { hoisted, makePlugin, renderWithQuery } from './index.test.hoisted';
+import { chooseRowAction, hoisted, makePlugin, renderWithQuery } from './index.test.hoisted';
 import { PluginsSection } from './index';
 
 describe('PluginsSection update checks and version replacement', () => {
@@ -153,5 +153,47 @@ describe('PluginsSection update checks and version replacement', () => {
 
     await waitFor(() => expect(hoisted.errorToast).toHaveBeenCalledWith({ title: 'Could not check plugin updates' }));
     expect(hoisted.successToast).not.toHaveBeenCalled();
+  });
+
+  it('shows the installed version when an update waits for the restart, not the one still running', async () => {
+    hoisted.plugins = [makePlugin({ version: '1.2.3' })];
+    const installed = {
+      name: 'Cool Plugin',
+      version: '1.2.4',
+      installPath: '/plugins/cool',
+      registryId: 'npm',
+      registryUrl: 'https://registry.npmjs.org',
+      classification: 'community',
+      classificationReason: 'Marketplace package',
+      requestedSpec: null,
+      updateOverride: 'inherit',
+    };
+    hoisted.apiMock.mockImplementation((url: string) => {
+      if (url.endsWith('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [installed] });
+      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
+      if (url.endsWith('/api/plugins/installed/Cool%20Plugin/versions'))
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            {
+              version: '1.2.4',
+              direction: 'current',
+              compatible: true,
+              permissionAdditions: [],
+              permissionRemovals: [],
+            },
+          ],
+        });
+      return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
+    });
+    const user = userEvent.setup();
+    renderWithQuery(<PluginsSection />);
+
+    await chooseRowAction(user, 'plugin-1', 'Manage version');
+
+    const current = await screen.findByRole('heading', { name: 'Current version' });
+    expect(current.closest('section')).toHaveTextContent('1.2.4');
+    expect(current.closest('section')).not.toHaveTextContent('1.2.3');
+    expect(await screen.findByRole('textbox', { name: 'Requested version or channel' })).toHaveValue('1.2.4');
   });
 });

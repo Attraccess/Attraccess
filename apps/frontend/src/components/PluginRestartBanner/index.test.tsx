@@ -11,18 +11,14 @@ const hoisted = vi.hoisted(() => ({
   statusOptions: undefined as Record<string, unknown> | undefined,
   refetch: vi.fn(),
   restart: vi.fn(),
-  waitForServerRestart: vi.fn(),
-  reloadPage: vi.fn(),
+  restartServerAndReload: vi.fn(),
   errorToast: vi.fn(),
 }));
 
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: hoisted.hasPermission }) }));
-vi.mock('../../utils/reloadPage', () => ({ reloadPage: hoisted.reloadPage }));
 vi.mock('../toastProvider', () => ({ useToastMessage: () => ({ error: hoisted.errorToast, success: vi.fn() }) }));
-vi.mock('./serverRestart', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./serverRestart')>()),
-  waitForServerRestart: hoisted.waitForServerRestart,
-}));
+// The wait for the new instance and the reload are tested in utils/serverRestart.test.ts.
+vi.mock('../../utils/serverRestart', () => ({ restartServerAndReload: hoisted.restartServerAndReload }));
 vi.mock('@attraccess/react-query-client', () => ({
   useGetPluginSystemStatus: (_clientOptions: unknown, _key: unknown, options: Record<string, unknown>) => {
     hoisted.statusOptions = options;
@@ -52,7 +48,13 @@ describe('PluginRestartBanner', () => {
     hoisted.status = pending();
     hoisted.refetch.mockResolvedValue({ data: pending() });
     hoisted.restart.mockResolvedValue({ ok: true });
-    hoisted.waitForServerRestart.mockResolvedValue(undefined);
+    // Reads the status, then posts the restart, as the real helper does; waiting and reloading are left out here.
+    hoisted.restartServerAndReload.mockImplementation(
+      async (getStatus: () => Promise<unknown>, trigger: () => Promise<unknown>) => {
+        await getStatus();
+        await trigger();
+      },
+    );
   });
 
   afterEach(() => vi.clearAllMocks());
@@ -98,15 +100,43 @@ describe('PluginRestartBanner', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('restarts after confirmation, waits for the new instance and reloads the page', async () => {
+  it('restarts after confirmation through the restart endpoint, reading the instance id from a fresh status', async () => {
+    hoisted.refetch.mockResolvedValue({ data: pending('fresh-instance') });
     render(<PluginRestartBanner />);
 
     await confirmRestart();
 
-    await waitFor(() => expect(hoisted.reloadPage).toHaveBeenCalledOnce());
-    expect(hoisted.restart).toHaveBeenCalledWith({});
-    expect(hoisted.waitForServerRestart).toHaveBeenCalledWith('instance-1', expect.any(Function));
+    await waitFor(() => expect(hoisted.restart).toHaveBeenCalledWith({}));
+    const [getStatus] = hoisted.restartServerAndReload.mock.calls[0];
+    await expect(getStatus()).resolves.toMatchObject({ instanceId: 'fresh-instance' });
+    expect(hoisted.refetch.mock.invocationCallOrder[0]).toBeLessThan(hoisted.restart.mock.invocationCallOrder[0]);
     expect(hoisted.errorToast).not.toHaveBeenCalled();
+  });
+
+  it('shows the restart as pending until the server is back', async () => {
+    hoisted.restartServerAndReload.mockReturnValue(new Promise(() => undefined));
+    render(<PluginRestartBanner />);
+
+    await confirmRestart();
+
+    await waitFor(() =>
+      expect(document.querySelector('[data-cy="plugin-restart-button"]')).toHaveAttribute('data-pending', 'true'),
+    );
+    expect(screen.getAllByText('Restarting…').length).toBeGreaterThan(0);
+  });
+
+  it('reports a refused restart request and lets the admin try again', async () => {
+    hoisted.restart.mockRejectedValue(new Error('403'));
+    render(<PluginRestartBanner />);
+
+    await confirmRestart();
+
+    await waitFor(() =>
+      expect(hoisted.errorToast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'The restart could not be completed' }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Restart now' })).toBeEnabled());
   });
 
   it('does not restart when the confirmation is cancelled', async () => {
@@ -120,7 +150,7 @@ describe('PluginRestartBanner', () => {
   });
 
   it('reports a restart that does not come back in time and lets the admin try again', async () => {
-    hoisted.waitForServerRestart.mockRejectedValue(new Error('Plugin system restart timed out'));
+    hoisted.restartServerAndReload.mockRejectedValue(new Error('Plugin system restart timed out'));
     render(<PluginRestartBanner />);
 
     await confirmRestart();
@@ -130,7 +160,6 @@ describe('PluginRestartBanner', () => {
         expect.objectContaining({ title: 'The restart could not be completed' }),
       ),
     );
-    expect(hoisted.reloadPage).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Restart now' })).toBeEnabled());
   });
 });

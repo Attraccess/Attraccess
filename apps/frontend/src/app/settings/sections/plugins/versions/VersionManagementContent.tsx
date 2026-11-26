@@ -39,6 +39,8 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
   const refreshAfterPluginChange = useRefreshAfterPluginChange();
   const { installedByName } = useInstalledNpmPlugins();
   const installed = installedByName.get(plugin.name);
+  // The installed package, which an update waiting for the restart already changed; the loaded plugin lags behind.
+  const currentVersion = installed?.version ?? plugin.version;
   const { mutateAsync: replaceInstalledPlugin } = usePluginControllerReplaceInstalledPackage();
 
   const [selectedVersion, setSelectedVersion] = useState<InstalledPluginVersionDto | null>(null);
@@ -121,7 +123,7 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
       <ModalBody className="flex flex-col gap-5">
         <VersionSection title={t('versionManagement.currentHeading')}>
           <div className="flex flex-col gap-1">
-            <p className="break-all text-lg font-medium">{plugin.version}</p>
+            <p className="break-all text-lg font-medium">{currentVersion}</p>
             {installed?.requestedSpec ? (
               <p className="break-all text-sm text-muted">
                 {t('versionManagement.requestedSpec', { spec: installed.requestedSpec })}
@@ -131,7 +133,12 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
         </VersionSection>
         <VersionSection title={t('versionManagement.availableHeading')}>
           {versionsQuery.isFetching ? <p role="status">{t('versionManagement.loading')}</p> : null}
-          <VersionCandidates versions={versions} selectedVersion={selectedVersion} onSelect={selectVersion} />
+          <VersionCandidates
+            versions={versions}
+            isLoading={versionsQuery.isLoading}
+            selectedVersion={selectedVersion}
+            onSelect={selectVersion}
+          />
         </VersionSection>
         {selectedVersion ? (
           <VersionSection title={t('versionManagement.detailsHeading', { version: selectedVersion.version })}>
@@ -162,7 +169,7 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
         ) : null}
         <Separator />
         <VersionSection title={t('versionManagement.settingsHeading')}>
-          <VersionPolicySettings packageName={plugin.name} fallbackSpec={plugin.version} />
+          <VersionPolicySettings packageName={plugin.name} fallbackSpec={currentVersion} />
         </VersionSection>
       </ModalBody>
       <ModalFooter className="flex-wrap">

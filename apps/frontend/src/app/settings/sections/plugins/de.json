@@ -181,7 +181,7 @@
     },
     "delete": {
       "title": "Plugin entfernt",
-      "description": "Das Plugin bleibt bis zum Neustart von Attraccess aktiv; nutzen Sie „Jetzt neu starten“ im Hinweisbanner."
+      "description": "Die Änderung wirkt nach dem Neustart von Attraccess; nutzen Sie „Jetzt neu starten“ im Hinweisbanner."
     }
   },
   "versionManagement": {
@@ -224,6 +224,7 @@
     "updateTo": "Auf {{version}} aktualisieren",
     "downgradeTo": "Auf {{version}} zurückstufen",
     "notCompatible": "Nicht kompatibel: {{reason}}",
+    "notCompatibleNoReason": "Nicht kompatibel mit dieser Attraccess-Version",
     "installedNow": "Derzeit installiert",
     "showOlderIncompatible": "{{count}} ältere inkompatible Versionen anzeigen",
     "hideOlderIncompatible": "Ältere inkompatible Versionen ausblenden",
