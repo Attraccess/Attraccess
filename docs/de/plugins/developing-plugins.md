@@ -1295,8 +1295,8 @@ npm-Paketnamen (`@attraccess/plugin-<name>`) über den npm-Installationsweg des 
 API-Host auf PostgreSQL (Core- und Plugin-Migrationen, Plugin-Erkennung, `AppModule`) und schlägt fehl, wenn ein
 Plugin nicht den Zustand „geladen“ erreicht. Lizenzpflichtige Plugins laden, weil die Prüfung die von ihnen
 deklarierten Lizenzmodule gewährt; ihre Storage-Kompilierung und Migrationen laufen also trotzdem. `pack-test`
-prüft nur den Tarball und sieht daher nicht, was ein Host bei Installation oder Laden ablehnt. Das nächtliche
-`publish-plugins` und der `plugins`-Job des Releases laufen erst, wenn sie bestanden wurde. Lokal führst du sie nach
+prüft nur den Tarball und sieht daher nicht, was ein Host bei Installation oder Laden ablehnt. Der nächtliche
+`publish-plugins`-Job und der Veröffentlichungsschritt des Releases laufen erst, wenn sie bestanden wurde. Lokal führst du sie nach
 `pnpm nx run-many --target=pack --projects=tag:type:plugin` aus; sie braucht PostgreSQL und eine administrative
 `TEST_DATABASE_URL`.
 

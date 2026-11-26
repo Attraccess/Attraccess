@@ -32,7 +32,7 @@ Offizielle Plugins werden auf npm unter diesen Dist-Tags veröffentlicht:
 Jeder Attraccess-Host hat einen Plugin-Kanal, gesetzt über die Umgebungsvariable `ATTRACCESS_PLUGIN_CHANNEL` (siehe [Umgebungsvariablen](installation/environment-variables.md#plugins)):
 
 - **Release-Images** verwenden `latest`. Der Marktplatz zeigt und installiert die `latest`-Version, Vorabversionen werden nie automatisch installiert.
-- **Nightly-Images** (`nightly-<sha>`, `nightly-latest`) verwenden `next`. Ihr Marktplatz zeigt, und eine Installation ohne gewählte Version installiert, die höhere der Versionen `next` und `latest` eines Plugins, die der Host ausführen kann. Ein Plugin ohne `next`-Build oder mit einem `next`-Build, der einen neueren Host braucht, bleibt auf `latest`. Ein Nightly-Build stammt immer aus demselben Commit-Bereich wie das Image, die Plugins passen also zum Host.
+- **Nightly-Images** (`nightly-<sha>`, `nightly-latest`) verwenden `next`. Ihr Marktplatz zeigt, und eine Installation ohne gewählte Version installiert, die höhere der Versionen `next` und `latest` eines Plugins, die der Host ausführen kann. Ein Plugin ohne `next`-Build oder mit einem `next`-Build, der einen neueren Host braucht, bleibt auf `latest`. `next` zeigt auf den neuesten Nightly-Build eines Plugins, der neuer sein kann als dein Image.
 
 Eine ausdrücklich gewählte Version (**Version verwalten** oder die API) hat immer Vorrang.
 
@@ -44,7 +44,7 @@ Auf einem Release-Host installiert die Standard-Richtlinie nie eine Vorabversion
 
 ### Ein Plugin auf `next` umstellen
 
-Ein Plugin, das als `latest` installiert wurde, bleibt auf `latest`, auch auf einem Nightly-Host. Zum Umstellen öffne **Einstellungen → Plugins**, öffne das Aktionsmenü (**⋯**) des installierten Plugins, wähle **Version verwalten** und trage `next` (oder eine bestimmte Nightly-Version) unter **Gewünschte Version oder Kanal** ein. Alternativ entfernst du das Plugin und installierst es erneut über den Marktplatz; seine Daten bleiben erhalten.
+Ein Plugin, das als `latest` installiert wurde, bleibt auf `latest`, auch auf einem Nightly-Host. Zum Umstellen öffne **Einstellungen → Plugins**, öffne das Aktionsmenü (**⋯**) des installierten Plugins, wähle **Version verwalten**, trage `next` (oder eine bestimmte Nightly-Version) in das Textfeld oben ein (**Gewünschte Version oder Kanal**) und klicke auf **Versionsregel speichern**. Wähle dann die Version in der Liste darunter und klicke auf **Aktualisieren**. **Aktualisieren** allein speichert deine Eingabe nicht. Alternativ entfernst du das Plugin und installierst es erneut über den Marktplatz; seine Daten bleiben erhalten.
 
 Sobald ein Plugin einmal released wurde, bietet der Marktplatz eines Release-Hosts nur noch released Versionen an. npm setzt `latest` bei der ersten Veröffentlichung eines Pakets automatisch; ein Plugin, das zuerst von einem Nightly veröffentlicht wird, hat deshalb bis zu seinem ersten Release ein Nightly als `latest`. Das Release behandelt ein Nightly-`latest` als „noch nie released" und veröffentlicht das Plugin.
 
@@ -66,13 +66,11 @@ Für ein einzelnes Plugin öffne **⋯ → Version verwalten**, stelle **Automat
 
 Für die globale Richtlinie gibt es noch keine Seite in der Weboberfläche. Ein Administrator, der Plugins verwalten darf, ändert sie mit `POST /api/plugins/update-policy`:
 
-| Request-Body                                                         | Wirkung                                                    |
-| -------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `{"checksEnabled": false}`                                           | Keine Update-Prüfungen und keine automatische Installation |
-| `{"mode": "off"}`                                                    | Updates werden nicht automatisch installiert               |
-| `{"maintenanceWindow": {"startMinute": 60, "durationMinutes": 120}}` | Das Fenster läuft von 01:00 bis 03:00 Uhr                  |
+- `{"checksEnabled": false}`: keine Update-Prüfungen und keine automatische Installation.
+- `{"mode": "off"}`: Updates werden nicht automatisch installiert.
+- `{"maintenanceWindow": {"startMinute": 60, "durationMinutes": 120}}`: Das Fenster läuft von 01:00 bis 03:00 Uhr.
 
-Auf einem Nightly-Host ersetzt das Speichern eines beliebigen Teils der globalen Richtlinie, auch nur des Wartungsfensters, den unter [Nightly-Hosts folgen `next`](#nightly-hosts-folgen-next) beschriebenen Nightly-Standard. Um mit einer gespeicherten Richtlinie weiter Nightly-Builds zu folgen, sende zusätzlich `{"mode": "follow", "prerelease": true}`. Jedes Plugin folgt dann seiner gewünschten Version oder seinem Kanal.
+Auf einem Nightly-Host ersetzt das Speichern eines beliebigen Teils der globalen Richtlinie, auch nur des Wartungsfensters, den unter [Nightly-Hosts folgen `next`](#nightly-hosts-folgen-next) beschriebenen Nightly-Standard. Die gespeicherte Richtlinie installiert keine Vorabversionen, solange du nicht `"prerelease": true` sendest. Um mit einer gespeicherten Richtlinie weiter Nightly-Builds zu folgen, sende zusätzlich `{"mode": "follow", "prerelease": true}`. Jedes Plugin folgt dann seiner gewünschten Version oder seinem Kanal.
 
 Ein Plugin, dessen eigene Regel nicht **Globale Regel übernehmen** ist, verwendet diese anstelle des globalen Modus. Ausgeschaltete Update-Prüfungen (`checksEnabled: false`) gelten für alle Plugins.
 

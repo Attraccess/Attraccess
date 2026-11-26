@@ -1926,7 +1926,7 @@ so they share the workspace toolchain, caching and CI.
     (core and plugin migrations, plugin discovery, `AppModule`) and fails if any plugin does not reach the loaded
     state. License-gated plugins load because the guard grants the license modules they declare, so their storage
     compilation and migrations still run. `pack-test` only inspects the tarball, so it cannot see what a host refuses
-    at install or load time. The nightly `publish-plugins` and the release `plugins` job run only after it passed.
+    at install or load time. The nightly `publish-plugins` job and the release's publish step run only after it passed.
     Run it locally after `pnpm nx run-many --target=pack --projects=tag:type:plugin`; it needs PostgreSQL and an
     administrative `TEST_DATABASE_URL`.
   - Preview the plan locally against the real registry with

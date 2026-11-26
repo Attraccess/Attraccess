@@ -32,7 +32,7 @@ Official plugins are published to npm under these dist-tags:
 Every Attraccess host has a plugin channel, set by the `ATTRACCESS_PLUGIN_CHANNEL` environment variable (see [Environment Variables](installation/environment-variables.md#plugins)):
 
 - **Release images** use `latest`. The marketplace shows and installs the `latest` version, and prereleases are never installed automatically.
-- **Nightly images** (`nightly-<sha>`, `nightly-latest`) use `next`. Their marketplace shows, and an install without a chosen version installs, the higher of the `next` and `latest` versions of a plugin that the host can run. A plugin without a `next` build, or whose `next` build needs a newer host, stays on `latest`. A nightly build always comes from the same commit range as the image, so the plugins match the host.
+- **Nightly images** (`nightly-<sha>`, `nightly-latest`) use `next`. Their marketplace shows, and an install without a chosen version installs, the higher of the `next` and `latest` versions of a plugin that the host can run. A plugin without a `next` build, or whose `next` build needs a newer host, stays on `latest`. `next` points to the newest nightly build of a plugin, which can be newer than your image.
 
 The version you choose explicitly (**Manage version** or the API) always wins.
 
@@ -44,7 +44,7 @@ On a release host the default policy never installs a prerelease.
 
 ### Switching a plugin to `next`
 
-A plugin that was installed as `latest` stays on `latest`, also on a nightly host. To switch it, open **Settings → Plugins**, open the installed plugin's actions menu (**⋯**), choose **Manage version** and enter `next` (or a specific nightly version) as **Requested version or channel**. You can also remove the plugin and install it again from the marketplace; its data is kept.
+A plugin that was installed as `latest` stays on `latest`, also on a nightly host. To switch it, open **Settings → Plugins**, open the installed plugin's actions menu (**⋯**), choose **Manage version**, enter `next` (or a specific nightly version) in the text field at the top (**Requested version or channel**) and click **Save version policy**. Then pick the version in the list below and click **Update**. **Update** alone does not save what you typed. You can also remove the plugin and install it again from the marketplace; its data is kept.
 
 Once a plugin has had a release, the marketplace of a release host offers only released versions. npm sets `latest` automatically on a package's first publish, so a plugin first published by a nightly has a nightly `latest` until its first release. The release treats a nightly `latest` as never released and publishes the plugin.
 
@@ -66,13 +66,11 @@ For one plugin, open **⋯ → Manage version**, set **Plugin automatic update p
 
 The global policy has no page in the web interface yet. An administrator who may manage plugins changes it with `POST /api/plugins/update-policy`:
 
-| Request body                                                         | Effect                                         |
-| -------------------------------------------------------------------- | ---------------------------------------------- |
-| `{"checksEnabled": false}`                                           | No update checks and no automatic installation |
-| `{"mode": "off"}`                                                    | Updates are not installed automatically        |
-| `{"maintenanceWindow": {"startMinute": 60, "durationMinutes": 120}}` | The window runs from 01:00 to 03:00            |
+- `{"checksEnabled": false}`: no update checks and no automatic installation.
+- `{"mode": "off"}`: updates are not installed automatically.
+- `{"maintenanceWindow": {"startMinute": 60, "durationMinutes": 120}}`: the window runs from 01:00 to 03:00.
 
-On a nightly host, saving any part of the global policy, also only the maintenance window, replaces the nightly default described in [Nightly hosts follow `next`](#nightly-hosts-follow-next). To keep following nightly builds with a saved policy, also send `{"mode": "follow", "prerelease": true}`. Each plugin then follows its requested version or channel.
+On a nightly host, saving any part of the global policy, also only the maintenance window, replaces the nightly default described in [Nightly hosts follow `next`](#nightly-hosts-follow-next). The saved policy installs no prereleases unless you send `"prerelease": true`. To keep following nightly builds with a saved policy, also send `{"mode": "follow", "prerelease": true}`. Each plugin then follows its requested version or channel.
 
 A plugin whose own setting is not **Inherit global policy** uses that setting instead of the global mode. Disabled checks (`checksEnabled: false`) apply to every plugin.
 
