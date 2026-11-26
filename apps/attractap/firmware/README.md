@@ -747,7 +747,7 @@ is expected to report _not secured_. `tests/efuse-report` checks the message for
 Lab secure readers use public keys and development-mode flash encryption; see
 `lab/secure-boot/README.md`.
 
-### "Secure this reader" conversion (ATT-1208, 2.14.0)
+### "Secure this reader" conversion (ATT-1208, 2.15.0)
 
 A paired plain reader moves to the release secure profile over the network, keeping its P-256
 pairing identity. The server drives every step inside the `attractap-session.v1` session
