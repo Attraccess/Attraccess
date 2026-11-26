@@ -16,7 +16,8 @@ export function VersionCandidates({ versions, selectedVersion, onSelect }: Props
         <Button
           key={candidate.version}
           variant={selectedVersion?.version === candidate.version ? 'primary' : 'secondary'}
-          className="justify-between"
+          // The list scrolls; without this its flex items shrink below their own height and overlap.
+          className="shrink-0 justify-between"
           isDisabled={!candidate.compatible || candidate.direction === 'current'}
           onPress={() => onSelect(candidate)}
           data-cy={`plugins-list-version-${candidate.version}`}

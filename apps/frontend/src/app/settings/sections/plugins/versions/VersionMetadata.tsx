@@ -48,7 +48,7 @@ export function VersionMetadata({
       {selectedVersion.deprecated ? (
         <p className="text-warning">{t('versionManagement.deprecated', { notice: selectedVersion.deprecated })}</p>
       ) : null}
-      <p>{t('versionManagement.integrity', { integrity: selectedVersion.integrity ?? '-' })}</p>
+      <p className="break-all">{t('versionManagement.integrity', { integrity: selectedVersion.integrity ?? '-' })}</p>
       {selectedVersion.repository ? (
         <a className="text-accent" href={selectedVersion.repository} target="_blank" rel="noreferrer">
           {t('versionManagement.repository')}
