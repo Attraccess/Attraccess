@@ -1939,6 +1939,41 @@
     "reason": "Secret management: restores secure-boot key material from a backup.",
     "shape": "41445151"
   },
+  "getSecureConversionEligibility": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "e5a51f56"
+  },
+  "runSecureConversionPreflight": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "cfb849c4"
+  },
+  "getSecureConversionStatus": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "96655381"
+  },
+  "startSecureConversion": {
+    "decision": "deny",
+    "reason": "Irreversible hardware action: starts a reader conversion that burns eFuses; it needs the typed confirmation in the web UI.",
+    "shape": "45dfef9b"
+  },
+  "cancelSecureConversion": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "be220525"
+  },
+  "retrySecureConversion": {
+    "decision": "deny",
+    "reason": "Irreversible hardware action: starts a reader conversion that burns eFuses; it needs the typed confirmation in the web UI.",
+    "shape": "b29356de"
+  },
+  "getActiveSecureConversion": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "57e2bd9e"
+  },
   "getResourceReaderUiSettings": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
