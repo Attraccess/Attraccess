@@ -47,7 +47,7 @@ function seed(root: string, overrides: { generation?: number } = {}) {
   writeMetadata(layout, {
     storageSchemaVersion: STORAGE_SCHEMA_VERSION,
     storageInstanceId: crypto.randomUUID(),
-    writtenBySidecar: '0.5.0-alpha.0',
+    writtenBySidecar: '0.5.1-alpha.0',
     fabricGeneration: overrides.generation ?? 1,
     fabricId: FABRIC_ID,
     rootCertFingerprint: sha256Hex(Buffer.from(ROOT_HEX, 'hex')),

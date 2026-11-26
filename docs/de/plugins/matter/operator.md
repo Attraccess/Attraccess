@@ -141,15 +141,15 @@ Eine `/v1/`-Anfrage oder ein WebSocket-Upgrade auf `/v1/events` mit nicht unters
     "correlationId": "5a1f6c0e-6f55-4a53-9a6e-2c6d6b0f5b1c",
     "retryable": false,
     "details": {
-      "received": { "wireVersion": 1, "attraccess": "1.10.0", "plugin": "0.5.0-alpha.0", "sidecar": "0.5.0-alpha.0" },
+      "received": { "wireVersion": 1, "attraccess": "1.10.0", "plugin": "0.5.1-alpha.0", "sidecar": "0.5.1-alpha.0" },
       "problems": [],
-      "running": { "sidecar": "0.5.0-alpha.0", "matterJs": "0.18.0" },
+      "running": { "sidecar": "0.5.1-alpha.0", "matterJs": "0.18.0" },
       "supported": [
         {
           "wireVersion": 1,
           "attraccess": "^2.0.0-0",
-          "plugin": "0.5.0-alpha.0",
-          "sidecar": "0.5.0-alpha.0",
+          "plugin": "0.5.1-alpha.0",
+          "sidecar": "0.5.1-alpha.0",
           "matterJs": "0.18.0"
         }
       ]
