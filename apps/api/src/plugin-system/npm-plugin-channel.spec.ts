@@ -169,6 +169,21 @@ describe('plugin channel', () => {
       );
     });
 
+    it('records the channel for a host-offered version and keeps installing that version', async () => {
+      const { service, installFromRegistry } = stubInstall('next');
+      await service.install(NAME, '0.2.1', undefined, undefined, undefined, 'next');
+      expect(installFromRegistry).toHaveBeenCalledWith(
+        NAME,
+        '0.2.1',
+        expect.anything(),
+        undefined,
+        [],
+        'next',
+        expect.anything(),
+        undefined,
+      );
+    });
+
     it('records latest on a latest host', async () => {
       const { service, installFromRegistry } = stubInstall('latest');
       await service.install(NAME, undefined);

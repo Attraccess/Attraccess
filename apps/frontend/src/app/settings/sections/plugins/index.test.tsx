@@ -412,7 +412,7 @@ describe('PluginsSection', () => {
     await waitFor(() =>
       expect(hoisted.installPackageMock).toHaveBeenCalledWith({
         path: { packageName: '@private/plugin', version: '2.3.4' },
-        body: { registryId: 'private' },
+        body: { registryId: 'private', followHostChannel: true },
       }),
     );
   });

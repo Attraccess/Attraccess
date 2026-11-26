@@ -170,6 +170,7 @@ export class NpmInstallation {
     registryId?: string,
     audit?: NpmPluginAuditState,
     planToken?: string,
+    recordAs?: string,
   ): Promise<InstalledNpmPlugin> {
     if (this.state.listInstalled().some((plugin) => plugin.name === name)) {
       throw new BadRequestException('Package is already installed; use the replacement endpoint');
@@ -178,7 +179,7 @@ export class NpmInstallation {
     const { version, metadata } = await this.plan.resolveVersion(name, spec, registry);
     const plan = await this.plan.installPlan(name, version, registry.id);
     // Without an explicit spec the install follows the host's plugin channel.
-    const requestedSpec = spec ?? resolvePluginChannel();
+    const requestedSpec = recordAs ?? spec ?? resolvePluginChannel();
     if (plan.plugins.length > 1)
       return this.installGraph(plan, registry, requestedSpec, undefined, [], audit, planToken);
     return this.installFromRegistry(name, version, registry, undefined, [], requestedSpec, metadata, audit);

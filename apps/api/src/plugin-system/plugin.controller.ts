@@ -16,6 +16,7 @@ import {
   Query,
 } from '@nestjs/common';
 
+import { resolvePluginChannel } from '../config/app.config';
 import { ApiTags, ApiConsumes, ApiOperation, ApiParam, ApiResponse, ApiQuery } from '@nestjs/swagger';
 
 import { auditActorOf } from '../audit/recorder/audit-event';
@@ -185,6 +186,7 @@ export class PluginController {
       body.registryId,
       body.planToken,
       req && auditActorOf(req.user),
+      body.followHostChannel && resolvePluginChannel() === 'next' ? 'next' : undefined,
     );
   }
 

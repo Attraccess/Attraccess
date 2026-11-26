@@ -75,6 +75,35 @@ describe('npm plugin request DTOs (HTTP integration)', () => {
     npmPluginService.updateVersionPolicy.mockResolvedValue({ name: 'example' });
   });
 
+  it.each([
+    ['next', true, 'next'],
+    ['latest', true, undefined],
+    ['next', false, undefined],
+  ])(
+    'on a %s host with followHostChannel %s records %s for a marketplace install',
+    async (channel, follow, recorded) => {
+      const previous = process.env.ATTRACCESS_PLUGIN_CHANNEL;
+      process.env.ATTRACCESS_PLUGIN_CHANNEL = channel;
+      try {
+        await request(app.getHttpServer())
+          .post('/api/plugins/npm/example/versions/1.2.3')
+          .send({ followHostChannel: follow })
+          .expect(201);
+        expect(npmPluginService.install).toHaveBeenCalledWith(
+          'example',
+          '1.2.3',
+          undefined,
+          expect.any(Object),
+          undefined,
+          recorded,
+        );
+      } finally {
+        if (previous === undefined) delete process.env.ATTRACCESS_PLUGIN_CHANNEL;
+        else process.env.ATTRACCESS_PLUGIN_CHANNEL = previous;
+      }
+    },
+  );
+
   it('preserves valid request properties through the global whitelist', async () => {
     await request(app.getHttpServer())
       .post('/api/plugins/registries')
@@ -96,6 +125,7 @@ describe('npm plugin request DTOs (HTTP integration)', () => {
       'private',
       expect.any(Object),
       'confirmed-dependency-plan',
+      undefined,
     );
 
     await request(app.getHttpServer())

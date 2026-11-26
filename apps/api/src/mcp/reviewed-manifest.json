@@ -1682,7 +1682,7 @@
   "PluginController_installPackage": {
     "decision": "deny",
     "reason": "Host lifecycle: installs, updates or removes executable plugin code, which may restart the host.",
-    "shape": "5e9e6691"
+    "shape": "db844e6b"
   },
   "PluginController_installPackageSpec": {
     "decision": "deny",

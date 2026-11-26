@@ -38,7 +38,7 @@ The version you choose explicitly (**Manage version** or the API) always wins.
 
 ### Nightly hosts follow `next`
 
-A plugin installed on a nightly host without a chosen version records `next` as its requested version. Under the default update policy, the maintenance window then moves it to the newest compatible build of `next` (or of `latest`, if that is higher), from one nightly to the next and from a nightly to the release. The usual safeguards still apply: nothing is installed automatically if the new version asks for more permissions, is a new major version, is deprecated, or if the plugin's update setting is **off** or **patch only**. This applies only while the update policy was never saved; a policy you saved under **Settings → Plugins** is not changed.
+A plugin installed on a nightly host from the marketplace, or through the API without a version, records `next` as its requested version. Under the default update policy, the maintenance window then moves it to the newest compatible build of `next` (or of `latest`, if that is higher), from one nightly to the next and from a nightly to the release. The usual safeguards still apply: nothing is installed automatically if the new version asks for more permissions, is a new major version, is deprecated, or if the plugin's update setting is **off** or **patch only**. This applies only while the update policy was never saved; a policy you saved under **Settings → Plugins** is not changed.
 
 On a release host nothing changes: prereleases are never installed automatically.
 

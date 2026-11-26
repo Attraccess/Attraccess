@@ -113,9 +113,18 @@ export class PluginAdministrationService {
     );
   }
 
-  install(packageName: string, spec: string | undefined, registryId?: string, planToken?: string, actor?: AuditActor) {
-    return this.installWithAudit(actor, 'plugin.installed', packageName, spec ?? resolvePluginChannel(), (state) =>
-      this.npmPluginService.install(packageName, spec, registryId, state, planToken),
+  /** `recordAs` is the requested spec to remember when it differs from the `spec` that is installed. */
+  install(
+    packageName: string,
+    spec: string | undefined,
+    registryId?: string,
+    planToken?: string,
+    actor?: AuditActor,
+    recordAs?: string,
+  ) {
+    const requestedSpec = recordAs ?? spec ?? resolvePluginChannel();
+    return this.installWithAudit(actor, 'plugin.installed', packageName, requestedSpec, (state) =>
+      this.npmPluginService.install(packageName, spec, registryId, state, planToken, recordAs),
     );
   }
 

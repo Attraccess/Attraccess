@@ -194,8 +194,9 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     registryId?: string,
     audit?: NpmPluginAuditState,
     planToken?: string,
+    recordAs?: string,
   ): Promise<InstalledNpmPlugin> {
-    return this.installation.install(name, spec, registryId, audit, planToken);
+    return this.installation.install(name, spec, registryId, audit, planToken, recordAs);
   }
 
   async checkInstalled(name: string): Promise<InstalledNpmPlugin> {

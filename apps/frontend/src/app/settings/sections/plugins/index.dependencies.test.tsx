@@ -78,7 +78,7 @@ describe('plugin dependency confirmations', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Install plugin' }));
     expect(hoisted.installPackageMock).toHaveBeenCalledWith({
       path: { packageName: provider.name, version: '1.0.0' },
-      body: { registryId: 'npm', planToken: 'reviewed-plan' },
+      body: { registryId: 'npm', followHostChannel: true, planToken: 'reviewed-plan' },
     });
   });
 

@@ -38,7 +38,7 @@ Eine ausdrücklich gewählte Version (**Version verwalten** oder die API) hat im
 
 ### Nightly-Hosts folgen `next`
 
-Ein Plugin, das auf einem Nightly-Host ohne gewählte Version installiert wird, merkt sich `next` als gewünschte Version. Mit der Standard-Update-Richtlinie bringt das Wartungsfenster es dann auf den neuesten kompatiblen Build von `next` (oder von `latest`, falls höher): von Nightly zu Nightly und von einem Nightly zum Release. Die üblichen Schutzmechanismen gelten weiter: Es wird nichts automatisch installiert, wenn die neue Version zusätzliche Berechtigungen verlangt, eine neue Hauptversion ist, als veraltet markiert ist oder die Update-Einstellung des Plugins **Aus** oder **Nur Patch** ist. Das gilt nur, solange die Update-Richtlinie nie gespeichert wurde; eine unter **Einstellungen → Plugins** gespeicherte Richtlinie bleibt unverändert.
+Ein Plugin, das auf einem Nightly-Host über den Marktplatz oder über die API ohne Versionsangabe installiert wird, merkt sich `next` als gewünschte Version. Mit der Standard-Update-Richtlinie bringt das Wartungsfenster es dann auf den neuesten kompatiblen Build von `next` (oder von `latest`, falls höher): von Nightly zu Nightly und von einem Nightly zum Release. Die üblichen Schutzmechanismen gelten weiter: Es wird nichts automatisch installiert, wenn die neue Version zusätzliche Berechtigungen verlangt, eine neue Hauptversion ist, als veraltet markiert ist oder die Update-Einstellung des Plugins **Aus** oder **Nur Patch** ist. Das gilt nur, solange die Update-Richtlinie nie gespeichert wurde; eine unter **Einstellungen → Plugins** gespeicherte Richtlinie bleibt unverändert.
 
 Auf einem Release-Host ändert sich nichts: Vorabversionen werden nie automatisch installiert.
 
