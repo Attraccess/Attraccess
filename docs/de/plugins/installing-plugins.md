@@ -54,7 +54,7 @@ Der Dialog **Version verwalten** zeigt die aktuelle Version, die verfügbaren Ve
 nennen den Grund), die Änderungen und Genehmigungen der ausgewählten Version und die **Update-Einstellungen** des
 Pakets. Das Speichern der Update-Einstellungen ändert nur, welche Versionen die Update-Prüfung anbietet; es installiert
 nichts. **Auf … aktualisieren** oder **Auf … zurückstufen** installiert die ausgewählte Version, die nach einem
-[Neustart](#neustart-zum-übernehmen-von-änderungen) wirksam wird.
+[Neustart](#neustart-zum-Übernehmen-von-Änderungen) wirksam wird.
 
 Sobald ein Plugin einmal released wurde, bietet der Marktplatz nur noch released Versionen an. Bis dahin gilt:
 
@@ -67,7 +67,7 @@ Sobald ein Plugin einmal released wurde, bietet der Marktplatz nur noch released
 2. Klicken Sie auf die Schaltflaeche **Plugin hochladen**
 3. Waehlen Sie die Plugin-Datei von Ihrem Computer aus
 4. Das Plugin wird hochgeladen und erscheint in der Plugin-Liste. Es wird nach einem
-   [Neustart](#neustart-zum-übernehmen-von-änderungen) aktiv.
+   [Neustart](#neustart-zum-Übernehmen-von-Änderungen) aktiv.
 
 <!-- TODO: Screenshot des Plugin-Upload-Dialogs -->
 
