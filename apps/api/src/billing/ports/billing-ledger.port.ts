@@ -93,6 +93,14 @@ export interface BillingLedgerStore {
     context?: BillingTransactionContext,
   ): Promise<BillingTransactionRecord>;
 
+  /**
+   * Deletes the usage's bill and its items while the bill is not completed, under the bill row lock: a usage that ends
+   * without any charge leaves no transaction. The bill stays when a priced meter reading of the usage is still
+   * pending (a late meter correction refers to the completed bill) or another transaction refers to it. Returns
+   * whether the bill was deleted.
+   */
+  discardPendingUsageBill(usageId: number, context: BillingTransactionContext): Promise<boolean>;
+
   findTransactionByExternalReference(reference: string): Promise<BillingTransactionRecord | null>;
 
   listPendingTransactions(): Promise<BillingTransactionRecord[]>;

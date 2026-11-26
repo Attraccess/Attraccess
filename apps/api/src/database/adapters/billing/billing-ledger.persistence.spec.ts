@@ -1,5 +1,12 @@
-import { BillingTransactionStatus } from '@attraccess/application-models';
-import { BillingTransaction, BillingTransactionItem, Setting, User } from '@attraccess/database-entities';
+import { BillingTransactionStatus, ResourceMeteringSessionStatus } from '@attraccess/application-models';
+import {
+  BillingTransaction,
+  BillingTransactionItem,
+  ResourceMeter,
+  ResourceMeteringSession,
+  Setting,
+  User,
+} from '@attraccess/database-entities';
 import { instanceToPlain } from 'class-transformer';
 import { billingTransactionAuditEvent } from '../../../audit/policies/billing';
 import { toBillingTransactionDto } from '../../../billing/dto/billing-dto.mapper';
@@ -271,6 +278,94 @@ describe('TypeOrmBillingLedgerStore on real PostgreSQL', () => {
 
       const stored = await db.primary.getRepository(BillingTransaction).findOneByOrFail({ id: charge?.id });
       expect(stored.amount).toBe(-25);
+    });
+  });
+
+  describe('a usage without any charge', () => {
+    const free = { sessionDurationCreditsPerMinute: 0, creditsPerUsage: 0 };
+
+    const startFree = async (name: string) => {
+      const { user, resource } = await db.seed(db.primary, name);
+      const usage = await db.seedUsage(db.primary, user.id, resource.id, free);
+      await main.service.handleResourceUsageStart(resource.id, usage, user);
+      const pending = await db.primary.getRepository(BillingTransaction).findOneByOrFail({ resourceUsageId: usage.id });
+      return { user, resource, usage, pending };
+    };
+
+    const pendingMeter = async (usage: { id: number; resourceId: number }, creditsPerUnit: number) => {
+      const meter = await db.primary
+        .getRepository(ResourceMeter)
+        .save({ resourceId: usage.resourceId, name: 'Energy', creditsPerUnit });
+      await db.primary.getRepository(ResourceMeteringSession).save({
+        id: `meter-of-${usage.id}`,
+        resourceId: usage.resourceId,
+        usageId: usage.id,
+        status: ResourceMeteringSessionStatus.Pending,
+        meterId: meter.id,
+        meterName: meter.name,
+        creditsPerUnit,
+      });
+    };
+
+    it('deletes the pending bill and its unpriced items, and leaves the balance alone', async () => {
+      const { user, usage, pending } = await startFree('free');
+      await db.primary
+        .getRepository(BillingTransactionItem)
+        .save({ billingTransactionId: pending.id, name: 'Material', unitPrice: 0, quantity: 3 });
+      await main.ledger.insertTransaction({ userId: user.id, amount: 50, status: BillingTransactionStatus.Completed });
+
+      await expect(main.service.chargeForResourceUsage(billable(usage, free))).resolves.toBeUndefined();
+
+      expect(await db.primary.getRepository(BillingTransaction).countBy({ resourceUsageId: usage.id })).toBe(0);
+      expect(await db.primary.getRepository(BillingTransactionItem).countBy({ billingTransactionId: pending.id })).toBe(
+        0,
+      );
+      expect(await balanceOf(user.id)).toBe(50);
+      expect(main.mail.sendResourceUsageBillingSummaryEmail).not.toHaveBeenCalled();
+    });
+
+    it('discards only a bill that is not completed', async () => {
+      const { user, resource } = await db.seed(db.primary, 'completed');
+      const usage = await db.seedUsage(db.primary, user.id, resource.id);
+      await main.ledger.insertTransaction({
+        userId: user.id,
+        amount: 0,
+        status: BillingTransactionStatus.Completed,
+        resourceUsageId: usage.id,
+      });
+
+      const discarded = await main.unitOfWork.run((scope) => main.ledger.discardPendingUsageBill(usage.id, scope));
+
+      expect(discarded).toBe(false);
+      expect(await db.primary.getRepository(BillingTransaction).countBy({ resourceUsageId: usage.id })).toBe(1);
+    });
+
+    it('keeps the bill as the anchor of a late correction while a priced meter reading is pending', async () => {
+      const { usage, pending } = await startFree('anchor');
+      await pendingMeter(usage, 30);
+
+      const charge = await main.service.chargeForResourceUsage(billable(usage, free));
+
+      expect(charge).toMatchObject({ id: pending.id, status: BillingTransactionStatus.Completed });
+      expect(charge?.amount).toBeCloseTo(0);
+    });
+
+    it('discards the bill when the pending meter reading has no price', async () => {
+      const { usage } = await startFree('unpriced-meter');
+      await pendingMeter(usage, 0);
+
+      await expect(main.service.chargeForResourceUsage(billable(usage, free))).resolves.toBeUndefined();
+
+      expect(await db.primary.getRepository(BillingTransaction).countBy({ resourceUsageId: usage.id })).toBe(0);
+    });
+
+    it('settles a usage a second time without an error and without creating a bill', async () => {
+      const { usage } = await startFree('second');
+
+      await main.service.chargeForResourceUsage(billable(usage, free));
+      await expect(main.service.chargeForResourceUsage(billable(usage, free))).resolves.toBeUndefined();
+
+      expect(await db.primary.getRepository(BillingTransaction).countBy({ resourceUsageId: usage.id })).toBe(0);
     });
   });
 

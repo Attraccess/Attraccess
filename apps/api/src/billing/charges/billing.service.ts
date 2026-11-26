@@ -193,13 +193,17 @@ export class BillingService {
 
     const existing = await this.ledgerStore.findUsageTransaction(usage.id, context);
 
-    if (grossCredits === BigInt(0) && !existing) {
-      return undefined;
-    }
-
     (existing?.items ?? []).forEach((item) => {
       grossCredits += toExactCredits(item.unitPrice) * toExactCredits(item.quantity);
     });
+
+    // A session without any charge leaves no bill: its pending one goes, unless a late meter correction needs it.
+    if (
+      grossCredits === BigInt(0) &&
+      (!existing || (await this.ledgerStore.discardPendingUsageBill(usage.id, context)))
+    ) {
+      return undefined;
+    }
 
     const billingFactor = usage.billingFactor ?? usage.user.billingFactor;
     const { amount: totalCredits, discount: billingFactorDiscountAmount } = applyBillingFactor(
