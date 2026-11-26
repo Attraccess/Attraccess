@@ -71,7 +71,7 @@ export function SummaryCard(props: Props) {
 
   const [transactionsPage] = useState(1);
 
-  const { data: transactions } = useGetBillingTransactions(
+  const { data: transactions, isLoading: isLoadingTransactions } = useGetBillingTransactions(
     { path: { userId: userId ?? 0 }, query: { page: transactionsPage, limit: transactionsPerPage } },
     undefined,
     {
@@ -203,7 +203,15 @@ export function SummaryCard(props: Props) {
             </TableHeader>
             <TableBody
               items={transactions?.data ?? []}
-              renderEmptyState={() => <EmptyState message={t('transactions.table.empty') as string} />}
+              renderEmptyState={() =>
+                isLoadingTransactions ? (
+                  <div className="flex justify-center py-12">
+                    <Spinner aria-label={t('transactions.table.loading') as string} />
+                  </div>
+                ) : (
+                  <EmptyState message={t('transactions.table.empty') as string} />
+                )
+              }
             >
               {(transaction) => (
                 <TableRow key={transaction.id} id={transaction.id} className="wrap-none cursor-pointer">

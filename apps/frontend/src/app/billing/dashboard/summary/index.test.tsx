@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   userId: 7 as number | undefined,
   balance: 12345,
   loading: false,
+  transactionsLoading: false,
   transactions: [] as {
     id: number;
     amount: number;
@@ -64,7 +65,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   },
   useGetBillingTransactions: (...args: unknown[]) => {
     state.transactionsQuery(...args);
-    return { data: { data: state.transactions } };
+    return state.transactionsLoading ? { data: undefined, isLoading: true } : { data: { data: state.transactions } };
   },
 }));
 vi.mock('./transactionDetailsModal', () => ({
@@ -94,6 +95,7 @@ beforeEach(() => {
   state.userId = 7;
   state.balance = 12345;
   state.loading = false;
+  state.transactionsLoading = false;
   state.transactions = [];
 });
 function open(props: Parameters<typeof SummaryCard>[0] = {}) {
@@ -210,4 +212,10 @@ it('opens the refund drawer from the row actions without opening the details', a
   );
   expect(state.refund).toHaveBeenCalledOnce();
   expect(screen.queryByRole('button', { name: 'Details #1' })).toBeNull();
+});
+it('shows a spinner instead of the empty state while the transactions load', () => {
+  state.transactionsLoading = true;
+  open();
+  expect(screen.getByLabelText('transactions.table.loading')).toBeTruthy();
+  expect(screen.queryByText('transactions.table.empty')).toBeNull();
 });
