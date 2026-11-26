@@ -25,6 +25,10 @@ vi.mock('@attraccess/react-query-client', () => ({
   useCreateResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
   UseListResourceMetersKeyFn: () => ['meters'],
+  UseGetResourceMeteringStatusKeyFn: () => ['status'],
+  useArchiveResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useRestoreResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({

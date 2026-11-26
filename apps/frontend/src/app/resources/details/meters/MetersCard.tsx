@@ -5,6 +5,8 @@ import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-front
 import { FlatSection } from '../../../../components/flatSection';
 import { useAuth } from '../../../../hooks/useAuth';
 import { MeterNameEditor } from './MeterNameEditor';
+import { MeterActions } from './MeterActions';
+import { ArchivedMeters } from './ArchivedMeters';
 import { useMeterValueFormatter } from '../../../../hooks/useMeterValueFormatter';
 import en from './en.json';
 import de from './de.json';
@@ -14,12 +16,18 @@ export function MetersCard({ resourceId, className }: { resourceId: number; clas
   const { t } = useTranslations({ en, de });
   const format = useMeterValueFormatter();
   const { hasPermission } = useAuth();
+  const manage = hasPermission('resources.update');
   const {
-    data: meters = [],
+    data = [],
     isLoading,
     isError,
-  } = useListResourceMeters({ path: { resourceId } }, undefined, { refetchInterval: 10_000 });
-  const manage = hasPermission('resources.update');
+  } = useListResourceMeters(
+    // Only people who may edit the resource get archived meters.
+    { path: { resourceId }, ...(manage ? { query: { includeArchived: true } } : {}) },
+    undefined,
+    { refetchInterval: 10_000 },
+  );
+  const meters = data.filter((meter) => !meter.archivedAt);
   if (!meters.length && !manage && !isLoading && !isError) return null;
   return (
     <FlatSection className={className} icon={<Gauge className="size-4" />} title={t('title')}>
@@ -32,7 +40,7 @@ export function MetersCard({ resourceId, className }: { resourceId: number; clas
           <div key={meter.id} className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-medium break-all">{meter.name}</h3>
-              {manage && <MeterNameEditor resourceId={resourceId} meter={meter} />}
+              {manage && <MeterActions resourceId={resourceId} meter={meter} />}
             </div>
             <dl className="grid grid-cols-2 gap-2 text-sm">
               <div>
@@ -60,6 +68,7 @@ export function MetersCard({ resourceId, className }: { resourceId: number; clas
           </div>
         ))}
         {manage && <MeterNameEditor resourceId={resourceId} />}
+        {manage && <ArchivedMeters resourceId={resourceId} meters={data.filter((meter) => meter.archivedAt)} />}
       </div>
     </FlatSection>
   );

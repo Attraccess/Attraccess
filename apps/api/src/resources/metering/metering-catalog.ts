@@ -24,6 +24,16 @@ export async function requireMeter(
   return meter;
 }
 
+/** Whether the meter ever accepted a reading. */
+export function hasObservations(meter: ResourceMeterRecord): boolean {
+  return meter.lifetimeValue !== '0' || meter.counterValue !== null || meter.latestObservedAt !== null;
+}
+
+/** Whether one of the usages captured the meter's terms when it started. */
+export function capturedBy(usages: MeteringUsageRecord[], meterId: number): boolean {
+  return usages.some((usage) => usage.meterRates?.some((rate) => rate.meterId === meterId));
+}
+
 /** Meter configuration and read-only views of definition and consumption state. */
 export class MeteringCatalog {
   constructor(private readonly store: MeteringStore) {}
@@ -65,8 +75,15 @@ export class MeteringCatalog {
     };
   }
 
-  async listMeters(resourceId: number) {
-    const meters = await this.store.listMeters(resourceId);
+  /** Whether the meter never recorded anything and no running usage captured it, so it may be deleted. */
+  private async isDeletable(meter: ResourceMeterRecord, openUsages: MeteringUsageRecord[]): Promise<boolean> {
+    if (hasObservations(meter) || capturedBy(openUsages, meter.id)) return false;
+    return !(await this.store.hasMeterRecords(meter.id));
+  }
+
+  async listMeters(resourceId: number, options: { includeArchived?: boolean } = {}) {
+    const meters = await this.store.listMeters(resourceId, undefined, options);
+    const openUsages = meters.length ? await this.store.findOpenUsages(resourceId) : [];
     const { byMeter } = await findActiveMeterSessions(
       this.store,
       resourceId,
@@ -75,7 +92,8 @@ export class MeteringCatalog {
     const result = [];
     for (const meter of meters) {
       const sessions = [];
-      for (const { usage, session: held } of byMeter.get(meter.id) ?? []) {
+      // Nothing runs on an archived meter: it has no session to show.
+      for (const { usage, session: held } of meter.archivedAt ? [] : (byMeter.get(meter.id) ?? [])) {
         const captured = usage.meterRates?.find((rate) => rate.meterId === meter.id);
         const session = held && (usage.meterRates == null || captured != null) ? held : undefined;
         const sessionRate = captured?.creditsPerUnit ?? session?.creditsPerUnit ?? 0;
@@ -133,6 +151,8 @@ export class MeteringCatalog {
         // The earliest running session, for clients that show one session per meter.
         session: sessions[0] ?? null,
         sessions,
+        archivedAt: meter.archivedAt,
+        deletable: await this.isDeletable(meter, openUsages),
       });
     }
     return result;
@@ -173,8 +193,9 @@ export class MeteringCatalog {
     return this.getMeterDto(resourceId, meterId);
   }
 
-  private async getMeterDto(resourceId: number, meterId: number) {
-    const meter = (await this.listMeters(resourceId)).find((m) => m.id === meterId);
+  /** One meter, active or archived. */
+  async getMeterDto(resourceId: number, meterId: number) {
+    const meter = (await this.listMeters(resourceId, { includeArchived: true })).find((m) => m.id === meterId);
     if (!meter) throw new BadRequestException('METER_NOT_FOUND');
     return meter;
   }

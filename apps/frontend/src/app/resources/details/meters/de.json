@@ -20,5 +20,18 @@
   "loadError": "Zähler konnten nicht geladen werden.",
   "rate": "{{name}} — {{currency}} pro Messwert",
   "rateHint": "0 deaktiviert die Abrechnung. Der Preis wird beim Sitzungsstart gespeichert.",
-  "perValue": "{{name}} — pro Messwert"
+  "perValue": "{{name}} — pro Messwert",
+  "archive": "Archivieren",
+  "archiveTitle": "{{name}} archivieren?",
+  "archiveMessage": "Der Zähler wird ausgeblendet und für neue Sitzungen weder gemessen noch abgerechnet. Verlauf und ausstehende Kosten bleiben erhalten. Flow-Knoten, die ihn verwenden, werden ungültig und seine Meldungen schlagen fehl, bis du einen anderen Zähler auswählst. Du kannst ihn später wiederherstellen.",
+  "restore": "Wiederherstellen",
+  "delete": "Löschen",
+  "deleteTitle": "{{name}} löschen?",
+  "deleteMessage": "Dieser Zähler hat noch nie etwas erfasst. Er wird endgültig entfernt. Flow-Knoten, die ihn verwenden, werden ungültig, bis du einen anderen Zähler auswählst.",
+  "archivedTitle": "Archivierte Zähler ({{count}})",
+  "archivedAt": "Archiviert: {{time}}",
+  "errorInUse": "Eine laufende Sitzung verwendet diesen Zähler. Versuche es nach dem Ende der Sitzung erneut. Um einen Zähler außer Betrieb zu nehmen, archiviere ihn.",
+  "errorHasHistory": "Dieser Zähler hat einen Verlauf und kann nicht gelöscht werden. Archiviere ihn stattdessen.",
+  "errorNameExists": "Ein aktiver Zähler hat bereits diesen Namen. Benenne zuerst einen der beiden um.",
+  "errorAction": "Der Zähler konnte nicht geändert werden. Versuche es erneut."
 }

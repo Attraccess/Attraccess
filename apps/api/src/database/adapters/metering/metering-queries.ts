@@ -1,5 +1,5 @@
 import { ResourceMeteringSegment, ResourceMeteringSession, ResourceUsage } from '@attraccess/database-entities';
-import { EntityManager, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
+import { EntityManager, IsNull, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 import type { SegmentWindowUsage } from '../../../resources/metering/metering-store.port';
 
 /** Segment boundaries carry the device's observation time, which may run somewhat ahead of or behind ours. */
@@ -26,6 +26,11 @@ export async function segmentsOfUsage(
     order: { startedAt: 'ASC' },
   });
   return segments.filter((segment) => segment.participants.some((participant) => participant.usageId === usage.id));
+}
+
+/** The usages of a resource that have not ended, published or not. */
+export function openUsageRows(manager: EntityManager, resourceId: number): Promise<ResourceUsage[]> {
+  return manager.find(ResourceUsage, { where: { resourceId, endTime: IsNull() } });
 }
 
 /**

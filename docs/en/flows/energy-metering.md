@@ -1,4 +1,5 @@
 # Meters and consumption billing
+
 <!-- llms-description: Named meters per resource for electricity, water or any value, with cumulative counters, session boundaries and optional billing. -->
 
 Each resource can have several named meters. A meter can count anything: electricity, water, material, heartbeats or other values. Attraccess does not store a unit or convert new readings.
@@ -8,6 +9,21 @@ Each resource can have several named meters. A meter can count anything: electri
 Create a meter using **Meters → Create meter** on the resource overview. Only a name is required. Every metering flow node must select a meter belonging to the resource. The node editor also has a **Create meter** button.
 
 The overview shows each meter's **lifetime consumption**, including readings outside sessions, and consumption attributed to the **current session**. The live billing card shows each session meter and its cost.
+
+## Archive or delete a meter
+
+Everyone who may edit the resource can take a meter out of use in the **Meters** card:
+
+- **Archive** is for a meter you no longer need. It is hidden from the overview, the billing settings and the meter choice of flow nodes. New sessions no longer measure or bill it, and periodic collection stops. Nothing is lost: lifetime consumption, readings, sessions and bills are kept. You can restore it at any time.
+- **Delete** removes a meter for good, for example one you created by mistake. The button only appears for a meter without any history: it never recorded a value, no session, reading request or shared time segment refers to it, and no running session captured it. A meter with history can only be archived.
+
+While a running session (including one that is just starting or ending) uses a meter, you cannot archive or delete it. Try again after the session has ended.
+
+Pending and failed charges do not prevent archiving. They stay in the list of unsettled meter charges, where you can still retry or waive them. A retry runs the meter's **Metering collection** branch as before. If you removed that branch, the retry fails and you can waive the charge.
+
+Flow nodes do not prevent archiving or deleting, and Attraccess does not change them. A node that still selects such a meter shows **Meter archived or removed**, and saving the flow fails with "Choose a meter belonging to this resource". Until you choose another meter or remove the node, each run of a **Report meter** node for an archived meter fails with the flow error `METER_ARCHIVED` and records nothing. Update these flows to avoid repeated errors.
+
+Archived meters are listed under **Archived meters** in the **Meters** card, visible only to people who may edit the resource. There you can restore, rename or, without history, delete them. A new meter may use the name of an archived one. Restoring is refused while an active meter has the same name; rename one of the two first. After restoring a meter, flow nodes that select it work again. Archiving, restoring and deleting are recorded in the audit log.
 
 ## Reporting values
 

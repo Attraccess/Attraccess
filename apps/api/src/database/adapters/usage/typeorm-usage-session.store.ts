@@ -279,7 +279,9 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
   }
 
   async findMeterRates(resourceId: number, context?: TransactionContext): Promise<UsageMeterRate[]> {
-    const meters = await this.managers.resolve(context).find(ResourceMeter, { where: { resourceId } });
+    const meters = await this.managers
+      .resolve(context)
+      .find(ResourceMeter, { where: { resourceId, archivedAt: IsNull() } });
     return meters.map((meter) => ({
       meterId: meter.id,
       name: meter.name,

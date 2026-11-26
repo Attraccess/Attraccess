@@ -15,6 +15,7 @@ const meter = (extra: Partial<ResourceMeterRecord> = {}): ResourceMeterRecord =>
   lifetimeValue: '1500000000',
   counterValue: null,
   latestObservedAt: null,
+  archivedAt: null,
   ...extra,
 });
 

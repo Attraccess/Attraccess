@@ -1567,27 +1567,42 @@
   "listResourceMeters": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "60d131f7"
+    "shape": "720f7ff3"
   },
   "createResourceMeter": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "18afaf0c"
+    "shape": "2138da51"
   },
   "updateResourceMeter": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "5e0d3116"
+    "shape": "13560f73"
+  },
+  "deleteResourceMeter": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "3f27941a"
+  },
+  "archiveResourceMeter": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "bf1e3a2a"
+  },
+  "restoreResourceMeter": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "ef0bc82f"
   },
   "setResourceMeterRate": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "a9f7121b"
+    "shape": "c1daa074"
   },
   "setResourceMeterAllocation": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "918a212c"
+    "shape": "4055fef1"
   },
   "getResourceMeteringStatus": {
     "decision": "allow",
@@ -1597,7 +1612,7 @@
   "getResourceMeteringLive": {
     "decision": "deny",
     "reason": "Streaming: server-sent events or live updates; a tool call returns a single response.",
-    "shape": "9689b3be"
+    "shape": "4b13321d"
   },
   "retryResourceMeteringSettlement": {
     "decision": "allow",

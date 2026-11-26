@@ -130,6 +130,9 @@ export class ResourceMeteringService implements OnModuleInit {
     options: { trigger: ResourceFlowNodeType; timeoutSeconds: number; freshAfter?: Date },
   ): Promise<ResourceMeteringOperationRecord> {
     return this.enqueue(session.resourceId, async () => {
+      // The cron listed its meters earlier: a meter archived meanwhile gets no further request.
+      if (kind === 'interim' && (await this.store.findMeterById(session.meterId))?.archivedAt)
+        throw new MeteringOperationError('METER_ARCHIVED');
       const requestedAt = new Date();
       // A flow addresses the person's own measuring point with the user the session belongs to.
       const userId = session.usageId === null ? null : await this.store.findUsageOwner(session.usageId);
@@ -310,8 +313,8 @@ export class ResourceMeteringService implements OnModuleInit {
     return this.catalog.createMeter(resourceId, name);
   }
 
-  listMeters(resourceId: number) {
-    return this.catalog.listMeters(resourceId);
+  listMeters(resourceId: number, options?: { includeArchived?: boolean }) {
+    return this.catalog.listMeters(resourceId, options);
   }
 
   waive(resourceId: number, sessionId: string, initiatorId: number): Promise<ResourceMeteringSessionRecord> {

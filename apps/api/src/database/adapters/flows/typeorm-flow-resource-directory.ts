@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, IsNull } from 'typeorm';
 import { Resource, ResourceMeter } from '@attraccess/database-entities';
 import type { FlowResourceRecord } from '@attraccess/application-models';
 import type { FlowResourceDirectory } from '../../../resources/flows/flow-resource-directory.port';
@@ -16,7 +16,10 @@ export class TypeOrmFlowResourceDirectory implements FlowResourceDirectory {
   }
 
   async meterIds(resourceId: number): Promise<number[]> {
-    const meters = await this.dataSource.manager.find(ResourceMeter, { where: { resourceId }, select: { id: true } });
+    const meters = await this.dataSource.manager.find(ResourceMeter, {
+      where: { resourceId, archivedAt: IsNull() },
+      select: { id: true },
+    });
     return meters.map((meter) => meter.id);
   }
 }

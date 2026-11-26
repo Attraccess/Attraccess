@@ -88,6 +88,8 @@ export class MeteringReadings {
       const session = operation.sessionId ? await this.store.findSession(operation.sessionId, scope) : null;
       if (operation.sessionId && !session) throw new Error(`The metering session ${operation.sessionId} is gone`);
       const meter = await requireMeter(this.store, operation.resourceId, operation.meterId, scope);
+      // Only the retry of an outstanding charge still reads an archived meter, as a final collection.
+      if (meter.archivedAt && operation.kind !== 'final') throw new MeteringOperationError('METER_ARCHIVED');
       if ((operation.kind === 'start') !== (report.kind === 'ready'))
         throw new MeteringOperationError('The reply does not answer this request');
       if (report.kind === 'ready') await this.completeStart(scope, operation, session, meter, report);
@@ -373,6 +375,7 @@ export class MeteringReadings {
   ): Promise<void> {
     const work = async (scope: TransactionContext) => {
       const meter = await requireMeter(this.store, resourceId, meterId, scope);
+      if (meter.archivedAt) throw new MeteringOperationError('METER_ARCHIVED');
       const session = await this.findReportSession(scope, resourceId, meter, lifecycleAttemptId, usageId);
       const id = reportId ?? randomUUID();
       const existing = await this.store.findOperation(id, scope);

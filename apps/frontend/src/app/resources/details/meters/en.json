@@ -20,5 +20,18 @@
   "loadError": "Unable to load meters.",
   "rate": "{{name}} — {{currency}} per measured value",
   "rateHint": "0 disables billing. The rate is captured when a session starts.",
-  "perValue": "{{name}} — per measured value"
+  "perValue": "{{name}} — per measured value",
+  "archive": "Archive",
+  "archiveTitle": "Archive {{name}}?",
+  "archiveMessage": "The meter is hidden and is no longer measured or billed for new sessions. Its history and pending charges are kept. Flow nodes that use it become invalid and its reports fail until you choose another meter. You can restore it later.",
+  "restore": "Restore",
+  "delete": "Delete",
+  "deleteTitle": "Delete {{name}}?",
+  "deleteMessage": "This meter never recorded anything. It is removed for good. Flow nodes that use it become invalid until you choose another meter.",
+  "archivedTitle": "Archived meters ({{count}})",
+  "archivedAt": "Archived: {{time}}",
+  "errorInUse": "A running session uses this meter. Try again after the session has ended. To take a meter out of use, archive it.",
+  "errorHasHistory": "This meter has recorded history and cannot be deleted. Archive it instead.",
+  "errorNameExists": "An active meter already has this name. Rename one of the two first.",
+  "errorAction": "Unable to change the meter. Try again."
 }

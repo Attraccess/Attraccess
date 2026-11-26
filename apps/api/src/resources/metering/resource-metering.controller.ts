@@ -1,8 +1,22 @@
-import { Body, Controller, Get, Patch, Param, ParseUUIDPipe, ParseIntPipe, Post, Req } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Patch,
+  Param,
+  ParseUUIDPipe,
+  ParseIntPipe,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceMeteringSessionRecord } from '@attraccess/application-models';
 import { ResourceMeteringService } from './resource-metering.service';
+import { MeterRemoval } from './meter-removal';
 import {
   MeterAllocationDto,
   MeterNameDto,
@@ -23,6 +37,7 @@ export class ResourceMeteringController {
   constructor(
     private readonly metering: ResourceMeteringService,
     private readonly activityVisibility: ResourceActivityVisibilityService,
+    private readonly removal: MeterRemoval,
   ) {}
 
   /**
@@ -56,12 +71,22 @@ export class ResourceMeteringController {
     summary: 'List the resource meters, lifetime totals and session consumption',
     operationId: 'listResourceMeters',
   })
+  @ApiQuery({
+    name: 'includeArchived',
+    required: false,
+    type: Boolean,
+    description: 'List archived meters too. Ignored without the permission `resources.update`.',
+  })
   @ApiResponse({ status: 200, type: [ResourceMeterDto] })
   async list(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
+    @Query('includeArchived') includeArchived?: string,
   ): Promise<ResourceMeterDto[]> {
-    return this.withVisibleSession(await this.metering.listMeters(resourceId), resourceId, req);
+    const meters = await this.metering.listMeters(resourceId, {
+      includeArchived: includeArchived === 'true' && req.user.effectivePermissions.has('resources.update'),
+    });
+    return this.withVisibleSession(meters, resourceId, req);
   }
 
   @Post('meters')
@@ -82,6 +107,48 @@ export class ResourceMeteringController {
     @Body() body: MeterNameDto,
   ): Promise<ResourceMeterDto> {
     return this.metering.updateMeter(resourceId, meterId, body.name);
+  }
+
+  @Post('meters/:meterId/archive')
+  @HttpCode(200)
+  @Auth('resources.update')
+  @ApiOperation({
+    summary: 'Archive a meter: hide it and stop measuring and billing it, keeping its history',
+    operationId: 'archiveResourceMeter',
+  })
+  @ApiResponse({ status: 200, type: ResourceMeterDto })
+  archive(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('meterId', ParseIntPipe) meterId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResourceMeterDto> {
+    return this.removal.archive(resourceId, meterId, req.user.id);
+  }
+
+  @Post('meters/:meterId/restore')
+  @HttpCode(200)
+  @Auth('resources.update')
+  @ApiOperation({ summary: 'Restore an archived meter', operationId: 'restoreResourceMeter' })
+  @ApiResponse({ status: 200, type: ResourceMeterDto })
+  restore(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('meterId', ParseIntPipe) meterId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResourceMeterDto> {
+    return this.removal.restore(resourceId, meterId, req.user.id);
+  }
+
+  @Delete('meters/:meterId')
+  @HttpCode(204)
+  @Auth('resources.update')
+  @ApiOperation({ summary: 'Delete a meter that never recorded anything', operationId: 'deleteResourceMeter' })
+  @ApiResponse({ status: 204, description: 'The meter is deleted' })
+  delete(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('meterId', ParseIntPipe) meterId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<void> {
+    return this.removal.delete(resourceId, meterId, req.user.id);
   }
 
   @Patch('meters/:meterId/rate')
