@@ -87,10 +87,15 @@ reader that was already paired over the encrypted connection (firmware 1.8.0 to 
 the server no longer knows it. At its next connection the server tells it that its pairing is no longer
 valid, and it shows its code again.
 
-**Readers on firmware older than 2.6.0 that only know a token cannot be updated over the air any more**:
-the update runs over the encrypted connection. Flash them over USB with the web flasher; they then start
-with firmware 2.6.0 and pair like a new reader. Such a reader that still tries to sign in with a token is
-refused at the connection: the server logs `token sign-in no longer supported` and creates nothing.
+**Readers on firmware older than 2.6.0 that only know a token update over the air first.** Old firmware
+cannot pair, so the server lets such a reader connect for one thing only: it signs it in without checking
+the token (there are no reader records left to check it against), offers the latest firmware for its
+variant and sends it. Nothing else works on that connection: no machines, no cards, no reader record. The
+reader shows the name "Firmware update" meanwhile. After the update it starts the new firmware and pairs like
+a new reader. The server logs `Updating an old reader with token sign-in` for each one. If it logs
+`has no newer image for it` instead, it has no firmware for that reader's variant: flash that reader over
+USB with the web flasher. At most 50 old readers update at the same time; the others connect again
+later.
 
 If the server cannot prove it is your installation, a Touch reader shows **Server could not be
 verified** on its connecting screen and tries again every 30 seconds; a Lite reader flashes
@@ -193,8 +198,8 @@ there is no button or command for it. The server certificate renews itself.
 
 | Reader firmware   | Behaviour with this server                                                                                                                                              |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| older than 1.8.0  | Cannot connect: it only knows token sign-in or the old registration request. Flash it with the web flasher (USB).                                                       |
-| 1.8.0 up to 2.5.x | Paired over the encrypted connection: shows its code again after the upgrade and pairs again. Still signing in with a token (never paired): flash 2.6.0 over USB first. |
+| older than 1.8.0  | Signs in with its token or the old registration request, gets the latest firmware over the air, then pairs.                                                             |
+| 1.8.0 up to 2.5.x | Paired over the encrypted connection: shows its code again after the upgrade and pairs again. Still signing in with a token (never paired): updates over the air, then pairs. |
 | 2.6.0 and newer   | Pairs with the flow on this page and never offers a token.                                                                                                              |
 
 ### Metrics

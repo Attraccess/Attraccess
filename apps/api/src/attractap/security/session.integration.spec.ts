@@ -344,7 +344,7 @@ describe('reader session through the real gateway', () => {
     expect(reader.frames.map((f) => json(f))).toEqual([{ t: 'session.rejected', reason: 'inactive-credential' }]);
   });
 
-  it('refuses unknown subprotocol versions and connections without a subprotocol (token readers) at upgrade', async () => {
+  it('refuses unknown subprotocol versions at upgrade', async () => {
     const statusOf = (socket: WebSocket) =>
       new Promise<number>((resolve) => {
         socket.on('unexpected-response', (_req, res) => resolve(res.statusCode ?? 0));
@@ -352,9 +352,44 @@ describe('reader session through the real gateway', () => {
         socket.on('error', () => undefined);
       });
     expect(await statusOf(new WebSocket(url, ['attractap-session.v2']))).toBe(400);
-    // A token reader offers no subprotocol: it gets no connection, so nothing is created for it.
-    expect(await statusOf(new WebSocket(url))).toBe(400);
     expect(SESSION_SUBPROTOCOL).toBe('attractap-session.v1');
+  });
+
+  it('lets an old reader with token sign-in in only to update its firmware', async () => {
+    // A token reader offers no subprotocol. It speaks the old JSON protocol in text frames.
+    const socket = new WebSocket(url);
+    const received: Array<{ event: string; data?: { type: string; payload: Record<string, unknown> } }> = [];
+    const next = () =>
+      new Promise<(typeof received)[number]>((resolve) => {
+        const check = () => {
+          const message = received.shift();
+          if (message) resolve(message);
+          else setTimeout(check, 10);
+        };
+        check();
+      });
+    socket.on('message', (data, isBinary) => {
+      if (!isBinary) received.push(JSON.parse(String(data)));
+    });
+    const sendEvent = (type: string, payload: unknown) =>
+      socket.send(JSON.stringify({ event: 'EVENT', data: { type, payload } }));
+
+    expect((await next()).data?.type).toBe('READER_REQUEST_AUTHENTICATION');
+    sendEvent('READER_AUTHENTICATE', { id: 3, token: 'tok-any' });
+    const authenticated = await next();
+    expect(authenticated.data?.type).toBe('READER_AUTHENTICATED');
+    expect(authenticated.data?.payload).toMatchObject({ name: 'Firmware update' });
+
+    // Nothing but the update: a tap or a heartbeat creates no reader and reaches no handler.
+    sendEvent('CARD_DETECTED', { uid: '04aabbccdd', detectionId: 1 });
+    socket.send(JSON.stringify({ event: 'HEARTBEAT' }));
+    expect((await next()).event).toBe('HEARTBEAT');
+    expect(received).toEqual([]);
+    expect(app.get(WebsocketService).sockets.size).toBe(0);
+
+    const closed = new Promise((resolve) => socket.on('close', resolve));
+    socket.close();
+    await closed;
   });
 
   describe('the reader control channel', () => {

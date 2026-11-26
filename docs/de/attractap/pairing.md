@@ -95,11 +95,16 @@ Code. Ein Reader, der schon über die verschlüsselte Verbindung gekoppelt war (
 behält seinen Schlüssel, aber der Server kennt ihn nicht mehr. Bei der nächsten Verbindung teilt der
 Server ihm mit, dass seine Kopplung nicht mehr gilt, und er zeigt seinen Code wieder.
 
-**Reader mit Firmware älter als 2.6.0, die nur einen Token kennen, lassen sich nicht mehr per Funk
-aktualisieren**: Das Update läuft über die verschlüsselte Verbindung. Flashe sie per USB mit dem
-Web-Flasher; sie starten dann mit Firmware 2.6.0 und koppeln wie ein neuer Reader. Ein solcher Reader,
-der sich weiter mit einem Token anmelden will, wird schon beim Verbindungsaufbau abgewiesen: Der Server
-protokolliert `token sign-in no longer supported` und legt nichts an.
+**Reader mit Firmware älter als 2.6.0, die nur einen Token kennen, aktualisieren sich zuerst per Funk.**
+Alte Firmware kann nicht koppeln, deshalb lässt der Server einen solchen Reader nur für eine Sache herein:
+Er meldet ihn an, ohne den Token zu prüfen (es gibt keine Einträge der Reader mehr, gegen die er ihn prüfen
+könnte), bietet ihm die neueste Firmware für seine Variante an und überträgt sie. Sonst geht über diese
+Verbindung nichts: keine Maschinen, keine Karten, kein Eintrag für den Reader. Der Reader zeigt währenddessen
+den Namen „Firmware update“. Nach dem Update startet er die neue Firmware und koppelt wie ein neuer Reader. Der
+Server protokolliert für jeden `Updating an old reader with token sign-in`. Steht stattdessen
+`has no newer image for it` im Log, hat er keine Firmware für die Variante dieses Readers: Flashe ihn dann per
+USB mit dem Web-Flasher. Höchstens 50 alte Reader aktualisieren gleichzeitig; die übrigen verbinden sich
+später erneut.
 
 Kann der Server nicht beweisen, dass er deine Installation ist, zeigt ein Touch-Reader auf seinem
 Verbindungsbildschirm **Server konnte nicht überprüft werden** und versucht es alle 30 Sekunden
@@ -211,8 +216,8 @@ sich selbst.
 
 | Reader-Firmware | Verhalten mit diesem Server                                                                                                                                                          |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| älter als 1.8.0 | Kann sich nicht verbinden: Er kennt nur die Token-Anmeldung oder die alte Registrierungsanfrage. Flashe ihn mit dem Web-Flasher (USB).                                               |
-| 1.8.0 bis 2.5.x | Über die verschlüsselte Verbindung gekoppelt: zeigt nach dem Upgrade seinen Code wieder und koppelt neu. Meldet sich noch per Token an (nie gekoppelt): flashe zuerst 2.6.0 per USB. |
+| älter als 1.8.0 | Meldet sich mit Token oder der alten Registrierungsanfrage an, bekommt die neueste Firmware per Funk und koppelt danach.                                                       |
+| 1.8.0 bis 2.5.x | Über die verschlüsselte Verbindung gekoppelt: zeigt nach dem Upgrade seinen Code wieder und koppelt neu. Meldet sich noch per Token an (nie gekoppelt): aktualisiert per Funk, koppelt dann. |
 | 2.6.0 und neuer | Koppelt mit dem Ablauf auf dieser Seite und bietet nie einen Token an.                                                                                                               |
 
 ### Metriken
