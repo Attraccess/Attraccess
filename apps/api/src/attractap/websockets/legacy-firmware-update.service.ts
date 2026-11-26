@@ -10,8 +10,14 @@ import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './we
 
 /** Old firmware cannot pair, so this many token readers may update at the same time; more are closed. */
 export const MAX_LEGACY_CONNECTIONS = 50;
-/** A legacy connection that sends nothing for this long is closed (heartbeats pause during the update itself). */
-export const LEGACY_IDLE_TIMEOUT_MS = 3 * 60_000;
+/**
+ * A slot is held only by downloading: a connection must be offered an update within this time, and after the offer
+ * it must request the next chunk within this time (old firmware pauses its heartbeats during the update). Heartbeats
+ * and other messages never extend it, so a client without credentials cannot hold a slot by idling.
+ */
+export const LEGACY_IDLE_TIMEOUT_MS = 60_000;
+/** Every legacy connection ends after this long, downloading or not; a reader that was not done reconnects. */
+export const LEGACY_MAX_CONNECTION_MS = 20 * 60_000;
 /** Repeated warnings about the same firmware without an update are logged at most this often. */
 const NO_UPDATE_WARNING_INTERVAL_MS = 10 * 60_000;
 
@@ -69,15 +75,19 @@ export class LegacyFirmwareUpdateService {
     this.connections.add(client);
 
     const socket = this.updateSocket(client);
+    const lifetime = setTimeout(() => client.close(), LEGACY_MAX_CONNECTION_MS);
+    lifetime.unref?.();
     let idleTimer: NodeJS.Timeout | null = null;
-    const touch = () => {
+    // Re-armed only when the update moves on: the offer, then each chunk request.
+    const progressed = () => {
       if (idleTimer) clearTimeout(idleTimer);
       idleTimer = setTimeout(() => client.close(), LEGACY_IDLE_TIMEOUT_MS);
       idleTimer.unref?.();
     };
-    touch();
+    progressed();
 
     client.on('close', () => {
+      clearTimeout(lifetime);
       if (idleTimer) clearTimeout(idleTimer);
       this.connections.delete(client);
       if (socket.state.ota?.fd) {
@@ -102,12 +112,11 @@ export class LegacyFirmwareUpdateService {
       },
     );
     client.on('message', (raw: Buffer | string, isBinary?: boolean) => {
-      touch();
       if (isBinary) return;
       queue = queue.then(async (admitted) => {
         if (!admitted || client.readyState !== WebSocket.OPEN) return admitted;
         try {
-          await this.onMessage(client, socket, String(raw));
+          await this.onMessage(client, socket, String(raw), progressed);
         } catch (error) {
           this.logger.error(`Old reader update failed: ${(error as Error).message}`);
         }
@@ -116,7 +125,12 @@ export class LegacyFirmwareUpdateService {
     });
   }
 
-  private async onMessage(client: WebSocket, socket: AuthenticatedWebSocket, raw: string): Promise<void> {
+  private async onMessage(
+    client: WebSocket,
+    socket: AuthenticatedWebSocket,
+    raw: string,
+    progressed: () => void,
+  ): Promise<void> {
     let message: LegacyMessage;
     try {
       message = JSON.parse(raw);
@@ -144,8 +158,11 @@ export class LegacyFirmwareUpdateService {
         });
         return;
       case AttractapEventType.READER_FIRMWARE_INFO:
-        return this.offerUpdate(client, socket, payload);
+        if (await this.offerUpdate(client, socket, payload)) progressed();
+        return;
       case AttractapEventType.FIRMWARE_REQUEST_CHUNK:
+        if (!socket.state.ota) return;
+        progressed();
         return this.firmwareHandler.handleFirmwareChunkRequest(socket, { type, payload } as AttractapEvent['data']);
       default:
         // ACKs, crash reports, card taps: nothing else is handled on this connection.
@@ -157,22 +174,23 @@ export class LegacyFirmwareUpdateService {
     client: WebSocket,
     socket: AuthenticatedWebSocket,
     payload: Record<string, unknown>,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const current = {
       name: String(payload.name ?? ''),
       variant: String(payload.variant ?? ''),
       version: String(payload.version ?? ''),
     } as AttractapFirmware;
-    if (socket.state.ota) return; // one update per connection
+    if (socket.state.ota) return false; // one update per connection
     if (await this.firmwareHandler.offerLegacyUpdate(socket, current)) {
       this.logger.log(
         `Updating an old reader with token sign-in (${current.name}/${current.variant} ${current.version}); ` +
           'it pairs once the update is done',
       );
-      return;
+      return true;
     }
     this.warnNoUpdate(current);
     client.close();
+    return false;
   }
 
   private warnNoUpdate(current: AttractapFirmware): void {

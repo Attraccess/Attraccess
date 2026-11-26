@@ -16,8 +16,9 @@ Sie aktualisieren Ihre Leser also, indem Sie Attraccess aktualisieren. Sobald da
 
 > [!IMPORTANT]
 > Updates laufen über die verschlüsselte Verbindung eines gekoppelten Lesegeräts. Ein Lesegerät, das sich
-> noch mit einem Token anmeldet, lässt sich nicht per Funk aktualisieren: Flashen Sie es per USB mit dem
-> Web-Flasher auf Firmware 2.6.0 und koppeln Sie es dann. Ein Lesegerät mit Firmware 1.8.0 bis 2.5.x muss
+> noch mit einem Token anmeldet, erhält ein Update über eine Verbindung, die sonst nichts erlaubt, und koppelt
+> danach. Nur ein Lesegerät, für dessen Firmware-Variante dieser Server kein Image hat, müssen Sie per USB mit
+> dem Web-Flasher flashen. Ein Lesegerät mit Firmware 1.8.0 bis 2.5.x muss
 > nach dem Server-Upgrade neu gekoppelt werden, bevor es Updates erhält. Siehe
 > [Nach dem Upgrade: jeder Reader koppelt neu](attractap/pairing.md#nach-dem-upgrade-jeder-reader-koppelt-neu).
 

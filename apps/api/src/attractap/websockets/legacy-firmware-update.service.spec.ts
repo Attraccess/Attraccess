@@ -7,6 +7,7 @@ import { WebSocket } from 'ws';
 import { AttractapFirmwareHandler } from './handlers/firmware/firmware.handler';
 import {
   LEGACY_IDLE_TIMEOUT_MS,
+  LEGACY_MAX_CONNECTION_MS,
   LegacyFirmwareUpdateService,
   MAX_LEGACY_CONNECTIONS,
 } from './legacy-firmware-update.service';
@@ -190,18 +191,62 @@ describe('LegacyFirmwareUpdateService', () => {
     clients.forEach((c) => c.close());
   });
 
-  it('closes a connection that stays silent', async () => {
-    jest.useFakeTimers();
-    const client = new FakeClient();
-    service.handleConnection(client as unknown as WebSocket, Promise.resolve());
+  describe('a slot is held only by downloading', () => {
+    beforeEach(() => jest.useFakeTimers({ doNotFake: ['setImmediate'] }));
+    const info = { name: LATEST.name, variant: LATEST.variant, version: '2.5.2' };
 
-    jest.advanceTimersByTime(LEGACY_IDLE_TIMEOUT_MS - 1);
-    expect(client.close).not.toHaveBeenCalled();
-    client.receive({ event: 'HEARTBEAT' });
-    jest.advanceTimersByTime(LEGACY_IDLE_TIMEOUT_MS - 1);
-    expect(client.close).not.toHaveBeenCalled();
-    jest.advanceTimersByTime(1);
-    expect(client.close).toHaveBeenCalled();
-    expect(service.connectionCount).toBe(0);
+    it('closes a connection that is not offered an update in time, heartbeats or not', async () => {
+      const client = await connect();
+
+      for (let i = 0; i < 5; i++) {
+        jest.advanceTimersByTime(LEGACY_IDLE_TIMEOUT_MS / 5 - 1);
+        client.receive({ event: 'HEARTBEAT' });
+        client.receive(event('READER_AUTHENTICATE', { id: 1, token: 't' }));
+        await flush();
+      }
+      expect(client.close).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(5);
+
+      expect(client.close).toHaveBeenCalled();
+      expect(service.connectionCount).toBe(0);
+    });
+
+    it('keeps a reader connected while it requests chunks, and closes it when they stop', async () => {
+      const client = await connect();
+      client.receive(event('READER_FIRMWARE_INFO', info));
+      await flush();
+
+      for (const offset of [0, 4096, 8192]) {
+        jest.advanceTimersByTime(LEGACY_IDLE_TIMEOUT_MS - 1);
+        client.receive(event('FIRMWARE_REQUEST_CHUNK', { offset, length: 4096 }));
+        await flush();
+      }
+      expect(client.close).not.toHaveBeenCalled();
+      client.receive({ event: 'HEARTBEAT' }); // does not count as progress
+      await flush();
+      jest.advanceTimersByTime(LEGACY_IDLE_TIMEOUT_MS);
+
+      expect(client.close).toHaveBeenCalled();
+    });
+
+    it(`ends every connection after ${LEGACY_MAX_CONNECTION_MS / 60_000} minutes`, async () => {
+      const client = await connect();
+      client.receive(event('READER_FIRMWARE_INFO', info));
+      await flush();
+
+      for (
+        let elapsed = 0;
+        elapsed < LEGACY_MAX_CONNECTION_MS - LEGACY_IDLE_TIMEOUT_MS / 2;
+        elapsed += LEGACY_IDLE_TIMEOUT_MS / 2
+      ) {
+        jest.advanceTimersByTime(LEGACY_IDLE_TIMEOUT_MS / 2);
+        client.receive(event('FIRMWARE_REQUEST_CHUNK', { offset: 0, length: 1 }));
+        await flush();
+      }
+      expect(client.close).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(LEGACY_IDLE_TIMEOUT_MS / 2);
+
+      expect(client.close).toHaveBeenCalled();
+    });
   });
 });
