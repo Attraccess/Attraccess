@@ -1,12 +1,15 @@
 import { Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-models';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
+import { MqttMessageEvent } from '../../../mqtt/mqtt-message.event';
 import { MqttSendMessageExecutor } from './mqtt-send-message.executor';
 import { NodeExecutionContext } from './node-executor.interface';
 
 describe('MqttSendMessageExecutor', () => {
   let executor: MqttSendMessageExecutor;
-  let mqttClientService: { publish: jest.Mock };
+  let mqttClientService: { publish: jest.Mock; subscribe: jest.Mock; unsubscribe: jest.Mock };
+  let eventEmitter: EventEmitter2;
   let ctx: NodeExecutionContext;
 
   const makeNode = (data: Record<string, unknown>): FlowNodeRecord =>
@@ -23,7 +26,12 @@ describe('MqttSendMessageExecutor', () => {
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
 
-    mqttClientService = { publish: jest.fn().mockResolvedValue(undefined) };
+    mqttClientService = {
+      publish: jest.fn().mockResolvedValue(undefined),
+      subscribe: jest.fn().mockResolvedValue(undefined),
+      unsubscribe: jest.fn().mockResolvedValue(undefined),
+    };
+    eventEmitter = new EventEmitter2();
 
     ctx = {
       transactionManager: undefined,
@@ -32,7 +40,7 @@ describe('MqttSendMessageExecutor', () => {
       setTemplateVariables: jest.fn(),
     } as unknown as NodeExecutionContext;
 
-    executor = new MqttSendMessageExecutor(mqttClientService as unknown as MqttClientService);
+    executor = new MqttSendMessageExecutor(mqttClientService as unknown as MqttClientService, eventEmitter);
   });
 
   afterEach(() => {
@@ -238,5 +246,94 @@ describe('MqttSendMessageExecutor', () => {
     error.name = 'MqttAcknowledgementTimeoutError';
 
     expect(executor.getFailureKind(error)).toBe('acknowledgement-timeout');
+  });
+
+  describe('with a response topic', () => {
+    const reply = (topic: string, payload: unknown, serverId = 42, retained = false) =>
+      eventEmitter.emit(
+        MqttMessageEvent.EVENT_NAME,
+        new MqttMessageEvent(serverId, topic, payload, undefined, retained),
+      );
+
+    it('catches a reply that arrives before the publish has completed', async () => {
+      // The device answers while the publish acknowledgement is still on its way.
+      mqttClientService.publish.mockImplementation(async () => {
+        reply('tasmota/stat/STATUS10', { StatusSNS: { ENERGY: { Total: 12.5 } } });
+      });
+
+      const result = await executor.execute(
+        makeNode({ serverId: 42, topic: 'tasmota/cmnd/Status', payload: '10', responseTopic: 'tasmota/stat/+' }),
+        { meter: 1 },
+        ctx,
+      );
+
+      expect(result).toEqual({
+        payload: {
+          meter: 1,
+          response: { topic: 'tasmota/stat/STATUS10', payload: { StatusSNS: { ENERGY: { Total: 12.5 } } } },
+        },
+      });
+      expect(mqttClientService.subscribe).toHaveBeenCalledWith(42, 'tasmota/stat/+', undefined, true);
+      expect(mqttClientService.subscribe.mock.invocationCallOrder[0]).toBeLessThan(
+        mqttClientService.publish.mock.invocationCallOrder[0],
+      );
+      expect(mqttClientService.unsubscribe).toHaveBeenCalledWith(42, 'tasmota/stat/+', undefined);
+      expect(eventEmitter.listenerCount(MqttMessageEvent.EVENT_NAME)).toBe(0);
+    });
+
+    it('ignores retained replays, other servers and other topics', async () => {
+      mqttClientService.publish.mockImplementation(async () => {
+        reply('dev/reply', 'stale', 42, true);
+        reply('dev/reply', 'other server', 7);
+        reply('dev/other', 'other topic');
+        reply('dev/reply', 'fresh');
+      });
+
+      const result = await executor.execute(
+        makeNode({ serverId: 42, topic: 'dev/cmd', responseTopic: 'dev/reply' }),
+        {},
+        ctx,
+      );
+
+      expect(result.payload).toEqual({ response: { topic: 'dev/reply', payload: 'fresh' } });
+    });
+
+    it('fails as an acknowledgement timeout when no reply arrives and cleans up', async () => {
+      jest.useFakeTimers();
+      try {
+        const pending = executor.execute(
+          makeNode({ serverId: 42, topic: 'dev/cmd', responseTopic: 'dev/reply', responseTimeoutSeconds: 3 }),
+          {},
+          ctx,
+        );
+        const assertion = expect(pending).rejects.toThrow("No MQTT reply on topic 'dev/reply' (server 42) within 3s");
+        await jest.advanceTimersByTimeAsync(3000);
+        await assertion;
+
+        const error = await pending.catch((e: unknown) => e);
+        expect(executor.getFailureKind(error)).toBe('acknowledgement-timeout');
+        expect(mqttClientService.unsubscribe).toHaveBeenCalledWith(42, 'dev/reply', undefined);
+        expect(eventEmitter.listenerCount(MqttMessageEvent.EVENT_NAME)).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('does not publish when the reply topic cannot be subscribed', async () => {
+      mqttClientService.subscribe.mockRejectedValue(new Error('not connected'));
+
+      await expect(
+        executor.execute(makeNode({ serverId: 42, topic: 'dev/cmd', responseTopic: 'dev/reply' }), {}, ctx),
+      ).rejects.toThrow('not connected');
+
+      expect(mqttClientService.publish).not.toHaveBeenCalled();
+      expect(mqttClientService.unsubscribe).toHaveBeenCalledWith(42, 'dev/reply', undefined);
+      expect(eventEmitter.listenerCount(MqttMessageEvent.EVENT_NAME)).toBe(0);
+    });
+
+    it('compiles the response topic and ignores a blank one', async () => {
+      await executor.execute(makeNode({ serverId: 42, topic: 'dev/cmd', responseTopic: '   ' }), { a: 1 }, ctx);
+      expect(mqttClientService.subscribe).not.toHaveBeenCalled();
+    });
   });
 });

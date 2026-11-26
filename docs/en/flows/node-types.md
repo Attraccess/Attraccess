@@ -244,7 +244,7 @@ Type: `processing.mqtt.waitForMessage`
 | **Subscribe QoS**       | Optional `0`, `1`, `2`; effective delivery QoS is the lower of publisher/subscriber QoS |
 | **On failure**          | See [Failure Behavior](flows/node-types.md#failure-behavior)                            |
 
-Waits for the next matching message after subscribing. On success, **Output** receives `{ topic, payload }`, replacing prior data. MQTT content is JSON-parsed when possible. Timeout or subscription failure follows **On failure**; connect **Failure** and choose `failure-output` for a timeout branch. Example: wait for a device's response before reporting energy.
+Waits for the next matching message after subscribing. On success, **Output** receives `{ topic, payload }`, replacing prior data. MQTT content is JSON-parsed when possible. Timeout or subscription failure follows **On failure**; connect **Failure** and choose `failure-output` for a timeout branch. Example: wait for a device's next unsolicited report. To ask a device and read its answer, set **Reply topic** on [MQTT Send Message](flows/node-types.md#mqtt-send-message) instead; this node only starts listening after the previous node has finished and misses fast replies.
 
 ### Error
 
@@ -301,9 +301,15 @@ Type: `output.mqtt.sendMessage`
 | **Retain**                            | Optional; empty uses the server default                                                 |
 | **Completion behavior**               | `acknowledged` or `dispatch`                                                            |
 | **Acknowledgement timeout (seconds)** | Optional positive integer; empty means no node deadline for the publish acknowledgement |
+| **Reply topic** (`responseTopic`)     | Optional template for a topic filter (`+`, trailing `#`) the device answers on          |
+| **Reply timeout (seconds)**           | Optional positive integer, default `10`; counted from the publish                       |
 | **On failure**                        | Shared failure policy above                                                             |
 
-Forwards unchanged payload through **Output** on success. Example: `{{json payload}}` forwards received MQTT content as JSON. Server, QoS, retain and timing settings are literal.
+Without a reply topic, forwards unchanged payload through **Output** on success. With a reply topic, the node subscribes and listens before it publishes, then forwards the input plus `response: { topic, payload }` (content JSON-parsed when possible). Retained messages the broker replays on subscribe are ignored. A missing reply follows **On failure** as an acknowledgement timeout. Example: a Tasmota plug with topic `shop/plug` answers `shop/plug/cmnd/Status` payload `10` on reply topic `shop/plug/stat/STATUS10`; read the counter as `{{response.payload.StatusSNS.ENERGY.Total}}`.
+
+Use the reply topic rather than **MQTT Send Message** followed by **Wait for MQTT Message**: a device often answers before the publish acknowledgement arrives, and a later wait node misses that reply.
+
+Payload example: `{{json payload}}` forwards received MQTT content as JSON. Server, QoS, retain and timing settings are literal.
 
 ### Set Billing Items
 
@@ -434,7 +440,7 @@ Reports values in collection branches and ordinary flows, including outside sess
 
 A reading pushed outside a metering run to a meter set to **Measured per session** must name the usage it belongs to: in a session lifecycle flow (start, stop, takeover) the lifecycle's usage is used, otherwise set **Usage ID** to a template that renders a usage ID, such as `{{ id }}` in a flow started by **Usage started** or **Usage stopped**, or `{{ metering.usageId }}` in a metering flow. A **Usage ID** that names a different usage than the lifecycle the flow runs in is rejected. With more than one running session, a reading that names no usage is rejected with a flow error and never guessed. Readings of a **Shared and split** meter belong to the meter and need no usage ID. See [Meters on shared machines](flows/energy-metering.md#meters-on-shared-machines).
 
-Example after **Wait for MQTT Message** returning `{"heartbeats":1500}` in its content: choose **Heartbeats**, mode **total**, value `{{payload.heartbeats}}`. See [Meters](flows/energy-metering.md) for baselines and retries.
+Example after **MQTT Send Message** with a reply topic whose reply content is `{"heartbeats":1500}`: choose **Heartbeats**, mode **total**, value `{{response.payload.heartbeats}}`. See [Meters](flows/energy-metering.md) for baselines and retries.
 
 ## See Also
 

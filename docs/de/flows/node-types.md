@@ -242,7 +242,7 @@ Typ: `processing.mqtt.waitForMessage`
 | **Subscribe-QoS**       | Optional `0`, `1`, `2`; effektives QoS ist das niedrigere von Publish-/Subscribe-QoS |
 | **Bei Fehler**          | Siehe [Fehlerverhalten](flows/node-types.md#fehlerverhalten)                         |
 
-Wartet nach dem Abonnieren auf die nächste passende Nachricht. Bei Erfolg erhält **Ausgang** `{ topic, payload }` und ersetzt die bisherigen Daten. MQTT-Inhalt wird nach Möglichkeit als JSON gelesen. Timeout oder Abonnementfehler folgen **Bei Fehler**; für einen Timeout-Zweig **Fehler** verbinden und `failure-output` wählen. Beispiel: vor der Energiemeldung auf die Geräteantwort warten.
+Wartet nach dem Abonnieren auf die nächste passende Nachricht. Bei Erfolg erhält **Ausgang** `{ topic, payload }` und ersetzt die bisherigen Daten. MQTT-Inhalt wird nach Möglichkeit als JSON gelesen. Timeout oder Abonnementfehler folgen **Bei Fehler**; für einen Timeout-Zweig **Fehler** verbinden und `failure-output` wählen. Beispiel: auf die nächste unaufgeforderte Meldung eines Geräts warten. Um ein Gerät abzufragen und seine Antwort zu lesen, stattdessen **Antwort-Topic** an [MQTT-Nachricht senden](flows/node-types.md#mqtt-nachricht-senden) setzen; dieser Knoten hört erst zu, wenn der vorherige Knoten fertig ist, und verpasst schnelle Antworten.
 
 ### Fehler
 
@@ -290,18 +290,24 @@ Beispiel-Body: `{"resource": {{json resource.name}}, "reading": {{json payload}}
 
 Typ: `output.mqtt.sendMessage`
 
-| Einstellung                         | Beschreibung                                                                     |
-| ----------------------------------- | -------------------------------------------------------------------------------- |
-| **Server** (`serverId`)             | Konfigurierter MQTT-Server                                                       |
-| **Topic**                           | Erforderliche Vorlage, etwa `workshop/{{resource.id}}/command`                   |
-| **Payload**                         | Optionale Nachrichtenvorlage                                                     |
-| **QoS**                             | Optional `0`, `1`, `2`; leer verwendet den Serverstandard                        |
-| **Retain**                          | Optional; leer verwendet den Serverstandard                                      |
-| **Abschlussverhalten**              | `acknowledged` oder `dispatch`                                                   |
-| **Bestätigungs-Timeout (Sekunden)** | Optionale positive ganze Zahl; ohne Wert kein Knoten-Timeout für die Bestätigung |
-| **Bei Fehler**                      | Gemeinsames Fehlerverhalten oben                                                 |
+| Einstellung                         | Beschreibung                                                                         |
+| ----------------------------------- | ------------------------------------------------------------------------------------ |
+| **Server** (`serverId`)             | Konfigurierter MQTT-Server                                                           |
+| **Topic**                           | Erforderliche Vorlage, etwa `workshop/{{resource.id}}/command`                       |
+| **Payload**                         | Optionale Nachrichtenvorlage                                                         |
+| **QoS**                             | Optional `0`, `1`, `2`; leer verwendet den Serverstandard                            |
+| **Retain**                          | Optional; leer verwendet den Serverstandard                                          |
+| **Abschlussverhalten**              | `acknowledged` oder `dispatch`                                                       |
+| **Bestätigungs-Timeout (Sekunden)** | Optionale positive ganze Zahl; ohne Wert kein Knoten-Timeout für die Bestätigung     |
+| **Antwort-Topic** (`responseTopic`) | Optionale Vorlage für einen Topic-Filter (`+`, abschließendes `#`) der Geräteantwort |
+| **Antwort-Timeout (Sekunden)**      | Optionale positive ganze Zahl, Standard `10`; gezählt ab dem Senden                  |
+| **Bei Fehler**                      | Gemeinsames Fehlerverhalten oben                                                     |
 
-Gibt bei Erfolg die unveränderte Payload über **Ausgang** weiter. Beispiel: `{{json payload}}` sendet empfangenen MQTT-Inhalt als JSON weiter. Server, QoS, Retain und Zeiteinstellungen sind feste Werte.
+Ohne Antwort-Topic gibt der Knoten bei Erfolg die unveränderte Payload über **Ausgang** weiter. Mit Antwort-Topic abonniert er das Topic und hört zu, bevor er sendet, und gibt dann die Eingabe plus `response: { topic, payload }` weiter (Inhalt nach Möglichkeit als JSON gelesen). Gespeicherte (retained) Nachrichten, die der Broker beim Abonnieren erneut zustellt, werden ignoriert. Bleibt die Antwort aus, folgt der Knoten **Bei Fehler** wie bei einem Bestätigungs-Timeout. Beispiel: Eine Tasmota-Steckdose mit Topic `shop/plug` antwortet auf `shop/plug/cmnd/Status` mit Payload `10` unter dem Antwort-Topic `shop/plug/stat/STATUS10`; den Zählerstand mit `{{response.payload.StatusSNS.ENERGY.Total}}` lesen.
+
+Verwenden Sie das Antwort-Topic statt **MQTT-Nachricht senden** gefolgt von **Auf MQTT-Nachricht warten**: Ein Gerät antwortet oft, bevor die Sendebestätigung eintrifft, und ein nachfolgender Warte-Knoten verpasst diese Antwort.
+
+Payload-Beispiel: `{{json payload}}` sendet empfangenen MQTT-Inhalt als JSON weiter. Server, QoS, Retain und Zeiteinstellungen sind feste Werte.
 
 ### Abrechnungsposten setzen
 
@@ -430,7 +436,7 @@ Meldet Werte in Abfragezweigen und gewöhnlichen Flows, auch ohne Sitzung. Eine 
 
 Eine außerhalb eines Messlaufs gesendete Messung an einen Zähler mit **Pro Sitzung gemessen** muss die Nutzung benennen, zu der sie gehört: In einem Flow des Sitzungsablaufs (Start, Ende, Übernahme) wird die Nutzung des Ablaufs verwendet, andernfalls setzen Sie **Nutzungs-ID** auf eine Vorlage, die eine Nutzungs-ID ergibt, etwa `{{ id }}` in einem Flow, den **Nutzung gestartet** oder **Nutzung beendet** auslöst, oder `{{ metering.usageId }}` in einem Mess-Flow. Eine **Nutzungs-ID**, die eine andere Nutzung als die des laufenden Sitzungsablaufs benennt, wird abgelehnt. Bei mehr als einer laufenden Sitzung wird eine Messung ohne Nutzung mit einem Flow-Fehler abgelehnt und nie geraten. Messungen eines Zählers mit **Geteilt und aufgeteilt** gehören zum Zähler und benötigen keine Nutzungs-ID. Siehe [Zähler bei gemeinsam genutzten Maschinen](flows/energy-metering.md#zähler-bei-gemeinsam-genutzten-maschinen).
 
-Beispiel nach **Auf MQTT-Nachricht warten** mit Inhalt `{"heartbeats":1500}`: **Heartbeats** auswählen, Modus **total**, Wert `{{payload.heartbeats}}`. Siehe [Zähler](flows/energy-metering.md) für Basiswerte und Wiederholungsversuche.
+Beispiel nach **MQTT-Nachricht senden** mit Antwort-Topic, deren Antwort den Inhalt `{"heartbeats":1500}` hat: **Heartbeats** auswählen, Modus **total**, Wert `{{response.payload.heartbeats}}`. Siehe [Zähler](flows/energy-metering.md) für Basiswerte und Wiederholungsversuche.
 
 ## Siehe auch
 
