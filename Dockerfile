@@ -50,7 +50,33 @@ RUN mkdir -p /app/deploy && cp -R dist/apps/api /app/deploy/api && \
     cd /app/deploy/api && pnpm install --prod --frozen-lockfile
 
 
-FROM node:${NODE_VERSION}-${NODE_VERSION_NAME}
+# esp-coredump and the ESP GDB binaries for server-side coredump symbolication. A stage of its own, because
+# the slim runtime has no curl; the full image uses the same Debian release, so the venv works in the runtime.
+FROM node:${NODE_VERSION}-${NODE_VERSION_NAME} AS esp-tools
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# The GDB tarballs come straight from Espressif's binutils-gdb releases (PlatformIO, which used to fetch
+# them, is no longer part of the firmware toolchain). The image has no libpython, so the GDB launchers run
+# the *-gdb-no-python binaries and the Python-linked *-gdb-3.* variants are never used.
+ARG ESP_GDB_VERSION=16.2_20250324
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/venv/bin/pip install --no-cache-dir esp-coredump && \
+    mkdir -p /opt/esp-gdb && cd /opt/esp-gdb && \
+    arch="$(uname -m)"; case "$arch" in aarch64|arm64) gdb_arch=aarch64-linux-gnu ;; *) gdb_arch=x86_64-linux-gnu ;; esac && \
+    curl -fsSL -o xtensa-gdb.tar.gz "https://github.com/espressif/binutils-gdb/releases/download/esp-gdb-v${ESP_GDB_VERSION}/xtensa-esp-elf-gdb-${ESP_GDB_VERSION}-${gdb_arch}.tar.gz" && \
+    curl -fsSL -o riscv-gdb.tar.gz "https://github.com/espressif/binutils-gdb/releases/download/esp-gdb-v${ESP_GDB_VERSION}/riscv32-esp-elf-gdb-${ESP_GDB_VERSION}-${gdb_arch}.tar.gz" && \
+    tar -xzf xtensa-gdb.tar.gz && tar -xzf riscv-gdb.tar.gz && \
+    rm -f xtensa-gdb.tar.gz riscv-gdb.tar.gz && \
+    find /opt/esp-gdb -path '*/bin/*-gdb-3.*' -delete
+
+
+# The runtime has no build tools (no compilers, git, curl or wget): add what the server needs explicitly.
+FROM node:${NODE_VERSION}-${NODE_VERSION_NAME}-slim
 
 ARG APP_UID=10001
 ARG APP_GID=10001
@@ -62,36 +88,32 @@ RUN groupadd -g ${APP_GID} appuser && useradd -u ${APP_UID} -g ${APP_GID} -m -d 
 WORKDIR /app
 
 # Minimal runtime libs for native Node modules and privilege drop.
-# python3 + esp-coredump are required for server-side coredump symbolication.
+# - python3: runs esp-coredump for server-side coredump symbolication
+# - openssh-client: the WAGO plugin spawns ssh, ssh-agent, ssh-add, ssh-keygen and ssh-keyscan
+# - ca-certificates: TLS trust store for the spawned tools
+# - tzdata: compose files set TZ
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
     libstdc++6 \
     gosu \
+    openssh-client \
     python3 \
     python3-venv \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
 
-# Install esp-coredump plus the ESP GDB binaries it shells out to for Xtensa
-# (ESP32/S2/S3) and RISC-V (ESP32-C3/C6/H2) coredumps. The GDB tarballs come
-# straight from Espressif's binutils-gdb releases (PlatformIO, which used to
-# fetch them, is no longer part of the firmware toolchain).
-ARG ESP_GDB_VERSION=16.2_20250324
-RUN python3 -m venv /opt/venv && \
-    /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
-    /opt/venv/bin/pip install --no-cache-dir esp-coredump && \
-    mkdir -p /opt/esp-gdb && cd /opt/esp-gdb && \
-    arch="$(uname -m)"; case "$arch" in aarch64|arm64) gdb_arch=aarch64-linux-gnu ;; *) gdb_arch=x86_64-linux-gnu ;; esac && \
-    curl -fsSL -o xtensa-gdb.tar.gz "https://github.com/espressif/binutils-gdb/releases/download/esp-gdb-v${ESP_GDB_VERSION}/xtensa-esp-elf-gdb-${ESP_GDB_VERSION}-${gdb_arch}.tar.gz" && \
-    curl -fsSL -o riscv-gdb.tar.gz "https://github.com/espressif/binutils-gdb/releases/download/esp-gdb-v${ESP_GDB_VERSION}/riscv32-esp-elf-gdb-${ESP_GDB_VERSION}-${gdb_arch}.tar.gz" && \
-    tar -xzf xtensa-gdb.tar.gz && tar -xzf riscv-gdb.tar.gz && \
-    rm -f xtensa-gdb.tar.gz riscv-gdb.tar.gz
+COPY --from=esp-tools /opt/venv /opt/venv
+COPY --from=esp-tools /opt/esp-gdb /opt/esp-gdb
 ENV PATH="/opt/venv/bin:/opt/esp-gdb/xtensa-esp-elf-gdb/bin:/opt/esp-gdb/riscv32-esp-elf-gdb/bin:${PATH}"
 ENV ESP_COREDUMP_CMD=/opt/venv/bin/esp-coredump
 ENV ESP_COREDUMP_XTENSA_GDB=/opt/esp-gdb/xtensa-esp-elf-gdb/bin/xtensa-esp32-elf-gdb
 ENV ESP_COREDUMP_RISCV_GDB=/opt/esp-gdb/riscv32-esp-elf-gdb/bin/riscv32-esp-elf-gdb
 
-# Copy the pre-built application (these will be built in the CI pipeline)
-COPY --from=builder /app/dist dist
+# Copy only what the server reads, each file once: the rest of dist/ (the swagger build with a second copy
+# of the API assets, library builds) is build output.
+COPY --from=builder /app/dist/apps/frontend /app/dist/apps/frontend
 COPY --from=builder /app/docs docs
+# The API as built, with its production node_modules installed.
 COPY --from=builder /app/deploy/api /app/dist/apps/api
 
 # Operator command to move stored card keys to a new AUTH_SESSION_SECRET (docs/en/settings/security.md).
@@ -124,6 +146,10 @@ ENV STATIC_DOCS_FILE_PATH=/app/docs
 RUN mkdir -p /app/storage/plugins
 ENV STORAGE_ROOT=/app/storage
 ENV PLUGIN_DIR=/app/storage/plugins
+
+# Fail the build if the slim image lacks something the server needs.
+COPY scripts/verify-server-image.mjs /tmp/verify-server-image.mjs
+RUN gosu appuser node /tmp/verify-server-image.mjs && rm /tmp/verify-server-image.mjs
 
 # Back to app root for consistent starting dir
 WORKDIR /app
