@@ -140,7 +140,8 @@ as before.
 - **Reader screen claim**: one flow at a time owns a reader (mass introduction, supervision started from the web, card
   enrollment, card reset), taken with an atomic claim and released compare-and-delete, with a TTL so a crashed holder
   cannot block a reader. A second flow gets the usual 409. A supervision started at the reader takes no claim; the
-  socket state of the instance holding the reader guards it. When a reader reconnects to another instance before its
+  socket state of the instance holding the reader guards it. With or without Valkey, card enrollment and card reset
+  answer 409 while any supervision runs at the reader. When a reader reconnects to another instance before its
   old one is cleaned up, a flow armed through the old socket ends then.
 - **Mass introductions**: sessions, participants and wrong-code counters live in Valkey with native TTLs. A user is
   introduced at most once per session (an atomic join claim; a concurrent join waits for the winner), five wrong codes

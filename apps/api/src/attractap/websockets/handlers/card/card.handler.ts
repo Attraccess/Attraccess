@@ -528,8 +528,10 @@ export class AttractapCardHandler implements OnModuleInit {
     this.cardConversations.abort(socket, 'CARD_REMOVED', 'enroll');
   }
 
+  /** One screen flow per reader; any supervision counts, so busy is the same with or without Valkey's claim. */
   private isBusyWithCardFlow(socket: AuthenticatedWebSocket): boolean {
-    return !!(socket.state.enrollment || socket.state.resetNfcCardData || socket.state.massIntroductionFlow);
+    const { enrollment, resetNfcCardData, massIntroductionFlow, supervisionFlow } = socket.state;
+    return !!(enrollment || resetNfcCardData || massIntroductionFlow || supervisionFlow);
   }
 
   /** The admin policy as an error code the frontend translates; other failures pass through. */

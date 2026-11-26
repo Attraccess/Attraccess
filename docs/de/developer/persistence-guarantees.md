@@ -147,7 +147,8 @@ des einen Prozesses, wie bisher.
 - **Bildschirm-Sperre je Leser**: Ein Ablauf belegt einen Leser (Masseneinweisung, im Web gestartete Aufsicht,
   Karten-Einlernen, Karten-Zurücksetzen), per atomarer Sperre genommen und per Vergleichen-und-Löschen freigegeben, mit
   TTL, damit eine abgestürzte Instanz keinen Leser blockiert. Ein zweiter Ablauf bekommt die übliche 409. Eine am Leser
-  gestartete Aufsicht nimmt keine Sperre; sie schützt der Socket-Zustand der Instanz, die den Leser hält. Verbindet
+  gestartete Aufsicht nimmt keine Sperre; sie schützt der Socket-Zustand der Instanz, die den Leser hält. Mit und ohne Valkey
+  antworten Karten-Einlernen und Karten-Zurücksetzen mit 409, solange am Leser eine Aufsicht läuft. Verbindet
   sich ein Leser neu mit einer anderen Instanz, bevor seine alte aufgeräumt ist, endet ein über den alten Socket
   gestarteter Ablauf dann.
 - **Masseneinweisungen**: Sitzungen, Teilnehmende und Zähler falscher Codes liegen mit nativen TTLs in Valkey. Jede
