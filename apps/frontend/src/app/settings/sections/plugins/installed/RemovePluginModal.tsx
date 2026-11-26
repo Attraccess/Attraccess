@@ -20,6 +20,7 @@ import { useToastMessage } from '../../../../../components/toastProvider';
 import { reloadPage } from '../../../../../utils/reloadPage';
 import { dependencyError } from '../dependencies/dependencyError';
 import { usePluginsTranslations } from '../usePluginsTranslations';
+import { rememberPluginRemoval } from './removalNotice';
 import { useInstalledNpmPlugins } from './useInstalledNpmPlugins';
 
 interface Props {
@@ -46,12 +47,9 @@ export function RemovePluginModal({ pluginId, onClose }: Props) {
     onSuccess: () => {
       // The server drops the plugin's bundle from the served asset set, so the running frontend is
       // holding modules that no longer exist: one page reload (not a server restart) gets back to a
-      // consistent app, and the restart banner shows after it.
+      // consistent app, and the restart banner and the success toast (see rememberPluginRemoval) show after it.
       dismiss();
-      toast.success({
-        title: t('success.delete.title'),
-        description: t('success.delete.description'),
-      });
+      rememberPluginRemoval();
       reloadPage();
     },
     onError: () => {
@@ -94,10 +92,7 @@ export function RemovePluginModal({ pluginId, onClose }: Props) {
         body: { approvedDependants: dependantsToRemove.map(({ name }) => name) },
       });
       dismiss();
-      toast.success({
-        title: t('success.delete.title'),
-        description: t('success.delete.description'),
-      });
+      rememberPluginRemoval();
       reloadPage();
     } catch (error) {
       setRemoveFailure(dependencyError(error));

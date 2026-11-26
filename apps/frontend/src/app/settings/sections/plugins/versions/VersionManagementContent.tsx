@@ -8,6 +8,7 @@ import { ModalBody, ModalFooter, ModalHeader, ModalHeading, Separator } from '@h
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { dependencyError } from '../dependencies/dependencyError';
+import { installFailureReason } from '../marketplace/describeInstallFailure';
 import { DependencyPlanDetails } from '../dependencies/DependencyPlanDetails';
 import { usePluginDependencyPlan } from '../dependencies/usePluginDependencyPlan';
 import { useInstalledNpmPlugins } from '../installed/useInstalledNpmPlugins';
@@ -101,8 +102,12 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
       });
       void refreshAfterPluginChange();
       onClose();
-    } catch {
-      toast.error({ title: t('error.replace.title'), description: t('error.replace.description') });
+    } catch (error) {
+      // The server's reason (e.g. a package it refuses) says more than a plain "try again".
+      toast.error({
+        title: t('error.replace.title'),
+        description: installFailureReason(error) ?? t('error.replace.description'),
+      });
     } finally {
       onReplacingChange(false);
     }

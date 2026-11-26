@@ -49,7 +49,7 @@ Official plugins are published to npm under these dist-tags:
 To try a nightly, open **Settings → Plugins**, open the installed plugin's actions menu (**⋯**), choose **Manage version** and enter `next` (or a specific nightly version) as **Requested version or channel**. Nightly versions are prereleases, so they are never installed automatically.
 
 The **Manage version** dialog shows the current version, the available versions (versions that cannot be installed
-say why), the changes and approvals of the version you select, and the package's **Update settings**. Saving the
+say why; older ones of those are folded away behind **Show … older incompatible versions**), the changes and approvals of the version you select, and the package's **Update settings**. Saving the
 update settings only changes which versions update checks offer; it installs nothing. **Update to …** or
 **Downgrade to …** installs the selected version, which takes effect after a [restart](#restart-to-apply-changes).
 

@@ -156,8 +156,8 @@
     "title": "Remove plugin?",
     "cancel": "Cancel",
     "delete": "Remove",
-    "messageRegistry": "Remove the plugin {{pluginName}}? Its code and runtime registrations will be removed and the app will reload. Its data and secrets are kept, so installing it again continues with them.",
-    "messageUploaded": "Remove the plugin {{pluginName}}? Its code, runtime registrations and all of its stored data will be deleted permanently, and the app will reload. Create a backup first if you might need the data.",
+    "messageRegistry": "Remove the plugin {{pluginName}}? Its code is removed but keeps running until Attraccess restarts; the page reloads now. Its data and secrets are kept, so installing it again continues with them.",
+    "messageUploaded": "Remove the plugin {{pluginName}}? Its code and all of its stored data will be deleted permanently. Its code keeps running until Attraccess restarts; the page reloads now. Create a backup first if you might need the data.",
     "messageRefused": "Remove the refused plugin {{pluginName}}? Its files will be removed without running its code, and the app will reload. Its stored data stays in the database until a compatible version takes it over."
   },
   "error": {
@@ -225,6 +225,8 @@
     "downgradeTo": "Downgrade to {{version}}",
     "notCompatible": "Not compatible: {{reason}}",
     "installedNow": "Installed now",
+    "showOlderIncompatible": "Show {{count}} older incompatible versions",
+    "hideOlderIncompatible": "Hide older incompatible versions",
     "details": "Release details",
     "update": "Update"
   },

@@ -51,7 +51,7 @@ Offizielle Plugins werden auf npm unter diesen Dist-Tags veröffentlicht:
 Um ein Nightly zu testen, öffne **Einstellungen → Plugins**, öffne das Aktionsmenü (**⋯**) des installierten Plugins, wähle **Version verwalten** und trage `next` (oder eine bestimmte Nightly-Version) unter **Gewünschte Version oder Kanal** ein. Nightly-Versionen sind Vorabversionen und werden nie automatisch installiert.
 
 Der Dialog **Version verwalten** zeigt die aktuelle Version, die verfügbaren Versionen (nicht installierbare Versionen
-nennen den Grund), die Änderungen und Genehmigungen der ausgewählten Version und die **Update-Einstellungen** des
+nennen den Grund; ältere davon sind hinter **… ältere inkompatible Versionen anzeigen** eingeklappt), die Änderungen und Genehmigungen der ausgewählten Version und die **Update-Einstellungen** des
 Pakets. Das Speichern der Update-Einstellungen ändert nur, welche Versionen die Update-Prüfung anbietet; es installiert
 nichts. **Auf … aktualisieren** oder **Auf … zurückstufen** installiert die ausgewählte Version, die nach einem
 [Neustart](#neustart-zum-Übernehmen-von-Änderungen) wirksam wird.

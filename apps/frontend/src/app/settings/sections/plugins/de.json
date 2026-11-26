@@ -156,8 +156,8 @@
     "title": "Plugin entfernen?",
     "cancel": "Abbrechen",
     "delete": "Entfernen",
-    "messageRegistry": "Das Plugin {{pluginName}} entfernen? Sein Code und seine Laufzeitregistrierungen werden entfernt und die App wird neu geladen. Seine Daten und Geheimnisse bleiben erhalten; eine erneute Installation setzt mit ihnen fort.",
-    "messageUploaded": "Das Plugin {{pluginName}} entfernen? Sein Code, seine Laufzeitregistrierungen und alle gespeicherten Daten werden dauerhaft gelöscht, und die App wird neu geladen. Erstellen Sie vorher ein Backup, wenn Sie die Daten noch brauchen könnten.",
+    "messageRegistry": "Das Plugin {{pluginName}} entfernen? Sein Code wird entfernt, läuft aber bis zum Neustart von Attraccess weiter; die Seite wird jetzt neu geladen. Seine Daten und Geheimnisse bleiben erhalten; eine erneute Installation setzt mit ihnen fort.",
+    "messageUploaded": "Das Plugin {{pluginName}} entfernen? Sein Code und alle gespeicherten Daten werden dauerhaft gelöscht. Sein Code läuft bis zum Neustart von Attraccess weiter; die Seite wird jetzt neu geladen. Erstellen Sie vorher ein Backup, wenn Sie die Daten noch brauchen könnten.",
     "messageRefused": "Das abgelehnte Plugin {{pluginName}} entfernen? Seine Dateien werden entfernt, ohne seinen Code auszuführen, und die App wird neu geladen. Seine gespeicherten Daten bleiben in der Datenbank, bis eine kompatible Version sie übernimmt."
   },
   "error": {
@@ -225,6 +225,8 @@
     "downgradeTo": "Auf {{version}} zurückstufen",
     "notCompatible": "Nicht kompatibel: {{reason}}",
     "installedNow": "Derzeit installiert",
+    "showOlderIncompatible": "{{count}} ältere inkompatible Versionen anzeigen",
+    "hideOlderIncompatible": "Ältere inkompatible Versionen ausblenden",
     "details": "Release-Details",
     "update": "Aktualisieren"
   },
