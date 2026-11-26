@@ -1,4 +1,5 @@
 # Reader Security (Secure Boot keys)
+
 <!-- llms-description: How to secure Attractap Touch V2 readers over the network so they only run firmware signed with your own keys, with key backup, restore and the protection's limits. -->
 
 Attractap Touch V2 readers can be **secured**: afterwards they only accept firmware signed by _your_
@@ -24,11 +25,11 @@ that, for example a device-lab reader, shows **Not secured**.
 
 The reader list and the reader editor show these chips:
 
-| Chip                        | Meaning                                                                                                                  |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Secured**                 | The last security report matched the release secure profile and the Secure Boot keys this installation recorded.          |
-| **Lab key (not secured)**   | The reader runs a device-lab build signed with the public lab keys. Anyone can sign firmware for it; it is never secured. |
-| Conversion step (e.g. **Transferring**) | A **Secure this reader** run is in progress for this reader.                                                 |
+| Chip                                    | Meaning                                                                                                                   |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **Secured**                             | The last security report matched the release secure profile and the Secure Boot keys this installation recorded.          |
+| **Lab key (not secured)**               | The reader runs a device-lab build signed with the public lab keys. Anyone can sign firmware for it; it is never secured. |
+| Conversion step (e.g. **Transferring**) | A **Secure this reader** run is in progress for this reader.                                                              |
 
 Open **Settings → Reader security** (permission `system.settings.manage`).
 
@@ -128,24 +129,24 @@ Also make sure that:
    browser or over USB afterwards, that it only accepts updates signed by this installation, and that
    moving it to another installation is not supported. It also reminds you to keep your key backups.
 2. Type the reader's name to confirm.
-3. The server asks the reader for a **preflight** report and shows the result as a list: chip, flash
-   size, partition table, unused key blocks, Secure Boot and flash encryption still off, free memory,
-   variant and firmware profile. Nothing is changed on the reader yet. If a check fails, the run cannot
-   start.
+3. Click **Run preflight**. The server asks the reader for a preflight report and shows the result as a
+   list: chip, flash size, partition table, unused key blocks, Secure Boot and flash encryption still
+   off, free memory, variant and firmware profile. Nothing is changed on the reader yet. If a check
+   fails, the run cannot start.
 4. Click **Start**. The progress view refreshes about every 2 seconds and shows the current step and the
    transfer percentage.
 
 The run goes through these steps:
 
-| Step                   | What happens                                                                                                                                                            |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Preflight**          | The reader reports its hardware and security settings; the server checks them.                                                                                          |
-| **Transferring**       | The reader downloads the secure firmware and bootloader, signed by this installation, keeps a backup of its pairing and settings, and checks both signatures.            |
-| **Keys burned**        | The server has recorded the fingerprints of the signing and recovery key. The reader writes them permanently into its eFuses and reports what it wrote back.             |
-| **Bootloader written** | The reader makes the old firmware unbootable, writes the new bootloader, checks it and restarts.                                                                         |
-| **Encrypting**         | The new bootloader turns on Secure Boot and encrypts the flash. The reader is offline during this step.                                                                 |
-| **Migrating**          | The secure firmware encrypts the settings storage, restores the pairing and settings from the backup, checks them, deletes the backup and locks the eFuse read protection. |
-| **Secured**            | The reader reconnects and its security report passes the check.                                                                                                         |
+| Step                   | What happens                                                                                                                                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Preflight**          | The reader reports its hardware and security settings; the server checks them.                                                                                                                                                                   |
+| **Transferring**       | The reader downloads the secure firmware and bootloader, signed by this installation, keeps a backup of its pairing and settings, and checks both signatures.                                                                                    |
+| **Keys burned**        | The server has recorded the fingerprints of the signing and recovery key. The reader writes them permanently into its eFuses and reports what it wrote back. It then makes the old firmware unbootable, writes the new bootloader and checks it. |
+| **Bootloader written** | The reader has reported the new bootloader as written and restarts into it.                                                                                                                                                                      |
+| **Encrypting**         | The new bootloader turns on Secure Boot and encrypts the flash. The reader is offline during this step.                                                                                                                                          |
+| **Migrating**          | The secure firmware encrypts the settings storage, restores the pairing and settings from the backup, checks them, deletes the backup and locks the eFuse read protection.                                                                       |
+| **Secured**            | The reader reconnects and its security report passes the check.                                                                                                                                                                                  |
 
 The server records the key fingerprints _before_ it tells the reader to write them, and it stores the
 reader's read-back before it continues. If the reader reports different values, the run stops with
@@ -154,9 +155,12 @@ _Key mismatch_.
 ### Don't unplug: the two critical windows
 
 There are two periods in which losing power can leave the reader unusable. The reader shows a full-screen
-**Don't unplug** notice during both, and the progress view shows a banner:
+**Don't unplug** notice before each of them; once it restarts into the new bootloader its screen stays dark until
+encryption and migration are done. The progress view shows a **Don't unplug** banner from _Keys burned_
+until the end of _Migrating_:
 
-1. **Writing the bootloader** (end of _Bootloader written_): about _N_ seconds (to be measured).
+1. **Writing the bootloader** (while the step still reads _Keys burned_): about _N_ seconds (to be
+   measured).
 2. **Turning on Secure Boot and encrypting the flash** (_Encrypting_, and _Migrating_ right after it):
    about _N_ minutes (to be measured).
 

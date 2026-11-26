@@ -1,4 +1,5 @@
 # Reader-Sicherheit (Secure-Boot-Schlüssel)
+
 <!-- llms-description: Wie Attractap-Touch-V2-Reader über das Netzwerk gesichert werden, damit sie nur mit deinen Schlüsseln signierte Firmware akzeptieren, samt Schlüssel-Backup und Grenzen des Schutzes. -->
 
 Attractap-Touch-V2-Reader können **gesichert** werden: Danach akzeptieren sie nur noch Firmware, die
@@ -25,19 +26,19 @@ zeigt **Nicht gesichert**.
 
 Reader-Liste und Reader-Editor zeigen diese Chips:
 
-| Chip                                       | Bedeutung                                                                                                                                                 |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Gesichert**                              | Der letzte Sicherheitsbericht passte zum sicheren Release-Profil und zu den Secure-Boot-Schlüsseln, die diese Installation gespeichert hat.                  |
-| **Laborschlüssel (nicht gesichert)**       | Der Reader läuft mit einem Gerätelabor-Build, signiert mit den öffentlichen Laborschlüsseln. Jeder kann Firmware dafür signieren; er wird nie gesichert. |
-| Sicherungsschritt (z. B. **Übertragung**)  | Für diesen Reader läuft gerade **Diesen Reader sichern**.                                                                                                 |
+| Chip                                      | Bedeutung                                                                                                                                                |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Gesichert**                             | Der letzte Sicherheitsbericht passte zum sicheren Release-Profil und zu den Secure-Boot-Schlüsseln, die diese Installation gespeichert hat.              |
+| **Laborschlüssel (nicht gesichert)**      | Der Reader läuft mit einem Gerätelabor-Build, signiert mit den öffentlichen Laborschlüsseln. Jeder kann Firmware dafür signieren; er wird nie gesichert. |
+| Sicherungsschritt (z. B. **Übertragung**) | Für diesen Reader läuft gerade **Diesen Reader sichern**.                                                                                                |
 
 Öffne **Einstellungen → Reader-Sicherheit** (Berechtigung `system.settings.manage`).
 
 ## Die zwei Schlüssel
 
-| Schlüssel                       | Zweck                                                                                                                                                                                                              |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Signaturschlüssel**           | Signiert die Firmware, die deine Reader akzeptieren. Der Server speichert ihn verschlüsselt mit einem aus `AUTH_SESSION_SECRET` abgeleiteten Schlüssel.                                                            |
+| Schlüssel                       | Zweck                                                                                                                                                                                                            |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Signaturschlüssel**           | Signiert die Firmware, die deine Reader akzeptieren. Der Server speichert ihn verschlüsselt mit einem aus `AUTH_SESSION_SECRET` abgeleiteten Schlüssel.                                                          |
 | **Wiederherstellungsschlüssel** | Ein Ersatz, dem jeder gesicherte Reader ebenfalls vertraut. Du lädst ihn einmal herunter, bewahrst ihn offline auf und weist nach, dass du ihn hast. Dann löscht der Server seine Kopie des privaten Schlüssels. |
 
 Beide sind RSA-3072-Schlüssel. Die Seite zeigt nur ihre Fingerabdrücke.
@@ -142,24 +143,24 @@ Stelle außerdem sicher, dass
    Installation signierte Updates annimmt und dass ein Umzug in eine andere Installation nicht unterstützt
    wird. Sie erinnert dich auch an deine Schlüssel-Backups.
 2. Gib zur Bestätigung den Namen des Readers ein.
-3. Der Server fordert vom Reader einen **Vorabprüfungs**-Bericht an und zeigt das Ergebnis als Liste:
-   Chip, Flash-Größe, Partitionstabelle, freie Schlüsselblöcke, Secure Boot und Flash-Verschlüsselung noch
-   aus, freier Speicher, Variante und Firmware-Profil. Am Reader wird dabei noch nichts verändert. Schlägt
-   eine Prüfung fehl, kann der Ablauf nicht starten.
+3. Klicke auf **Vorabprüfung starten**. Der Server fordert vom Reader einen Vorabprüfungs-Bericht an und
+   zeigt das Ergebnis als Liste: Chip, Flash-Größe, Partitionstabelle, freie Schlüsselblöcke, Secure Boot
+   und Flash-Verschlüsselung noch aus, freier Speicher, Variante und Firmware-Profil. Am Reader wird
+   dabei noch nichts verändert. Schlägt eine Prüfung fehl, kann der Ablauf nicht starten.
 4. Klicke auf **Starten**. Die Fortschrittsansicht aktualisiert sich etwa alle 2 Sekunden und zeigt den
    aktuellen Schritt und den Übertragungsfortschritt in Prozent.
 
 Der Ablauf durchläuft diese Schritte:
 
-| Schritt                     | Was passiert                                                                                                                                                                                                   |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Vorabprüfung**            | Der Reader meldet seine Hardware und Sicherheitseinstellungen, der Server prüft sie.                                                                                                                          |
-| **Übertragung**             | Der Reader lädt die sichere Firmware und den Bootloader herunter, beide von dieser Installation signiert, legt ein Backup seiner Kopplung und Einstellungen an und prüft beide Signaturen.                     |
-| **Schlüssel eingebrannt**   | Der Server hat die Fingerabdrücke von Signatur- und Wiederherstellungsschlüssel gespeichert. Der Reader schreibt sie dauerhaft in seine eFuses und meldet zurück, was er dort gelesen hat.                     |
-| **Bootloader geschrieben**  | Der Reader macht die alte Firmware unstartbar, schreibt den neuen Bootloader, prüft ihn und startet neu.                                                                                                      |
-| **Verschlüsselung**         | Der neue Bootloader schaltet Secure Boot ein und verschlüsselt den Flash. Der Reader ist in diesem Schritt offline.                                                                                           |
-| **Migration**               | Die sichere Firmware verschlüsselt den Einstellungsspeicher, stellt Kopplung und Einstellungen aus dem Backup wieder her, prüft sie, löscht das Backup und sperrt den Leseschutz der eFuses.                   |
-| **Gesichert**               | Der Reader verbindet sich wieder und sein Sicherheitsbericht besteht die Prüfung.                                                                                                                             |
+| Schritt                    | Was passiert                                                                                                                                                                                                                                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Vorabprüfung**           | Der Reader meldet seine Hardware und Sicherheitseinstellungen, der Server prüft sie.                                                                                                                                                                                                  |
+| **Übertragung**            | Der Reader lädt die sichere Firmware und den Bootloader herunter, beide von dieser Installation signiert, legt ein Backup seiner Kopplung und Einstellungen an und prüft beide Signaturen.                                                                                            |
+| **Schlüssel eingebrannt**  | Der Server hat die Fingerabdrücke von Signatur- und Wiederherstellungsschlüssel gespeichert. Der Reader schreibt sie dauerhaft in seine eFuses und meldet zurück, was er dort gelesen hat. Danach macht er die alte Firmware unstartbar, schreibt den neuen Bootloader und prüft ihn. |
+| **Bootloader geschrieben** | Der Reader hat den neuen Bootloader als geschrieben gemeldet und startet mit ihm neu.                                                                                                                                                                                                 |
+| **Verschlüsselung**        | Der neue Bootloader schaltet Secure Boot ein und verschlüsselt den Flash. Der Reader ist in diesem Schritt offline.                                                                                                                                                                   |
+| **Migration**              | Die sichere Firmware verschlüsselt den Einstellungsspeicher, stellt Kopplung und Einstellungen aus dem Backup wieder her, prüft sie, löscht das Backup und sperrt den Leseschutz der eFuses.                                                                                          |
+| **Gesichert**              | Der Reader verbindet sich wieder und sein Sicherheitsbericht besteht die Prüfung.                                                                                                                                                                                                     |
 
 Der Server speichert die Schlüssel-Fingerabdrücke, _bevor_ er den Reader anweist, sie zu schreiben, und er
 speichert die Rückmeldung des Readers, bevor er weitermacht. Meldet der Reader andere Werte, bricht der
@@ -167,10 +168,13 @@ Ablauf mit _Schlüssel stimmen nicht überein_ ab.
 
 ### Nicht abstecken: die zwei kritischen Zeiträume
 
-In zwei Zeiträumen kann ein Stromausfall den Reader unbrauchbar machen. Der Reader zeigt währenddessen
-bildschirmfüllend **Nicht abstecken**, und die Fortschrittsansicht zeigt einen Hinweis:
+In zwei Zeiträumen kann ein Stromausfall den Reader unbrauchbar machen. Der Reader zeigt vor jedem davon
+bildschirmfüllend **Nicht abstecken**; nach dem Neustart in den neuen Bootloader bleibt sein Bildschirm dunkel, bis
+Verschlüsselung und Migration fertig sind. Die Fortschrittsansicht zeigt den Hinweis **Reader nicht abstecken**
+ab _Schlüssel eingebrannt_ bis zum Ende von _Migration_:
 
-1. **Schreiben des Bootloaders** (Ende von _Bootloader geschrieben_): etwa _N_ Sekunden (wird noch gemessen).
+1. **Schreiben des Bootloaders** (während der Schritt noch _Schlüssel eingebrannt_ anzeigt): etwa _N_
+   Sekunden (wird noch gemessen).
 2. **Einschalten von Secure Boot und Verschlüsseln des Flashs** (_Verschlüsselung_ und direkt danach
    _Migration_): etwa _N_ Minuten (wird noch gemessen).
 

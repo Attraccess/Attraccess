@@ -90,6 +90,7 @@
     "preflight-failed": "A preflight check failed.",
     "transfer-failed": "The transfer of the secure firmware failed.",
     "verify-failed": "The reader could not verify the signed firmware.",
+    "burn-failed": "The reader could not burn the keys. Its eFuses may already hold them, so this run cannot be retried.",
     "burn-refused": "The reader refused to burn the keys.",
     "digest-mismatch": "Key mismatch: the reader reported different key fingerprints than the server recorded.",
     "bootloader-write-failed": "Writing the new bootloader failed.",
@@ -104,6 +105,13 @@
     "title": "Interrupted",
     "message": "The reader has been offline for more than 15 minutes after the bootloader was written. It may have lost power in a critical window. Bring it back online; if it reconnects, the run continues. If it does not, it probably needs to be replaced."
   },
-  "labKey": "Lab key (not secured)",
-  "secured": "Secured"
+  "error": {
+    "generic": "The request failed. Try again.",
+    "genericStatus": "The request failed (HTTP {{status}}). Try again.",
+    "readerNotFound": "This reader no longer exists.",
+    "preflightTimeout": "The reader did not answer the preflight in time. Make sure it is online and run the preflight again.",
+    "cannotCancel": "This run can no longer be cancelled.",
+    "cannotRetry": "This run cannot be retried.",
+    "cannotSecureNow": "This reader cannot be secured right now. Reload the page to see why."
+  }
 }

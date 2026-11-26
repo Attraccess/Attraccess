@@ -28,7 +28,7 @@
     "noFlashing": "Danach kann der Reader nicht mehr über den Browser oder per USB geflasht werden.",
     "signedOnly": "Er akzeptiert nur noch Updates, die von dieser Installation signiert sind.",
     "noMove": "Den Reader in eine andere Installation umzuziehen, wird nicht unterstützt.",
-    "backup": "Sichere das Backup des Signaturschlüssels, den Wiederherstellungsschlüssel samt Passphrasen, die Datenbank und AUTH_SESSION_SECRET. Ohne sie kann der Reader unter Umständen nie wieder aktualisiert werden.",
+    "backup": "Bewahre das Backup des Signaturschlüssels, den Wiederherstellungsschlüssel samt Passphrasen, die Datenbank und AUTH_SESSION_SECRET sicher auf. Ohne sie kann der Reader unter Umständen nie wieder aktualisiert werden.",
     "continue": "Weiter"
   },
   "start": {
@@ -90,6 +90,7 @@
     "preflight-failed": "Eine Vorabprüfung ist fehlgeschlagen.",
     "transfer-failed": "Die Übertragung der sicheren Firmware ist fehlgeschlagen.",
     "verify-failed": "Der Reader konnte die signierte Firmware nicht prüfen.",
+    "burn-failed": "Der Reader konnte die Schlüssel nicht einbrennen. Seine eFuses enthalten sie möglicherweise schon, daher kann dieser Vorgang nicht wiederholt werden.",
     "burn-refused": "Der Reader hat das Einbrennen der Schlüssel abgelehnt.",
     "digest-mismatch": "Schlüssel stimmen nicht überein: Der Reader hat andere Fingerabdrücke gemeldet, als der Server gespeichert hat.",
     "bootloader-write-failed": "Das Schreiben des neuen Bootloaders ist fehlgeschlagen.",
@@ -104,6 +105,13 @@
     "title": "Unterbrochen",
     "message": "Der Reader ist seit mehr als 15 Minuten offline, nachdem der Bootloader geschrieben wurde. Er hat womöglich in einem kritischen Zeitraum den Strom verloren. Bring ihn wieder online; verbindet er sich, geht der Ablauf weiter. Wenn nicht, muss er vermutlich ersetzt werden."
   },
-  "labKey": "Laborschlüssel (nicht gesichert)",
-  "secured": "Gesichert"
+  "error": {
+    "generic": "Die Anfrage ist fehlgeschlagen. Versuche es erneut.",
+    "genericStatus": "Die Anfrage ist fehlgeschlagen (HTTP {{status}}). Versuche es erneut.",
+    "readerNotFound": "Diesen Reader gibt es nicht mehr.",
+    "preflightTimeout": "Der Reader hat nicht rechtzeitig auf die Vorabprüfung geantwortet. Stelle sicher, dass er online ist, und starte die Vorabprüfung erneut.",
+    "cannotCancel": "Dieser Ablauf kann nicht mehr abgebrochen werden.",
+    "cannotRetry": "Dieser Ablauf kann nicht erneut versucht werden.",
+    "cannotSecureNow": "Dieser Reader kann gerade nicht gesichert werden. Lade die Seite neu, um den Grund zu sehen."
+  }
 }

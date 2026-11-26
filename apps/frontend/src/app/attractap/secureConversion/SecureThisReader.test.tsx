@@ -21,12 +21,16 @@ const mocks = vi.hoisted(() => ({
   start: vi.fn(),
   retry: vi.fn(),
   cancel: vi.fn(),
+  eligibilityOptions: undefined as { enabled?: boolean } | undefined,
 }));
 
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ hasPermission: () => mocks.canManage }) }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useGetSecureConversionEligibility: () => ({ data: mocks.eligibility, isLoading: false, refetch: vi.fn() }),
+  useGetSecureConversionEligibility: (_path: unknown, _key: unknown, options: { enabled?: boolean }) => {
+    mocks.eligibilityOptions = options;
+    return { data: mocks.eligibility, isLoading: false, refetch: vi.fn() };
+  },
   useGetSecureConversionStatus: () => ({ data: mocks.status, isLoading: false, refetch: vi.fn() }),
   useRunSecureConversionPreflight: () => ({ mutate: mocks.preflight, data: mocks.preflightData, isPending: false }),
   useStartSecureConversion: () => ({ mutate: mocks.start, isPending: false }),
@@ -158,6 +162,20 @@ describe('SecureThisReader', () => {
     expect(mocks.start).toHaveBeenCalledWith({ path: { id: 7 }, body: { confirmName: 'Front door' } });
   });
 
+  it('says why a wrong name is refused, and sends the name as compared (trimmed)', async () => {
+    mocks.preflightData = { ok: true, checks: [] };
+    render(<SecureThisReader reader={reader} />);
+    await userEvent.click(button());
+    await userEvent.click(screen.getByRole('button', { name: 'risk.continue' }));
+    await userEvent.type(screen.getByRole('textbox'), 'Back door');
+    expect(screen.getByText('start.nameMismatch')).toBeInTheDocument();
+    await userEvent.clear(screen.getByRole('textbox'));
+    await userEvent.type(screen.getByRole('textbox'), ' Front door ');
+    expect(screen.queryByText('start.nameMismatch')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'start.start' }));
+    expect(mocks.start).toHaveBeenCalledWith({ path: { id: 7 }, body: { confirmName: 'Front door' } });
+  });
+
   it('keeps Start disabled when a preflight check failed', async () => {
     mocks.preflightData = { ok: false, checks: [{ check: 'key-blocks', ok: false, value: null }] };
     render(<SecureThisReader reader={reader} />);
@@ -178,6 +196,8 @@ describe('SecureThisReader', () => {
     };
     render(<SecureThisReader reader={reader} />);
     expect(screen.getByText('failure.verify-failed')).toBeInTheDocument();
+    // Retry is the way on; no second "Secure this reader" next to it.
+    expect(screen.queryByRole('button', { name: /button/ })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'progress.retry' }));
     expect(mocks.retry).toHaveBeenCalledWith({ path: { id: 7 } });
   });
@@ -192,6 +212,15 @@ describe('SecureThisReader', () => {
     expect(screen.getByText('25 %')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'progress.cancel' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /button/ })).toBeNull();
+    // Eligibility cannot change the view while a run is going: not asked.
+    expect(mocks.eligibilityOptions?.enabled).toBe(false);
+  });
+
+  it('asks for eligibility while the button can show, and not for a secured reader', () => {
+    const { rerender } = render(<SecureThisReader reader={reader} />);
+    expect(mocks.eligibilityOptions?.enabled).toBe(true);
+    rerender(<SecureThisReader reader={{ ...reader, secured: true } as Attractap} />);
+    expect(mocks.eligibilityOptions?.enabled).toBe(false);
   });
 
   it.each(['digests-burned', 'bootloader-written', 'encrypting', 'migrating'])('warns not to unplug in %s', (state) => {

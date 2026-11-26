@@ -1,4 +1,4 @@
-import { Input, Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
+import { FieldError, Input, Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
 import { Button, StandardModal, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useRunSecureConversionPreflight,
@@ -47,6 +47,7 @@ export function SecureReaderStartModal({ isOpen, reader, onClose, onStarted }: R
             >
               <Label>{t('start.typeName')}</Label>
               <Input placeholder={reader.name} autoComplete="off" />
+              <FieldError>{t('start.nameMismatch')}</FieldError>
             </TextField>
             <p className="text-sm text-muted">{t('start.preflightHint')}</p>
             <Button
@@ -79,7 +80,7 @@ export function SecureReaderStartModal({ isOpen, reader, onClose, onStarted }: R
             <Button
               isDisabled={!nameMatches || !result?.ok}
               isPending={start.isPending}
-              onPress={() => start.mutate({ path: { id: reader.id }, body: { confirmName: typedName } })}
+              onPress={() => start.mutate({ path: { id: reader.id }, body: { confirmName: typedName.trim() } })}
               data-cy="secure-conversion-start-button"
             >
               {t('start.start')}

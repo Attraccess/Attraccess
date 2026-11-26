@@ -9,18 +9,13 @@ import {
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../hooks/useAuth';
 import { ConversionProgress } from './ConversionProgress';
-import { isRunning, POLL_INTERVAL_MS } from './conversionStates';
+import { eligibilityNeeded, IDLE_POLL_MS, runningIn, statusPollInterval } from './conversionStates';
 import { SecureConversionSection } from './SecureConversionSection';
 import { SecureReaderButton } from './SecureReaderButton';
 import { SecureReaderRiskDialog } from './SecureReaderRiskDialog';
 import { SecureReaderStartModal } from './SecureReaderStartModal';
 import de from './de.json';
 import en from './en.json';
-
-const IDLE_POLL_MS = 10_000;
-
-const runningIn = (status: SecureConversionStatusDto | undefined) =>
-  !!status?.conversion && isRunning(status.conversion.state);
 
 /**
  * "Secure this reader" in the reader editor's security area. Hidden entirely while the reader's variant is not
@@ -35,11 +30,14 @@ export function SecureThisReader(props: Readonly<{ reader: Attractap }>) {
 
   const path = { path: { id: reader.id } };
   // Without the permission the server answers only whether the action exists, with `missing-permission`.
-  const eligibility = useGetSecureConversionEligibility(path, undefined, { refetchInterval: IDLE_POLL_MS });
   const status = useGetSecureConversionStatus(path, undefined, {
     enabled: canManage,
     refetchInterval: (query) =>
-      runningIn(query.state.data as SecureConversionStatusDto | undefined) ? POLL_INTERVAL_MS : IDLE_POLL_MS,
+      statusPollInterval(query.state.data as SecureConversionStatusDto | undefined, reader.secured),
+  });
+  const eligibility = useGetSecureConversionEligibility(path, undefined, {
+    enabled: eligibilityNeeded(status.data, reader.secured),
+    refetchInterval: IDLE_POLL_MS,
   });
 
   if (!canManage) {
@@ -47,7 +45,7 @@ export function SecureThisReader(props: Readonly<{ reader: Attractap }>) {
     return (
       <SecureConversionSection>
         <div className="flex items-center justify-between gap-4">
-          <p className="text-sm text-default-500">{t('description')}</p>
+          <p className="text-sm text-muted">{t('description')}</p>
           <SecureReaderButton blockers={eligibility.data.blockers} onPress={() => undefined} />
         </div>
       </SecureConversionSection>
@@ -67,7 +65,8 @@ export function SecureThisReader(props: Readonly<{ reader: Attractap }>) {
   };
   const blockers = eligibility.data?.blockers ?? [];
   const noSigningKey = status.data?.signingKeyAvailable === false;
-  const showButton = !eligibility.data?.hidden && !runningIn(status.data) && !reader.secured;
+  // A failed run that can be retried offers Retry instead of a second way to start.
+  const showButton = !eligibility.data?.hidden && !runningIn(status.data) && !reader.secured && !status.data?.canRetry;
   const showProgress = !!conversion && (conversion.state as string) !== 'cancelled';
   // A secured reader without a conversion to show has nothing here: no empty heading.
   if (!noSigningKey && !showButton && !showProgress) return null;
@@ -82,7 +81,7 @@ export function SecureThisReader(props: Readonly<{ reader: Attractap }>) {
       {status.data && <ConversionProgress readerId={reader.id} status={status.data} onChanged={refresh} />}
       {showButton && (
         <div className="flex items-center justify-between gap-4">
-          <p className="text-sm text-default-500">{t('description')}</p>
+          <p className="text-sm text-muted">{t('description')}</p>
           <SecureReaderButton blockers={blockers} onPress={() => setStep('risk')} />
         </div>
       )}

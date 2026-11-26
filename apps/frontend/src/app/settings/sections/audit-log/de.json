@@ -450,7 +450,7 @@
     "after.creditsPerUnit": "Preis pro Messwert nachher",
     "before.allocation": "Zuordnung vorher",
     "after.allocation": "Zuordnung nachher",
-    "conversionId": "Konvertierungs-ID",
+    "conversionId": "Ablauf-ID",
     "conversionState": "Schritt",
     "targetVersion": "Ziel-Firmwareversion",
     "digest0": "Digest des Signaturschlüssels",

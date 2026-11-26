@@ -3,8 +3,9 @@ import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import type { Attractap, AttractapConversionState } from '@attraccess/react-query-client';
 import { ConversionStateChip } from './ConversionStateChip';
 import { isRunning } from './conversionStates';
-import de from './de.json';
-import en from './en.json';
+// The reader editor's "Secure reader" chip (pairing/ReaderSecured) owns these labels; the list shows the same words.
+import de from '../pairing/de.json';
+import en from '../pairing/en.json';
 
 interface Props {
   reader: Pick<Attractap, 'id' | 'secured' | 'firmwareProfile'>;
@@ -21,12 +22,12 @@ export function ReaderSecurityChips({ reader, conversionState }: Readonly<Props>
     <span className="ms-2 inline-flex flex-wrap gap-1 whitespace-nowrap">
       {reader.secured && (
         <Chip size="sm" variant="soft" color="success" data-cy={`attractap-secured-chip-${reader.id}`}>
-          {t('secured')}
+          {t('secured.secured')}
         </Chip>
       )}
       {reader.firmwareProfile === 'secure-lab' && (
         <Chip size="sm" variant="soft" color="default" data-cy={`attractap-lab-key-chip-${reader.id}`}>
-          {t('labKey')}
+          {t('secured.labKey')}
         </Chip>
       )}
       {running && <ConversionStateChip state={running} />}
