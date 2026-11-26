@@ -14,6 +14,7 @@ import {
   isDistTag,
   sameUpdatePolicy,
   defaultUpdatePolicy,
+  DEFAULT_PLUGIN_UPDATE_POLICY,
   REGISTRY_PARENT,
   UPDATE_POLICY_KEY,
   normalizeUpdatePolicy,
@@ -510,7 +511,11 @@ export class NpmInstallation {
 
   async setUpdatePolicy(patch: Partial<PluginUpdatePolicy>): Promise<PluginUpdatePolicy> {
     return this.state.mutateInstalls(async () => {
-      const policy = normalizeUpdatePolicy({ ...(await this.getUpdatePolicy()), ...patch });
+      // The first save builds on the release default, not the host's: the next-host default allows prereleases only
+      // for plugins that follow `next`, while a saved prerelease flag would allow them for every plugin.
+      const stored = await this.readUpdatePolicy();
+      const base = stored.explicit ? stored.policy : DEFAULT_PLUGIN_UPDATE_POLICY;
+      const policy = normalizeUpdatePolicy({ ...base, ...patch });
       await this.settings.setPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY, JSON.stringify(policy));
       return policy;
     });

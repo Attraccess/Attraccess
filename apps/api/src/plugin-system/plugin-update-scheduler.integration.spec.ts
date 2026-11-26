@@ -244,19 +244,27 @@ describe('automatic plugin updates (integration)', () => {
   });
 
   it.each([
-    ['minor', OLD],
-    ['follow', NEWEST],
-  ] as const)(
-    'on a next host, a saved policy replaces the nightly default: in %s mode the plugin ends at %s',
-    async (mode, expected) => {
-      const { service, versions, runAt } = await host();
-      // Saving only the window still saves a policy. It keeps the prerelease flag the next-host default had.
-      await service.setUpdatePolicy({ maintenanceWindow: { startMinute: 180, durationMinutes: 120 } });
-      await service.setUpdatePolicy({ mode });
-      await runAt(inWindow);
-      expect(versions()[NAME]).toBe(expected);
-    },
-  );
+    [{}, OLD],
+    [{ mode: 'follow' as const }, OLD],
+    [{ mode: 'follow' as const, prerelease: true }, NEWEST],
+  ])('on a next host, a saved policy replaces the nightly default: saving %j ends at %s', async (patch, expected) => {
+    const { service, versions, runAt } = await host();
+    // Saving only the window still saves a policy, and it does not take over the next-host prerelease flag.
+    await service.setUpdatePolicy({ maintenanceWindow: { startMinute: 180, durationMinutes: 120 } });
+    await service.setUpdatePolicy(patch);
+    await runAt(inWindow);
+    expect(versions()[NAME]).toBe(expected);
+  });
+
+  it('keeps a plugin that requests latest off nightlies after only the window was saved on a next host', async () => {
+    const { service, publish, versions, runAt } = await host();
+    await service.updateRequestedSpec(NAME, 'latest');
+    await publish(NAME, '0.4.0-nightly.1.1');
+    await service.setUpdatePolicy({ maintenanceWindow: { startMinute: 180, durationMinutes: 120 } });
+    await runAt(inWindow);
+    expect(versions()[NAME]).toBe(OLD);
+    expect(await service.getUpdatePolicy()).toMatchObject({ prerelease: false });
+  });
 
   it('respects a saved maintenance window', async () => {
     const { service, versions, runAt } = await host();
