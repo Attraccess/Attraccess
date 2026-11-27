@@ -1,5 +1,4 @@
 # Meters and consumption billing
-
 <!-- llms-description: Named meters per resource for electricity, water or any value, with cumulative counters, session boundaries and optional billing. -->
 
 Each resource can have several named meters. A meter can count anything: electricity, water, material, heartbeats or other values. Attraccess does not store a unit or convert new readings.
@@ -21,7 +20,7 @@ While a running session (including one that is just starting or ending) uses a m
 
 Pending and failed charges do not prevent archiving. They stay in the list of unsettled meter charges, where you can still retry or waive them. A retry runs the meter's **Metering collection** branch as before. If you removed that branch, the retry fails and you can waive the charge.
 
-Flow nodes do not prevent archiving or deleting, and Attraccess does not change them. A node that still selects such a meter shows **Meter archived or removed**, and saving the flow fails with "Choose a meter belonging to this resource". Until you choose another meter or remove the node, each run of a **Report meter** node for an archived meter fails with the flow error `METER_ARCHIVED` and records nothing. Update these flows to avoid repeated errors.
+Flow nodes do not prevent archiving or deleting, and Attraccess does not change them. A node that still selects such a meter shows **Meter archived or removed** and is marked with "Choose a meter belonging to this resource". You can still save the flow, but the node stays marked. Until you choose another meter or remove the node, each run of a **Report meter** node for an archived meter fails with the flow error `METER_ARCHIVED` and records nothing. Update these flows to avoid repeated errors.
 
 Archived meters are listed under **Archived meters** in the **Meters** card, visible only to people who may edit the resource. There you can restore, rename or, without history, delete them. A new meter may use the name of an archived one. Restoring is refused while an active meter has the same name; rename one of the two first. After restoring a meter, flow nodes that select it work again. Archiving, restoring and deleting are recorded in the audit log.
 
