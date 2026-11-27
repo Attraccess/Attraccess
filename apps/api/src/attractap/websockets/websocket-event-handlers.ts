@@ -6,6 +6,7 @@ import type { AttractapCardHandler } from './handlers/card/card.handler';
 import type { AttractapCrashReportHandler } from './handlers/crash-report/crash-report.handler';
 import type { AttractapFirmwareHandler } from './handlers/firmware/firmware.handler';
 import type { AttractapFormsHandler } from './handlers/forms/forms.handler';
+import type { AttractapMaintenanceRequestHandler } from './handlers/maintenance/maintenance-request.handler';
 import type { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
 import type { AttractapProjectsHandler } from './handlers/projects/projects.handler';
 import type { ResourceListService } from './handlers/resource-list/resource-list.service';
@@ -25,6 +26,7 @@ export interface EventHandlerDeps {
   cardHandler: AttractapCardHandler;
   formsHandler: AttractapFormsHandler;
   sessionHandler: AttractapSessionHandler;
+  maintenanceRequestHandler: AttractapMaintenanceRequestHandler;
   billingHandler: AttractapBillingHandler;
   projectsHandler: AttractapProjectsHandler;
   supervisionHandler: AttractapSupervisionHandler;
@@ -102,6 +104,8 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
     [AttractapEventType.UNLATCH_DOOR]: (socket, eventData) => d.sessionHandler.handleUnlatchDoor(socket, eventData),
     [AttractapEventType.TRIGGER_FLOW_BUTTON]: (socket, eventData) =>
       d.sessionHandler.handleTriggerFlowButton(socket, eventData),
+    [AttractapEventType.CREATE_MAINTENANCE_REQUEST]: (socket, eventData) =>
+      d.maintenanceRequestHandler.handleCreateMaintenanceRequest(socket, eventData),
     [AttractapEventType.BILLING_REQUEST_TOPUP]: (socket, eventData) =>
       d.billingHandler.handleBillingRequestTopup(socket, eventData),
     [AttractapEventType.FIRMWARE_REQUEST_CHUNK]: (socket, eventData) =>

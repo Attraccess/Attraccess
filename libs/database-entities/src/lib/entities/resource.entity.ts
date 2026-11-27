@@ -57,6 +57,15 @@ export class Resource {
   })
   allowTakeOver!: boolean;
 
+  @Column({ type: 'boolean', default: true })
+  @ApiProperty({
+    description:
+      'Whether the web app and Attractap readers ask "Is the machine OK?" before a user ends their own session (needs the maintenance license module). Never enforced by the server.',
+    example: true,
+    default: true,
+  })
+  askMaintenanceCheckOnSessionEnd!: boolean;
+
   @Column({ type: 'integer', default: 1 })
   @ApiProperty({
     description:

@@ -5,6 +5,8 @@ import { ResourceListService } from './resource-list.service';
 export function registerResourceListServiceFixture() {
   let service: ResourceListService;
 
+  let licenseService: { verifyLicense: jest.Mock };
+
   let websocketService: { sockets: Map<string, any> };
 
   let attractapService: { findReaderById: jest.Mock };
@@ -96,6 +98,8 @@ export function registerResourceListServiceFixture() {
       })),
     };
     (service as any).readerTimeZone = readerTimeZoneStub();
+    licenseService = { verifyLicense: jest.fn().mockResolvedValue({}) };
+    (service as any).licenseService = licenseService;
     (service as any).rbacService = { getEffectivePermissions: jest.fn().mockResolvedValue(new Set()) };
     (service as any).websocketService = websocketService;
     (service as any).attractapService = attractapService;
@@ -118,6 +122,9 @@ export function registerResourceListServiceFixture() {
     },
     get attractapService() {
       return attractapService;
+    },
+    get licenseService() {
+      return licenseService;
     },
     get resourceUsageService() {
       return resourceUsageService;

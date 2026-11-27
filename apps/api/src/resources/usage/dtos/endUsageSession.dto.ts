@@ -1,7 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsDate, IsArray, IsInt, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsDate, IsArray, IsInt, IsObject, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { FormSubmissionRequestDto } from '../../forms/dto';
+import { CreateMaintenanceRequestDto } from '../../maintenances/dtos/create-maintenance-request.dto';
 
 export class EndUsageSessionDto {
   @ApiProperty({
@@ -44,4 +45,16 @@ export class EndUsageSessionDto {
   @ValidateNested({ each: true })
   @Type(() => FormSubmissionRequestDto)
   formSubmissions?: FormSubmissionRequestDto[];
+
+  @ApiProperty({
+    description:
+      'Files a maintenance request for the resource, by the user ending the session, once the session ended. Nothing is filed when the end fails or without the maintenance license module; a failed filing does not fail the end (see `maintenanceRequestFiled`).',
+    required: false,
+    type: () => CreateMaintenanceRequestDto,
+  })
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => CreateMaintenanceRequestDto)
+  maintenanceRequest?: CreateMaintenanceRequestDto;
 }

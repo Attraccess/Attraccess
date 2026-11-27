@@ -2,6 +2,7 @@
 import { Test } from '@nestjs/testing';
 import { AttractapFormsHandler } from '../forms/forms.handler';
 import { AttractapSessionHandler } from './session.handler';
+import { SessionEndMaintenanceRequests } from '../../../../resources/usage/sessions/session-end-maintenance-requests';
 import { ResourceActionGuard } from '../resource-action.guard';
 import { AttractapService } from '../../../attractap.service';
 import { UsersService } from '../../../../users-and-auth/users/users.service';
@@ -41,6 +42,7 @@ describe('AttractapSessionHandler stop on a machine shared by several people', (
         { provide: ResourceUsageService, useValue: { endSession } },
         { provide: ResourceFlowsExecutorService, useValue: {} },
         { provide: SumUpService, useValue: {} },
+        { provide: SessionEndMaintenanceRequests, useValue: { fileAfterEnd: jest.fn() } },
         { provide: BillingService, useValue: { getResourceUsageCharge } },
         { provide: ResourceListService, useValue: { sendResourceListToSocket: jest.fn() } },
         { provide: SupervisionService, useValue: {} },

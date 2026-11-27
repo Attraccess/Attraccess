@@ -16,6 +16,8 @@ import { StartBlockedResponseDto } from '../dtos/startBlocked.response.dto';
 import { GetResourceHistoryQueryDto } from '../dtos/getResourceHistoryQuery.dto';
 
 import { ResourceUsageResponseDto } from '../dtos/resource-usage-response.dto';
+import { EndedUsageSessionResponseDto } from '../dtos/ended-usage-session-response.dto';
+import { SessionEndMaintenanceRequests } from './session-end-maintenance-requests';
 
 import { GetResourceHistoryResponseDto } from '../dtos/GetResourceHistoryResponse.dto';
 
@@ -44,6 +46,7 @@ export class ResourceUsageController {
     protected readonly preStart: PreStartService,
     protected readonly sessionEnd: SessionEndNotifier,
     protected readonly networkRestriction: NetworkRestrictionService,
+    protected readonly endMaintenanceRequests: SessionEndMaintenanceRequests,
   ) {}
 
   @Post('lock')
@@ -309,7 +312,7 @@ export class ResourceUsageController {
   @ApiResponse({
     status: 200,
     description: 'Usage session ended successfully.',
-    type: ResourceUsageResponseDto,
+    type: EndedUsageSessionResponseDto,
   })
   @ApiResponse({
     status: 400,
@@ -328,7 +331,7 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() dto: EndUsageSessionDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<UsageSessionResponse> {
+  ): Promise<UsageSessionResponse & { maintenanceRequestFiled?: boolean }> {
     await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.UsageEnd, resourceId);
     const ended = await this.resourceUsageService.endSession(resourceId, req.user, dto, {
       auditOrigin: auditActorOf(req.user),
@@ -341,7 +344,14 @@ export class ResourceUsageController {
         req.user.locale,
       );
     }
-    return ended && toUsageSessionResponse(ended);
+    const maintenanceRequestFiled =
+      ended && (await this.endMaintenanceRequests.fileAfterEnd(resourceId, req.user.id, dto.maintenanceRequest));
+    return (
+      ended && {
+        ...toUsageSessionResponse(ended),
+        ...(maintenanceRequestFiled === undefined ? {} : { maintenanceRequestFiled }),
+      }
+    );
   }
 
   @Post('extend')

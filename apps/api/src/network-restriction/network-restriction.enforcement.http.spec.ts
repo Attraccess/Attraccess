@@ -7,6 +7,7 @@ import { ResourceUsageController } from '../resources/usage/sessions/resource-us
 import { ResourceUsageService } from '../resources/usage/sessions/resource-usage.service';
 import { ResourceActivityVisibilityService } from '../resources/usage/authorization/resource-activity-visibility.service';
 import { SessionEndNotifier } from '../resources/usage/pre-start/session-end-notifier.service';
+import { SessionEndMaintenanceRequests } from '../resources/usage/sessions/session-end-maintenance-requests';
 import { PreStartService } from '../resources/usage/pre-start/pre-start.service';
 import { ResourceListVisibilityService } from '../resources/visibility/resource-list-visibility.service';
 import { SupervisionController } from '../resources/supervision/supervision.controller';
@@ -84,6 +85,7 @@ describe('network restriction on the resource action endpoints', () => {
         { provide: ResourceListVisibilityService, useValue: { canSee: async () => true } },
         { provide: PreStartService, useValue: { gateHttp: sideEffects.gateHttp } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+        { provide: SessionEndMaintenanceRequests, useValue: { fileAfterEnd: jest.fn() } },
         { provide: SupervisionService, useValue: { ...sideEffects, pendingResourceId: () => 5 } },
         { provide: SupervisionLiveService, useValue: {} },
         { provide: SseInstrumentation, useValue: {} },

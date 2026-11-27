@@ -24,6 +24,13 @@ export class Resource {
   allowTakeOver!: boolean;
 
   @ApiProperty({
+    description: 'Whether ending your own session first asks "Is the machine OK?" (web and Attractap readers)',
+    example: true,
+    default: true,
+  })
+  askMaintenanceCheckOnSessionEnd!: boolean;
+
+  @ApiProperty({
     description:
       'Maximum number of people who can have an active session on this machine at the same time (machines only, 1-1000)',
     example: 1,
@@ -226,6 +233,7 @@ export class Resource {
 export function toResourceDto(record: ResourceRecord): Resource {
   const dto: Resource = {
     allowTakeOver: record.allowTakeOver,
+    askMaintenanceCheckOnSessionEnd: record.askMaintenanceCheckOnSessionEnd,
     maxParallelSessions: record.maxParallelSessions,
     maxSessionDurationMinutes: record.maxSessionDurationMinutes,
     requireSessionDurationEstimate: record.requireSessionDurationEstimate,

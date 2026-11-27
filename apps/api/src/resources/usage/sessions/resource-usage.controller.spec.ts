@@ -6,13 +6,17 @@ import { ResourceUsageController } from './resource-usage.controller';
 import { ResourceUsageService } from './resource-usage.service';
 import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';
 import { PreStartService } from '../pre-start/pre-start.service';
+import { MaintenanceRequestService } from '../../maintenances/maintenance-request.service';
+import { LicenseService } from '../../../license/license.service';
 import { SessionEndNotifier } from '../pre-start/session-end-notifier.service';
+import { SessionEndMaintenanceRequests } from './session-end-maintenance-requests';
 import { ResourceListVisibilityService } from '../../visibility/resource-list-visibility.service';
 
 // Both are required: a wiring mistake must fail module compilation, not silently skip the gate.
 const gateProviders = [
   { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
   { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+  { provide: SessionEndMaintenanceRequests, useValue: { fileAfterEnd: jest.fn() } },
   { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
 ];
 
@@ -165,6 +169,7 @@ it("runs the session-end default for the ended session's owner when a manager en
       },
       { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
       { provide: SessionEndNotifier, useValue: { applyDefault } },
+      { provide: SessionEndMaintenanceRequests, useValue: { fileAfterEnd: jest.fn() } },
       { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
       { provide: ResourceUsageService, useValue: { endSession } },
       { provide: ResourceActivityVisibilityService, useValue: {} },
@@ -173,6 +178,76 @@ it("runs the session-end default for the ended session's owner when a manager en
   const request = { user: { id: 1, locale: 'en', authenticationMethod: 'session' } } as unknown as AuthenticatedRequest;
   await moduleRef.get(ResourceUsageController).endSession(5, {} as never, request);
   expect(applyDefault).toHaveBeenCalledWith({ resourceId: 5, userId: 2, sessionId: 9 }, 'web', 'en');
+});
+
+describe('ending a session with a maintenance request', () => {
+  const request = { user: { id: 1, locale: 'en', authenticationMethod: 'session' } } as unknown as AuthenticatedRequest;
+  const body = { maintenanceRequest: { reason: 'Blade is dull' } };
+  const build = async (endSession: jest.Mock, createRequest: jest.Mock) => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ResourceUsageController],
+      providers: [
+        {
+          provide: ResourceListVisibilityService,
+          useValue: { canSee: jest.fn(async () => true), permittedForUserId: jest.fn(async () => undefined) },
+        },
+        { provide: PreStartService, useValue: {} },
+        { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+        // The real filer, so the order against the end is what runs in production.
+        SessionEndMaintenanceRequests,
+        { provide: MaintenanceRequestService, useValue: { createRequest } },
+        { provide: LicenseService, useValue: { verifyLicense: jest.fn().mockResolvedValue({}) } },
+        { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
+        { provide: ResourceUsageService, useValue: { endSession } },
+        { provide: ResourceActivityVisibilityService, useValue: {} },
+      ],
+    }).compile();
+    return moduleRef.get(ResourceUsageController);
+  };
+
+  it('files it only after the session ended, for the user who ended it, and says so', async () => {
+    const order: string[] = [];
+    const endSession = jest.fn(async () => {
+      order.push('ended');
+      return { id: 9, userId: 2 };
+    });
+    const createRequest = jest.fn(async () => order.push('filed'));
+
+    const response = await (await build(endSession, createRequest)).endSession(5, body, request);
+
+    expect(order).toEqual(['ended', 'filed']);
+    expect(createRequest).toHaveBeenCalledTimes(1);
+    expect(createRequest).toHaveBeenCalledWith(5, 1, 'Blade is dull');
+    expect(response).toMatchObject({ id: 9, maintenanceRequestFiled: true });
+  });
+
+  it('files nothing when the end fails', async () => {
+    const createRequest = jest.fn();
+    const controller = await build(jest.fn().mockRejectedValue(new Error('busy')), createRequest);
+
+    await expect(controller.endSession(5, body, request)).rejects.toThrow('busy');
+    expect(createRequest).not.toHaveBeenCalled();
+  });
+
+  it('still ends the session when filing fails, and says the request was not filed', async () => {
+    const controller = await build(
+      jest.fn().mockResolvedValue({ id: 9, userId: 1 }),
+      jest.fn().mockRejectedValue(new Error('database gone')),
+    );
+
+    await expect(controller.endSession(5, body, request)).resolves.toMatchObject({
+      id: 9,
+      maintenanceRequestFiled: false,
+    });
+  });
+
+  it('answers a plain end without the field', async () => {
+    const createRequest = jest.fn();
+    const controller = await build(jest.fn().mockResolvedValue({ id: 9, userId: 1 }), createRequest);
+
+    expect(await controller.endSession(5, {}, request)).not.toHaveProperty('maintenanceRequestFiled');
+    expect(createRequest).not.toHaveBeenCalled();
+  });
 });
 
 describe('start-blocked query', () => {
@@ -187,6 +262,7 @@ describe('start-blocked query', () => {
         },
         { provide: PreStartService, useValue: { gateHttp: jest.fn(), queryStartBlocked } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+        { provide: SessionEndMaintenanceRequests, useValue: { fileAfterEnd: jest.fn() } },
         { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
         { provide: ResourceUsageService, useValue: {} },
         { provide: ResourceActivityVisibilityService, useValue: {} },

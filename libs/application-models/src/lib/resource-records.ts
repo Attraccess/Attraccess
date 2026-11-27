@@ -19,6 +19,8 @@ export interface ResourceRecord {
   documentationUrl: string | null;
   metadata: Record<string, unknown> | null;
   allowTakeOver: boolean;
+  /** Whether ending one's own session first asks "Is the machine OK?" (web and readers; not enforced). */
+  askMaintenanceCheckOnSessionEnd: boolean;
   maxParallelSessions: number;
   /** Longest a session may run, in minutes; null means no limit. Machines only. */
   maxSessionDurationMinutes: number | null;

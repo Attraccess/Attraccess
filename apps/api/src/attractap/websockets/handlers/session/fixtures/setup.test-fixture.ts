@@ -78,4 +78,5 @@ export function resetTestFixture(scope: AttractapSessionHandlerSessionFlowButton
     getConfiguration: jest.fn().mockResolvedValue({ currency: 'EUR', minorUnit: 2 }),
   };
   (scope.handler as any).billingService = scope.mockBillingService;
+  (scope.handler as any).endMaintenanceRequests = { fileAfterEnd: jest.fn().mockResolvedValue(undefined) };
 }

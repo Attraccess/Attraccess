@@ -31,6 +31,7 @@ export interface NewResource {
   documentationMarkdown: string | null;
   documentationUrl: string | null;
   allowTakeOver: boolean;
+  askMaintenanceCheckOnSessionEnd: boolean;
   maxParallelSessions: number;
   maxSessionDurationMinutes: number | null;
   requireSessionDurationEstimate: boolean;

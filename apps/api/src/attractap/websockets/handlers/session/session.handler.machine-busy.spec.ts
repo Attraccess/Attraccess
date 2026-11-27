@@ -23,6 +23,7 @@ function setup() {
     supervisionService: { settleByCard: jest.fn() },
     billingService: { getResourceUsageCharge: jest.fn().mockResolvedValue(null), getConfiguration: jest.fn() },
     sumUpService: { getIsEnabled: jest.fn().mockResolvedValue(false) },
+    endMaintenanceRequests: { fileAfterEnd: jest.fn().mockResolvedValue(undefined) },
     startGate: { run: jest.fn().mockResolvedValue({ kind: 'proceed' }), afterStop: jest.fn() },
     cardSessions,
   });

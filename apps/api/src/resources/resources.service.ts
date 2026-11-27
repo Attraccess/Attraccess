@@ -58,6 +58,7 @@ export function resourceAuditSnapshot(resource: ResourceRecord) {
     metadata: resource.metadata,
     imageFilename: resource.imageFilename,
     allowTakeOver: resource.allowTakeOver,
+    askMaintenanceCheckOnSessionEnd: resource.askMaintenanceCheckOnSessionEnd,
     maxParallelSessions: resource.maxParallelSessions,
     maxSessionDurationMinutes: resource.maxSessionDurationMinutes,
     requireSessionDurationEstimate: resource.requireSessionDurationEstimate,
@@ -93,6 +94,8 @@ export function applyResourceFields(resource: ResourceRecord, dto: UpdateResourc
 
   // Handle allowTakeOver field
   if (dto.allowTakeOver !== undefined) resource.allowTakeOver = dto.allowTakeOver;
+  if (dto.askMaintenanceCheckOnSessionEnd !== undefined)
+    resource.askMaintenanceCheckOnSessionEnd = dto.askMaintenanceCheckOnSessionEnd;
   if (dto.maxParallelSessions !== undefined) resource.maxParallelSessions = dto.maxParallelSessions;
   if (dto.maxSessionDurationMinutes !== undefined) resource.maxSessionDurationMinutes = dto.maxSessionDurationMinutes;
   if (dto.requireSessionDurationEstimate !== undefined)
@@ -133,6 +136,9 @@ export function resourceUpdateAuditDetails(
     ...(JSON.stringify(before.metadata ?? {}) !== JSON.stringify(updatedResource.metadata ?? {}) ? ['metadata'] : []),
     ...(before.imageFilename !== updatedResource.imageFilename ? ['image'] : []),
     ...(before.allowTakeOver !== updatedResource.allowTakeOver ? ['allowTakeOver'] : []),
+    ...(before.askMaintenanceCheckOnSessionEnd !== updatedResource.askMaintenanceCheckOnSessionEnd
+      ? ['askMaintenanceCheckOnSessionEnd']
+      : []),
     ...(before.maxParallelSessions !== updatedResource.maxParallelSessions ? ['maxParallelSessions'] : []),
     ...(before.maxSessionDurationMinutes !== updatedResource.maxSessionDurationMinutes
       ? ['maxSessionDurationMinutes']
@@ -272,6 +278,7 @@ export class ResourcesService {
       documentationMarkdown: dto.documentationMarkdown || null,
       documentationUrl: dto.documentationUrl || null,
       allowTakeOver: dto.allowTakeOver || false,
+      askMaintenanceCheckOnSessionEnd: dto.askMaintenanceCheckOnSessionEnd ?? true,
       maxParallelSessions: dto.maxParallelSessions ?? 1,
       ...durationSettings,
       type: dto.type,

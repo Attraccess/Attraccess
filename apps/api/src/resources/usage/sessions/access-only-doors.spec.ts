@@ -15,6 +15,7 @@ import { AttractapEvent, AttractapEventType } from '../../../attractap/websocket
 import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';
 import { PreStartService } from '../pre-start/pre-start.service';
 import { SessionEndNotifier } from '../pre-start/session-end-notifier.service';
+import { SessionEndMaintenanceRequests } from './session-end-maintenance-requests';
 import { ResourceUsageController } from './resource-usage.controller';
 import { ResourceUsageService } from './resource-usage.service';
 import { arrangeIntroducedUser, InMemoryUsageScope } from './fixtures/arrangements.test-fixture';
@@ -118,7 +119,7 @@ describe('Access-only doors', () => {
       const moduleRef = await Test.createTestingModule({
         controllers: [ResourceUsageController],
         providers: [
-        { provide: ResourceListVisibilityService, useValue: { canSee: jest.fn(async () => true) } },
+          { provide: ResourceListVisibilityService, useValue: { canSee: jest.fn(async () => true) } },
           // Only the door actions of the real service: as a provider it would also run its lifecycle hooks.
           {
             provide: ResourceUsageService,
@@ -131,6 +132,7 @@ describe('Access-only doors', () => {
           { provide: ResourceActivityVisibilityService, useValue: {} },
           { provide: PreStartService, useValue: {} },
           { provide: SessionEndNotifier, useValue: {} },
+          { provide: SessionEndMaintenanceRequests, useValue: { fileAfterEnd: jest.fn() } },
           { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
         ],
       })

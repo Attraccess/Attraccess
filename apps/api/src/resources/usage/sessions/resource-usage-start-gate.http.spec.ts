@@ -7,6 +7,7 @@ import { ResourceUsageController } from './resource-usage.controller';
 import { ResourceUsageService } from './resource-usage.service';
 import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';
 import { SessionEndNotifier } from '../pre-start/session-end-notifier.service';
+import { SessionEndMaintenanceRequests } from './session-end-maintenance-requests';
 import { PreStartService } from '../pre-start/pre-start.service';
 import { StartBlockedException, StartConfirmationRequiredException } from '../pre-start/start-confirmation.errors';
 import { ResourceListVisibilityService } from '../../visibility/resource-list-visibility.service';
@@ -43,6 +44,7 @@ describe('POST /resources/:id/usage/start through the pre-start gate', () => {
         { provide: ResourceActivityVisibilityService, useValue: {} },
         { provide: PreStartService, useValue: { gateHttp } },
         { provide: SessionEndNotifier, useValue: { applyDefault } },
+        { provide: SessionEndMaintenanceRequests, useValue: { fileAfterEnd: jest.fn() } },
         { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
       ],
     })
