@@ -343,8 +343,12 @@ function administrationDetails(
   return details;
 }
 
-/** What the host does without a user: installing a plugin update and reporting how it activated. */
-const SYSTEM_ACTIONS: readonly string[] = ['plugin.replaced', 'plugin.activation_completed'];
+/** What the host does without a user: installing a plugin update, restarting for it and reporting how it activated. */
+const SYSTEM_ACTIONS: readonly string[] = [
+  'plugin.replaced',
+  'plugin.restart_requested',
+  'plugin.activation_completed',
+];
 
 function validActor(input: AdministrationAuditInput): boolean {
   if (input.actorId !== null) return positive(input.actorId);

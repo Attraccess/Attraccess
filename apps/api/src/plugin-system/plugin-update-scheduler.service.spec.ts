@@ -1,3 +1,4 @@
+import { SYSTEM_AUDIT_ACTOR } from '../audit/recorder/audit-event';
 import type { InstalledNpmPlugin } from './npm-plugin.service';
 import { DEFAULT_PLUGIN_UPDATE_POLICY, PluginUpdatePolicy } from './npm/update-policy';
 import {
@@ -47,11 +48,15 @@ function setup(plugins: Array<Partial<InstalledNpmPlugin>> = [{}], policy: Plugi
       installed.find((item) => item.name === name).autoUpdateFailure = { version, failedAt: failedAt.toISOString() };
     }),
   };
+  const pluginService = { requestRestart: jest.fn() };
   const administration = {
     applyAutomaticUpdate: jest.fn(async (_name: string, _version: string, restart: () => void) => restart()),
+    restart: jest.fn(async (actor: unknown) => {
+      expect(actor).toBe(SYSTEM_AUDIT_ACTOR);
+      pluginService.requestRestart();
+    }),
   };
-  const pluginService = { requestRestart: jest.fn() };
-  const scheduler = new PluginUpdateScheduler(npm as never, administration as never, pluginService as never);
+  const scheduler = new PluginUpdateScheduler(npm as never, administration as never);
   const runAt = (instant: Date) => {
     clock(instant);
     return scheduler.run();
@@ -138,7 +143,7 @@ describe('PluginUpdateScheduler', () => {
     });
 
     it('stops starting installs and holds the restart back once the window closed during an install', async () => {
-      const { scheduler, runAt, administration, pluginService, current } = setup([{}, {}]);
+      const { scheduler, runAt, administration, pluginService } = setup([{}, {}]);
       administration.applyAutomaticUpdate.mockImplementationOnce(async (_name, _version, restart) => {
         clock(at('2026-11-30T05:01:00Z'));
         restart();
@@ -153,8 +158,9 @@ describe('PluginUpdateScheduler', () => {
       expect(pluginService.requestRestart).not.toHaveBeenCalled();
 
       // The next window installs the rest and restarts once.
-      current.policy = ENABLED;
       await runAt(at('2026-12-07T03:30:00Z'));
+      // (This fake registry keeps offering plugin-0's update too, so only plugin-1's install is asserted.)
+      expect(administration.applyAutomaticUpdate.mock.calls.map(([name]) => name)).toContain('plugin-1');
       expect(pluginService.requestRestart).toHaveBeenCalledTimes(1);
     });
 

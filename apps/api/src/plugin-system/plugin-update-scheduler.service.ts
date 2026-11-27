@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { currentPluginUpdateWindow, PluginUpdateWindow } from '@attraccess/shared';
 
+import { SYSTEM_AUDIT_ACTOR } from '../audit/recorder/audit-event';
 import { InstalledNpmPlugin, NpmPluginService } from './npm-plugin.service';
 import { PluginAdministrationService } from './plugin-administration.service';
-import { PluginService } from './plugin.service';
 
 /** How old an update check may get before the host asks the registry again. */
 export const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -30,7 +30,6 @@ export class PluginUpdateScheduler {
   constructor(
     private readonly npmPlugins: NpmPluginService,
     private readonly administration: PluginAdministrationService,
-    private readonly pluginService: PluginService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -115,7 +114,15 @@ export class PluginUpdateScheduler {
     this.restartDue = false;
     this.restartRequested = true;
     this.logger.log('Restarting to activate the updated plugins.');
-    this.pluginService.requestRestart();
+    try {
+      // Audited like a plugin manager's restart: it also applies changes still waiting for one.
+      await this.administration.restart(SYSTEM_AUDIT_ACTOR);
+    } catch (error) {
+      // Not restarted (the audit could not be written): a later pass tries again, still only inside a window.
+      this.restartDue = true;
+      this.restartRequested = false;
+      throw error;
+    }
   }
 
   /** The version to install now, if an update is offered and it did not just fail. */

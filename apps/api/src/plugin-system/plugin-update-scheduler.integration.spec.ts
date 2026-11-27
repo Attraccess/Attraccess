@@ -109,7 +109,7 @@ describe('automatic plugin updates (integration)', () => {
     restart.mockClear();
     const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
     const administration = new PluginAdministrationService(pluginService, {} as never, service, audit as never);
-    const scheduler = new PluginUpdateScheduler(service, administration, pluginService);
+    const scheduler = new PluginUpdateScheduler(service, administration);
 
     for (const name of [NAME, OTHER]) {
       await publish(name, options.installed ?? OLD);
@@ -143,8 +143,9 @@ describe('automatic plugin updates (integration)', () => {
     for (const plugin of service.listInstalled())
       expect(plugin).toMatchObject({ requestedSpec: 'next', knownGoodVersion: OLD, state: 'active' });
     expect(restart).toHaveBeenCalledTimes(1);
-    expect(rows()).toHaveLength(2);
-    for (const row of rows())
+    const [restartRow, ...replaced] = [...rows()].reverse();
+    expect(replaced).toHaveLength(2);
+    for (const row of replaced)
       expect(row).toMatchObject({
         domain: 'administration',
         action: 'plugin.replaced',
@@ -153,6 +154,13 @@ describe('automatic plugin updates (integration)', () => {
         outcome: 'succeeded',
         details: expect.objectContaining({ oldVersion: OLD, newVersion: NEWEST }),
       });
+    // The restart itself is audited too: it also applies changes a plugin manager left waiting for one.
+    expect(restartRow).toMatchObject({
+      action: 'plugin.restart_requested',
+      actorId: null,
+      outcome: 'succeeded',
+      details: { pendingChanges: 1, restartRequested: 1 },
+    });
   });
 
   it('records how an automatic update activated after the restart, still as the system actor', async () => {
@@ -198,6 +206,7 @@ describe('automatic plugin updates (integration)', () => {
     expect(restart).toHaveBeenCalledTimes(1);
     expect(
       rows()
+        .filter((row) => row.action === 'plugin.replaced')
         .map((row) => row.outcome)
         .sort(),
     ).toEqual(['failed', 'succeeded']);
@@ -208,7 +217,7 @@ describe('automatic plugin updates (integration)', () => {
     // The restarted host has a new scheduler; the failure is on disk, so the same version is left alone.
     const attempts = download.mock.calls.length;
     const notCalled = { applyAutomaticUpdate: jest.fn() };
-    const restarted = new PluginUpdateScheduler(service, notCalled as never, { requestRestart: restart } as never);
+    const restarted = new PluginUpdateScheduler(service, notCalled as never);
     jest.setSystemTime(new Date(inWindow.getTime() + 5 * 60_000));
     await restarted.run();
     expect(notCalled.applyAutomaticUpdate).not.toHaveBeenCalled();
@@ -222,7 +231,6 @@ describe('automatic plugin updates (integration)', () => {
       new PluginAdministrationService(new PluginService(), {} as never, service, {
         record: jest.fn().mockResolvedValue({ status: 'recorded' }),
       } as never),
-      new PluginService(),
     );
     const anHourLater = new Date(inWindow.getTime() + 61 * 60_000);
     jest.setSystemTime(anHourLater);
