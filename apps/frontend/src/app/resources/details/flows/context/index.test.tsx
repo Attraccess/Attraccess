@@ -145,3 +145,27 @@ it('has no node types until the schemas arrive', () => {
   expect(context.flowNodeTypes).toEqual({});
   expect(screen.queryByTestId('node-one')).toBeNull();
 });
+
+it('removes the edges of a node it removes and keeps the others', () => {
+  show();
+  const position = { x: 0, y: 0 };
+  act(() =>
+    context.setNodes([
+      { id: 'nut', type: 'trigger', position, data: {} },
+      { id: 'FAIL', type: 'action', position, data: {} },
+      { id: 'OK', type: 'action', position, data: {} },
+    ]),
+  );
+  act(() =>
+    context.setEdges([
+      { id: 'failure', source: 'nut', sourceHandle: 'failure', target: 'FAIL' },
+      { id: 'success', source: 'nut', sourceHandle: 'success', target: 'OK' },
+      { id: 'onwards', source: 'FAIL', target: 'OK' },
+    ]),
+  );
+
+  act(() => context.removeNode('FAIL'));
+
+  expect(context.nodes.map((node) => node.id)).toEqual(['nut', 'OK']);
+  expect(context.edges.map((edge) => edge.id)).toEqual(['success']);
+});
