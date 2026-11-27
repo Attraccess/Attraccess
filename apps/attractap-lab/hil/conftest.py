@@ -471,6 +471,13 @@ def ble(api, admin, reader, resource):
                             {"name": "Lab Reader", "connectedResourceIds": [resource], "allowPluginBle": True},
                             token=admin)
     assert status == 200, body
+    # A fresh reader opens Bluetooth setup (ATT-1371) at boot and keeps NimBLE until 10 s after it got paired; a BLE
+    # request before that fails with ble-init-failed detail=bt-setup.
+    console = reader["console"]
+    with console.lock:
+        opened = console.data.rfind(b"Bluetooth setup open")
+    if opened >= 0:
+        console.expect(r"Bluetooth setup closed", opened, 60)
 
     def call(path, body=None, timeout=900):
         status, answer = api.call("POST", f"/ble-lab/{path}", body or {}, token=admin, timeout=timeout)
