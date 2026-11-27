@@ -35,6 +35,18 @@ export const attractapDetails = {
   'reader.recovery_key_verified': new Set(['recoveryFingerprint']),
   'reader.signing_key_backup_downloaded': new Set(['signingFingerprint']),
   'reader.secure_keys_restored': new Set(['signingFingerprint', 'recoveryFingerprint', 'source']),
+  // "Secure this reader" (ATT-1208): ids, states, reason codes, public digests and versions only.
+  'reader.secure_conversion_started': new Set([
+    'conversionId',
+    'conversionState',
+    'targetVersion',
+    'signingFingerprint',
+    'recoveryFingerprint',
+  ]),
+  'reader.secure_conversion_preflight': new Set(['conversionId', 'conversionState', 'ok', 'failedChecks']),
+  'reader.secure_conversion_digests_burned': new Set(['conversionId', 'conversionState', 'digest0', 'digest1']),
+  'reader.secure_conversion_failed': new Set(['conversionId', 'conversionState', 'reason']),
+  'reader.secure_conversion_interrupted': new Set(['conversionId', 'conversionState']),
   'ui.hook_decision': new Set([
     'plugin',
     'readerId',
@@ -195,6 +207,13 @@ const detailValidators: Record<string, (value: DetailValue) => boolean> = {
   setting: oneOf('noScreenPolicy', 'widgetsEnabled', 'hookFailurePolicy', 'readerWidgetsEnabled'),
   value: (value) => typeof value === 'string' || typeof value === 'boolean',
   reason: (value) => typeof value === 'string' && /^[a-z0-9-]{1,40}$/.test(value),
+  conversionId: positive,
+  conversionState: (value) => typeof value === 'string' && /^[a-z-]{1,24}$/.test(value),
+  targetVersion: (value) => printable(value, 32),
+  digest0: (value) => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value),
+  digest1: (value) => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value),
+  ok: (value) => typeof value === 'boolean',
+  failedChecks: (value) => Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 32,
 };
 
 export function validAttractapDetails(action: AttractapAuditAction, details: Record<string, unknown>): boolean {
@@ -251,6 +270,11 @@ export const ATTRACTAP_AUDIT_ACTIONS = [
   'attractap.reader.recovery_key_verified',
   'attractap.reader.signing_key_backup_downloaded',
   'attractap.reader.secure_keys_restored',
+  'attractap.reader.secure_conversion_started',
+  'attractap.reader.secure_conversion_preflight',
+  'attractap.reader.secure_conversion_digests_burned',
+  'attractap.reader.secure_conversion_failed',
+  'attractap.reader.secure_conversion_interrupted',
   'attractap.ui.hook_decision',
   'attractap.ui.step_issued',
   'attractap.ui.step_answered',

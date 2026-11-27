@@ -366,7 +366,7 @@ export class MqttClientService implements OnModuleDestroy {
       };
       cancellations.add(cancel);
 
-      client.on('message', (topic, payloadBuffer) => {
+      client.on('message', (topic, payloadBuffer, packet) => {
         if (!active) return;
         const payloadString = payloadBuffer.toString();
         let payload = payloadString;
@@ -379,7 +379,7 @@ export class MqttClientService implements OnModuleDestroy {
 
         this.eventEmitter.emit(
           MqttMessageEvent.EVENT_NAME,
-          new MqttMessageEvent(serverId, topic, payload, payloadBuffer),
+          new MqttMessageEvent(serverId, topic, payload, payloadBuffer, packet?.retain === true),
         );
       });
 

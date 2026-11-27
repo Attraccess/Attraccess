@@ -4,19 +4,28 @@ import { SettingsStoreService } from '../../settings/settings-store.service';
 import { ATTRACTAP_KEYS, ATTRACTAP_PARENT } from '../../settings/constants';
 import { CardWriterPolicyService, READER_NOT_ALLOWED_TO_WRITE_CARDS } from './card-writer-policy.service';
 import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
+import { ATTRACTAP_READER_STORE } from '../reader-store.port';
 
 describe('CardWriterPolicyService', () => {
   let stored: Map<string, string | null>;
   let policy: CardWriterPolicyService;
+  let securedReaders: Set<number>;
 
   const store = (key: string, value: string | null) => stored.set(`${ATTRACTAP_PARENT}.${key}`, value);
 
   beforeEach(async () => {
     stored = new Map();
+    securedReaders = new Set();
     const moduleRef = await Test.createTestingModule({
       providers: [
         CardWriterPolicyService,
         { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
+        {
+          provide: ATTRACTAP_READER_STORE,
+          useValue: {
+            findSecurity: jest.fn(async (id: number) => (id === 404 ? undefined : { id, secured: securedReaders.has(id) })),
+          },
+        },
         {
           provide: SettingsStoreService,
           useValue: {
@@ -111,6 +120,16 @@ describe('CardWriterPolicyService', () => {
         { settingKey: 'attractap.allowUidOnlyCards', before: 'true', after: 'false' },
       ]);
     });
+  });
+
+  it('allows only readers the server checked as secured in "secured" mode, whatever the list says', async () => {
+    securedReaders.add(4);
+    await policy.set({ mode: 'secured', readerIds: [1] });
+    await expect(policy.get()).resolves.toMatchObject({ mode: 'secured', readerIds: [1] });
+    await expect(policy.isAllowed(4)).resolves.toBe(true);
+    await expect(policy.isAllowed(1)).resolves.toBe(false);
+    await expect(policy.isAllowed(404)).resolves.toBe(false);
+    await expect(policy.assertAllowed(1)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('allows every reader in "all" mode even with a stored list', async () => {

@@ -13,6 +13,10 @@
       "selected": {
         "label": "Selected readers",
         "description": "Only the readers you pick below can enroll and reset RFID cards."
+      },
+      "secured": {
+        "label": "Only secured readers",
+        "description": "Only readers that are currently secured can enroll and reset RFID cards. A reader that loses its Secured status cannot write cards until it is secured again."
       }
     }
   },

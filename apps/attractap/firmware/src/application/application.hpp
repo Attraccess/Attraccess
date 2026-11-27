@@ -31,6 +31,8 @@ private:
     Logger logger;
     API &api;
     bool firmwareUpdateActive = false;
+    // The "Secure this reader" conversion took NFC and the screen (ATT-1208); the reader restarts to give them back.
+    bool conversionNfcSuspended = false;
     Beeper beeper;
     // The card the server last refused; its repeat detections are ignored (ATT-882).
     RefusedCardGuard refusedCardGuard;

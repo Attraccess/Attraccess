@@ -83,7 +83,7 @@ export function AttractapSection() {
           data-testid="card-writer-mode"
         >
           <Label className="sr-only">{t('mode.label')}</Label>
-          {(['all', 'selected'] as const).map((option) => (
+          {(['all', 'selected', 'secured'] as const).map((option) => (
             <Radio key={option} value={option} data-testid={`card-writer-mode-${option}`}>
               <Radio.Content>
                 <Radio.Control>

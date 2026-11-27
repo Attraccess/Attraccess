@@ -13,6 +13,7 @@ export type { PluginReaderCapabilitiesColumn } from './entities/plugin-reader.en
 export { AttractapInstallation } from './entities/attractap-installation.entity';
 export { AttractapSecureBootKey } from './entities/attractap-secure-boot-key.entity';
 export type { SecureBootKeyRole } from './entities/attractap-secure-boot-key.entity';
+export { AttractapSecureConversion } from './entities/attractap-secure-conversion.entity';
 export {
   ReaderUiAlert,
   ReaderUiPluginSettings,
@@ -145,6 +146,7 @@ import { PluginBleEndpointEntity } from './entities/plugin-ble-endpoint.entity';
 import { PluginReaderEntity } from './entities/plugin-reader.entity';
 import { AttractapInstallation } from './entities/attractap-installation.entity';
 import { AttractapSecureBootKey } from './entities/attractap-secure-boot-key.entity';
+import { AttractapSecureConversion } from './entities/attractap-secure-conversion.entity';
 import {
   ReaderUiAlert,
   ReaderUiPluginSettings,
@@ -239,6 +241,7 @@ export const entities = {
   PluginReaderEntity,
   AttractapInstallation,
   AttractapSecureBootKey,
+  AttractapSecureConversion,
   ReaderUiAlert,
   ReaderUiPluginSettings,
   ReaderUiReaderSettings,

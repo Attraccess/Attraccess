@@ -34,9 +34,12 @@ import { CardConversationService } from './card-conversation.service';
 import { CardDetectedRouter } from './card-detected.router';
 import { CardOperationsService } from './card-operations.service';
 import { CardWriterPolicyService } from './card-writer-policy.service';
+import { ConversionTransferService } from '../secure-conversion/conversion-transfer.service';
+import { SecuredReaderUpdates } from '../secure-conversion/secured-reader-updates';
 import { AttractapCardHandler } from './handlers/card/card.handler';
 import { AttractapCrashReportHandler } from './handlers/crash-report/crash-report.handler';
 import { AttractapFirmwareHandler } from './handlers/firmware/firmware.handler';
+import { LegacyFirmwareUpdateService } from './legacy-firmware-update.service';
 import { AttractapFormsHandler } from './handlers/forms/forms.handler';
 import { ReaderFormImages } from './handlers/forms/reader-form-images.service';
 import { FormImageHandoffService } from '../../resources/forms/images/form-image-handoff.service';
@@ -161,6 +164,12 @@ export function gatewayProviders(
     ResourceActionGuard,
     AttractapAuthHandler,
     AttractapFirmwareHandler,
+    LegacyFirmwareUpdateService,
+    {
+      provide: ConversionTransferService,
+      useValue: { chunk: jest.fn().mockResolvedValue(null), stagingInUse: jest.fn().mockResolvedValue(false) },
+    },
+    { provide: SecuredReaderUpdates, useValue: { prepare: jest.fn().mockResolvedValue(null) } },
     AttractapCrashReportHandler,
     AttractapCardHandler,
     AttractapFormsHandler,

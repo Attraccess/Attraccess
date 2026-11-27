@@ -103,7 +103,9 @@ def test_published_elf_is_the_flashed_build_not_the_ota_rebuild(tmp_path):
     (root / "apps/attractap/firmware/version.txt").write_text("9.9.9\n")
     run_sh = root / "apps/attractap-lab/hil/run.sh"
     shutil.copy(RUN_SH, run_sh)
-    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "EMULATOR_IMAGE": "/dev/null", "HIL_DATABASE_URL": "postgres://hil:hil@127.0.0.1:5432/hil"}
+    # NO_CONVERSION_BUILD: this test is about the published ELF, not the "Secure this reader" image build.
+    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "EMULATOR_IMAGE": "/dev/null", "NO_CONVERSION_BUILD": "1",
+           "HIL_DATABASE_URL": "postgres://hil:hil@127.0.0.1:5432/hil"}
     code, _ = run(tmp_path, env, place("board=attractap, profile=plain, variant=attractap-touch-v2"), run_sh)
     published = tmp_path / "published"
     assert code == 1

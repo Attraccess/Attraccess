@@ -86,7 +86,10 @@ export function buildNodeExecutorRegistry(
     ),
     [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET]: new HealthSetExecutor(dependencies.resourceHealthService),
     [ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST]: new HttpSendRequestExecutor(),
-    [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE]: new MqttSendMessageExecutor(dependencies.mqttClientService),
+    [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE]: new MqttSendMessageExecutor(
+      dependencies.mqttClientService,
+      dependencies.eventEmitter,
+    ),
     [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY]: new ActivityTrackExecutor(
       dependencies.resourceActivity,
     ),

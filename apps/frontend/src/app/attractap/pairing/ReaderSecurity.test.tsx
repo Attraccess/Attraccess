@@ -51,6 +51,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   }) => (isOpen ? <div>{children({ close: vi.fn() })}</div> : null),
 }));
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => mocks.toast }));
+vi.mock('../secureConversion/SecureThisReader', () => ({ SecureThisReader: () => null }));
 vi.mock('./PairingDialog', () => ({
   PairingDialog: (props: unknown) => {
     mocks.pairingDialog(props);

@@ -31,8 +31,9 @@ function setup() {
     record: jest.fn(async (event: AuditEvent, scope?: TransactionScope) => void events.push({ event, scope })),
   };
   const encryption = new EncryptionService({ get: () => ({ AUTH_SESSION_SECRET: 'test-secret' }) } as never);
-  const service = new SecureBootKeyService(store, unitOfWork, encryption, audit as never);
-  return { store, unitOfWork, events, service, audit };
+  const guard = { active: false, conversionActive: jest.fn(async () => guard.active) };
+  const service = new SecureBootKeyService(store, unitOfWork, encryption, audit as never, guard);
+  return { store, unitOfWork, events, service, audit, guard };
 }
 
 describe('SecureBootKeyService (against the key store port)', () => {
@@ -60,6 +61,30 @@ describe('SecureBootKeyService (against the key store port)', () => {
       ['attractap.reader.recovery_key_downloaded', false],
     ]);
     for (const { event } of events) expect(JSON.stringify(event)).not.toMatch(/PRIVATE KEY|correct horse/);
+  });
+
+  it('refuses to replace or restore the keys while a conversion is running', async () => {
+    const { service, guard, events } = setup();
+    await service.createKeys(ACTOR);
+    const backup = await service.downloadSigningKeyBackup(PASSPHRASE, ACTOR);
+    events.length = 0;
+    guard.active = true;
+    await expect(service.createKeys(ACTOR)).rejects.toThrow('while a reader is being secured');
+    await expect(service.restore('signing-backup', backup.pem, PASSPHRASE, ACTOR)).rejects.toThrow(
+      'while a reader is being secured',
+    );
+    expect(events).toEqual([]);
+  });
+
+  it('confirms the conversion keys before a burn only while they are current and held', async () => {
+    const { service, store } = setup();
+    await service.createKeys(ACTOR);
+    const keyOf = (role: string) => store.keys.find((key) => key.role === role) as (typeof store.keys)[number];
+    const digests = { digest0: keyOf('signing').digest, digest1: keyOf('recovery').digest };
+    await expect(service.conversionKeysCurrent(digests)).resolves.toBe(true);
+    await expect(service.conversionKeysCurrent({ ...digests, digest1: 'a'.repeat(64) })).resolves.toBe(false);
+    keyOf('signing').privateKeyEncrypted = 'garbage';
+    await expect(service.conversionKeysCurrent(digests)).resolves.toBe(false);
   });
 
   it('refuses to regenerate once a reader has a digest burned, and records nothing', async () => {
