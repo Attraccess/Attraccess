@@ -4,6 +4,8 @@
   "loading": "Flow wird geladen…",
   "loadError": "Flow konnte nicht geladen werden. Bitte versuche es erneut.",
   "actions": {
+    "save": "Speichern",
+    "layout": "Knoten anordnen",
     "export": "Exportieren",
     "import": "Importieren",
     "addNode": "Knoten hinzufügen",

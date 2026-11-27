@@ -13,6 +13,7 @@ import nodesEnTranslations from '../node/en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import { edgesHaveChanged, nodesHaveChanged } from './flowComparison';
+import { connectedEdges } from './connectedEdges';
 
 /**
  * Loads the saved flow into the editor and offers save, import and export. Also turns off pull-to-refresh
@@ -113,7 +114,7 @@ export function useFlowCanvasData() {
   const save = useCallback(() => {
     saveFlow({
       nodes: nodes as ResourceFlowNodeDto[],
-      edges: edges as ResourceFlowEdgeDto[],
+      edges: connectedEdges(nodes, edges) as ResourceFlowEdgeDto[],
     });
   }, [nodes, edges, saveFlow]);
 
