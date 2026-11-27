@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArchiveIcon, ArchiveRestoreIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -30,6 +30,14 @@ export function MeterActions({ resourceId, meter }: { resourceId: number; meter:
   const queryClient = useQueryClient();
   const [errorKey, setErrorKey] = useState<string>();
   const [renaming, setRenaming] = useState(false);
+  const wrapper = useRef<HTMLDivElement>(null);
+  const focusMenu = useRef(false);
+  // The menu trigger only exists again once the rename form is gone.
+  useEffect(() => {
+    if (renaming || !focusMenu.current) return;
+    focusMenu.current = false;
+    wrapper.current?.querySelector('button')?.focus();
+  }, [renaming]);
   const archive = useArchiveResourceMeter();
   const restore = useRestoreResourceMeter();
   const remove = useDeleteResourceMeter();
@@ -55,14 +63,17 @@ export function MeterActions({ resourceId, meter }: { resourceId: number; meter:
 
   if (!hasPermission('resources.update')) return null;
   return (
-    <div className="flex flex-col items-end gap-2">
+    <div ref={wrapper} className="flex flex-col items-end gap-2">
       {renaming ? (
         <MeterNameForm
           resourceId={resourceId}
           meter={meter}
           // A new name settles a name clash, and an older message would no longer be true.
           onSaved={() => setErrorKey(undefined)}
-          onClose={() => setRenaming(false)}
+          onClose={(hadFocus) => {
+            focusMenu.current = hadFocus;
+            setRenaming(false);
+          }}
         />
       ) : (
         <TableRowActions

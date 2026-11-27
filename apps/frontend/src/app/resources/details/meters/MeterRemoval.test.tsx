@@ -192,6 +192,42 @@ describe('removing meters', () => {
     expect(state.rename).not.toHaveBeenCalled();
   });
 
+  it('saves once: not from the repeat of a held Enter, nor from a second Enter while saving', async () => {
+    let finish: (saved: unknown) => void = () => undefined;
+    state.rename.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    render(<MetersCard resourceId={7} />);
+    await choose('Energy', en.rename);
+    const input = screen.getByRole('textbox', { name: en.name });
+    // Enter still held from the menu entry reaches the field as repeats.
+    fireEvent.keyDown(input, { key: 'Enter', repeat: true });
+    expect(state.rename).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(state.rename).toHaveBeenCalledTimes(1);
+    finish({ id: 1, name: 'Energy' });
+    await waitFor(() => expect(screen.queryByRole('textbox')).not.toBeInTheDocument());
+  });
+
+  it.each([
+    ['Cancel', en.cancel],
+    ['Save', en.save],
+  ])('gives the focus back to the menu after %s', async (_name, label) => {
+    state.rename.mockResolvedValue({ id: 1, name: 'Energy' });
+    render(<MetersCard resourceId={7} />);
+    await choose('Energy', en.rename);
+    await waitFor(() => expect(screen.getByRole('textbox', { name: en.name })).toHaveFocus());
+    await userEvent.click(screen.getByRole('button', { name: label }));
+    await waitFor(() => expect(trigger('Energy')).toHaveFocus());
+  });
+
+  it('gives the focus back to "Create meter" when its form closes', async () => {
+    render(<MetersCard resourceId={7} />);
+    await userEvent.click(screen.getByRole('button', { name: en.create }));
+    await waitFor(() => expect(screen.getByRole('textbox', { name: en.name })).toHaveFocus());
+    await userEvent.click(screen.getByRole('button', { name: en.cancel }));
+    expect(screen.getByRole('button', { name: en.create })).toHaveFocus();
+  });
+
   it('lists archived meters in a collapsed section with their own menu', async () => {
     state.meters = [meter(1, 'Energy'), archivedMeter()];
     render(<MetersCard resourceId={7} />);

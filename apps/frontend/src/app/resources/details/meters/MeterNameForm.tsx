@@ -21,7 +21,8 @@ export function MeterNameForm({
   resourceId: number;
   meter?: ResourceMeterDto;
   onSaved?: (meter: ResourceMeterDto) => void;
-  onClose: () => void;
+  /** `hadFocus`: the focus was still in the form, so the control that opened it should get it back. */
+  onClose: (hadFocus: boolean) => void;
 }) {
   const { t } = useTranslations({ en, de });
   const queryClient = useQueryClient();
@@ -31,6 +32,12 @@ export function MeterNameForm({
   const update = useUpdateResourceMeter();
   const pending = create.isPending || update.isPending;
   const input = useRef<HTMLInputElement>(null);
+  const form = useRef<HTMLDivElement>(null);
+  // A ref, not `pending`: it must also block a second Enter that arrives before the next render.
+  const saving = useRef(false);
+  // A disabled Save button drops the focus to the page body, which still counts as the form's.
+  const close = () =>
+    onClose(document.activeElement === document.body || !!form.current?.contains(document.activeElement));
   // Not `autoFocus`: opened from a menu, the form mounts while the closing menu still moves the focus, which would
   // take it away again.
   useEffect(() => {
@@ -38,7 +45,8 @@ export function MeterNameForm({
     return () => cancelAnimationFrame(frame);
   }, []);
   const save = async () => {
-    if (!name.trim()) return;
+    if (!name.trim() || saving.current) return;
+    saving.current = true;
     setError(false);
     try {
       const saved = meter
@@ -47,14 +55,16 @@ export function MeterNameForm({
       await queryClient.invalidateQueries({
         queryKey: UseListResourceMetersKeyFn({ path: { resourceId } }),
       });
-      onClose();
+      close();
       onSaved?.(saved);
     } catch {
       setError(true);
+    } finally {
+      saving.current = false;
     }
   };
   return (
-    <div className="flex flex-col gap-2">
+    <div ref={form} className="flex flex-col gap-2">
       <TextField
         value={name}
         onChange={setName}
@@ -62,7 +72,8 @@ export function MeterNameForm({
         onKeyDown={(event) => {
           if (event.key === 'Enter') {
             event.preventDefault();
-            void save();
+            // Enter held on the menu entry or button that opened the form keeps repeating into the field.
+            if (!event.repeat) void save();
           }
         }}
       >
@@ -74,7 +85,7 @@ export function MeterNameForm({
         <Button size="sm" onPress={() => void save()} isDisabled={!name.trim() || pending}>
           {t(meter ? 'save' : 'create')}
         </Button>
-        <Button size="sm" variant="ghost" onPress={onClose} isDisabled={pending}>
+        <Button size="sm" variant="ghost" onPress={close} isDisabled={pending}>
           {t('cancel')}
         </Button>
       </div>
