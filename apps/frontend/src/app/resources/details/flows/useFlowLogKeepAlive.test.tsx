@@ -85,6 +85,21 @@ describe('renewals', () => {
     expect(state.keepAlive).toHaveBeenCalledTimes(16);
   });
 
+  it('sends a single renewal at the warning mark when the minute tick lands just before it', () => {
+    mount();
+    // The last input is not aligned with the minute tick, so the tick at 15:00 comes 1.5 s before the mark.
+    advance(1_500);
+    input();
+    advance(14 * MINUTE + 30 * SECOND - 1_500);
+    state.keepAlive.mockClear();
+
+    advance(32 * SECOND);
+    expect(state.keepAlive).toHaveBeenCalledTimes(1);
+
+    advance(30 * MINUTE);
+    expect(state.keepAlive).toHaveBeenCalledTimes(1);
+  });
+
   it('sends nothing when the page wakes after more than 16 minutes without input', () => {
     mount();
     wakeAfter(17 * MINUTE);

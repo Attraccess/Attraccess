@@ -101,7 +101,11 @@ export function useFlowLogKeepAlive(owner: FlowOwner, timing: FlowLogKeepAliveTi
         enterPhase('timedOut');
       } else if (idle >= idleWarningMs) {
         enterPhase('warned');
-      } else if (now - lastRenewalAt >= renewIntervalMs - TICK_SLACK_MS) {
+      } else if (
+        now - lastRenewalAt >= renewIntervalMs - TICK_SLACK_MS &&
+        // The final renewal at the warning mark follows within a tick; renewing now as well would send two.
+        idleWarningMs - idle >= renewIntervalMs - TICK_SLACK_MS
+      ) {
         renew();
       }
     };
