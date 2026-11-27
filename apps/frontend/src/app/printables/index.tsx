@@ -1,16 +1,37 @@
+import { Tabs } from '@heroui/react';
 import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { RfidKeychainCard } from './RfidKeychainCard';
+import { SmartPlugCover } from './SmartPlugCover';
 import de from './de.json';
 import en from './en.json';
 
-// One model today. A second one becomes a HeroUI Tabs wrapper around these cards.
 export default function PrintablesPage() {
   const { t } = useTranslations({ de, en });
 
+  // Only the selected panel is mounted, so a model's render worker starts when its tab opens.
   return (
     <div>
       <PageHeader title={t('pageTitle')} subtitle={t('pageSubtitle')} />
-      <RfidKeychainCard />
+      <Tabs defaultSelectedKey="rfid-keychain-card">
+        <Tabs.ListContainer>
+          <Tabs.List aria-label={t('modelSelection')}>
+            <Tabs.Tab id="rfid-keychain-card" data-cy="printables-tab-rfid-keychain-card">
+              {t('cardTitle')}
+              <Tabs.Indicator />
+            </Tabs.Tab>
+            <Tabs.Tab id="smart-plug-cover" data-cy="printables-tab-smart-plug-cover">
+              {t('plugTitle')}
+              <Tabs.Indicator />
+            </Tabs.Tab>
+          </Tabs.List>
+        </Tabs.ListContainer>
+        <Tabs.Panel id="rfid-keychain-card" className="pt-5">
+          <RfidKeychainCard />
+        </Tabs.Panel>
+        <Tabs.Panel id="smart-plug-cover" className="pt-5">
+          <SmartPlugCover />
+        </Tabs.Panel>
+      </Tabs>
     </div>
   );
 }

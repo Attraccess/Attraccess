@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertionMessage, createSerialQueue, renderErrorReason } from './openscad.worker';
+import { assertionMessage, createSerialQueue, renderErrorReason } from './openscadRuntime';
 import { NO_OUTPUT_ERROR } from './errors';
 
 describe('createSerialQueue', () => {
@@ -65,6 +65,24 @@ describe('createSerialQueue', () => {
     expect(log).toEqual(['start:running', 'end:running', 'start:latest', 'end:latest']);
   });
 
+  it('tells a running task when a newer submission has superseded it', async () => {
+    const submit = createSerialQueue();
+    const seen: boolean[] = [];
+    const running = controllable([], 'running');
+
+    submit(1, async (isCurrent) => {
+      seen.push(isCurrent());
+      await running.task();
+      seen.push(isCurrent());
+    });
+    await flush();
+    submit(2, async () => undefined);
+    running.release();
+    await flush();
+
+    expect(seen).toEqual([true, false]);
+  });
+
   it('keeps processing later tasks after one rejects', async () => {
     const log: string[] = [];
     const submit = createSerialQueue();
@@ -90,12 +108,12 @@ describe('assertionMessage', () => {
     // rfid-keychain-card.scad) itself quotes the label, so it contains two embedded, unescaped
     // quote characters in addition to the pair OpenSCAD wraps around the whole message.
     const line =
-      'ERROR: Assertion \'(!HAS_LABEL || (LABEL_SIZE >= (LABEL_CAP_MIN / CAP_RATIO)))\' failed: ' +
+      "ERROR: Assertion '(!HAS_LABEL || (LABEL_SIZE >= (LABEL_CAP_MIN / CAP_RATIO)))' failed: " +
       '"Label too long: "THIS LABEL IS ... LONG" does not fit in 54 mm at the minimum 3 mm cap height." ' +
       'in file /card.scad, line 69';
 
     expect(assertionMessage([line])).toBe(
-      'Label too long: "THIS LABEL IS ... LONG" does not fit in 54 mm at the minimum 3 mm cap height.'
+      'Label too long: "THIS LABEL IS ... LONG" does not fit in 54 mm at the minimum 3 mm cap height.',
     );
   });
 
@@ -107,12 +125,10 @@ describe('assertionMessage', () => {
 describe('renderErrorReason', () => {
   it('surfaces the assert() message as-is when OpenSCAD reports one', () => {
     const line =
-      'ERROR: Assertion \'(!HAS_LABEL || (LABEL_SIZE >= (LABEL_CAP_MIN / CAP_RATIO)))\' failed: ' +
+      "ERROR: Assertion '(!HAS_LABEL || (LABEL_SIZE >= (LABEL_CAP_MIN / CAP_RATIO)))' failed: " +
       '"Label too long: "X" does not fit in 54 mm at the minimum 3 mm cap height." in file /card.scad, line 69';
 
-    expect(renderErrorReason([line])).toBe(
-      'Label too long: "X" does not fit in 54 mm at the minimum 3 mm cap height.'
-    );
+    expect(renderErrorReason([line])).toBe('Label too long: "X" does not fit in 54 mm at the minimum 3 mm cap height.');
   });
 
   it('falls back to a stable, translatable reason code when there is no assert() failure', () => {
