@@ -15,6 +15,7 @@ import { AttractapSecureConversion1796300000003 } from './1796300000003-attracta
 import { BillingTransactionReferenceIndexes1796400000000 } from './1796400000000-billing-transaction-reference-indexes';
 import { DiscardZeroUsageBills1796400000001 } from './1796400000001-discard-zero-usage-bills';
 import { ResourceMeterArchive1796400000002 } from './1796400000002-resource-meter-archive';
+import { NfcCardUniqueUid1796500000000 } from './1796500000000-nfc-card-unique-uid';
 
 /** The released PostgreSQL migration track, in order. Later schema changes are appended here as new migrations. */
 export const postgresMigrations = [
@@ -35,4 +36,5 @@ export const postgresMigrations = [
   BillingTransactionReferenceIndexes1796400000000,
   DiscardZeroUsageBills1796400000001,
   ResourceMeterArchive1796400000002,
+  NfcCardUniqueUid1796500000000,
 ];
