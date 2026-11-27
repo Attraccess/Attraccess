@@ -22,6 +22,11 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   useUpdateResourceBillingConfiguration: () => ({ mutate: state.updateConfiguration, isPending: false }),
   useListResourceMeters: () => ({ data: state.meters }),
   useSetResourceMeterRate: () => ({ mutateAsync: state.setRate, isPending: false }),
+  ProjectSwitchCharging: {
+    CONTINUE: 'continue',
+    CONTINUE_PER_PART_ROUNDING: 'continue-per-part-rounding',
+    NEW_SESSION: 'new-session',
+  },
   useSetResourceMeterAllocation: () => ({
     mutateAsync: state.setAllocation,
     isPending: false,

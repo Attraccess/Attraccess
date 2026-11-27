@@ -1,0 +1,19 @@
+{
+  "project": "Projekt",
+  "noProject": "Kein Projekt",
+  "change": "Projekt wechseln",
+  "dialog": {
+    "title": "Projekt wechseln",
+    "description": "Die Maschine läuft weiter. Die Nutzung bis jetzt wird dem aktuellen Projekt zugeordnet, alles danach dem neuen.",
+    "select": "Neues Projekt",
+    "placeholder": "Projekt wählen",
+    "unchanged": "Die Sitzung gehört bereits zu diesem Projekt.",
+    "cancel": "Abbrechen",
+    "confirm": "Projekt wechseln"
+  },
+  "success": {
+    "title": "Projekt gewechselt",
+    "project": "Die Nutzung wird jetzt {{name}} zugeordnet.",
+    "noProject": "Die Nutzung wird keinem Projekt mehr zugeordnet."
+  }
+}

@@ -39,6 +39,10 @@
     "title": "Zähler nicht eingerichtet",
     "description": "Für diese Ressource ist die Zählerabrechnung aktiv, aber ihr Flow definiert keinen vollständigen Zähler. Bitten Sie eine Administratorin oder einen Administrator, die Knoten für Messstart und Messwertabfrage hinzuzufügen."
   },
+  "METER_SWITCH_FAILED": {
+    "title": "Zähler nicht lesbar",
+    "description": "Das Projekt wurde nicht gewechselt, weil ein abgerechneter Zähler nicht gelesen werden konnte: {{error}}"
+  },
   "METER_INITIALIZATION_FAILED": {
     "title": "Zähler nicht gestartet",
     "description": "Die Sitzung wurde nicht gestartet, weil ein kostenpflichtiger Zähler nicht initialisiert werden konnte: {{error}}"

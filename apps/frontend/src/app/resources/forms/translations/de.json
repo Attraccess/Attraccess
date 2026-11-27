@@ -3,7 +3,8 @@
     "title": {
       "start": "Formulare vor dem Start ausfüllen",
       "takeover": "Formulare vor der Übernahme ausfüllen",
-      "end": "Formulare vor dem Beenden ausfüllen"
+      "end": "Formulare vor dem Beenden ausfüllen",
+      "projectSwitch": "Formulare vor dem Projektwechsel ausfüllen"
     },
     "description": "Bitte fülle die erforderlichen Felder aus, um fortzufahren.",
     "submit": "Formulare senden",

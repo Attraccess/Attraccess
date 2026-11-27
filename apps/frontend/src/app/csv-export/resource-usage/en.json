@@ -22,6 +22,8 @@
     "supervisorId": "Supervisor ID",
     "supervisorDisplayName": "Supervisor Display Name",
     "supervisorUsername": "Supervisor Name",
+    "sessionId": "Session ID",
+    "previousUsageId": "Continued from Session ID (project switch)",
     "userEmail": "User Email",
     "userExternalIdentifier": "User External ID",
     "supervisorEmail": "Supervisor Email"

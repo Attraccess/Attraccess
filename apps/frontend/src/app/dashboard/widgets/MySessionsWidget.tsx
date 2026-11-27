@@ -28,6 +28,7 @@ import { SessionTimer } from '../../resources/usage/components/SessionTimer';
 import { itemsPerSize, MoreLink, WidgetEmpty, WidgetError, WidgetList, WidgetLoading } from './widgetParts';
 import de from './de.json';
 import en from './en.json';
+import { sessionStartOf } from '../../resources/usage/sessionDuration';
 
 const SESSIONS_PER_SIZE = { small: 1, medium: 3, large: 7 };
 
@@ -87,7 +88,7 @@ function SessionRow({
         >
           {resource.name}
         </Link>
-        {ownSession && <SessionTimer startTime={ownSession.startTime} variant="compact" />}
+        {ownSession && <SessionTimer startTime={sessionStartOf(ownSession)} variant="compact" />}
       </div>
       <ConfirmableButton
         label={t('my-sessions.stop')}

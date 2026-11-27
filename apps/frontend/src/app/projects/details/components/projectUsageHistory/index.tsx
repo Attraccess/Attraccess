@@ -17,6 +17,7 @@ import de from './de.json';
 import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal';
 import { AttraccessUser } from '@attraccess/plugins-frontend-ui';
 import { HistoryHeader } from '../../../../resources/usage/components/HistoryHeader';
+import { ContinuationLabel } from '../../../../resources/usage/components/ContinuationLabel';
 
 type ProjectUsageHistoryProps = {
   projectId: number;
@@ -85,6 +86,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
                       </TableCell>
                       <TableCell>
                         <DateTimeDisplay date={session.startTime} />
+                        <ContinuationLabel previousUsageId={session.previousUsageId} />
                       </TableCell>
                       <TableCell>
                         {session.endTime ? <DateTimeDisplay date={session.endTime} /> : t('history.inProgress')}

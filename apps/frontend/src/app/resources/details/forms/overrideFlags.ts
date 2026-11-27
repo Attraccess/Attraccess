@@ -1,10 +1,11 @@
 import type { FormResourceOverrideDto, ResourceApplicableFormDto } from '@attraccess/react-query-client';
 
-/** The three usage actions a form can be required at, with their flag on the form and on an override. */
+/** The usage actions a form can be required at, with their flag on the form and on an override. */
 export const OVERRIDE_FLAGS = [
   ['start', 'isRequiredOnResourceUsageStart'],
   ['takeover', 'isRequiredOnResourceUsageTakeOver'],
   ['end', 'isRequiredOnResourceUsageEnd'],
+  ['projectSwitch', 'isRequiredOnResourceUsageProjectSwitch'],
 ] as const;
 export type OverrideAction = (typeof OVERRIDE_FLAGS)[number][0];
 export type OverrideFlag = (typeof OVERRIDE_FLAGS)[number][1];
@@ -23,6 +24,7 @@ export function currentOverride(item: ResourceApplicableFormDto): FormResourceOv
       isRequiredOnResourceUsageStart: null,
       isRequiredOnResourceUsageTakeOver: null,
       isRequiredOnResourceUsageEnd: null,
+      isRequiredOnResourceUsageProjectSwitch: null,
     }
   );
 }

@@ -131,6 +131,7 @@ export function ResourceFormsTab() {
                 <TableColumn>{t('resourceTab.columns.start')}</TableColumn>
                 <TableColumn>{t('resourceTab.columns.takeover')}</TableColumn>
                 <TableColumn>{t('resourceTab.columns.end')}</TableColumn>
+                <TableColumn>{t('resourceTab.columns.projectSwitch')}</TableColumn>
                 <TableColumn>
                   <TableActionsColumnHeader />
                 </TableColumn>

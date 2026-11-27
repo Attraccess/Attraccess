@@ -34,6 +34,7 @@ const flags = (start: boolean, takeover: boolean, end: boolean) => ({
   isRequiredOnResourceUsageStart: start,
   isRequiredOnResourceUsageTakeOver: takeover,
   isRequiredOnResourceUsageEnd: end,
+  isRequiredOnResourceUsageProjectSwitch: false,
 });
 const applicable = (id: number, name: string, source: string, extra: Record<string, unknown> = {}) => ({
   form: { id, name, scope: source, fields: [], ...flags(false, false, true) },
@@ -52,7 +53,12 @@ beforeEach(() => {
     applicable(2, 'Laser safety', 'group', {
       groupName: 'Lasers',
       disabled: true,
-      override: { disabled: true, ...flags(false, false, false), isRequiredOnResourceUsageTakeOver: null },
+      override: {
+        disabled: true,
+        ...flags(false, false, false),
+        isRequiredOnResourceUsageTakeOver: null,
+        isRequiredOnResourceUsageProjectSwitch: null,
+      },
     }),
     applicable(3, 'Own checklist', 'resource', {
       override: {
@@ -60,6 +66,7 @@ beforeEach(() => {
         isRequiredOnResourceUsageStart: true,
         isRequiredOnResourceUsageTakeOver: null,
         isRequiredOnResourceUsageEnd: null,
+        isRequiredOnResourceUsageProjectSwitch: null,
       },
       effective: flags(true, false, true),
     }),
@@ -98,6 +105,7 @@ it('switches an inherited form off and on, keeping other overrides', async () =>
       isRequiredOnResourceUsageStart: null,
       isRequiredOnResourceUsageTakeOver: null,
       isRequiredOnResourceUsageEnd: null,
+      isRequiredOnResourceUsageProjectSwitch: null,
     },
   });
   // Switching the disabled one back on keeps its flag overrides.
@@ -109,6 +117,7 @@ it('switches an inherited form off and on, keeping other overrides', async () =>
       isRequiredOnResourceUsageStart: false,
       isRequiredOnResourceUsageTakeOver: null,
       isRequiredOnResourceUsageEnd: false,
+      isRequiredOnResourceUsageProjectSwitch: null,
     },
   });
 });
@@ -124,6 +133,7 @@ it('overrides a flag, and removes an override that only inherits', async () => {
       isRequiredOnResourceUsageStart: null,
       isRequiredOnResourceUsageTakeOver: true,
       isRequiredOnResourceUsageEnd: null,
+      isRequiredOnResourceUsageProjectSwitch: null,
     },
   });
 
@@ -156,6 +166,7 @@ it('stores "Not required" as false, and keeps an override that still changes ano
       isRequiredOnResourceUsageStart: null,
       isRequiredOnResourceUsageTakeOver: null,
       isRequiredOnResourceUsageEnd: false,
+      isRequiredOnResourceUsageProjectSwitch: null,
     },
   });
 
@@ -163,7 +174,12 @@ it('stores "Not required" as false, and keeps an override that still changes ano
   state.forms = [
     applicable(2, 'Laser safety', 'group', {
       groupName: 'Lasers',
-      override: { disabled: false, ...flags(true, false, false), isRequiredOnResourceUsageTakeOver: null },
+      override: {
+        disabled: false,
+        ...flags(true, false, false),
+        isRequiredOnResourceUsageTakeOver: null,
+        isRequiredOnResourceUsageProjectSwitch: null,
+      },
     }),
   ];
   cleanup();
@@ -178,6 +194,7 @@ it('stores "Not required" as false, and keeps an override that still changes ano
       isRequiredOnResourceUsageStart: true,
       isRequiredOnResourceUsageTakeOver: null,
       isRequiredOnResourceUsageEnd: null,
+      isRequiredOnResourceUsageProjectSwitch: null,
     },
   });
 });

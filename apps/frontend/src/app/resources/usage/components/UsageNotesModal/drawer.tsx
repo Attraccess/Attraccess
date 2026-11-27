@@ -13,6 +13,7 @@ import de from './translations/de';
 import { X } from 'lucide-react';
 import { ProjectsSelect } from '../../../../../components/projectsSelect/index';
 import { useAuth } from '../../../../../hooks/useAuth';
+import { ContinuationLabel } from '../ContinuationLabel';
 import { FormImageAnswer } from '../../../../forms/images/FormImageAnswer';
 
 export interface UsageNotesDrawerProps {
@@ -167,6 +168,7 @@ export const UsageNotesDrawer = memo(
                   <p>
                     {t('sessionStarted')}: <DateTimeDisplay date={session.startTime} />
                   </p>
+                  <ContinuationLabel previousUsageId={session.previousUsageId} />
                   {session.endTime && (
                     <p>
                       {t('sessionEnded')}: <DateTimeDisplay date={session.endTime} />

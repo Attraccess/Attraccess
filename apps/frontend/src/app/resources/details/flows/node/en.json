@@ -97,6 +97,13 @@
             "outputs": {
               "output": "Output"
             }
+          },
+          "project-switched": {
+            "title": "Project switched",
+            "description": "Triggers when the owner of a running session switches its project. The machine keeps running: Usage started, Usage stopped and Usage taken over do not run. If this flow fails, the switch is refused. Billing items added here go to the part that ends.",
+            "outputs": {
+              "output": "Output"
+            }
           }
         },
         "metering": {

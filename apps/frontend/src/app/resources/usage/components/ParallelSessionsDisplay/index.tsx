@@ -25,6 +25,7 @@ import en from './translations/en.json';
 import de from './translations/de.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
+import { sessionStartOf } from '../../sessionDuration';
 
 export interface ParallelSessionsDisplayProps {
   resourceId: number;
@@ -127,7 +128,7 @@ export function ParallelSessionsDisplay({
                         <p className="text-sm font-medium">{t('unknownUser')}</p>
                       )}
                       <p className="text-xs text-muted">
-                        {t('sessionStarted')} <DateTimeDisplay date={usage.startTime} />
+                        {t('sessionStarted')} <DateTimeDisplay date={sessionStartOf(usage)} />
                       </p>
                       {usage.autoEndAt && <SessionAutoEnd resourceId={resourceId} usage={usage} canExtend={canEnd} />}
                       {usage.supervisorUser && (

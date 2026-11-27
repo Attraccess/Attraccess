@@ -30,6 +30,7 @@ import { MaintenanceInProgressDisplay } from './maintenance';
 import { FlatSection } from '../../../../../components/flatSection';
 import { RequestMaintenanceButton } from '../../../details/maintenance-management/request';
 import { InstantMaintenanceButton } from '../../../details/maintenance-management/instant';
+import { sessionStartOf } from '../../sessionDuration';
 
 // A plugin's start-blocked answer may have changed (e.g. a booking began or ended). Only that one query depends on
 // it, so it must not refetch the session state of every viewer.
@@ -176,7 +177,11 @@ export function ResourceUsageSession({
       return (
         <>
           {mySession && (
-            <ActiveSessionDisplay resourceId={resourceId} usageId={mySession.id} startTime={mySession.startTime} />
+            <ActiveSessionDisplay
+              resourceId={resourceId}
+              usageId={mySession.id}
+              startTime={sessionStartOf(mySession)}
+            />
           )}
           {(otherSessions.length > 0 || isFull) && (
             <ParallelSessionsDisplay
@@ -200,7 +205,7 @@ export function ResourceUsageSession({
             <ActiveSessionDisplay
               resourceId={resourceId}
               usageId={activeSession.id}
-              startTime={activeSession.startTime}
+              startTime={sessionStartOf(activeSession)}
             />
             {!canStartSession && <IntroductionRequiredDisplay resourceId={resourceId} />}
           </>

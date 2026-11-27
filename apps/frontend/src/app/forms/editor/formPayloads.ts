@@ -19,6 +19,7 @@ export const EMPTY_FORM: EditableForm = {
   isRequiredOnResourceUsageStart: false,
   isRequiredOnResourceUsageTakeOver: false,
   isRequiredOnResourceUsageEnd: false,
+  isRequiredOnResourceUsageProjectSwitch: false,
   fields: [],
 };
 
@@ -32,6 +33,7 @@ export function toEditableForm(form: FormResponseDto): EditableForm {
     isRequiredOnResourceUsageStart: form.isRequiredOnResourceUsageStart,
     isRequiredOnResourceUsageTakeOver: form.isRequiredOnResourceUsageTakeOver,
     isRequiredOnResourceUsageEnd: form.isRequiredOnResourceUsageEnd,
+    isRequiredOnResourceUsageProjectSwitch: form.isRequiredOnResourceUsageProjectSwitch,
     fields: form.fields.map((field) => parseFieldFromResponse(field)),
   };
 }
@@ -60,6 +62,7 @@ export function buildRequestBody(form: EditableForm) {
     isRequiredOnResourceUsageStart: form.isRequiredOnResourceUsageStart,
     isRequiredOnResourceUsageTakeOver: form.isRequiredOnResourceUsageTakeOver,
     isRequiredOnResourceUsageEnd: form.isRequiredOnResourceUsageEnd,
+    isRequiredOnResourceUsageProjectSwitch: form.isRequiredOnResourceUsageProjectSwitch,
     fields: form.fields.map((field, index) => ({
       id: field.id,
       name: field.name,

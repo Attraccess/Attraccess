@@ -13,6 +13,7 @@ import { PinEditControls, PinTile } from './SortablePinCard';
 import { RESOURCE_TILE_SIZES, TileSize } from './sizes';
 import de from './de.json';
 import en from './en.json';
+import { sessionStartOf } from '../resources/usage/sessionDuration';
 
 export interface PinCardProps {
   id: string;
@@ -242,7 +243,7 @@ function SmallResourceContent({
     <>
       <StatusChip resourceId={resourceId} />
       <span className="line-clamp-2 text-sm font-medium text-foreground">{title}</span>
-      {ownSession && <SessionTimer startTime={ownSession.startTime} variant="compact" />}
+      {ownSession && <SessionTimer startTime={sessionStartOf(ownSession)} variant="compact" />}
     </>
   );
   if (isEditing) {
@@ -290,7 +291,7 @@ function LargeResourceContent({
       {/* Session controls vary with the resource (forms, supervisors), so they scroll inside the fixed tile. */}
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
         {/* The user's own session shows its timer inside the session controls already. */}
-        {otherSession && <SessionTimer startTime={otherSession.startTime} />}
+        {otherSession && <SessionTimer startTime={sessionStartOf(otherSession)} />}
         {renderSession()}
       </div>
     </>

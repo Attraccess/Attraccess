@@ -307,6 +307,8 @@ export function ResourceFormsModal({
         return t('modal.title.takeover');
       case 'end':
         return t('modal.title.end');
+      case 'project-switch':
+        return t('modal.title.projectSwitch');
       case 'start':
       default:
         return t('modal.title.start');

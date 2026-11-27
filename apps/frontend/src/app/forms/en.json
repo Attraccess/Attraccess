@@ -14,6 +14,7 @@
     "resourceUsageStart": "Required by default at session start",
     "resourceUsageTakeover": "Required by default at takeover",
     "resourceUsageEnd": "Required by default at session end",
+    "resourceUsageProjectSwitch": "Required by default when switching the project",
     "addField": "Add field",
     "reorderField": "Reorder field",
     "emptyFieldsTitle": "No fields",
@@ -146,7 +147,8 @@
     "badges": {
       "start": "On start",
       "takeover": "On takeover",
-      "end": "On end"
+      "end": "On end",
+      "projectSwitch": "On project switch"
     },
     "switchedOff": "{{count}} switched off"
   },
@@ -166,7 +168,8 @@
     "actions": {
       "start": "Start",
       "takeover": "Takeover",
-      "end": "End"
+      "end": "End",
+      "project-switch": "Project switch"
     },
     "showAnswers": "Show answers",
     "hideAnswers": "Hide answers",
@@ -186,7 +189,8 @@
       "enabled": "Enabled",
       "start": "Start",
       "takeover": "Takeover",
-      "end": "End"
+      "end": "End",
+      "projectSwitch": "Project switch"
     },
     "toggle": "Use {{name}} on this resource",
     "override": {

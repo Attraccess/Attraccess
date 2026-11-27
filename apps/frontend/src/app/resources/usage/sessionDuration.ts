@@ -11,15 +11,24 @@ const MINUTE_MS = 60_000;
 /** The deadline fields of a session, as the API returns them. */
 export interface SessionDeadline {
   startTime: string;
+  sessionStartTime?: string | null;
   autoEndAt?: string | null;
   maxAutoEndAt?: string | null;
+}
+
+/**
+ * Since when the person has been using the machine. After a project switch the running record is a continuation:
+ * its `startTime` is the switch, `sessionStartTime` the start of the session.
+ */
+export function sessionStartOf(usage: { startTime: string; sessionStartTime?: string | null }): string {
+  return usage.sessionStartTime ?? usage.startTime;
 }
 
 /** The latest the automatic end can be moved to: the session's maximum, or the 30 day limit. */
 export function extensionCap(session: SessionDeadline): Date {
   return session.maxAutoEndAt
     ? new Date(session.maxAutoEndAt)
-    : new Date(new Date(session.startTime).getTime() + ABSOLUTE_LIMIT_MINUTES * MINUTE_MS);
+    : new Date(new Date(sessionStartOf(session)).getTime() + ABSOLUTE_LIMIT_MINUTES * MINUTE_MS);
 }
 
 /** Whole minutes the deadline can still move; 0 without a deadline. */

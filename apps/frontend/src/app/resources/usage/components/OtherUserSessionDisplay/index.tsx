@@ -34,6 +34,7 @@ import { useCanEndOtherSessions } from '../../hooks/useCanEndOtherSessions';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStartSessionWithConfirmation } from '../../hooks/useStartSessionWithConfirmation';
 import { useSessionDurationEstimate } from '../../hooks/useSessionDurationEstimate';
+import { sessionStartOf } from '../../sessionDuration';
 
 export function useInvalidateSessionHistory(resourceId: number) {
   const queryClient = useQueryClient();
@@ -253,7 +254,7 @@ export function OtherUserSessionDisplay({ resourceId }: OtherUserSessionDisplayP
         </div>
 
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          ({t('sessionStarted')} <DateTimeDisplay date={activeSession.startTime} />)
+          ({t('sessionStarted')} <DateTimeDisplay date={sessionStartOf(activeSession)} />)
         </p>
 
         {activeSession.autoEndAt && (
