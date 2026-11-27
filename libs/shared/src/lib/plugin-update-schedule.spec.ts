@@ -46,7 +46,10 @@ describe('plugin update schedule', () => {
   });
 
   it('treats a missing zone as UTC', () => {
-    expect(open(schedule({ timeZone: null }), '2026-11-30T02:30:00Z')).not.toBeNull();
+    // 03:30 UTC is inside 02:00-04:00 UTC, but after it in Berlin (04:30 there): a zone other than UTC would fail.
+    expect(open(schedule({ timeZone: null }), '2026-11-30T03:30:00Z')).toEqual(
+      span('2026-11-30T02:00:00Z', '2026-11-30T04:00:00Z'),
+    );
   });
 
   describe('daylight saving time (Europe/Berlin)', () => {
@@ -71,6 +74,17 @@ describe('plugin update schedule', () => {
       expect(nextPluginUpdateWindow(skipped, new Date('2027-03-27T12:00:00Z'))).toEqual(
         span('2027-03-28T01:30:00Z', '2027-03-28T03:30:00Z'),
       );
+    });
+
+    it('keeps a day-long window open past the end of a 23-hour day', () => {
+      // Saturday 23:30 CET plus 24 h of elapsed time ends on Monday at 00:30 CEST, two calendar days later.
+      const saturday = schedule({
+        weekdays: [6],
+        startMinute: 23 * 60 + 30,
+        durationMinutes: 1440,
+        timeZone: 'Europe/Berlin',
+      });
+      expect(open(saturday, '2026-03-29T22:15:00Z')).toEqual(span('2026-03-28T22:30:00Z', '2026-03-29T22:30:00Z'));
     });
 
     it('opens once, at the first occurrence, for a start the clock repeats', () => {

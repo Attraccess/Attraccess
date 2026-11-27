@@ -125,14 +125,22 @@ export function readStoredUpdatePolicy(raw: string | null | undefined): {
 } {
   const fallback = { policy: DEFAULT_PLUGIN_UPDATE_POLICY, legacy: false };
   if (!raw) return fallback;
+  let stored: Record<string, unknown>;
   try {
-    const stored = JSON.parse(raw) as Record<string, unknown>;
-    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return fallback;
-    // Only this version writes the switch, so its absence identifies every earlier policy, and only those.
-    if (!('automaticUpdates' in stored)) return { policy: fromLegacyPolicy(stored), legacy: true };
-    return { policy: parseUpdatePolicy(stored), legacy: false };
+    stored = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     return fallback;
+  }
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return fallback;
+  // Only this version writes the switch, so its absence identifies every earlier policy, and only those.
+  if (!('automaticUpdates' in stored)) return { policy: fromLegacyPolicy(stored), legacy: true };
+  try {
+    return { policy: parseUpdatePolicy(stored), legacy: false };
+  } catch {
+    // No longer valid (e.g. the runtime stopped knowing the zone): automatic updates are off, but a plugin manager who
+    // switched the checks off, for instance to stop registry requests, keeps them off.
+    const checksEnabled = stored.checksEnabled === false ? false : DEFAULT_PLUGIN_UPDATE_POLICY.checksEnabled;
+    return { policy: { ...DEFAULT_PLUGIN_UPDATE_POLICY, checksEnabled }, legacy: false };
   }
 }
 

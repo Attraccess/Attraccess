@@ -19,6 +19,26 @@ export class PluginUpdateScheduleDto {
   timeZone: string | null;
 }
 
+/** The schedule fields to change; the host keeps the others. */
+export class UpdatePluginUpdateScheduleDto {
+  @ApiPropertyOptional({ type: [Number], description: 'ISO weekdays a window starts on, 1 = Monday to 7 = Sunday' })
+  weekdays?: number[];
+
+  @ApiPropertyOptional({
+    type: 'integer',
+    minimum: 0,
+    maximum: 1439,
+    description: 'Local start time, as a minute of the day',
+  })
+  startMinute?: number;
+
+  @ApiPropertyOptional({ type: 'integer', minimum: 1, maximum: 1440 })
+  durationMinutes?: number;
+
+  @ApiPropertyOptional({ type: String, nullable: true, description: 'IANA time zone; null means UTC' })
+  timeZone?: string | null;
+}
+
 export class PluginUpdatePolicyDto {
   @ApiProperty({ description: 'Whether the host looks for newer versions. Looking installs nothing.' })
   checksEnabled: boolean;
@@ -46,8 +66,8 @@ export class UpdatePluginUpdatePolicyDto {
   @ApiPropertyOptional({ enum: UPDATE_STEPS })
   mode?: (typeof UPDATE_STEPS)[number];
 
-  @ApiPropertyOptional({ type: PluginUpdateScheduleDto })
-  schedule?: PluginUpdateScheduleDto;
+  @ApiPropertyOptional({ type: UpdatePluginUpdateScheduleDto })
+  schedule?: UpdatePluginUpdateScheduleDto;
 
   @ApiPropertyOptional()
   prerelease?: boolean;

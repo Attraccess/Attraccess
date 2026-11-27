@@ -77,4 +77,13 @@ describe('plugin update policy', () => {
       expect(readStoredUpdatePolicy(raw).policy).toEqual(DEFAULT_PLUGIN_UPDATE_POLICY);
     },
   );
+
+  it('keeps checks off when a stored policy no longer validates', () => {
+    const saved = patchUpdatePolicy(DEFAULT_PLUGIN_UPDATE_POLICY, { checksEnabled: false, schedule: SCHEDULE });
+    const stored = { ...saved, automaticUpdates: true, schedule: { ...saved.schedule, timeZone: 'Mars/Olympus_Mons' } };
+    expect(readStoredUpdatePolicy(JSON.stringify(stored))).toEqual({
+      policy: { ...DEFAULT_PLUGIN_UPDATE_POLICY, checksEnabled: false },
+      legacy: false,
+    });
+  });
 });

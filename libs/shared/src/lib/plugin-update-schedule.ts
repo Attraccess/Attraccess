@@ -39,12 +39,15 @@ function windowOn(schedule: PluginUpdateSchedule, day: CalendarDate): PluginUpda
   return { start, end: new Date(start.getTime() + schedule.durationMinutes * 60_000) };
 }
 
-/** The windows starting from the day before `now` (it may still be open) to a week ahead, in order. */
+/**
+ * The windows starting from two days before `now` to a week ahead, in order. Two days: a day-long window that starts
+ * late in the evening before a 23-hour day is still open just after the next midnight but one.
+ */
 function windowsAround(schedule: PluginUpdateSchedule, now: Date): PluginUpdateWindow[] {
   const local = fromAbsolute(now.getTime(), schedule.timeZone ?? 'UTC');
   const today = new CalendarDate(local.year, local.month, local.day);
   const windows: PluginUpdateWindow[] = [];
-  for (let offset = -1; offset <= 8; offset += 1) {
+  for (let offset = -2; offset <= 8; offset += 1) {
     const window = windowOn(schedule, today.add({ days: offset }));
     if (window) windows.push(window);
   }
