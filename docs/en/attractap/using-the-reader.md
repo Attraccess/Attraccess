@@ -42,6 +42,17 @@ While the reader processes an action, the controls are temporarily unavailable. 
 
 To record machine usage against a project, tap the machine's name to open its details, tap **Projekt wählen** (Choose project), and select your project before starting there. Starting directly from the list records the usage without a project.
 
+### Change the project of a running session
+
+On a Touch reader with current firmware (the capability **projectSwitch**), the details of your own running session show **Projekt: …** and **Projekt wechseln** (Change project). The button is offered when the session already has a project or you have one to switch to.
+
+1. Tap the machine's name to open its details, then tap **Projekt wechseln**
+2. Pick a project (the list can be searched and paged) or **Kein Projekt** (No project). The current one cannot be picked.
+3. Complete any form required for a project switch
+4. The reader confirms with **Projekt gewechselt** (Project changed) and the new project
+
+The machine keeps running, and the start time shown stays that of your session. If the switch is refused (for example a meter cannot be read, or the balance does not cover a new session where the resource [charges it like one](billing/configuration.md#charging-on-project-switch)), the reader says why and the session keeps its project. Older firmware, Attractap Lite, the BLE Bridge and plugin readers do not offer this. See [Switching the project of a running session](resources/usage-tracking.md#switching-the-project-of-a-running-session).
+
 ### Results, messages and low balance
 
 The reader reports results on a full screen of its own and returns to the screen you were on:

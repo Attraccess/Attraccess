@@ -34,7 +34,7 @@ If a resource reaches the same form more than once, for example through two grou
 On a resource's **Settings** → **Forms** page you see every form that applies to it, including inherited group and global forms. For each form you can:
 
 - **Switch it off** for this resource. The form keeps applying everywhere else.
-- **Override when it is required.** For each of Session Start, Session Takeover and Session End, choose **Inherit** (use the form's default), **Required** or **Not required**.
+- **Override when it is required.** For each of Session Start, Session Takeover, Session End and Project Switch, choose **Inherit** (use the form's default), **Required** or **Not required**.
 
 Only these settings can differ per resource. The name and the fields are always the same everywhere the form applies.
 
@@ -42,11 +42,12 @@ Only these settings can differ per resource. The name and the fields are always 
 
 A form sets a default for each point in the usage lifecycle. A resource can override these defaults (see above):
 
-| Trigger              | When it appears                                            |
-| -------------------- | ---------------------------------------------------------- |
-| **Session Start**    | When a user starts using the resource                      |
-| **Session Takeover** | When a user takes over an active session from another user |
-| **Session End**      | When a user ends their usage session                       |
+| Trigger              | When it appears                                                                                                                                                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Session Start**    | When a user starts using the resource                                                                                                                                                                                                              |
+| **Session Takeover** | When a user takes over an active session from another user                                                                                                                                                                                         |
+| **Session End**      | When a user ends their usage session                                                                                                                                                                                                               |
+| **Project Switch**   | When a user [switches the project](resources/usage-tracking.md#switching-the-project-of-a-running-session) of their running session. The answers belong to the part that starts with the switch. Start, takeover and end forms are not asked then. |
 
 > [!TIP]
 > Use **Session End** forms to collect data that is only known after usage, such as material consumption or print results.

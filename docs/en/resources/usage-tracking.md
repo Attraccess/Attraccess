@@ -91,7 +91,29 @@ You find the figures in the **Operating duration** card on the resource [detail 
 
 If you have active [projects](projects/overview.md), you can link a usage session to a project. This helps track which resources are used for which projects.
 
-The project association is set when starting the session.
+The project association is set when starting the session. After a session has ended, its owner can move it to another of their projects in the usage history.
+
+### Switching the project of a running session
+
+While your machine session is running, you can move it to another project without stopping the machine:
+
+1. Open the resource detail page
+2. In the running session, click **Change project**
+3. Pick another of your projects, or **No project**, and click **Switch project**
+4. Fill in any [forms](forms/overview.md) required for a project switch
+
+Everything up to the switch is booked to the old project, everything after it to the new one: minutes, machine running time, [metered consumption](flows/energy-metering.md), credits and the [project statistics](projects/overview.md#usage-statistics). The elapsed time shown for your session still counts from its original start.
+
+- **One record per project.** A switch ends the current usage record and starts a **continuation** at the same instant. The history shows them as consecutive rows; each later row is marked **continued from #…**. Every row has its own duration and charge. The [CSV export](resources/csv-export.md) contains the ID of the previous part (`previousUsageId`).
+- **The machine keeps running.** A switch does not run the **Usage Started**, **Usage Stopped** or **Usage Takeover** [flows](flows/node-types.md#resource-usage-project-switched), asks for no start, end or takeover forms and sends no start, stop or takeover notifications. To react to a switch, use the **Project switched** flow trigger and the **Project switch** form action. No end note is asked.
+- **Charging** follows the resource's [Charging on project switch](billing/configuration.md#charging-on-project-switch) setting. The previous part is billed at the switch.
+- **Meters** are read at the switch. If a billed meter cannot be read, or a project switch flow fails, the whole switch is refused: the session keeps running under the old project.
+- **Carried over:** the prices and billing factor saved at the start, the supervisor, the [automatic stop](#automatic-stop-and-extending-a-session) and its extensions, and on a shared machine your slot (a full machine does not block a switch).
+- **Who can switch:** only the person whose session it is. Administrators and resource managers cannot switch somebody else's running session; they can still change ended parts as before. Doors have no sessions to switch.
+- If your installation [restricts actions to the local network](settings/security.md), switching follows the rule for starting a session on the web and in the API.
+- A session counts once for the **number of uses** maintenance schedule, for supervised-use promotion and in the session counts of the resource hours report. Project statistics count each part for its project.
+
+You can also switch on a [Touch reader](attractap/using-the-reader.md#change-the-project-of-a-running-session), or through the REST API with `POST /api/resources/{resourceId}/usage/sessions/active/project` and the body `{ "projectId": 12 }` (`null` for no project; `usageId` optionally names the running session, so a session that ended meanwhile is not mistaken for its successor).
 
 ## Usage History
 

@@ -42,6 +42,17 @@ Während der Leser eine Aktion verarbeitet, sind die Bedienelemente kurzzeitig n
 
 Um die Maschinennutzung einem Projekt zuzuordnen, öffnen Sie über den Namen der Maschine deren Details. Tippen Sie auf **Projekt wählen**, wählen Sie Ihr Projekt aus und starten Sie die Nutzung dort. Wenn Sie direkt aus der Liste starten, wird die Nutzung ohne Projekt erfasst.
 
+### Das Projekt einer laufenden Sitzung wechseln
+
+An einem Touch-Leser mit aktueller Firmware (Fähigkeit **projectSwitch**) zeigen die Details Ihrer eigenen laufenden Sitzung **Projekt: …** und **Projekt wechseln**. Die Schaltfläche erscheint, wenn die Sitzung bereits ein Projekt hat oder Sie eines zum Wechseln haben.
+
+1. Öffnen Sie über den Namen der Maschine deren Details und tippen Sie auf **Projekt wechseln**
+2. Wählen Sie ein Projekt (die Liste lässt sich durchsuchen und blättern) oder **Kein Projekt**. Das aktuelle ist nicht wählbar.
+3. Füllen Sie die für einen Projektwechsel erforderlichen Formulare aus
+4. Der Leser bestätigt mit **Projekt gewechselt** und dem neuen Projekt
+
+Die Maschine läuft weiter, und die angezeigte Startzeit bleibt die Ihrer Sitzung. Wird der Wechsel abgelehnt (etwa weil ein Zähler nicht lesbar ist oder das Guthaben nicht für eine neue Sitzung reicht, wenn die Ressource [so abrechnet](billing/configuration.md#abrechnung-beim-projektwechsel)), nennt der Leser den Grund, und die Sitzung behält ihr Projekt. Ältere Firmware, Attractap Lite, die BLE-Bridge und Plugin-Leser bieten dies nicht an. Siehe [Das Projekt einer laufenden Sitzung wechseln](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln).
+
 ### Ergebnisse, Meldungen und niedriges Guthaben
 
 Der Leser zeigt Ergebnisse auf einem eigenen Vollbild und kehrt danach zu Ihrem Bildschirm zurück:

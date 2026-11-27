@@ -1,4 +1,5 @@
 # Payloads, Variablen & Vorlagen
+
 <!-- llms-description: Erklärt Flow-Payloads, Trigger-Daten, Vorlagen, Arithmetik, Einheitenumrechnung und dauerhaft gespeicherte Flow-Variablen. -->
 
 Jeder Flow-Knoten erhält Daten vom vorherigen Knoten und gibt Daten an den nächsten weiter. Diese Daten heißen **Payload**. Vorlagen lesen die Payload, um Nachrichten, URLs oder andere Einstellungen zu erzeugen. **Flow-Variablen** speichern Werte, die einen Flow-Durchlauf überdauern sollen.
@@ -17,16 +18,17 @@ Eine Payload ist meist ein JSON-Objekt. `payload` ist außerdem der Name des Fel
 
 Die Anfangsdaten hängen vom Trigger ab. Bei Objekt-Payloads ergänzt Attraccess `resource.id`, `resource.name`, `resource.type` und `resource.metadata`. Die Metadaten enthalten die benutzerdefinierten Daten der Ressource und können `null` sein.
 
-| Trigger                                          | Nützliche Payload-Pfade                                                                                                                                                                  |
-| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Button**, **Keine Aktivität**                  | Nur Ressourcenkontext; keine Benutzer- oder Nachrichtendaten                                                                                                                             |
-| **Nutzung gestartet / beendet**                  | Nutzungsfelder an der Wurzel: `id`, `startTime`, `endTime`, `startNotes`, `endNotes`, `user.id`, `user.username`, `user.firstName`, `user.lastName`, `user.displayName`, `formSubmissions`, `activeSessions`                                    |
-| **Nutzung übernommen**                           | Felder der bisherigen Sitzung (`id` ist die bisherige Sitzung) sowie `newUser`, `oldUser`, `takeOverTime`, `activeSessions`                                                              |
-| **Tür entriegelt / verriegelt / Falle geöffnet** | `event.timestamp`, `usage.start`, `usage.end`, `user.id`, `user.username`, `user.firstName`, `user.lastName`, `user.displayName`, `user.externalIdentifier`                                                                                     |
-| **MQTT-Nachricht empfangen**                     | `serverId`, `topic`, `payload`                                                                                                                                                           |
-| **Variable geändert**                            | `change.scope`, `change.key`, `change.previousValue`, `change.newValue`, `change.changedAt`, `change.sourceResourceId`; überwachte Werte unter `variables.resource` / `variables.global` |
-| **Companion-Ereignisse**                         | Ereignisfelder an der Wurzel, etwa `idleSeconds`, `appName`, `vendorId`; siehe [Knotentypen](flows/node-types.md)                                                                        |
-| **Messung starten / Messwert abfragen**          | `metering.sessionId`, `metering.operationId`, `metering.resourceId`, `metering.usageId`, `metering.userId`, `metering.kind`, `metering.requestedAt`                                      |
+| Trigger                                          | Nützliche Payload-Pfade                                                                                                                                                                                      |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Button**, **Keine Aktivität**                  | Nur Ressourcenkontext; keine Benutzer- oder Nachrichtendaten                                                                                                                                                 |
+| **Nutzung gestartet / beendet**                  | Nutzungsfelder an der Wurzel: `id`, `startTime`, `endTime`, `startNotes`, `endNotes`, `user.id`, `user.username`, `user.firstName`, `user.lastName`, `user.displayName`, `formSubmissions`, `activeSessions` |
+| **Projekt gewechselt**                           | Felder des Abschnitts, der endet (`id`), sowie `previousUsageId`, `newUsageId`, `previousProjectId`, `newProjectId`, `previousProject`, `newProject`, `switchTime`, `activeSessions`                         |
+| **Nutzung übernommen**                           | Felder der bisherigen Sitzung (`id` ist die bisherige Sitzung) sowie `newUser`, `oldUser`, `takeOverTime`, `activeSessions`                                                                                  |
+| **Tür entriegelt / verriegelt / Falle geöffnet** | `event.timestamp`, `usage.start`, `usage.end`, `user.id`, `user.username`, `user.firstName`, `user.lastName`, `user.displayName`, `user.externalIdentifier`                                                  |
+| **MQTT-Nachricht empfangen**                     | `serverId`, `topic`, `payload`                                                                                                                                                                               |
+| **Variable geändert**                            | `change.scope`, `change.key`, `change.previousValue`, `change.newValue`, `change.changedAt`, `change.sourceResourceId`; überwachte Werte unter `variables.resource` / `variables.global`                     |
+| **Companion-Ereignisse**                         | Ereignisfelder an der Wurzel, etwa `idleSeconds`, `appName`, `vendorId`; siehe [Knotentypen](flows/node-types.md)                                                                                            |
+| **Messung starten / Messwert abfragen**          | `metering.sessionId`, `metering.operationId`, `metering.resourceId`, `metering.usageId`, `metering.userId`, `metering.kind`, `metering.requestedAt`                                                          |
 
 Überall, wo eine Payload oder ein Vorlagenkontext einen Benutzer enthält (`user`, `previousUser` sowie `newUser` und `oldUser` einer Übernahme), hat der Benutzer zusätzlich `firstName`, `lastName` (beide können leer sein) und `displayName`: „Vorname Nachname“, ersatzweise der Benutzername. Verwenden Sie `{{user.displayName}}` in Nachrichten für Menschen; `username` bleibt die stabile Kennung.
 

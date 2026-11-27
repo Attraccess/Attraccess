@@ -1,4 +1,5 @@
 # Payloads, Variables & Templates
+
 <!-- llms-description: Explains flow payloads, trigger data, templates, arithmetic and unit conversion, and persistent flow variables. -->
 
 Each flow node receives data from the previous node and produces data for the next one. This data is called the **payload**. Templates read that payload to build messages, URLs or other settings. **Flow variables** store values that must survive a flow run.
@@ -17,16 +18,17 @@ A payload is usually a JSON object. The word `payload` is also the name of a fie
 
 The starting data depends on the trigger. For object payloads, Attraccess adds `resource.id`, `resource.name`, `resource.type` and `resource.metadata`. Metadata contains the resource's configured custom data and can be `null`.
 
-| Trigger                                | Useful payload paths                                                                                                                                                                   |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Button**, **No Activity**            | Resource context only; no user or message data                                                                                                                                         |
-| **Usage Started / Stopped**            | Usage fields at the root: `id`, `startTime`, `endTime`, `startNotes`, `endNotes`, `user.id`, `user.username`, `user.firstName`, `user.lastName`, `user.displayName`, `formSubmissions`, `activeSessions`                                      |
-| **Usage Takeover**                     | Outgoing usage fields (`id` is the outgoing session), plus `newUser`, `oldUser`, `takeOverTime` and `activeSessions`                                                                   |
-| **Door Unlocked / Locked / Unlatched** | `event.timestamp`, `usage.start`, `usage.end`, `user.id`, `user.username`, `user.firstName`, `user.lastName`, `user.displayName`, `user.externalIdentifier`                                                                                   |
-| **MQTT Message Received**              | `serverId`, `topic`, `payload`                                                                                                                                                         |
-| **Variable Changed**                   | `change.scope`, `change.key`, `change.previousValue`, `change.newValue`, `change.changedAt`, `change.sourceResourceId`; watched values under `variables.resource` / `variables.global` |
-| **Companion events**                   | Event fields at the root, such as `idleSeconds`, `appName` or `vendorId`; see the [node reference](flows/node-types.md)                                                                |
-| **Metering Start / Collection**        | `metering.sessionId`, `metering.operationId`, `metering.resourceId`, `metering.usageId`, `metering.userId`, `metering.kind`, `metering.requestedAt`                                    |
+| Trigger                                | Useful payload paths                                                                                                                                                                                     |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Button**, **No Activity**            | Resource context only; no user or message data                                                                                                                                                           |
+| **Usage Started / Stopped**            | Usage fields at the root: `id`, `startTime`, `endTime`, `startNotes`, `endNotes`, `user.id`, `user.username`, `user.firstName`, `user.lastName`, `user.displayName`, `formSubmissions`, `activeSessions` |
+| **Project switched**                   | Fields of the part that ends (`id`), plus `previousUsageId`, `newUsageId`, `previousProjectId`, `newProjectId`, `previousProject`, `newProject`, `switchTime`, `activeSessions`                          |
+| **Usage Takeover**                     | Outgoing usage fields (`id` is the outgoing session), plus `newUser`, `oldUser`, `takeOverTime` and `activeSessions`                                                                                     |
+| **Door Unlocked / Locked / Unlatched** | `event.timestamp`, `usage.start`, `usage.end`, `user.id`, `user.username`, `user.firstName`, `user.lastName`, `user.displayName`, `user.externalIdentifier`                                              |
+| **MQTT Message Received**              | `serverId`, `topic`, `payload`                                                                                                                                                                           |
+| **Variable Changed**                   | `change.scope`, `change.key`, `change.previousValue`, `change.newValue`, `change.changedAt`, `change.sourceResourceId`; watched values under `variables.resource` / `variables.global`                   |
+| **Companion events**                   | Event fields at the root, such as `idleSeconds`, `appName` or `vendorId`; see the [node reference](flows/node-types.md)                                                                                  |
+| **Metering Start / Collection**        | `metering.sessionId`, `metering.operationId`, `metering.resourceId`, `metering.usageId`, `metering.userId`, `metering.kind`, `metering.requestedAt`                                                      |
 
 Wherever a payload or template context carries a user (`user`, `previousUser`, and the `newUser` and `oldUser` of a takeover), the user also has `firstName`, `lastName` (both may be empty) and `displayName`: "First Last", or the username when no name is set. Use `{{user.displayName}}` in messages meant for people; `username` stays the stable identifier.
 

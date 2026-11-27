@@ -42,6 +42,16 @@ Type: `input.resource.usage.takeover` · Machines
 
 Runs when an active session is taken over. No settings. Payload contains the outgoing usage session plus `newUser`, `oldUser`, `takeOverTime` and `activeSessions` (always 1 to 1). Use `{{newUser.username}}` for the incoming owner. A takeover uses this trigger instead of the ordinary Usage Started trigger. The outgoing session ends here, and **Usage Stopped** does not run for it. Add billing items for the outgoing session (for example consumables you normally add on stop) with [**Add billing item**](flows/node-types.md#set-billing-items) in this flow; they are billed on the outgoing session. If stop charges should also apply to takeovers, add the same billing branch to both triggers. The takeover payload has no `endTime` or `endNotes` (use `takeOverTime`), and its `formSubmissions` are the new user's takeover form answers, not stop form answers, so a copied branch must read its values from there. Do not copy physical effects such as switching a relay off onto this trigger, because the machine stays in use by the new user.
 
+### Resource Usage Project Switched
+
+Type: `input.resource.usage.project-switched` · Machines
+
+Runs when the owner of a running session [switches its project](resources/usage-tracking.md#switching-the-project-of-a-running-session). No settings. The machine keeps running: **Usage Started**, **Usage Stopped** and **Usage Takeover** do not run for a switch, so a flow that must also react to a project change needs this trigger. Do not switch power off here.
+
+The payload contains the part that ends (`id` is its ID) plus `previousUsageId` (the same), `newUsageId` (the continuation), `previousProjectId` and `newProjectId` (`null` without a project), `previousProject`, `newProject`, `switchTime`, `activeSessions` (the same before and after) and `formSubmissions` with the answers to the [project switch forms](forms/overview.md). [**Add billing item**](flows/node-types.md#set-billing-items) adds to the part that ends.
+
+If this flow fails, the whole switch is refused and the session keeps running under the old project. [**End usage session**](flows/node-types.md#end-usage-session) with **The triggering session** is refused for the same reason (it would stop a machine that keeps running); **The session of a user** and **All sessions** end the chosen sessions after the switch, the switched one as its continuation.
+
 ### Door Unlocked
 
 Type: `input.resource.door.unlocked` · Doors

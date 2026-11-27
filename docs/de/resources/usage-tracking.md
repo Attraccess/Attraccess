@@ -91,7 +91,29 @@ Die Werte finden Sie in der Karte **Betriebsdauer** auf der [Detailseite](resour
 
 Wenn Sie aktive [Projekte](projects/overview.md) haben, können Sie eine Nutzungssitzung mit einem Projekt verknüpfen. So lässt sich nachverfolgen, welche Ressourcen für welche Projekte verwendet werden.
 
-Die Projektzuordnung wird beim Starten der Sitzung festgelegt.
+Die Projektzuordnung wird beim Starten der Sitzung festgelegt. Nach dem Ende einer Sitzung kann die Person, der sie gehört, sie in der Nutzungshistorie einem anderen eigenen Projekt zuordnen.
+
+### Das Projekt einer laufenden Sitzung wechseln
+
+Während Ihre Maschinensitzung läuft, können Sie sie einem anderen Projekt zuordnen, ohne die Maschine anzuhalten:
+
+1. Öffnen Sie die Detailseite der Ressource
+2. Klicken Sie in der laufenden Sitzung auf **Projekt wechseln**
+3. Wählen Sie ein anderes Ihrer Projekte oder **Kein Projekt** und klicken Sie auf **Projekt wechseln**
+4. Füllen Sie die für einen Projektwechsel erforderlichen [Formulare](forms/overview.md) aus
+
+Alles bis zum Wechsel wird dem alten Projekt zugeordnet, alles danach dem neuen: Minuten, Betriebszeit der Maschine, [Zählerverbrauch](flows/energy-metering.md), Credits und die [Projektstatistiken](projects/overview.md#nutzungsstatistiken). Die angezeigte Dauer Ihrer Sitzung zählt weiterhin ab dem ursprünglichen Start.
+
+- **Ein Eintrag pro Projekt.** Ein Wechsel beendet den aktuellen Nutzungseintrag und beginnt im selben Augenblick eine **Fortsetzung**. Die Historie zeigt sie als aufeinanderfolgende Zeilen; jede spätere ist als **Fortsetzung von #…** markiert. Jede Zeile hat ihre eigene Dauer und Abrechnung. Der [CSV-Export](resources/csv-export.md) enthält die ID des vorherigen Abschnitts (`previousUsageId`).
+- **Die Maschine läuft weiter.** Ein Wechsel führt die [Flows](flows/node-types.md#projekt-gewechselt) **Nutzung gestartet**, **Nutzung beendet** und **Nutzung übernommen** nicht aus, verlangt keine Start-, End- oder Übernahmeformulare und sendet keine Start-, Stopp- oder Übernahme-Benachrichtigungen. Um auf einen Wechsel zu reagieren, verwenden Sie den Flow-Auslöser **Projekt gewechselt** und die Formularaktion **Projektwechsel**. Eine Endnotiz wird nicht abgefragt.
+- Die **Abrechnung** richtet sich nach der Einstellung [Abrechnung beim Projektwechsel](billing/configuration.md#abrechnung-beim-projektwechsel) der Ressource. Der vorherige Abschnitt wird beim Wechsel abgerechnet.
+- **Zähler** werden beim Wechsel abgelesen. Lässt sich ein kostenpflichtiger Zähler nicht lesen oder schlägt ein Projektwechsel-Flow fehl, wird der gesamte Wechsel abgelehnt: Die Sitzung läuft unter dem alten Projekt weiter.
+- **Übernommen werden:** die beim Start gespeicherten Preise und der Abrechnungsfaktor, die Aufsichtsperson, der [automatische Stopp](#automatisches-stoppen-und-sitzung-verlängern) samt Verlängerungen und auf einer gemeinsam genutzten Maschine Ihr Platz (eine volle Maschine verhindert keinen Wechsel).
+- **Wer wechseln darf:** nur die Person, der die Sitzung gehört. Administratoren und Ressourcenverwaltende können fremde laufende Sitzungen nicht wechseln; beendete Abschnitte können wie bisher geändert werden. Türen haben keine Sitzungen zum Wechseln.
+- Wenn Ihre Installation [Aktionen auf das lokale Netzwerk beschränkt](settings/security.md), gilt für den Wechsel im Web und über die API die Regel für den Sitzungsstart.
+- Eine Sitzung zählt einmal für Wartungspläne nach **Anzahl der Nutzungen**, für die Freischaltung nach beaufsichtigten Nutzungen und bei den Sitzungszahlen im Bericht zu Ressourcenstunden. Die Projektstatistiken zählen jeden Abschnitt für sein Projekt.
+
+Sie können auch an einem [Touch-Leser](attractap/using-the-reader.md#das-projekt-einer-laufenden-sitzung-wechseln) wechseln oder über die REST-API mit `POST /api/resources/{resourceId}/usage/sessions/active/project` und dem Inhalt `{ "projectId": 12 }` (`null` für kein Projekt; `usageId` benennt optional die laufende Sitzung, damit eine inzwischen beendete Sitzung nicht mit ihrer Nachfolgerin verwechselt wird).
 
 ## Nutzungshistorie
 
