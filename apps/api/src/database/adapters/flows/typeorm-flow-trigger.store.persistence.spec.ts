@@ -77,7 +77,11 @@ describe('TypeOrmFlowTriggerStore (PostgreSQL)', () => {
       });
     await edges.save([
       edge('e-laser', 'laser-own', 'laser-target', { resourceId: laser.id }, 'output'),
+      edge('e-laser-legacy', 'laser-own', 'laser-legacy', { resourceId: laser.id }, null),
+      edge('e-laser-failure', 'laser-own', 'laser-failure', { resourceId: laser.id }, 'failure'),
       edge('e-drill', 'drill-own', 'drill-target', { resourceId: drill.id }, 'output'),
+      // Same source id on another resource's canvas: never followed from the laser's node.
+      edge('e-drill-same-source-legacy', 'laser-own', 'drill-target', { resourceId: drill.id }, null),
       edge('e-global', 'global-on', 'global-target', { flowId: enabled.id }, 'output'),
       edge('e-global-legacy', 'global-on', 'global-legacy', { flowId: enabled.id }, null),
       edge('e-global-failure', 'global-on', 'global-failure', { flowId: enabled.id }, 'failure'),
@@ -149,11 +153,17 @@ describe('TypeOrmFlowTriggerStore (PostgreSQL)', () => {
       .findTriggerNodes(type)
       .then((nodes) => nodes.filter((node) => node.id === 'global-on'));
 
-    expect(ids(await store.findOutgoingEdges(laserNode, 'output'))).toEqual(['e-laser']);
+    expect(ids(await store.findOutgoingEdges(laserNode, 'output'))).toEqual(['e-laser', 'e-laser-legacy']);
+    expect(ids(await store.findOutgoingEdges(laserNode, 'failure'))).toEqual(['e-laser-failure']);
     expect(ids(await store.findOutgoingEdges(globalNode, 'output'))).toEqual(['e-global', 'e-global-legacy']);
     expect(ids(await store.findOutgoingEdges(globalNode, 'failure'))).toEqual(['e-global-failure']);
     expect(ids(await store.findOutgoingEdges(globalNode, 'output-true'))).toEqual(['e-global-true']);
     expect(await store.findOutgoingEdges(globalNode, 'output-false')).toEqual([]);
+    // A JavaScript caller without a handle gets the default output, never every edge.
+    expect(ids(await store.findOutgoingEdges(globalNode, undefined as unknown as string))).toEqual([
+      'e-global',
+      'e-global-legacy',
+    ]);
   });
 
   it('follows the edges of another canvas only from that canvas', async () => {

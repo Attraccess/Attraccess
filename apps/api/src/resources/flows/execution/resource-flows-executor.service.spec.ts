@@ -666,7 +666,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     scope.nodesById[billingNode.id] = billingNode;
     scope.initialNodes = [inputNode];
 
-    // Edge: input -> billing (no sourceHandle filter)
+    // Edge: input -> billing (no handle: the default output)
     scope.edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: billingNode.id }];
     // Billing is terminal
     scope.edgesBySourceAndHandle[`${billingNode.id}|`] = [];
@@ -812,7 +812,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     [inputNode, ifNode, billingNodeA, billingNodeB].forEach((n) => (scope.nodesById[n.id] = n));
     scope.initialNodes = [inputNode];
 
-    // input -> if (no handle filter on input)
+    // input -> if (no handle: the default output)
     scope.edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: ifNode.id }];
     // if -> two billing nodes on the same handle 'output-true'
     scope.edgesBySourceAndHandle[`${ifNode.id}|output-true`] = [

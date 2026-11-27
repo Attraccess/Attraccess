@@ -226,7 +226,7 @@ export class FlowExecutionEngine {
           : resultOfPreviousNode.payload;
       responseOfNode = {
         payload,
-        outputHandle: failureBehavior === 'failure-output' ? 'failure' : 'output',
+        outputHandle: failureBehavior === 'failure-output' ? 'failure' : DEFAULT_OUTPUT_HANDLE,
       };
     }
 
@@ -267,7 +267,7 @@ export class FlowExecutionEngine {
     const pluginNode = getPluginFlowNode(node.type);
     if (pluginNode) {
       if (pluginNode.isInput) {
-        return { payload: input, outputHandle: 'output' };
+        return { payload: input, outputHandle: DEFAULT_OUTPUT_HANDLE };
       }
       return pluginNode.execute(
         { id: node.id, type: node.type, data: node.data as Record<string, unknown> },

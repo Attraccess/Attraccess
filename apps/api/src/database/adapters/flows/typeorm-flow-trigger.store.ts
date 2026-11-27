@@ -51,6 +51,8 @@ export class TypeOrmFlowTriggerStore implements FlowTriggerStore {
     outputHandle: string,
     context?: TransactionContext,
   ): Promise<FlowEdgeRecord[]> {
+    // A JavaScript caller can still pass no handle; TypeORM would drop that condition and match every edge.
+    const handle = outputHandle ?? DEFAULT_OUTPUT_HANDLE;
     const onHandle = (sourceHandle: string | ReturnType<typeof IsNull>): FindOptionsWhere<ResourceFlowEdge> => ({
       source: node.id,
       sourceHandle,
@@ -58,7 +60,7 @@ export class TypeOrmFlowTriggerStore implements FlowTriggerStore {
     });
     // Edges saved without a handle are the default output.
     const where =
-      outputHandle === DEFAULT_OUTPUT_HANDLE ? [onHandle(outputHandle), onHandle(IsNull())] : onHandle(outputHandle);
+      handle === DEFAULT_OUTPUT_HANDLE ? [onHandle(handle), onHandle(IsNull())] : onHandle(handle);
     const edges = await this.manager(context).getRepository(ResourceFlowEdge).find({ where });
     return edges.map(toEdgeRecord);
   }

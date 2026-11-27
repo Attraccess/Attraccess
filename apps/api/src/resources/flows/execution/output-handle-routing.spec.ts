@@ -27,6 +27,13 @@ describe('output handle routing', () => {
     resetTestFixture(scope);
   });
 
+  afterEach(() => {
+    // The engine always names the handle it continues on; the store never sees `undefined`.
+    for (const [, handle] of scope.flowStore.findOutgoingEdges.mock.calls) {
+      expect(typeof handle).toBe('string');
+    }
+  });
+
   function build(nodes: FlowNodeRecord[], wiring: Wiring) {
     scope.initialNodes = [nodes[0]];
     scope.nodesById = Object.fromEntries(nodes.map((node) => [node.id, node]));
@@ -69,7 +76,6 @@ describe('output handle routing', () => {
       'output',
       undefined,
     );
-    expect(scope.flowStore.findOutgoingEdges).not.toHaveBeenCalledWith(expect.anything(), undefined, undefined);
   });
 
   it('continues a successful MQTT wait on output only', async () => {
