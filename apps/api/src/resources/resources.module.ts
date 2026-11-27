@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ResourcesController } from './resources.controller';
-import { ScheduleModule } from '@nestjs/schedule';
 import { FileStorageModule } from '../common/modules/file-storage.module';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { ConfigModule } from '@nestjs/config';
@@ -29,7 +28,6 @@ import { ResourceListVisibilityModule } from './visibility/resource-list-visibil
   imports: [
     ResourceListVisibilityModule,
     ResourcesPersistenceModule,
-    ScheduleModule.forRoot(),
     FileStorageModule,
     UsersAndAuthModule,
     ConfigModule,

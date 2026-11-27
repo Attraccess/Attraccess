@@ -259,9 +259,11 @@ it.each(['type', 'position', 'data', 'identity', 'count'] as const)(
     );
     expect(saveButton()).toBeEnabled();
     fireEvent.click(saveButton());
+    // Without node "one" its edge leads nowhere, so the save leaves it out.
+    const edges = change === 'count' || change === 'identity' ? [] : state.edges;
     expect(state.save).toHaveBeenCalledWith({
       path: { resourceId: 7 },
-      body: { nodes: state.nodes, edges: state.edges },
+      body: { nodes: state.nodes, edges },
     });
     act(() => state.options.onSuccess());
     expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['flow', 7] });

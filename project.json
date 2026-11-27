@@ -75,6 +75,7 @@
       "options": {
         "commands": [
           "node scripts/check-file-size.mjs",
+          "node scripts/check-case-collisions.mjs",
           "node scripts/check-import-cycles.mjs",
           "node scripts/check-persistence-boundaries.mjs --require-clean-plugins"
         ],
