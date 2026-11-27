@@ -669,6 +669,8 @@ void testSessionTls()
             CHECK(client.feed(second.data(), second.size(), onFrame) == SessionTls::Status::Open);
         }
         CHECK(delivered == PAYLOAD);
+        // Grown to exactly what was checked. A plain `insert` would have doubled to about 3.2 KiB, past the budget.
+        CHECK(client.inboundCapacity() == second.size());
 
         // The second piece (3.4 KiB) needs more than the buffer kept (2.4 KiB), and the heap has no room for it: the
         // session fails cleanly instead of the reader aborting.

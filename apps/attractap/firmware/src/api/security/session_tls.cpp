@@ -220,6 +220,11 @@ SessionTls::Status SessionTls::feed(const uint8_t *data, size_t length,
     return status;
 }
 
+size_t SessionTls::inboundCapacity() const
+{
+    return impl ? impl->inbound.capacity() : 0;
+}
+
 SessionTls::Status SessionTls::advance(const SessionFraming::Decoder::FrameCallback &onFrame)
 {
     if (state == Status::Handshaking)
