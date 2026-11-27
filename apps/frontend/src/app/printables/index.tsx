@@ -12,14 +12,14 @@ export default function PrintablesPage() {
   return (
     <div>
       <PageHeader title={t('pageTitle')} subtitle={t('pageSubtitle')} />
-      <Tabs defaultSelectedKey="rfid-keychain-card">
+      <Tabs defaultSelectedKey="rfid-keychain-card" className="max-w-[1050px]">
         <Tabs.ListContainer>
           <Tabs.List aria-label={t('modelSelection')}>
-            <Tabs.Tab id="rfid-keychain-card" data-cy="printables-tab-rfid-keychain-card">
+            <Tabs.Tab id="rfid-keychain-card" data-cy="printables-tab-rfid-keychain-card" className="whitespace-nowrap">
               {t('cardTitle')}
               <Tabs.Indicator />
             </Tabs.Tab>
-            <Tabs.Tab id="smart-plug-cover" data-cy="printables-tab-smart-plug-cover">
+            <Tabs.Tab id="smart-plug-cover" data-cy="printables-tab-smart-plug-cover" className="whitespace-nowrap">
               {t('plugTitle')}
               <Tabs.Indicator />
             </Tabs.Tab>

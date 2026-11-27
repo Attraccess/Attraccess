@@ -19,7 +19,7 @@
   "errorNoOutput": "Some characters in this label can't be engraved. Try letters, numbers and basic punctuation.",
   "modelSelection": "Printable model",
   "plugTitle": "Smart Plug Security Cover",
-  "plugDescription": "A two-part cover that stops people pressing the smart plug's button or pulling the cable. Two 3 x 5 mm passages take security seals.",
+  "plugDescription": "A two-part cover that stops people pressing the smart plug's button or pulling the cable. Two 3 × 5 mm passages take security seals.",
   "plugDevice": "Smart plug",
   "plugDeviceDescription": "The Nous profile comes from the manufacturer's CAD model. The Shelly profiles are estimated from published sizes: do a test fit and raise the clearance if needed.",
   "plugNous": "Nous A1T / A1Z",
@@ -39,7 +39,7 @@
   "heightAbovePlugDescription": "How far the cover reaches above the smart plug's face. Raise it for a tall angled plug.",
   "cableCutoutHeight": "Cable cutout height",
   "cableCutoutHeightDescription": "Height of the side opening in the body that the angled cable leaves through.",
-  "plugPrintTip": "Print body and cover separately and check the fit on your plug first. Fit both around the plug, then close both 3 x 5 mm passages with disposable security seals.",
+  "plugPrintTip": "Print body and cover separately and check the fit on your plug first. Fit both around the smart plug, then close both 3 × 5 mm passages with disposable security seals.",
   "plugPreviewAriaLabel": "3D preview of the smart plug security cover. Drag to rotate.",
   "plugErrorNoOutput": "The cover could not be generated with these settings. Try the default values."
 }

@@ -45,7 +45,7 @@ export function SmartPlugCover() {
       <div className="flex w-full flex-col gap-4 lg:max-w-sm lg:shrink-0">
         <div>
           <h2 className="text-lg font-medium">{t('plugTitle')}</h2>
-          <p className="text-sm text-default-500">{t('plugDescription')}</p>
+          <p className="text-sm text-muted">{t('plugDescription')}</p>
         </div>
 
         <Select
@@ -83,17 +83,18 @@ export function SmartPlugCover() {
         />
         <PlugCableFields config={config} onChange={update} />
 
+        <PrintTip>{t('plugPrintTip')}</PrintTip>
+      </div>
+
+      <div className="flex w-full min-w-0 flex-1 flex-col gap-4">
+        {/* Next to the preview rather than under the controls: the control column is taller
+            than a laptop screen, so an alert there would sit below the fold. */}
         {error !== null && (
           <RenderErrorAlert
             title={t('errorTitle')}
             message={error === NO_OUTPUT_ERROR ? t('plugErrorNoOutput') : error}
           />
         )}
-
-        <PrintTip>{t('plugPrintTip')}</PrintTip>
-      </div>
-
-      <div className="flex w-full min-w-0 flex-1 flex-col gap-4">
         <PreviewStage status={status}>
           {result !== null && (
             <Preview body={result.body} accent={result.cover} ariaLabel={t('plugPreviewAriaLabel')} />

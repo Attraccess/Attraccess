@@ -49,7 +49,7 @@ export function RfidKeychainCard() {
       <div className="flex w-full flex-col gap-4 lg:max-w-sm lg:shrink-0">
         <div>
           <h2 className="text-lg font-medium">{t('cardTitle')}</h2>
-          <p className="text-sm text-default-500">{t('cardDescription')}</p>
+          <p className="text-sm text-muted">{t('cardDescription')}</p>
         </div>
 
         <TextField value={label} onChange={setLabel}>

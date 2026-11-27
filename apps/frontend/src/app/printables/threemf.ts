@@ -63,7 +63,7 @@ export function buildThreeMf(parts: ThreeMfPart[]): Uint8Array<ArrayBuffer> {
   const objects = parts
     .map(
       (part, index) =>
-        `<object id="${index + 2}" type="model" pid="1" pindex="${index}">${meshXml(part.mesh)}</object>`,
+        `<object id="${index + 2}" name="${escapeXml(part.name)}" type="model" pid="1" pindex="${index}">${meshXml(part.mesh)}</object>`,
     )
     .join('');
 

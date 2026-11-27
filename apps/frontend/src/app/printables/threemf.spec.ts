@@ -37,6 +37,9 @@ describe('buildThreeMf', () => {
     expect(xml).toContain('<base name="Body" displaycolor="#B4B4B4FF"');
     expect(xml).toContain('<base name="Letters" displaycolor="#1D9BF0FF"');
     expect(xml.match(/<object /g)).toHaveLength(2);
+    // Slicers list each object under its own name, not "Object 1"/"Object 2".
+    expect(xml).toContain('<object id="2" name="Body"');
+    expect(xml).toContain('<object id="3" name="Letters"');
     expect(xml.match(/<item /g)).toHaveLength(2);
   });
 

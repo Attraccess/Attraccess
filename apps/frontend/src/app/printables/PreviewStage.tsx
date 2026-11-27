@@ -18,12 +18,12 @@ export function PreviewStage({ status, children }: PreviewStageProps) {
   return (
     // min-h matches Preview's own height so the first render — when there is no canvas yet —
     // still has somewhere to show the spinner instead of collapsing to nothing.
-    <div className="relative min-h-80 rounded-lg bg-default-100">
+    <div className="relative min-h-80 rounded-lg bg-surface-secondary">
       {children}
       {status === 'rendering' && (
-        <div className="absolute inset-0 flex items-center justify-center gap-2">
+        <div className="absolute inset-0 flex items-center justify-center gap-2 rounded-lg bg-surface-secondary/70">
           <Spinner size="sm" />
-          <span className="text-sm text-default-500">{t('rendering')}</span>
+          <span className="text-sm text-muted">{t('rendering')}</span>
         </div>
       )}
       {/* A single, permanently-mounted live region rather than putting aria-live on the

@@ -81,6 +81,9 @@ export function Preview({ body, accent, ariaLabel }: PreviewProps) {
 
     const camera = new THREE.PerspectiveCamera(FOV, 1, 1, 1000);
     camera.position.copy(CAMERA_START);
+    // The models are Z-up (OpenSCAD's convention). With three's default Y-up camera a sideways
+    // drag would tumble an upright model onto its side instead of turning it like a turntable.
+    camera.up.set(0, 0, 1);
     cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
