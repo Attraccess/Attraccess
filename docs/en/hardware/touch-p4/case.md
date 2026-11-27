@@ -112,14 +112,17 @@ files for it, and use `rsvg-convert` for labels.
   outline fits the sample. Not measured: the cover lens alone (`lens_t`, 0.55 mm by the drawing) and the
   corner radius (at least 1 mm assumed). They decide whether the screen sits flush. Measure the panel you
   buy; if it differs, set `disp_t` and `lens_t` and export the parts again.
+  - First print (27 November 2026): with `tape_t` 0.3 mm the glass stood about 0.7 mm proud. `tape_t` is now
+    1.1 mm, which lowers the frame's rim by 0.8 mm. It covers the tape and whatever the lens has beyond 0.55 mm;
+    which of the two it is was not measured.
   - `lens_t` is the lens alone: the touch sensor (76.5 x 76.7 mm) is smaller than the lens, so the
     border the frame holds has no sensor behind it.
   - The sensor is 0.9 mm wider than the frame's opening for the LCD module (75.6 mm). The frame's rim
-    reaches 0.4 mm under each side edge of the sensor and, with the 0.3 mm tape, presses on it by
-    0.05 mm. An opening of 77.3 mm would clear it.
+    reaches 0.4 mm under each side edge of the sensor. With the 0.3 mm tape it pressed on it by 0.05 mm;
+    since the rim went 0.8 mm lower it clears it in CAD. An opening of 77.3 mm would clear it with any tape.
   - The sample's lens border carries its own tape (3M, with a liner; 0.175 mm 3M 9495 by the drawing,
-    not measured). It can replace the manual's 0.3 mm tape; the glass then sits 0.1 mm lower and the rim presses
-    on the sensor's edges by 0.2 mm, so widen the opening first.
+    not measured). It can replace the manual's tape only with a frame exported for it: set `tape_t` from a test
+    fit and widen the opening first.
 - **Display distance to the board.** The case holds the display 1.7 mm off the board (`disp_gap`).
   Details in the [design notes](hardware/touch-p4/design-notes.md#display-mounting-and-flex).
   - The display's flex folds flat onto the LCD's metal back and goes through a slot behind the display.
