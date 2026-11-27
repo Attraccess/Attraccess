@@ -9,11 +9,13 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv-provider.js';
 import { buildRestRequest, McpArgumentError, RestRequest } from './mcp-rest-bridge';
+import { mcpToolAllowed } from '@attraccess/shared';
 import type { McpTool } from './openapi-tools';
 
 export interface McpToolSource {
-  list(): McpTool[];
+  /** Every tool; `tools/call` checks the caller's permissions against the tool's requirement itself. */
   get(name: string): McpTool | undefined;
+  toolsFor(permissions: ReadonlySet<string>): McpTool[];
 }
 
 // Building an Ajv instance costs far more than the rest of a server; one is enough for every request.
@@ -24,6 +26,8 @@ export function createMcpServer(
   tools: McpToolSource,
   execute: (request: RestRequest) => Promise<CallToolResult>,
   version: string,
+  /** The caller's effective permissions (API token: token ∩ owner; OAuth: grant ∩ current). */
+  permissions: ReadonlySet<string>,
 ): Server {
   const server = new Server(
     { name: 'attraccess', version },
@@ -37,7 +41,7 @@ export function createMcpServer(
   );
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({
-    tools: tools.list().map((tool) => ({
+    tools: tools.toolsFor(permissions).map((tool) => ({
       name: tool.name,
       description: tool.description,
       inputSchema: tool.inputSchema,
@@ -51,7 +55,9 @@ export function createMcpServer(
 
   server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToolResult> => {
     const tool = tools.get(request.params.name);
-    if (!tool) throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${request.params.name}`);
+    // A tool the caller cannot use is indistinguishable from one that does not exist.
+    if (!tool || !mcpToolAllowed(tool.auth, permissions))
+      throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${request.params.name}`);
     try {
       const restRequest = buildRestRequest(tool, (request.params.arguments ?? {}) as Record<string, unknown>);
       return await execute(restRequest);

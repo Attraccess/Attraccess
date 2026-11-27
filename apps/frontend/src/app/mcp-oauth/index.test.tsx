@@ -20,6 +20,7 @@ const state = vi.hoisted(() => ({
     { onSuccess: (value: { redirectUrl: string }) => void; onError: (error: unknown) => void }
   >,
   leave: vi.fn(),
+  refetch: vi.fn(),
 }));
 
 const t = (key: string, vars?: Record<string, unknown>) => [key, ...Object.values(vars ?? {})].join(':');
@@ -40,8 +41,36 @@ vi.mock('../../hooks/useRbacCatalogTranslations', () => ({
       `category ${permission?.categoryLabel ?? category}`,
   }),
 }));
+// The picker has its own tests; here it is a list of checkboxes with the same props.
+vi.mock('../../components/permissionPicker', () => ({
+  PermissionPicker: (props: {
+    permissions: Array<{ key: string }>;
+    selectedKeys: Set<string>;
+    onChange: (keys: Iterable<string>) => void;
+    presentation?: string;
+    isDisabled?: boolean;
+  }) => (
+    <fieldset data-presentation={props.presentation} disabled={props.isDisabled}>
+      {props.permissions.map(({ key }) => (
+        <label key={key}>
+          <input
+            type="checkbox"
+            checked={props.selectedKeys.has(key)}
+            onChange={() => {
+              const next = new Set(props.selectedKeys);
+              if (next.has(key)) next.delete(key);
+              else next.add(key);
+              props.onChange(next);
+            }}
+          />
+          {`pick ${key}`}
+        </label>
+      ))}
+    </fieldset>
+  ),
+}));
 vi.mock('@attraccess/react-query-client', () => ({
-  useGetMcpOAuthRequest: () => state.consent,
+  useGetMcpOAuthRequest: () => ({ ...state.consent, refetch: state.refetch }),
   useApproveMcpOAuthRequest: (_mutationKey: unknown, options: (typeof state.options)[string]) => {
     state.options.approve = options;
     return { mutate: state.approve };
@@ -51,21 +80,29 @@ vi.mock('@attraccess/react-query-client', () => ({
     return { mutate: state.deny };
   },
 }));
+const permission = (key: string, category: string) => ({ key, label: key, description: '', category });
 const view = {
   clientName: 'Claude Code',
   redirectUri: 'http://127.0.0.1:8123/cb',
   redirectHost: '127.0.0.1:8123',
   loopbackRedirect: true,
   registeredByOperator: false,
-  // Users first: the page orders categories like the rest of the app, not like the API.
-  permissions: [
-    { key: 'users.roles.manage', label: 'Roles', description: 'Manage roles', category: 'users' },
-    { key: 'resources.read', label: 'Read', description: 'Read resources', category: 'resources' },
-    { key: 'plugin.thing', label: 'Plugin thing', description: '', category: '' },
-  ],
+  permissions: [permission('users.roles.manage', 'users'), permission('resources.read', 'resources')],
   requestedAll: false,
   unavailablePermissions: [] as string[],
   resource: 'http://localhost:3000/api/mcp',
+  availablePermissions: [
+    permission('resources.read', 'resources'),
+    permission('resources.update', 'resources'),
+    permission('users.roles.manage', 'users'),
+  ],
+  requestedPermissionKeys: ['users.roles.manage', 'resources.read'],
+  tools: [
+    { name: 'listRoles', summary: 'List roles', requiredAll: ['users.roles.manage'], requiredAny: [] },
+    { name: 'getAllResources', summary: 'List resources', requiredAll: [], requiredAny: [] },
+    { name: 'updateResource', summary: 'Update', requiredAll: ['resources.update'], requiredAny: [] },
+    { name: 'readOrUpdate', summary: 'Either', requiredAll: [], requiredAny: ['resources.read', 'resources.update'] },
+  ],
   expiresAt: '2026-01-01T00:00:00Z',
 };
 
@@ -77,35 +114,81 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it('shows the client, the redirect host and the permissions grouped by category in the app order', () => {
+const selected = () =>
+  screen
+    .getAllByRole('checkbox')
+    .filter((box) => (box as HTMLInputElement).checked)
+    .map((box) => box.parentElement?.textContent);
+const toolCount = () => screen.getByText(/^tools\.title:/).textContent;
+const approveButton = () => screen.getByText('approve').closest('button') as HTMLButtonElement;
+
+it('shows the client and the redirect host', () => {
   render(<McpOAuthAuthorizePage />);
   expect(screen.getByText('title:Claude Code')).toBeTruthy();
   expect(screen.getByText(/^loopback.message:127.0.0.1:8123/)).toBeTruthy();
-  const groups = screen.getAllByText(/^category |^permissions.other$/);
-  expect(groups.map((node) => node.textContent)).toEqual(['category resources', 'category users', 'permissions.other']);
-  expect(screen.getByText('label resources.read')).toBeTruthy();
-  expect(screen.getByTitle('about users.roles.manage')).toBeTruthy();
 });
 
-it('lists plugin categories after the core ones under their plugin heading', () => {
-  const matter = {
-    key: 'matter.devices.read',
-    label: 'View Matter devices',
-    description: '',
-    category: 'plugin:matter',
-    pluginName: 'matter',
-    categoryLabel: 'Matter & Thread',
+it('offers the permissions the user holds in the drawer picker, preselected with the requested ones', () => {
+  const { container } = render(<McpOAuthAuthorizePage />);
+  expect(container.querySelector('[data-presentation="drawer"]')).toBeTruthy();
+  expect(screen.getAllByRole('checkbox')).toHaveLength(3);
+  expect(selected()).toEqual(['pick resources.read', 'pick users.roles.manage']);
+});
+
+it('preselects everything the user holds when the client asked for all', () => {
+  state.consent = {
+    data: { ...view, requestedAll: true, requestedPermissionKeys: view.availablePermissions.map(({ key }) => key) },
+    isError: false,
   };
-  state.consent = { data: { ...view, permissions: [matter, ...view.permissions] }, isError: false };
   render(<McpOAuthAuthorizePage />);
-  const groups = screen.getAllByText(/^category |^permissions.other$/);
-  expect(groups.map((node) => node.textContent)).toEqual([
-    'category resources',
-    'category users',
-    'category Matter & Thread',
-    'permissions.other',
-  ]);
-  expect(screen.queryByText('category plugin:matter')).toBeNull();
+  expect(selected()).toHaveLength(3);
+  expect(screen.getByText('permissions.all:3')).toBeTruthy();
+});
+
+it('preselects only requested permissions the user holds', () => {
+  state.consent = {
+    data: {
+      ...view,
+      requestedPermissionKeys: ['resources.read', 'billing.manage'],
+      unavailablePermissions: ['billing.manage'],
+    },
+    isError: false,
+  };
+  render(<McpOAuthAuthorizePage />);
+  expect(selected()).toEqual(['pick resources.read']);
+});
+
+it('counts the tools the current selection enables and updates when it changes', () => {
+  render(<McpOAuthAuthorizePage />);
+  // listRoles, getAllResources (open to everyone) and readOrUpdate (needs one of two).
+  expect(toolCount()).toBe('tools.title:3');
+  fireEvent.click(screen.getByLabelText('pick users.roles.manage'));
+  expect(toolCount()).toBe('tools.title:2');
+  fireEvent.click(screen.getByLabelText('pick resources.update'));
+  expect(toolCount()).toBe('tools.title:3');
+  fireEvent.click(screen.getByLabelText('pick resources.read'));
+  fireEvent.click(screen.getByLabelText('pick resources.update'));
+  // Nothing selected: nothing can be allowed, so even the tools that need no permission do not count.
+  expect(toolCount()).toBe('tools.title:0');
+});
+
+it('lists the names and summaries of the enabled tools', () => {
+  const { container } = render(<McpOAuthAuthorizePage />);
+  fireEvent.click(screen.getByText(/^tools\.title:/));
+  const list = container.querySelector('[data-cy="mcp-oauth-tools-list"]');
+  expect(list?.textContent).toContain('listRoles');
+  expect(list?.textContent).toContain('List roles');
+  expect(list?.textContent).not.toContain('updateResource');
+});
+
+it('disables Allow when nothing is selected', () => {
+  render(<McpOAuthAuthorizePage />);
+  expect(approveButton().disabled).toBe(false);
+  fireEvent.click(screen.getByLabelText('pick resources.read'));
+  fireEvent.click(screen.getByLabelText('pick users.roles.manage'));
+  expect(approveButton().disabled).toBe(true);
+  fireEvent.click(approveButton());
+  expect(state.approve).not.toHaveBeenCalled();
 });
 
 it('warns about a self-registered client and only notes an operator-registered one', () => {
@@ -122,20 +205,24 @@ it('warns about a self-registered client and only notes an operator-registered o
   expect(second.container.querySelector('[data-cy="mcp-oauth-redirect-notice"]')?.outerHTML).not.toMatch(/warning/);
 });
 
-it('explains an all-permissions request and permissions the user does not hold', () => {
+it('explains permissions the user does not hold', () => {
   state.consent = {
-    data: { ...view, requestedAll: true, unavailablePermissions: ['users.roles.manage'] },
+    data: { ...view, unavailablePermissions: ['users.roles.manage'] },
     isError: false,
   };
   render(<McpOAuthAuthorizePage />);
-  expect(screen.getByText('permissions.all:3')).toBeTruthy();
   expect(screen.getByText('unavailable.message:label users.roles.manage')).toBeTruthy();
 });
 
-it('approves and sends the browser to the client', () => {
+it('approves with the selected permissions and sends the browser to the client', () => {
   render(<McpOAuthAuthorizePage />);
+  fireEvent.click(screen.getByLabelText('pick resources.update'));
+  fireEvent.click(screen.getByLabelText('pick resources.read'));
   fireEvent.click(screen.getByText('approve'));
-  expect(state.approve).toHaveBeenCalledWith({ path: { requestId: 'mcp_rq_abc' } });
+  expect(state.approve).toHaveBeenCalledWith({
+    path: { requestId: 'mcp_rq_abc' },
+    body: { permissionKeys: ['resources.update', 'users.roles.manage'] },
+  });
   expect(state.deny).not.toHaveBeenCalled();
   expect((screen.getByText('deny').closest('button') as HTMLButtonElement).disabled).toBe(true);
   act(() => state.options.approve.onSuccess({ redirectUrl: 'http://127.0.0.1:8123/cb?code=c&state=s' }));
@@ -150,6 +237,43 @@ it('denies and sends the browser to the client with the error redirect', () => {
   act(() => state.options.deny.onSuccess({ redirectUrl: 'http://127.0.0.1:8123/cb?error=access_denied' }));
   expect(state.leave).toHaveBeenCalledWith('http://127.0.0.1:8123/cb?error=access_denied');
   expect(screen.getByText('returningDenied')).toBeTruthy();
+});
+
+it('lets the user correct the selection after the API rejects it, instead of ending the flow', () => {
+  render(<McpOAuthAuthorizePage />);
+  fireEvent.click(screen.getByText('approve'));
+  act(() => state.options.approve.onError({ status: 400 }));
+  expect(screen.getByText('selectionError')).toBeTruthy();
+  expect(state.refetch).toHaveBeenCalled();
+  expect(screen.queryByText('error.expired')).toBeNull();
+  expect(screen.queryByText('error.generic')).toBeNull();
+  expect(approveButton().disabled).toBe(false);
+  fireEvent.click(screen.getByLabelText('pick resources.read'));
+  expect(screen.queryByText('selectionError')).toBeNull();
+  fireEvent.click(approveButton());
+  expect(state.approve).toHaveBeenCalledTimes(2);
+});
+
+it('drops a picked permission from the selection once the user no longer holds it', () => {
+  const { rerender } = render(<McpOAuthAuthorizePage />);
+  fireEvent.click(screen.getByLabelText('pick resources.update'));
+  state.consent = {
+    data: { ...view, availablePermissions: view.availablePermissions.filter(({ key }) => key !== 'resources.update') },
+    isError: false,
+  };
+  rerender(<McpOAuthAuthorizePage />);
+  fireEvent.click(approveButton());
+  expect(state.approve).toHaveBeenCalledWith({
+    path: { requestId: 'mcp_rq_abc' },
+    body: { permissionKeys: ['resources.read', 'users.roles.manage'] },
+  });
+});
+
+it('still ends the flow when the request has expired while approving', () => {
+  render(<McpOAuthAuthorizePage />);
+  fireEvent.click(screen.getByText('approve'));
+  act(() => state.options.approve.onError({ status: 404 }));
+  expect(screen.getByText('error.expired')).toBeTruthy();
 });
 
 it('answers only once even when pressed twice', () => {

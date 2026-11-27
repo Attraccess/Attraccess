@@ -37,7 +37,7 @@ import { MetricsService } from '../../../metrics/metrics.service';
 import { SettingsService } from '../../../settings/settings.service';
 import { SsoProviderResponseDto, toSsoProviderResponse } from './dto/sso-provider-response.dto';
 import { SSOProviderType } from '@attraccess/application-models';
-import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest, AuthenticatedUser, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import { Request, Response } from 'express';
 import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from './dto/sso-provisioning.dto';
 
@@ -268,6 +268,7 @@ export class SSOController {
   @ApiResponse({ status: 200, description: 'OIDC configuration JSON' })
   @ApiBadRequestResponse({ description: 'Invalid host or applicationName' })
   @ApiBadGatewayResponse({ description: DISCOVERY_BAD_GATEWAY })
+  @NotAnMcpTool('SSRF risk: the server fetches an arbitrary identity provider URL')
   async discoverAuthentik(@Query('host') host: string, @Query('applicationName') applicationName: string) {
     if (typeof host !== 'string' || typeof applicationName !== 'string' || !host || !applicationName) {
       throw new BadRequestException('Missing required parameters');
@@ -288,6 +289,7 @@ export class SSOController {
   @ApiResponse({ status: 200, description: 'OIDC configuration JSON' })
   @ApiBadRequestResponse({ description: 'Invalid host or realm' })
   @ApiBadGatewayResponse({ description: DISCOVERY_BAD_GATEWAY })
+  @NotAnMcpTool('SSRF risk: the server fetches an arbitrary identity provider URL')
   async discoverKeycloak(@Query('host') host: string, @Query('realm') realm: string) {
     if (typeof host !== 'string' || typeof realm !== 'string' || !host || !realm) {
       throw new BadRequestException('Missing required parameters');

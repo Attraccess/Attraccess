@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Card, Skeleton } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Skeleton } from '@heroui/react';
 import { Button, StatusDialog, useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import {
   useApproveMcpOAuthRequest,
@@ -7,7 +7,7 @@ import {
   useGetMcpOAuthRequest,
 } from '@attraccess/react-query-client';
 import { UnauthorizedLayout } from '../unauthorized/unauthorized-layout/layout';
-import { PermissionChipGroups } from '../../components/permissionList';
+import { McpOAuthPermissionChoice } from './McpOAuthPermissionChoice';
 import { useRbacCatalogTranslations } from '../../hooks/useRbacCatalogTranslations';
 import en from './en.json';
 import de from './de.json';
@@ -49,6 +49,9 @@ export function McpOAuthAuthorizePage() {
   const [decided, setDecided] = useState<Decision | null>(null);
   const [redirecting, setRedirecting] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(() => (isFramed() ? 'framed' : null));
+  // Until the user changes it, the selection is what the client asked for, within what the user holds.
+  const [chosen, setChosen] = useState<Set<string> | null>(null);
+  const [selectionRejected, setSelectionRejected] = useState(false);
 
   const consent = useGetMcpOAuthRequest({ path: { requestId: requestId ?? '' } }, undefined, {
     enabled: Boolean(requestId) && failure !== 'framed',
@@ -62,6 +65,13 @@ export function McpOAuthAuthorizePage() {
     },
     onError: (error: unknown) => {
       setDecided(null);
+      // The API refuses a bad selection before it uses up the request: the user can correct it and try again.
+      // A refetch drops permissions the user lost in the meantime from the offer and from the selection.
+      if ((error as ApiFailure | undefined)?.status === 400) {
+        setSelectionRejected(true);
+        void consent.refetch();
+        return;
+      }
       setFailure(classify(error));
     },
   };
@@ -69,6 +79,11 @@ export function McpOAuthAuthorizePage() {
   const deny = useDenyMcpOAuthRequest(undefined, handlers);
 
   const view = consent.data;
+  // Always within what the user holds now, also after a refetch removed a permission the user had picked.
+  const selectedKeys = useMemo(() => {
+    const available = new Set((view?.availablePermissions ?? []).map((permission) => permission.key));
+    return new Set([...(chosen ?? view?.requestedPermissionKeys ?? [])].filter((key) => available.has(key)));
+  }, [view, chosen]);
   const unavailableLabels = useMemo(() => {
     const byKey = new Map((view?.permissions ?? []).map((permission) => [permission.key, permission]));
     return (view?.unavailablePermissions ?? []).map((key) => permissionLabel(byKey.get(key) ?? { key })).join(', ');
@@ -77,7 +92,9 @@ export function McpOAuthAuthorizePage() {
   const decide = (decision: Decision) => {
     if (!requestId || decided) return;
     setDecided(decision);
-    (decision === 'approve' ? approve : deny).mutate({ path: { requestId } });
+    setSelectionRejected(false);
+    if (decision === 'deny') return deny.mutate({ path: { requestId } });
+    approve.mutate({ path: { requestId }, body: { permissionKeys: [...selectedKeys].sort() } });
   };
 
   const problem = !requestId ? 'missing' : (failure ?? (consent.isError ? classify(consent.error) : null));
@@ -103,14 +120,14 @@ export function McpOAuthAuthorizePage() {
   const warn = view ? view.loopbackRedirect || !view.registeredByOperator : false;
   return (
     <UnauthorizedLayout>
-      <Card className="w-full" data-cy="mcp-oauth-consent">
-        <Card.Header>
-          <Card.Title className="break-words">
+      <div className="flex w-full flex-col gap-4" data-cy="mcp-oauth-consent">
+        <header className="flex flex-col gap-1">
+          <h2 className="break-words text-xl font-semibold">
             {view ? t('title', { client: view.clientName }) : <Skeleton className="h-6 w-64 rounded-md" />}
-          </Card.Title>
-          <Card.Description>{t('intro')}</Card.Description>
-        </Card.Header>
-        <Card.Content className="flex flex-col gap-4">
+          </h2>
+          <p className="text-sm text-muted">{t('intro')}</p>
+        </header>
+        <div className="flex flex-col gap-4">
           {!view ? (
             <Skeleton className="h-32 w-full rounded-md" />
           ) : (
@@ -126,7 +143,7 @@ export function McpOAuthAuthorizePage() {
               </Alert>
 
               {view.unavailablePermissions.length > 0 && (
-                <Alert status="danger" data-cy="mcp-oauth-unavailable">
+                <Alert status="warning" data-cy="mcp-oauth-unavailable">
                   <AlertContent>
                     <AlertTitle>{t('unavailable.title')}</AlertTitle>
                     <AlertDescription>{t('unavailable.message', { permissions: unavailableLabels })}</AlertDescription>
@@ -134,25 +151,31 @@ export function McpOAuthAuthorizePage() {
                 </Alert>
               )}
 
-              <section aria-labelledby="mcp-oauth-permissions" className="flex flex-col gap-3">
-                <h4 id="mcp-oauth-permissions" className="text-base font-semibold">
-                  {t('permissions.title')}
-                </h4>
-                {view.requestedAll && (
-                  <p className="text-sm text-muted">{t('permissions.all', { count: view.permissions.length })}</p>
-                )}
-                {view.permissions.length === 0 ? (
-                  <p className="text-sm text-muted">{t('permissions.none')}</p>
-                ) : (
-                  <PermissionChipGroups permissions={view.permissions} uncategorizedLabel={t('permissions.other')} />
-                )}
-              </section>
+              <McpOAuthPermissionChoice
+                availablePermissions={view.availablePermissions}
+                tools={view.tools}
+                selectedKeys={selectedKeys}
+                onChange={(keys) => {
+                  setChosen(keys);
+                  setSelectionRejected(false);
+                }}
+                requestedAll={view.requestedAll}
+                isDisabled={decided !== null || redirecting}
+              />
+
+              {selectionRejected && (
+                <Alert status="danger" data-cy="mcp-oauth-selection-error">
+                  <AlertContent>
+                    <AlertDescription>{t('selectionError')}</AlertDescription>
+                  </AlertContent>
+                </Alert>
+              )}
 
               <p className="text-sm text-muted">{t('notice')}</p>
             </>
           )}
-        </Card.Content>
-        <Card.Footer className="flex flex-col items-end gap-2">
+        </div>
+        <footer className="flex flex-col items-end gap-2">
           <div className="flex justify-end gap-2">
             <Button
               variant="secondary"
@@ -164,7 +187,9 @@ export function McpOAuthAuthorizePage() {
               {t('deny')}
             </Button>
             <Button
-              isDisabled={!view || (decided !== null && decided !== 'approve') || redirecting}
+              isDisabled={
+                !view || selectedKeys.size === 0 || (decided !== null && decided !== 'approve') || redirecting
+              }
               isPending={decided === 'approve'}
               onPress={() => decide('approve')}
               data-cy="mcp-oauth-approve"
@@ -175,8 +200,8 @@ export function McpOAuthAuthorizePage() {
           <p role="status" aria-live="polite" className="text-sm text-muted" data-cy="mcp-oauth-returning">
             {redirecting ? t(decided === 'deny' ? 'returningDenied' : 'returningApproved') : ''}
           </p>
-        </Card.Footer>
-      </Card>
+        </footer>
+      </div>
     </UnauthorizedLayout>
   );
 }

@@ -12,15 +12,16 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { ApiExcludeController, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiExcludeController, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
 import type { Request, Response } from 'express';
 import { RbacService } from '../users-and-auth/rbac/rbac.service';
 import { resolveIp } from '../users-and-auth/rate-limiting/login.rate-limit.guard';
-import { McpOAuthConsentDto, McpOAuthRedirectDto } from './mcp-oauth.dto';
+import { McpOAuthApproveDto, McpOAuthConsentDto, McpOAuthRedirectDto } from './mcp-oauth.dto';
 import { McpOAuthError, McpOAuthService } from './mcp-oauth.service';
 import { McpEndpoints, McpPublicUrls } from './mcp-public-urls.service';
 import { McpRateLimit, McpRateLimitGuard } from './mcp-rate-limit.guard';
+import { McpToolRegistry } from './mcp-tool-registry';
 
 /** Sends the browser to the frontend error page. Only a fixed error code travels, never client-supplied text. */
 function errorPage(res: Response, endpoints: McpEndpoints, code: string): void {
@@ -193,6 +194,15 @@ export class McpOAuthController {
   }
 }
 
+export async function translateOAuthError<T>(action: () => Promise<T>): Promise<T> {
+  try {
+    return await action();
+  } catch (error) {
+    if (error instanceof McpOAuthError) throw new HttpException(error.message, error.status);
+    throw error;
+  }
+}
+
 /** What the frontend consent page calls, with the user's own browser session. */
 @ApiTags('MCP OAuth')
 @Controller('mcp/oauth/requests')
@@ -201,6 +211,7 @@ export class McpOAuthConsentController {
   constructor(
     private readonly urls: McpPublicUrls,
     private readonly oauth: McpOAuthService,
+    private readonly registry: McpToolRegistry,
   ) {}
 
   @SessionAuth()
@@ -210,17 +221,31 @@ export class McpOAuthConsentController {
   @ApiOkResponse({ type: McpOAuthConsentDto })
   async describe(@Req() req: AuthenticatedRequest, @Param('requestId') requestId: string): Promise<McpOAuthConsentDto> {
     await oauthEndpoints(this.urls, req as unknown as Request);
-    return this.translate(() => this.oauth.describeRequest(requestId, req.user));
+    const view = await this.translate(() => this.oauth.describeRequest(requestId, req.user));
+    // The page previews a selection locally: it gets every tool the user's full permissions could unlock.
+    const available = new Set(view.availablePermissions.map((permission) => permission.key));
+    const tools = this.registry.toolsFor(available).map((tool) => ({
+      name: tool.name,
+      summary: tool.description.split('\n')[0],
+      requiredAll: tool.auth.all,
+      requiredAny: tool.auth.any,
+    }));
+    return { ...view, tools };
   }
 
   @SessionAuth()
   @Post(':requestId/approve')
   @McpRateLimit('consent')
   @ApiOperation({ summary: 'Allow an MCP client', operationId: 'approveMcpOAuthRequest' })
+  @ApiBody({ type: McpOAuthApproveDto, required: false })
   @ApiOkResponse({ type: McpOAuthRedirectDto })
-  async approve(@Req() req: AuthenticatedRequest, @Param('requestId') requestId: string): Promise<McpOAuthRedirectDto> {
+  async approve(
+    @Req() req: AuthenticatedRequest,
+    @Param('requestId') requestId: string,
+    @Body() body?: McpOAuthApproveDto,
+  ): Promise<McpOAuthRedirectDto> {
     const endpoints = await oauthEndpoints(this.urls, req as unknown as Request);
-    return this.translate(() => this.oauth.approve(requestId, req.user, endpoints.origin));
+    return this.translate(() => this.oauth.approve(requestId, req.user, endpoints.origin, body?.permissionKeys));
   }
 
   @SessionAuth()
@@ -233,12 +258,7 @@ export class McpOAuthConsentController {
     return this.translate(() => this.oauth.deny(requestId, endpoints.origin));
   }
 
-  private async translate<T>(action: () => Promise<T>): Promise<T> {
-    try {
-      return await action();
-    } catch (error) {
-      if (error instanceof McpOAuthError) throw new HttpException(error.message, error.status);
-      throw error;
-    }
+  private translate<T>(action: () => Promise<T>): Promise<T> {
+    return translateOAuthError(action);
   }
 }
