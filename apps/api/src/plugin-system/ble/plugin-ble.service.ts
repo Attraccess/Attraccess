@@ -26,6 +26,7 @@ import { BleSessionEngine, type BleSessionClock } from '@attraccess/plugins-back
 import { Inject, Injectable, Logger, LoggerService, OnModuleDestroy, Optional } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { OnEvent } from '@nestjs/event-emitter';
+import { remoteEvent } from '../../attractap/websockets/reader-event-relay';
 import { randomUUID } from 'crypto';
 import { classifyPersistenceError, isUniqueViolation } from '../../database/persistence-errors';
 import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../../attractap/events';
@@ -141,6 +142,7 @@ export class PluginBleService implements OnModuleDestroy {
 
   // The event bus is shared with plugins (EMIT_EVENTS), so the database decides, not the event payload.
   @OnEvent(ReaderUpdatedEvent.EVENT_NAME)
+  @OnEvent(remoteEvent(ReaderUpdatedEvent.EVENT_NAME))
   async onReaderUpdated(event: ReaderUpdatedEvent): Promise<void> {
     if (typeof event.reader?.allowPluginBle !== 'boolean') return;
     await this.watches.readerAccessChanged(event.reader.id);
@@ -150,6 +152,7 @@ export class PluginBleService implements OnModuleDestroy {
   }
 
   @OnEvent(ReaderDeletedEvent.EVENT_NAME)
+  @OnEvent(remoteEvent(ReaderDeletedEvent.EVENT_NAME))
   async onReaderDeleted(event: ReaderDeletedEvent): Promise<void> {
     await this.watches.readerAccessChanged(event.readerId);
     if (!(await this.findReader(event.readerId))) await this.revokeReader(event.readerId);

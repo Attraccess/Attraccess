@@ -1,4 +1,4 @@
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 
 import {
   BadRequestException,
@@ -201,6 +201,7 @@ export class UsersAdminController {
     status: 404,
     description: 'User not found.',
   })
+  @NotAnMcpTool('Credential flow: sets the password of another user')
   async setUserPassword(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: SetUserPasswordDto,

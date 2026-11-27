@@ -68,6 +68,18 @@ describe('AttractapSelect for card writing', () => {
     expect(await options()).toEqual(['Workshop']);
   });
 
+  it('offers only secured readers in "secured" mode, whatever the stored list says', async () => {
+    readersQuery([
+      { ...reader(1, 'Entrance', {}), secured: true } as ReturnType<typeof reader>,
+      reader(2, 'Workshop', {}),
+    ]);
+    vi.mocked(useGetCardWriterSettings).mockReturnValue({
+      data: { mode: 'secured', readerIds: [2] },
+    } as ReturnType<typeof useGetCardWriterSettings>);
+    render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} forCardWriting />);
+    expect(await options()).toEqual(['Entrance']);
+  });
+
   it('does not apply the card writer rules to other pickers', async () => {
     vi.mocked(useGetCardWriterSettings).mockReturnValue({
       data: { mode: 'selected', readerIds: [2] },

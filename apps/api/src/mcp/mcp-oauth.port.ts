@@ -22,6 +22,8 @@ export interface McpOAuthStore {
 
   createGrant(grant: NewMcpOAuthGrant): Promise<McpOAuthGrantRecord>;
   findGrant(grantId: string): Promise<McpOAuthGrantRecord | null>;
+  /** The user's grants that are neither revoked nor expired, newest first. */
+  listActiveGrantsForUser(userId: number): Promise<McpOAuthGrantRecord[]>;
   /** Records a use of the grant. */
   touchGrant(grantId: string, usedAt: Date): Promise<void>;
   /** Ends a grant and drops every token issued under it, in one atomic step. */

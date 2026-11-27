@@ -167,6 +167,8 @@ class ReleaseBuildFlags(unittest.TestCase):
         self.assertIn("-DATTRACTAP_TEST_HOOKS=OFF", args)
         self.assertIn("-DATTRACTAP_LV_PERF_MONITOR=OFF", args)
         self.assertIn("-DATTRACTAP_LAB_CA=", args)
+        # The lab's conversion stop-before-burn (ATT-1208) never reaches a shipped image.
+        self.assertIn("-DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=OFF", args)
 
     def test_secure_release_builds_clear_the_lab_ca(self):
         with mock.patch.object(b, "run_idf", return_value=1) as run_idf, \

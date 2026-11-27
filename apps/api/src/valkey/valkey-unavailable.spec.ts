@@ -8,6 +8,7 @@ describe('isValkeyUnavailableError', () => {
       name: 'MaxRetriesPerRequestError',
     }),
     new Error('Connection is closed.'),
+    new Error('Command timed out'),
     new Error('Valkey is reconnecting'),
     new Error('Valkey is close'),
     new Error('Valkey is end'),

@@ -15,6 +15,11 @@ const hoisted = vi.hoisted(() => ({
   errorToast: vi.fn(),
   showToast: vi.fn(),
   uploadOptions: undefined as UploadOptions | undefined,
+  refreshAfterPluginChange: vi.fn(),
+}));
+
+vi.mock('../settings/sections/plugins/useRefreshAfterPluginChange', () => ({
+  useRefreshAfterPluginChange: () => hoisted.refreshAfterPluginChange,
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
@@ -41,6 +46,7 @@ beforeEach(() => {
   hoisted.successToast.mockReset();
   hoisted.errorToast.mockReset();
   hoisted.uploadOptions = undefined;
+  hoisted.refreshAfterPluginChange.mockReset();
 });
 
 afterEach(() => {
@@ -135,16 +141,17 @@ describe('UploadPluginModal', () => {
     expect(hoisted.uploadMutateMock).not.toHaveBeenCalled();
   });
 
-  it('shows a success toast and closes after a successful upload', () => {
-    vi.useFakeTimers();
+  it('shows a success toast, closes and refreshes the plugin state', () => {
     const onClose = vi.fn();
     render(<UploadPluginModal isOpen onClose={onClose} />);
 
     hoisted.uploadOptions?.onSuccess?.();
 
     expect(onClose).toHaveBeenCalled();
-    expect(hoisted.successToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Success' }));
-    vi.useRealTimers();
+    expect(hoisted.successToast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Success', description: expect.stringContaining('after a restart') }),
+    );
+    expect(hoisted.refreshAfterPluginChange).toHaveBeenCalledOnce();
   });
 
   it('shows an error toast when the upload fails', () => {

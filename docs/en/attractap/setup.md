@@ -64,8 +64,8 @@ LED pattern, security notes and what to do after the upgrade to firmware 2.6.0, 
 
 > [!NOTE]
 > You need the `resources.update` permission to approve a reader. A reader that signs in with a token
-> (any firmware older than 1.8.0, and a reader on 1.8.0 to 2.5.x that was never paired) cannot pair and
-> cannot update over the air; flash it to firmware 2.6.0 with the web flasher (USB) first.
+> (any firmware older than 1.8.0, and a reader on 1.8.0 to 2.5.x that was never paired) cannot pair. It
+> updates its firmware over the air first, then shows its pairing code.
 
 ## Step 3: Assign Resources to the Reader
 

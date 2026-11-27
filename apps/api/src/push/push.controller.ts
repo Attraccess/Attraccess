@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Post, Put, Query, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import type { PushSubscriptionRecord } from '@attraccess/application-models';
 import { PushSubscription } from './dtos/pushSubscription.dto';
 import { PushService } from './push.service';
@@ -33,6 +33,7 @@ export class PushController {
     operationId: 'pushGetVapidConfig',
   })
   @ApiResponse({ status: 200, description: 'The current VAPID configuration', type: VapidConfigDto })
+  @NotAnMcpTool('Secret management: returns the private VAPID key pair')
   async getVapidConfig(): Promise<VapidConfigDto> {
     const [publicKey, subscriptionCount] = await Promise.all([
       this.pushService.getPublicKey(),
@@ -55,6 +56,7 @@ export class PushController {
     type: ReplaceVapidKeysResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Only one of publicKey/privateKey was provided, or a key is invalid' })
+  @NotAnMcpTool('Secret management: replaces the VAPID key pair')
   async replaceVapidKeys(@Body() dto: ReplaceVapidKeysDto): Promise<ReplaceVapidKeysResponseDto> {
     const hasPublicKey = Boolean(dto.publicKey?.trim());
     const hasPrivateKey = Boolean(dto.privateKey?.trim());

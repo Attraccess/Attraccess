@@ -16,7 +16,8 @@ The way to update your readers is therefore to update Attraccess. Once the backe
 
 > [!IMPORTANT]
 > Updates run over the encrypted connection of a paired reader. A reader that still signs in with a token
-> cannot update over the air: flash it to firmware 2.6.0 over USB with the web flasher, then pair it. A
+> gets one update over a connection that allows nothing else, then pairs; only a reader whose firmware
+> variant this server has no image for has to be flashed over USB with the web flasher. A
 > reader on firmware 1.8.0 to 2.5.x has to be paired again after the server upgrade before it receives
 > updates. See [After the upgrade: every reader pairs again](attractap/pairing.md#after-the-upgrade-every-reader-pairs-again).
 

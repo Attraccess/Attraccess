@@ -58,7 +58,7 @@ Ein Leser kann sich nicht selbst registrieren. Er zeigt einen wechselnden Code, 
 Der Leser verbindet sich und ist einsatzbereit. Details, das LED-Muster der Lite-Variante, Sicherheitshinweise und den Ablauf nach dem Upgrade auf Firmware 2.6.0, bei dem jeder Leser neu koppelt, finden Sie unter [Reader koppeln](attractap/pairing.md).
 
 > [!NOTE]
-> Zum Freigeben eines Lesegeräts brauchen Sie die Berechtigung `resources.update`. Ein Lesegerät, das sich mit einem Token anmeldet (jede Firmware älter als 1.8.0 und ein nie gekoppeltes Lesegerät mit 1.8.0 bis 2.5.x), kann weder koppeln noch per Funk aktualisiert werden; flashen Sie es zuerst mit dem Web-Flasher (USB) auf Firmware 2.6.0.
+> Zum Freigeben eines Lesegeräts brauchen Sie die Berechtigung `resources.update`. Ein Lesegerät, das sich mit einem Token anmeldet (jede Firmware älter als 1.8.0 und ein nie gekoppeltes Lesegerät mit 1.8.0 bis 2.5.x), kann nicht koppeln. Es aktualisiert zuerst seine Firmware per Funk und zeigt dann seinen Kopplungscode.
 
 ## Schritt 3: Ressourcen dem Leser zuweisen
 

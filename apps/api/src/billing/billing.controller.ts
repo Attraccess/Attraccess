@@ -1,6 +1,6 @@
 import { AllowCrossSiteWrite } from '../common/security/cross-site-write.guard';
 import { ResourceFlowNodeType } from '@attraccess/application-models';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 
 import {
   Body,
@@ -287,6 +287,7 @@ export class BillingController {
     operationId: 'setSumUpApiKey',
   })
   @ApiResponse({ status: 200, description: 'The SumUp apiKey has been set.', type: String, example: 'OK' })
+  @NotAnMcpTool('Secret management: stores a payment provider API key')
   async setSumUpApiKey(@Body() body: SetSumUpApiKeyDto): Promise<string> {
     await this.sumUpService.setApiKey(body.apiKey);
     return 'OK';

@@ -1,3 +1,4 @@
+import { AuditLog } from '@attraccess/database-entities';
 import { EmailTemplateType } from '@attraccess/application-models';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { EmailLayoutController } from '../email-layout/email-layout.controller';
@@ -11,6 +12,8 @@ import { PluginAdministrationService } from '../plugin-system/plugin-administrat
 import { InstalledNpmPlugin, NpmPluginAuditState } from '../plugin-system/npm-plugin.service';
 import { PluginController } from '../plugin-system/plugin.controller';
 import { PluginService } from '../plugin-system/plugin.service';
+import { clearPluginRestartRequired, markPluginRestartRequired } from '../plugin-system/runtime/restart-required';
+import { setupAuditDatabase } from '../database/adapters/audit/audit.test-fixture';
 import { SettingsController } from '../settings/settings.controller';
 import { SettingsAdministrationService } from '../settings/settings-administration.service';
 import { projectAuditRow } from './recorder/audit-row';
@@ -367,7 +370,8 @@ describe('administration lifecycle hooks', () => {
         throw new Error(secret);
       }),
     };
-    const controller = pluginController({ requestRestart: jest.fn() }, npm, audit);
+    const pluginService = { requestRestart: jest.fn() };
+    const controller = pluginController(pluginService, npm, audit);
     await controller.installPackage(plugin.name, '2.0.0', { registryId: 'default' }, req);
     await expect(
       controller.replaceInstalledPackage(
@@ -385,6 +389,43 @@ describe('administration lifecycle hooks', () => {
     expect(events[1]).toMatchObject({
       outcome: 'failed',
       details: { oldVersion: '1.0.0', newVersion: '2.0.0', rollbackOutcome: 'succeeded' },
+    });
+    // Package changes only mark a restart as required; the administrator restarts separately.
+    expect(pluginService.requestRestart).not.toHaveBeenCalled();
+  });
+
+  describe('plugin system restart', () => {
+    const fixture = setupAuditDatabase();
+
+    beforeEach(async () => {
+      await fixture.store.setPlainSetting('audit', 'domains', JSON.stringify(['administration']));
+    });
+
+    afterEach(() => clearPluginRestartRequired());
+
+    it('persists the restart request with its pending changes before restarting', async () => {
+      const pluginService = { requestRestart: jest.fn() };
+      const controller = new PluginController(
+        {} as never,
+        new PluginAdministrationService(pluginService as never, {} as never, {} as never, fixture.service),
+      );
+      markPluginRestartRequired();
+
+      await expect(controller.restartPluginSystem(req)).resolves.toEqual({ ok: true });
+
+      expect(pluginService.requestRestart).toHaveBeenCalledTimes(1);
+      expect(await fixture.source.getRepository(AuditLog).find()).toEqual([
+        expect.objectContaining({
+          domain: 'administration',
+          action: 'plugin.restart_requested',
+          actorId: 42,
+          authenticationMethod: 'api-token',
+          apiTokenId: 9,
+          outcome: 'succeeded',
+          subjectType: 'plugin-system',
+          details: { pendingChanges: 1, restartRequested: 1 },
+        }),
+      ]);
     });
   });
 });

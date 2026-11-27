@@ -75,4 +75,19 @@ describe('LiveNotificationsService', () => {
       await expect(service.notifyTransactionUpdate(999)).rejects.toBeInstanceOf(BadRequestException);
     });
   });
+
+  describe('notifyTransactionRemoved', () => {
+    it('emits the removed transaction as given on its owner’s subject, without loading it', () => {
+      const removed = { id: 9, userId: 77, amount: 0, items: [] } as unknown as BillingTransactionRecord;
+      const received = jest.fn();
+      const other = jest.fn();
+      service.getTransactionSubject(77).subscribe(received);
+      service.getTransactionSubject(78).subscribe(other);
+
+      service.notifyTransactionRemoved(removed);
+
+      expect(received).toHaveBeenCalledWith({ data: removed });
+      expect(other).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -116,6 +116,10 @@ export interface ConsentView {
   unavailablePermissions: string[];
   resource: string;
   expiresAt: Date;
+  /** The user's current effective permissions: what the consent page offers. Sorted. */
+  availablePermissions: ConsentPermission[];
+  /** The requested keys; every available key when the client asked for all. Not limited to the available ones. */
+  requestedPermissionKeys: string[];
 }
 
 type Registered = StaticOAuthClient & {
@@ -308,7 +312,7 @@ export class McpOAuthService {
     const keys = requestedAll ? [...current].sort() : payload.permissionKeys;
     // The consent page cannot read the permission catalog itself: listing it needs an administrator permission.
     const catalog = new Map((await this.rbac.getPermissions()).map((permission) => [permission.key, permission]));
-    const permissions = keys.map((key) => {
+    const describe = (key: string): ConsentPermission => {
       const known = catalog.get(key);
       return {
         key,
@@ -321,31 +325,59 @@ export class McpOAuthService {
         categoryLabel: known?.categoryLabel ?? null,
         categoryLabelDe: known?.categoryLabelDe ?? null,
       };
-    });
+    };
     return {
       clientName: client.clientName,
       registeredByOperator: client.isStatic,
       redirectUri: payload.redirectUri,
       redirectHost: new URL(payload.redirectUri).host,
       loopbackRedirect: isLoopbackRedirectUri(payload.redirectUri),
-      permissions,
+      permissions: keys.map(describe),
       requestedAll,
       unavailablePermissions: keys.filter((permission) => !current.has(permission)),
       resource: payload.resource,
       expiresAt: token.expiresAt,
+      availablePermissions: [...current].sort().map(describe),
+      requestedPermissionKeys: keys,
     };
   }
 
-  /** Consent granted: returns the redirect carrying a single-use authorization code. */
-  async approve(requestId: string, user: { id: number }, issuer: string): Promise<{ redirectUrl: string }> {
-    const { payload } = await this.consumeRequest(requestId);
+  /**
+   * Checks the keys the user picked on the consent page: sorted and de-duplicated, never empty, all in the permission
+   * catalog and all held by the user right now. Throws a 400 (the request stays usable) otherwise.
+   */
+  private async chosenKeys(chosen: readonly string[], current: ReadonlySet<string>): Promise<string[]> {
+    const keys = [...new Set(chosen)].sort();
+    if (keys.length === 0) throw new McpOAuthError('invalid_request', 'Choose at least one permission');
+    const known = new Set((await this.rbac.getPermissions()).map((permission) => permission.key));
+    const unknown = keys.filter((key) => !known.has(key));
+    if (unknown.length) throw new McpOAuthError('invalid_scope', `Unknown permissions: ${unknown.join(' ')}`);
+    const notHeld = keys.filter((key) => !current.has(key));
+    if (notHeld.length) throw new McpOAuthError('invalid_scope', `Permissions you do not hold: ${notHeld.join(' ')}`);
+    return keys;
+  }
+
+  /**
+   * Consent granted: returns the redirect carrying a single-use authorization code. `chosenKeys` (the consent page's
+   * choice) is validated before the request is consumed and becomes the grant; without it the requested scope applies.
+   */
+  async approve(
+    requestId: string,
+    user: { id: number },
+    issuer: string,
+    chosenKeys?: readonly string[],
+  ): Promise<{ redirectUrl: string }> {
+    const loaded = await this.loadRequest(requestId);
     const current = await this.rbac.getEffectivePermissions(user.id, true);
-    const requested = payload.permissionKeys.length ? payload.permissionKeys : [...current].sort();
-    if (requested.some((permission) => !current.has(permission))) {
+    const chosen = chosenKeys === undefined ? undefined : await this.chosenKeys(chosenKeys, current);
+    const { payload } = await this.consumeLoaded(loaded);
+    const requested = chosen ?? (payload.permissionKeys.length ? payload.permissionKeys : [...current].sort());
+    // A grant never stores an empty key list (a user without permissions) or more than the user holds.
+    if (requested.length === 0 || requested.some((permission) => !current.has(permission))) {
       return {
         redirectUrl: this.redirect(payload, issuer, {
           error: 'invalid_scope',
-          error_description: 'Requested permissions exceed those of the user',
+          error_description: requested.length ? 'Requested permissions exceed those of the user' : 'Nothing to grant',
         }),
       };
     }
@@ -542,7 +574,11 @@ export class McpOAuthService {
   }
 
   private async consumeRequest(requestId: string): Promise<{ payload: RequestPayload }> {
-    const { payload, token } = await this.loadRequest(requestId);
+    return this.consumeLoaded(await this.loadRequest(requestId));
+  }
+
+  private async consumeLoaded(loaded: { payload: RequestPayload; token: McpOAuthTokenRecord }) {
+    const { payload, token } = loaded;
     if (!(await this.consume(token.tokenHash))) {
       throw new McpOAuthError('not_found', 'This authorization request was already answered', 404);
     }

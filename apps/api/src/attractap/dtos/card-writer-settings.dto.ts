@@ -2,12 +2,14 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional } from 'class-validator';
 
-export const CARD_WRITER_MODES = ['all', 'selected'] as const;
+/** `secured`: only readers the server checked as secured (eFuse report, ATT-1208) may write cards. */
+export const CARD_WRITER_MODES = ['all', 'selected', 'secured'] as const;
 export type CardWriterMode = (typeof CARD_WRITER_MODES)[number];
 
 export class CardWriterSettingsDto {
   @ApiProperty({
-    description: 'Which readers may enroll and reset cards: every reader, or only the selected ones',
+    description:
+      'Which readers may enroll and reset cards: every reader, only the selected ones, or only secured readers',
     enum: CARD_WRITER_MODES,
   })
   @IsIn(CARD_WRITER_MODES)

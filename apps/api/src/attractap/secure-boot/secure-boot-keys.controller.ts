@@ -11,7 +11,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import { auditActorOf } from '../../audit/recorder/audit-event';
 import { LicenseModuleType } from '../../license/license.service';
 import { RequiresLicense } from '../../license/require-license.decorator';
@@ -37,6 +37,7 @@ export class AttractapSecureBootKeysController {
   @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Secure Boot key status; never includes key material', operationId: 'getSecureBootKeys' })
   @ApiResponse({ status: 200, type: SecureBootKeysStateDto })
+  @NotAnMcpTool('Secret management: returns secure-boot key material')
   async getKeys(): Promise<SecureBootKeysStateDto> {
     return await this.keys.getState();
   }
@@ -46,6 +47,7 @@ export class AttractapSecureBootKeysController {
   @ApiOperation({ summary: 'Create the signing and recovery keys', operationId: 'createSecureBootKeys' })
   @ApiResponse({ status: 201, type: SecureBootKeyFingerprintsDto })
   @ApiResponse({ status: 409, description: 'Keys exist and readers have digests burned with them' })
+  @NotAnMcpTool('Secret management: generates secure-boot key material')
   async createKeys(@Req() req: AuthenticatedRequest): Promise<SecureBootKeyFingerprintsDto> {
     return await this.keys.createKeys(auditActorOf(req.user));
   }
@@ -59,6 +61,7 @@ export class AttractapSecureBootKeysController {
   })
   @ApiResponse({ status: 200, type: KeyFileDownloadDto })
   @Header('Cache-Control', 'no-store')
+  @NotAnMcpTool('Secret management: serves the recovery key')
   async downloadRecoveryKey(
     @Body() body: PassphraseDto,
     @Req() req: AuthenticatedRequest,
@@ -74,6 +77,7 @@ export class AttractapSecureBootKeysController {
     operationId: 'checkRecoveryKey',
   })
   @ApiResponse({ status: 200, type: RecoveryCheckResultDto })
+  @NotAnMcpTool('Secret management: checks a secure-boot recovery key')
   async checkRecoveryKey(@Body() body: KeyFileDto, @Req() req: AuthenticatedRequest): Promise<RecoveryCheckResultDto> {
     return await this.keys.checkRecoveryKey(body.pem, body.passphrase, auditActorOf(req.user));
   }
@@ -87,6 +91,7 @@ export class AttractapSecureBootKeysController {
   })
   @ApiResponse({ status: 200, type: KeyFileDownloadDto })
   @Header('Cache-Control', 'no-store')
+  @NotAnMcpTool('Secret management: serves the signing key backup')
   async downloadSigningKeyBackup(
     @Body() body: PassphraseDto,
     @Req() req: AuthenticatedRequest,
@@ -103,6 +108,7 @@ export class AttractapSecureBootKeysController {
   })
   @ApiResponse({ status: 200, type: SecureBootKeyFingerprintsDto })
   @ApiResponse({ status: 409, description: 'Readers are secured with the current signing key' })
+  @NotAnMcpTool('Secret management: restores secure-boot key material')
   async restore(@Body() body: RestoreKeysDto, @Req() req: AuthenticatedRequest): Promise<SecureBootKeyFingerprintsDto> {
     return await this.keys.restore(body.source, body.pem, body.passphrase, auditActorOf(req.user));
   }

@@ -16,6 +16,7 @@ import {
 import { ActivityIcon, CpuIcon, LogsIcon, PencilIcon, Trash2Icon, ArrowRightIcon } from 'lucide-react';
 import { AttractapEditor } from '../AttractapEditor/AttractapEditor';
 import { ReadersToPair } from '../pairing/ReadersToPair';
+import { ReaderSecurityChips } from '../secureConversion/ReaderSecurityChips';
 import { AttractapHardwareSetup } from '../HardwareSetup/index';
 import { WebSerialConsole } from '../HardwareSetup/WebSerialConsole/index';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -33,6 +34,7 @@ import {
 import {
   Attractap,
   useDeleteReader,
+  useGetActiveSecureConversion,
   useGetFirmwares,
   useGetReaders,
   useGetReadersToPair,
@@ -42,6 +44,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { useNow } from '../../../hooks/useNow';
+import { useAuth } from '../../../hooks/useAuth';
 import de from './de.json';
 import en from './en.json';
 
@@ -62,6 +65,14 @@ export function AttractapList() {
   const { data: allReaders, error: readersError } = useGetReaders({}, undefined, {
     refetchInterval: 5000,
   });
+
+  // The installation runs at most one "Secure this reader" conversion; its reader gets a step chip.
+  const { hasPermission } = useAuth();
+  const { data: activeConversion } = useGetActiveSecureConversion({}, undefined, {
+    enabled: hasPermission('system.settings.manage'),
+    refetchInterval: 5000,
+  });
+  const conversion = activeConversion?.conversion ?? null;
 
   // Readers that are not paired yet come from their own list and are shown in the pairing card only.
   const { data: readersToPair } = useGetReadersToPair({}, undefined, { refetchInterval: 5000 });
@@ -256,6 +267,10 @@ export function AttractapList() {
                         >
                           <TableCell>
                             {reader.name}
+                            <ReaderSecurityChips
+                              reader={reader}
+                              conversionState={conversion?.readerId === reader.id ? conversion.state : null}
+                            />
                             {isBleBridge(reader) && (
                               <>
                                 <br />

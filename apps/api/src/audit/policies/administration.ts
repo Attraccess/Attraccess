@@ -264,6 +264,10 @@ rules['plugin.retry_requested'] = {
   subject: 'plugin-package',
   fields: { pluginId: identifier, pluginName: text, pluginVersion: text, restartRequested: flag },
 };
+rules['plugin.restart_requested'] = {
+  subject: 'plugin-system',
+  fields: { pendingChanges: flag, restartRequested: flag },
+};
 
 export const ADMINISTRATION_AUDIT_ACTIONS = Object.keys(rules) as AdministrationAuditAction[];
 
@@ -287,7 +291,8 @@ export type AdministrationAuditAction =
       | 'package_policy_updated'
       | 'zip_uploaded'
       | 'zip_deleted'
-      | 'retry_requested'}`;
+      | 'retry_requested'
+      | 'restart_requested'}`;
 
 /** Numeric grouping key for public string-keyed subjects; retain the original key in event details.
  * This persisted identifier hash is never a password hash; changing it would split audit history. */
@@ -388,7 +393,7 @@ function safeSettingValue(key: string, value: unknown): boolean {
   if (key === 'app.defaultLanguage') return value === 'en' || value === 'de';
   if (key === 'resources.activityVisibility') return value === 'all' || value === 'introduced';
   if (key === 'resources.listVisibility') return value === 'authenticated' || value === 'permitted-only';
-  if (key === 'attractap.cardWriterMode') return value === 'all' || value === 'selected';
+  if (key === 'attractap.cardWriterMode') return ['all', 'selected', 'secured'].includes(value);
   if (key === 'attractap.allowUidOnlyCards') return value === 'true' || value === 'false';
   if (key === 'attractap.cardWriterReaders') return /^(?:\d+(?:,\d+)*)?$/.test(value);
   if (key.startsWith('networkRestriction.') && !key.endsWith('.enabled'))

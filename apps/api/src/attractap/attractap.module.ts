@@ -4,6 +4,11 @@ import { AttractapController } from './attractap.controller';
 import { ResourceAttractapsController } from './resource-attractaps.controller';
 import { AttractapService } from './attractap.service';
 import { WebsocketService } from './websockets/websocket.service';
+import { ReaderRouter } from './websockets/reader-router';
+import { ReaderScreenService } from './websockets/reader-screen.service';
+import { ReaderEventRelay } from './websockets/reader-event-relay';
+import { ReaderCredentialRecheck } from './websockets/reader-credential-recheck';
+import { ClusterPairingService } from './security/cluster-pairing.service';
 import { AttractapGateway } from './websockets/websocket.gateway';
 import { AttractapNfcCardsController } from './card.controller';
 import { CardAccessService } from './card-access.service';
@@ -13,6 +18,7 @@ import { ResourceActionGuard } from './websockets/handlers/resource-action.guard
 import { ReaderTimeZoneService } from './websockets/reader-time-zone.service';
 import { AttractapAuthHandler } from './websockets/handlers/auth/auth.handler';
 import { AttractapFirmwareHandler } from './websockets/handlers/firmware/firmware.handler';
+import { LegacyFirmwareUpdateService } from './websockets/legacy-firmware-update.service';
 import { AttractapCrashReportHandler } from './websockets/handlers/crash-report/crash-report.handler';
 import { AttractapCardHandler } from './websockets/handlers/card/card.handler';
 import { AttractapFormsHandler } from './websockets/handlers/forms/forms.handler';
@@ -32,8 +38,19 @@ import { EfuseReportService } from './security/efuse-report.service';
 import { ReaderSessionService } from './security/reader-session.service';
 import { SessionMetrics } from './security/session-metrics';
 import { SecureBootKeyService } from './secure-boot/secure-boot-key.service';
+import { SECURE_BOOT_KEY_CHANGE_GUARD } from './secure-boot/secure-boot-key-change-guard.port';
 import { SecureImageService } from './secure-boot/secure-image.service';
 import { AttractapSecureBootKeysController } from './secure-boot/secure-boot-keys.controller';
+import { ConversionAudit } from './secure-conversion/conversion-audit';
+import { ConversionImages } from './secure-conversion/conversion-images';
+import { ConversionKeyChangeGuard } from './secure-conversion/conversion-key-change-guard';
+import { ConversionProtocolService } from './secure-conversion/conversion-protocol.service';
+import { ConversionSessionRegistry } from './secure-conversion/conversion-session-registry';
+import { ConversionTransferService } from './secure-conversion/conversion-transfer.service';
+import { PreflightExpectations } from './secure-conversion/preflight-expectations';
+import { SecureConversionController } from './secure-conversion/secure-conversion.controller';
+import { SecureConversionService } from './secure-conversion/secure-conversion.service';
+import { SecuredReaderUpdates } from './secure-conversion/secured-reader-updates';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { ResourcesModule } from '../resources/resources.module';
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
@@ -111,11 +128,21 @@ import { ResourceListVisibilityModule } from '../resources/visibility/resource-l
     InstallationIdentityService,
     CredentialRegistryService,
     PairingService,
+    ClusterPairingService,
     ReaderControlService,
     EfuseReportService,
     ReaderSessionService,
     SecureBootKeyService,
+    { provide: SECURE_BOOT_KEY_CHANGE_GUARD, useClass: ConversionKeyChangeGuard },
     SecureImageService,
+    ConversionAudit,
+    ConversionImages,
+    ConversionProtocolService,
+    ConversionSessionRegistry,
+    ConversionTransferService,
+    PreflightExpectations,
+    SecureConversionService,
+    SecuredReaderUpdates,
     SessionMetrics,
     CardAccessService,
     AttractapService,
@@ -124,6 +151,10 @@ import { ResourceListVisibilityModule } from '../resources/visibility/resource-l
     CardOperationsService,
     CardWriterPolicyService,
     WebsocketService,
+    ReaderRouter,
+    ReaderScreenService,
+    ReaderEventRelay,
+    ReaderCredentialRecheck,
     AttractapGateway,
     WebSocketEventService,
     AttractapFirmwareService,
@@ -133,6 +164,7 @@ import { ResourceListVisibilityModule } from '../resources/visibility/resource-l
     AttractapAuthHandler,
     ReaderTimeZoneService,
     AttractapFirmwareHandler,
+    LegacyFirmwareUpdateService,
     AttractapCrashReportHandler,
     AttractapCardHandler,
     AttractapFormsHandler,
@@ -161,6 +193,7 @@ import { ResourceListVisibilityModule } from '../resources/visibility/resource-l
     ResourceAttractapsController,
     AttractapPairingController,
     AttractapSecureBootKeysController,
+    SecureConversionController,
     ReaderUiAdminController,
   ],
 })

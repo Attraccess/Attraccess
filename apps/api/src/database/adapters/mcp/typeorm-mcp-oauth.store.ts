@@ -10,7 +10,7 @@ import type {
   NewMcpOAuthToken,
 } from '@attraccess/application-models';
 import { McpOAuthClient, McpOAuthGrant, McpOAuthToken } from '@attraccess/database-entities';
-import { EntityManager, LessThan, Repository } from 'typeorm';
+import { EntityManager, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 import { ScopedUnitOfWork, UNIT_OF_WORK } from '../../unit-of-work';
 import type { McpOAuthStore } from '../../../mcp/mcp-oauth.port';
 
@@ -93,6 +93,14 @@ export class TypeOrmMcpOAuthStore implements McpOAuthStore {
   async findGrant(grantId: string): Promise<McpOAuthGrantRecord | null> {
     const row = await this.grants.findOneBy({ id: grantId });
     return row ? toGrant(row) : null;
+  }
+
+  async listActiveGrantsForUser(userId: number): Promise<McpOAuthGrantRecord[]> {
+    const rows = await this.grants.find({
+      where: { userId, revokedAt: IsNull(), expiresAt: MoreThan(new Date()) },
+      order: { createdAt: 'DESC' },
+    });
+    return rows.map(toGrant);
   }
 
   async touchGrant(grantId: string, usedAt: Date): Promise<void> {

@@ -11,5 +11,35 @@
     "oauthUnavailable": "OAuth sign-in is not available because Attraccess is not reached over HTTPS here. Use an API token."
   },
   "docs": "How to connect an AI client",
-  "docsUrl": "https://docs.attraccess.org/#/en/developer/mcp"
+  "docsUrl": "https://docs.attraccess.org/#/en/developer/mcp",
+  "grants": {
+    "title": "Connected AI apps",
+    "description": "AI apps you allowed through OAuth. Revoking one signs it out immediately; it has to ask for access again.",
+    "columns": {
+      "client": "App",
+      "permissions": "Permissions",
+      "approved": "Approved",
+      "lastUsed": "Last used",
+      "expires": "Expires"
+    },
+    "morePermissions": "+{{count}} more",
+    "unverified": "Unverified",
+    "unverifiedHint": "The app registered itself, so Attraccess cannot confirm its name.",
+    "neverUsed": "Never",
+    "empty": "No AI app is connected.",
+    "actions": {
+      "revoke": "Revoke"
+    },
+    "revokeConfirm": {
+      "title": "Revoke {{name}}?",
+      "message": "The app loses access immediately and has to ask for permission again."
+    },
+    "success": {
+      "revoked": "App revoked"
+    },
+    "errors": {
+      "loadFailed": "Could not load the connected AI apps",
+      "revokeFailed": "Could not revoke the app"
+    }
+  }
 }

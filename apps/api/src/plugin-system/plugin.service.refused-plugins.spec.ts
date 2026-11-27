@@ -82,7 +82,7 @@ describe('PluginService refused plugins', () => {
     const ble = { deleteAllForPlugin: jest.fn().mockResolvedValue(undefined) };
     const readers = { deleteAllForPlugin: jest.fn().mockResolvedValue(undefined) };
 
-    await new PluginUninstallService(new PluginService(), ble as never, readers as never).deletePlugin(plugin.id, true);
+    await new PluginUninstallService(ble as never, readers as never).deletePlugin(plugin.id);
 
     expect(runDown).not.toHaveBeenCalled();
     expect(existsSync(join(fixture.root, 'legacy-plugin'))).toBe(false);

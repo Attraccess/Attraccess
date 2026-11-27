@@ -37,19 +37,20 @@ describe('EnrollmentLimitsService', () => {
     expect(limits.reservePending('again', '10.1.1.1')).toBe(true);
 
     const total = new EnrollmentLimitsService();
-    for (let i = 0; i < 200; i++) expect(total.reservePending(`t${i}`, `10.2.${Math.floor(i / 20)}.${i % 20}`)).toBe(true);
+    for (let i = 0; i < 200; i++)
+      expect(total.reservePending(`t${i}`, `10.2.${Math.floor(i / 20)}.${i % 20}`)).toBe(true);
     expect(total.reservePending('t200', '10.9.9.9')).toBe(false);
     expect(total.pendingCount).toBe(200);
   });
 
-  it('throttles an approver after 5 wrong codes per minute with retry-after', () => {
+  it('throttles an approver after 5 wrong codes per minute with retry-after', async () => {
     const t = 9_000_000;
     for (let i = 0; i < 5; i++) {
-      limits.assertApproverAllowed(7, t);
-      limits.recordWrongCode(7, t);
+      await limits.assertApproverAllowed(7, t);
+      await limits.recordWrongCode(7, t);
     }
-    expect(() => limits.assertApproverAllowed(7, t + 1000)).toThrow(EnrollmentRateLimitedException);
-    expect(() => limits.assertApproverAllowed(8, t + 1000)).not.toThrow();
-    expect(() => limits.assertApproverAllowed(7, t + 61_000)).not.toThrow();
+    await expect(limits.assertApproverAllowed(7, t + 1000)).rejects.toThrow(EnrollmentRateLimitedException);
+    await expect(limits.assertApproverAllowed(8, t + 1000)).resolves.toBeUndefined();
+    await expect(limits.assertApproverAllowed(7, t + 61_000)).resolves.toBeUndefined();
   });
 });

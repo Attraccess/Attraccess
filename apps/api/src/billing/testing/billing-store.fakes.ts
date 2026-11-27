@@ -62,6 +62,8 @@ export class FakeBillingLedgerStore implements BillingLedgerStore {
   audits: RecordedAudit[] = [];
   receipts = new Map<number, UsageReceiptSource>();
   contexts: Array<BillingTransactionContext | undefined> = [];
+  /** Usages with a priced meter reading still pending: their bill is the anchor of a late meter correction. */
+  pendingPricedMeterUsages = new Set<number>();
   private nextId = 1;
 
   getBalance(userId: number, context?: BillingTransactionContext): Promise<number | null> {
@@ -169,6 +171,19 @@ export class FakeBillingLedgerStore implements BillingLedgerStore {
     ];
     this.applyBalance(record);
     return Promise.resolve(record);
+  }
+
+  discardPendingUsageBill(usageId: number, context: BillingTransactionContext): Promise<boolean> {
+    this.contexts.push(context);
+    const index = this.transactions.findIndex(
+      (t) =>
+        t.resourceUsageId === usageId &&
+        t.status !== BillingTransactionStatus.Completed &&
+        !this.transactions.some((other) => other.refundOfId === t.id || other.correctionOfId === t.id),
+    );
+    if (index < 0 || this.pendingPricedMeterUsages.has(usageId)) return Promise.resolve(false);
+    this.transactions.splice(index, 1);
+    return Promise.resolve(true);
   }
 
   findTransactionByExternalReference(reference: string): Promise<BillingTransactionRecord | null> {

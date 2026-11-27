@@ -236,11 +236,13 @@ describe('BillingService', () => {
           attributedOperatingDurationInMinutes: durationMs / 60_000,
           sessionDurationCreditsPerMinute: 3,
           operatingDurationCreditsPerMinute: 7,
+          // A session price, so even a session of no time has a charge and keeps its bill.
+          creditsPerUsage: 1,
         });
 
         const transaction = await f.service.chargeForResourceUsage(usage, fakeTransactionScope());
 
-        expect(transaction?.amount).toBe(-roundedMinutes * 10);
+        expect(transaction?.amount).toBe(-(roundedMinutes * 10 + 1));
         expect(transaction?.items).toContainEqual(
           expect.objectContaining({ name: 'PER_MINUTE', durationMs, quantity: roundedMinutes, unitPrice: 3 }),
         );
@@ -459,6 +461,176 @@ describe('BillingService', () => {
           source: 'resource-usage',
         }),
       );
+    });
+
+    describe('a session without any charge', () => {
+      /** The pending bill a session start creates for usage 22, with the given (flow or meter) items on it. */
+      const pendingBill = async (items: Array<{ name: string; unitPrice: number; quantity?: number }> = []) => {
+        const bill = await f.ledgerStore.insertTransaction({
+          userId: 25,
+          amount: 0,
+          status: BillingTransactionStatus.Pending,
+          resourceUsageId: 22,
+        });
+        bill.items = items.map((item, index) => ({
+          id: index + 1,
+          billingTransactionId: bill.id,
+          description: null,
+          externalReference: null,
+          quantity: 1,
+          durationMs: null,
+          meterQuantity: null,
+          meterCreditsPerUnit: null,
+          allocation: null,
+          ...item,
+        }));
+        return bill;
+      };
+
+      it.each([
+        ['no items', []],
+        ['flow items without a price', [{ name: 'Material', unitPrice: 0, quantity: 3 }]],
+      ])('discards the pending bill of a session with %s and settles nothing', async (_name, items) => {
+        await pendingBill(items);
+        const scope = fakeTransactionScope();
+
+        await expect(
+          f.service.chargeForResourceUsage(billableUsage({ endTime: new Date('2026-09-20T09:10:00Z') }), scope),
+        ).resolves.toBeUndefined();
+
+        expect(f.ledgerStore.transactions).toHaveLength(0);
+        expect(f.ledgerStore.audits).toHaveLength(0);
+        // The discard joins the caller's unit of work, under the same bill lock as the read before it.
+        expect(f.ledgerStore.contexts.at(-1)).toBe(scope);
+      });
+
+      it('mails nothing and, once committed, only tells open billing pages that the pending bill is gone', async () => {
+        const bill = await pendingBill();
+
+        await expect(f.service.chargeForResourceUsage(billableUsage())).resolves.toBeUndefined();
+
+        expect(f.ledgerStore.transactions).toHaveLength(0);
+        expect(f.liveNotifications.notifyTransactionRemoved).toHaveBeenCalledWith(
+          expect.objectContaining({ id: bill.id, status: BillingTransactionStatus.Pending }),
+        );
+        expect(f.liveNotifications.notifyTransactionUpdate).not.toHaveBeenCalled();
+        expect(f.email.sendResourceUsageBillingSummaryEmail).not.toHaveBeenCalled();
+      });
+
+      it('tells open billing pages about the discard only after the caller’s unit of work committed', async () => {
+        await pendingBill();
+        const scope = fakeTransactionScope();
+
+        await f.service.chargeForResourceUsage(billableUsage(), scope);
+
+        expect(f.liveNotifications.notifyTransactionRemoved).not.toHaveBeenCalled();
+        (scope.afterCommit as jest.Mock).mock.calls.forEach(([callback]) => callback());
+        expect(f.liveNotifications.notifyTransactionRemoved).toHaveBeenCalledTimes(1);
+      });
+
+      it('settles a second time without an error and without creating a bill', async () => {
+        await pendingBill();
+
+        await f.service.chargeForResourceUsage(billableUsage(), fakeTransactionScope());
+        await expect(
+          f.service.chargeForResourceUsage(billableUsage(), fakeTransactionScope()),
+        ).resolves.toBeUndefined();
+
+        expect(f.ledgerStore.transactions).toHaveLength(0);
+      });
+
+      it('keeps the bill of a session whose only charge is a priced item', async () => {
+        const bill = await pendingBill([{ name: 'Material', unitPrice: 4, quantity: 2 }]);
+
+        const transaction = await f.service.chargeForResourceUsage(billableUsage(), fakeTransactionScope());
+
+        expect(transaction).toMatchObject({ id: bill.id, amount: -8, status: BillingTransactionStatus.Completed });
+      });
+
+      it('keeps a bill reduced to 0 by a 100 % billing factor, with its discount line', async () => {
+        const bill = await pendingBill();
+
+        const transaction = await f.service.chargeForResourceUsage(
+          billableUsage({ creditsPerUsage: 6, billingFactor: 0 }),
+          fakeTransactionScope(),
+        );
+
+        expect(transaction).toMatchObject({ id: bill.id, status: BillingTransactionStatus.Completed });
+        expect(transaction?.amount).toBeCloseTo(0);
+        expect(transaction?.items).toContainEqual(
+          expect.objectContaining({ name: 'BILLING_FACTOR', unitPrice: -6, quantity: 1 }),
+        );
+      });
+
+      it('keeps a bill whose session price a negative flow item cancels out, completed at 0 with its items', async () => {
+        const bill = await pendingBill([{ name: 'Member discount', unitPrice: -10 }]);
+
+        const transaction = await f.service.chargeForResourceUsage(
+          billableUsage({ creditsPerUsage: 10 }),
+          fakeTransactionScope(),
+        );
+
+        expect(transaction).toMatchObject({ id: bill.id, status: BillingTransactionStatus.Completed });
+        expect(transaction?.amount).toBeCloseTo(0);
+        expect(transaction?.items).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ name: 'PER_SESSION', unitPrice: 10 }),
+            expect.objectContaining({ name: 'Member discount', unitPrice: -10 }),
+          ]),
+        );
+        expect(f.liveNotifications.notifyTransactionRemoved).not.toHaveBeenCalled();
+      });
+
+      it('keeps a bill whose flow items cancel out on a resource without rates', async () => {
+        const bill = await pendingBill([
+          { name: 'Material', unitPrice: 5 },
+          { name: 'Material refund', unitPrice: -5 },
+        ]);
+
+        const transaction = await f.service.chargeForResourceUsage(billableUsage(), fakeTransactionScope());
+
+        expect(transaction).toMatchObject({ id: bill.id, status: BillingTransactionStatus.Completed });
+        expect(transaction?.amount).toBeCloseTo(0);
+        expect(transaction?.items).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ name: 'Material', unitPrice: 5 }),
+            expect.objectContaining({ name: 'Material refund', unitPrice: -5 }),
+          ]),
+        );
+        expect(f.ledgerStore.transactions).toHaveLength(1);
+      });
+
+      it('completes the bill at 0 while a priced meter reading is pending, as the anchor of its late correction', async () => {
+        const bill = await pendingBill([{ name: 'Energy', unitPrice: 0 }]);
+        f.ledgerStore.pendingPricedMeterUsages.add(22);
+
+        const transaction = await f.service.chargeForResourceUsage(billableUsage(), fakeTransactionScope());
+
+        expect(transaction).toMatchObject({ id: bill.id, status: BillingTransactionStatus.Completed });
+        expect(transaction?.amount).toBeCloseTo(0);
+        expect(f.ledgerStore.transactions).toHaveLength(1);
+        expect(f.liveNotifications.notifyTransactionRemoved).not.toHaveBeenCalled();
+      });
+
+      it('discards the bill of a session that took no time, although it has per-minute rates', async () => {
+        await pendingBill();
+        const startTime = new Date('2026-09-20T09:05:00Z');
+
+        await expect(
+          f.service.chargeForResourceUsage(
+            billableUsage({
+              startTime,
+              endTime: startTime,
+              attributedOperatingDurationInMinutes: 0,
+              sessionDurationCreditsPerMinute: 3,
+              operatingDurationCreditsPerMinute: 7,
+            }),
+            fakeTransactionScope(),
+          ),
+        ).resolves.toBeUndefined();
+
+        expect(f.ledgerStore.transactions).toHaveLength(0);
+      });
     });
   });
 });

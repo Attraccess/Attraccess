@@ -196,6 +196,18 @@ describe('AttractapGateway card relay rules', () => {
       expect(massIntroductionService.detachReader).toHaveBeenCalledWith('mass-1', 7);
     });
 
+    it('a disconnect releases the screen claim of a supervision armed from the web, though it forgot the reader', async () => {
+      const socket = loggedInReader();
+      const release = jest.spyOn(fixture.gateway['supervisionHandler']['screen'], 'release');
+
+      await fixture.gateway.handleDisconnect(socket);
+
+      expect(socket.readerId).toBeNull();
+      expect(supervisionService.cancelReaderRequest).toHaveBeenCalledWith('web-request');
+      // Otherwise the reader answers busy until the claim lapses.
+      expect(release).toHaveBeenCalledWith(7, 'supervision:web-request');
+    });
+
     it.each(['READER_AUTHENTICATE', 'READER_REGISTER'])(
       'closes the connection on the removed token sign-in (%s) and logs nothing of it',
       async (type) => {

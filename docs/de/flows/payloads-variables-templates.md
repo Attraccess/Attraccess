@@ -209,6 +209,7 @@ Alle Einträge in einem **Payload setzen**-Knoten lesen dieselbe Eingangs-Payloa
 | **HTTP-Anfrage**, bestätigt (`acknowledged`) | Antwort-Body direkt; `{"energy_wh":1500}` wird mit `{{energy_wh}}` gelesen          |
 | **HTTP-Anfrage**, nur senden (`dispatch`)    | Ursprüngliche Payload; kein Antwort-Body                                            |
 | **Auf MQTT-Nachricht warten**, Erfolg        | `{ "topic": "…", "payload": … }`; keine vorherigen Felder und keine `serverId`      |
+| **MQTT-Nachricht senden**, Antwort-Topic     | Eingangs-Felder plus `response: { "topic": "…", "payload": … }`                     |
 | **Abrechnungsposten hinzufügen**             | Der Posten: `name`, `description`, `externalReference`, `unitPrice`, `quantity`     |
 | **PC sperren / entsperren**                  | Eingangs-Felder, wobei `companion` durch `{ "delivered": true/false }` ersetzt wird |
 
@@ -266,7 +267,7 @@ Beim Beispielwert `42` sendet der Wahr-Zweig `{"temperature":42,"limit":40}`. **
 
 ## Durchläufe prüfen und Fehler finden
 
-Öffnen Sie **Flow-Protokolle**, wählen Sie eine Aufzeichnungsdauer und klicken Sie vor dem Auslösen auf **Aufzeichnung starten**. Prüfen Sie `input` und `output` der Knoteneinträge, um genaue Pfade und Änderungen der Felder zu sehen. Protokolle werden während der Aufzeichnung gesammelt und bleiben bis zum Verlassen oder Neuladen der Seite sichtbar.
+Öffnen Sie **Flow-Logs**, wählen Sie eine Aufzeichnungsdauer und klicken Sie vor dem Auslösen auf **Aufzeichnung starten**. Prüfen Sie `input` und `output` der Knoteneinträge, um genaue Pfade und Änderungen der Felder zu sehen. Protokolle werden während der Aufzeichnung gesammelt und bleiben bis zum Verlassen oder Neuladen der Seite sichtbar. Vorher können Sie sie über **Herunterladen** als NDJSON oder reinen Text speichern, etwa für einen Fehlerbericht. Die Datei kann personenbezogene Daten aus den Payloads enthalten.
 
 | Symptom                                | Prüfen                                                                                                                       |
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |

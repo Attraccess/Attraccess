@@ -184,22 +184,28 @@ export class BillingService {
     const sharedOperating = operatingShare?.shared ? operatingShare : null;
     // Legacy sessions have no complete snapshot; preserve their existing configuration fallback.
     const creditsForSession = usage.creditsPerUsage ?? configuration.creditsPerUsage;
-    let grossCredits =
-      toExactCredits(sessionDurationRate) * toExactCredits(roundedMinutes) +
-      (sharedOperating
-        ? toExactCredits(operatingDurationRate > 0 ? sharedOperating.credits : 0)
-        : toExactCredits(operatingDurationRate) * toExactCredits(roundedOperatingMinutes)) +
-      toExactCredits(creditsForSession);
-
     const existing = await this.ledgerStore.findUsageTransaction(usage.id, context);
+    const components = [
+      toExactCredits(sessionDurationRate) * toExactCredits(roundedMinutes),
+      sharedOperating
+        ? toExactCredits(operatingDurationRate > 0 ? sharedOperating.credits : 0)
+        : toExactCredits(operatingDurationRate) * toExactCredits(roundedOperatingMinutes),
+      toExactCredits(creditsForSession),
+      ...(existing?.items ?? []).map((item) => toExactCredits(item.unitPrice) * toExactCredits(item.quantity)),
+    ];
+    const grossCredits = components.reduce((sum, credits) => sum + credits, BigInt(0));
 
-    if (grossCredits === BigInt(0) && !existing) {
-      return undefined;
+    if (grossCredits === BigInt(0) && !existing) return undefined;
+
+    // A session without any charge leaves no bill: its pending one goes, unless a late meter correction needs it.
+    // Charges that cancel out (a negative flow item against a session price) keep the bill at 0, with its items.
+    if (existing && components.every((credits) => credits === BigInt(0))) {
+      if (await this.ledgerStore.discardPendingUsageBill(usage.id, context)) {
+        // An open billing page still lists the pending bill; it has no receipt, so nothing else is published.
+        context.afterCommit(() => this.liveNotificationsService.notifyTransactionRemoved(existing));
+        return undefined;
+      }
     }
-
-    (existing?.items ?? []).forEach((item) => {
-      grossCredits += toExactCredits(item.unitPrice) * toExactCredits(item.quantity);
-    });
 
     const billingFactor = usage.billingFactor ?? usage.user.billingFactor;
     const { amount: totalCredits, discount: billingFactorDiscountAmount } = applyBillingFactor(

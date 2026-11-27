@@ -3,7 +3,8 @@
 
 With a release build directory, fails (exit 1) when:
   - a source was compiled with a lab-only define (ATTRACTAP_CRASH_TRIGGER,
-    ATTRACTAP_TEST_HOOKS, ATTRACTAP_UI_SELFTEST, ATTRACTAP_LAB_CA, ATTRACTAP_LV_PERF_MONITOR), read from
+    ATTRACTAP_TEST_HOOKS, ATTRACTAP_UI_SELFTEST, ATTRACTAP_LAB_CA, ATTRACTAP_LV_PERF_MONITOR,
+    ATTRACTAP_CONVERSION_STOP_BEFORE_BURN), read from
     compile_commands.json,
   - the app image contains a lab-only serial topic (the `debug.crash` trigger, the `debug.stats`
     run-time stats table) or trusts the device-lab TLS CA (its certificate list entry),
@@ -21,7 +22,7 @@ import os
 import sys
 
 LAB_ONLY_DEFINES = ("ATTRACTAP_CRASH_TRIGGER=1", "ATTRACTAP_TEST_HOOKS=1", "ATTRACTAP_UI_SELFTEST=1",
-                    "ATTRACTAP_LAB_CA=1", "ATTRACTAP_LV_PERF_MONITOR=1")
+                    "ATTRACTAP_LAB_CA=1", "ATTRACTAP_LV_PERF_MONITOR=1", "ATTRACTAP_CONVERSION_STOP_BEFORE_BURN=1")
 LAB_ONLY_MARKERS = (b"debug.crash", b"debug.stats", b"Attractap Device Lab CA")
 # sdkconfig.lab-stats / sdkconfig.debug only; read from the generated config/sdkconfig.h.
 LAB_ONLY_SDKCONFIG = ("CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS",)

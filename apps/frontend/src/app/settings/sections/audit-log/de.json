@@ -222,6 +222,7 @@
     "plugin.zip_uploaded": "Plugin-Archiv hochgeladen",
     "plugin.zip_deleted": "Plugin-Archiv gelöscht",
     "plugin.retry_requested": "Erneuter Plugin-Versuch angefordert",
+    "plugin.restart_requested": "Plugin-Neustart angefordert",
     "billing.transaction.updated": "Abrechnung geändert",
     "meter_charge.waived": "Zählerkosten erlassen",
     "meter.updated": "Zähler geändert",
@@ -231,7 +232,12 @@
     "flow.deleted": "Globaler Flow gelöscht",
     "flow.canvas_updated": "Canvas eines globalen Flows geändert",
     "flow_variable.set": "Flow-Variable gesetzt",
-    "flow_variable.deleted": "Flow-Variable gelöscht"
+    "flow_variable.deleted": "Flow-Variable gelöscht",
+    "attractap.reader.secure_conversion_started": "Sichern eines Readers gestartet",
+    "attractap.reader.secure_conversion_preflight": "Vorabprüfung eines Readers ausgewertet",
+    "attractap.reader.secure_conversion_digests_burned": "Secure-Boot-Schlüssel in einen Reader eingebrannt",
+    "attractap.reader.secure_conversion_failed": "Sichern eines Readers fehlgeschlagen",
+    "attractap.reader.secure_conversion_interrupted": "Sichern eines Readers unterbrochen"
   },
   "targets": {
     "resource": "Ressource",
@@ -260,6 +266,7 @@
     "plugin-package": "Plugin-Paket",
     "plugin-registry": "Plugin-Registry",
     "plugin-policy": "Plugin-Regel",
+    "plugin-system": "Plugin-System",
     "flow": "Globaler Flow"
   },
   "fields": {
@@ -351,6 +358,7 @@
     "permissionRemovals": "Entfernte Berechtigungen",
     "migrationOutcome": "Migrationsergebnis",
     "activationOutcome": "Aktivierungsergebnis",
+    "pendingChanges": "Ausstehende Plugin-Änderungen",
     "restartRequested": "Neustart angefordert",
     "rollbackOutcome": "Ergebnis der Wiederherstellung",
     "updateOverride": "Update-Regel für dieses Paket",
@@ -444,7 +452,14 @@
     "before.creditsPerUnit": "Preis pro Messwert vorher",
     "after.creditsPerUnit": "Preis pro Messwert nachher",
     "before.allocation": "Zuordnung vorher",
-    "after.allocation": "Zuordnung nachher"
+    "after.allocation": "Zuordnung nachher",
+    "conversionId": "Ablauf-ID",
+    "conversionState": "Schritt",
+    "targetVersion": "Ziel-Firmwareversion",
+    "digest0": "Digest des Signaturschlüssels",
+    "digest1": "Digest des Wiederherstellungsschlüssels",
+    "ok": "Bestanden",
+    "failedChecks": "Fehlgeschlagene Prüfungen"
   },
   "fieldValues": {
     "allocation": {

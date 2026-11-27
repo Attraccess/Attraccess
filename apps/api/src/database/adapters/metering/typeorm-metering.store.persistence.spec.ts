@@ -129,7 +129,7 @@ describe('TypeOrmMeteringStore with two independent connections', () => {
     await insertRow(a.source, 'user', { id: 7, username: 'initiator', email: 'initiator@example.test' });
     await a.source.getRepository(ResourceMeter).save({ id: 1, resourceId: 1, name: 'Energy', creditsPerUnit: 30 });
     audit = { record: jest.fn().mockResolvedValue({}) };
-    live = { notifyTransactionUpdate: jest.fn().mockResolvedValue(undefined) };
+    live = { notifyTransactionUpdate: jest.fn().mockResolvedValue(undefined), notifyTransactionRemoved: jest.fn() };
   });
 
   afterEach(async () => {
@@ -316,16 +316,14 @@ describe('TypeOrmMeteringStore with two independent connections', () => {
 
   describe('mapping', () => {
     it('hands out complete session and operation records with their defaults', async () => {
-      await a.source
-        .getRepository(ResourceUsage)
-        .save({
-          id: 1,
-          resourceId: 1,
-          userId: 1,
-          usageAction: ResourceUsageAction.Usage,
-          startTime: START,
-          endTime: END,
-        });
+      await a.source.getRepository(ResourceUsage).save({
+        id: 1,
+        resourceId: 1,
+        userId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        startTime: START,
+        endTime: END,
+      });
       const session = await a.store.createSession({
         id: 'new-session',
         resourceId: 1,

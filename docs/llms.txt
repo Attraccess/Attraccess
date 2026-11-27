@@ -72,7 +72,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Reader Pairing](https://docs.attraccess.org/en/attractap/pairing.md): How a reader joins an installation with one admin approval, reader states, re-pairing and the encrypted connection.
 - [RFID Cards](https://docs.attraccess.org/en/attractap/rfid-cards.md): How RFID cards link to user accounts, how to manage cards, supported card types, insecure UID-only cards and which readers may enroll or reset cards.
 - [Firmware Updates](https://docs.attraccess.org/en/attractap/firmware-updates.md): How Attractap readers receive over-the-air firmware updates from the Attraccess backend, firmware variants and troubleshooting.
-- [Reader Security](https://docs.attraccess.org/en/attractap/reader-security.md): How to secure Attractap Touch V2 readers so they only accept firmware signed with your own Secure Boot keys, including backup and restore.
+- [Reader Security](https://docs.attraccess.org/en/attractap/reader-security.md): How to secure Attractap Touch V2 readers over the network so they only run firmware signed with your own keys, with key backup, restore and the protection's limits.
 - [Reader Display](https://docs.attraccess.org/en/attractap/reader-ui.md): How plugins show notes and prompts on Attractap reader screens, which readers support them, and the related admin settings and alerts.
 - [LED Guide (Lite)](https://docs.attraccess.org/en/attractap/led-guide.md): Explains the LED ring animations and one-time feedback signals of the display-less Attractap Lite reader.
 
@@ -151,7 +151,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Adding a Database Backend](https://docs.attraccess.org/en/developer/adding-a-database-backend.md): How the PostgreSQL backend is structured, the steps to add another relational backend, the backup and restore contract, and how the one-time SQLite import fits in.
 - [API Log Destinations](https://docs.attraccess.org/en/developer/logging.md): How the API routes logs to destinations with RoutedLogger, including registering a driver and startup ownership.
 - [API Reference](https://docs.attraccess.org/en/developer/api-reference.md): Describes the REST API and its OpenAPI docs, the generated API client and React Query hooks, authentication and key modules.
-- [MCP Server (AI Clients)](https://docs.attraccess.org/en/developer/mcp.md): Explains how to connect MCP clients to Attraccess with API tokens or OAuth, which tools are exposed, how permissions apply and how the reviewed manifest is maintained.
+- [MCP Server (AI Clients)](https://docs.attraccess.org/en/developer/mcp.md): Explains how to connect MCP clients with API tokens or OAuth, how permissions choose the tools and how to revoke an app.
 - [AI Agents (llms.txt & WebMCP)](https://docs.attraccess.org/en/developer/ai-agents.md): Explains the llms.txt index and the experimental WebMCP tools of the docs site, how to try them in Chrome and how to add pages.
 - [Contributing](https://docs.attraccess.org/en/developer/contributing.md): How to contribute to Attraccess: forking, branching, code style, testing, issue tracking and reporting bugs.
 
@@ -235,7 +235,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Reader koppeln](https://docs.attraccess.org/de/attractap/pairing.md): Wie ein Leser mit einer Admin-Freigabe in die Installation aufgenommen wird: Status, erneutes Koppeln und verschlüsselte Verbindung.
 - [RFID-Karten](https://docs.attraccess.org/de/attractap/rfid-cards.md): Wie RFID-Karten mit Benutzerkonten verknüpft sind, Kartenverwaltung, Kartentypen, unsichere UID-only-Karten und welche Leser Karten registrieren oder zurücksetzen dürfen.
 - [Firmware-Updates](https://docs.attraccess.org/de/attractap/firmware-updates.md): Wie Attractap-Leser Over-the-Air-Firmware-Updates vom Attraccess-Backend erhalten, inklusive Firmware-Varianten und Fehlerbehebung.
-- [Reader-Sicherheit](https://docs.attraccess.org/de/attractap/reader-security.md): Wie Attractap-Touch-V2-Reader gesichert werden, damit sie nur mit deinen eigenen Secure-Boot-Schlüsseln signierte Firmware akzeptieren, inklusive Backup und Wiederherstellung der Schlüssel.
+- [Reader-Sicherheit](https://docs.attraccess.org/de/attractap/reader-security.md): Wie Attractap-Touch-V2-Reader über das Netzwerk gesichert werden, damit sie nur mit deinen Schlüsseln signierte Firmware akzeptieren, samt Schlüssel-Backup und Grenzen des Schutzes.
 - [Reader-Anzeige](https://docs.attraccess.org/de/attractap/reader-ui.md): Wie Plugins Hinweise und Abfragen auf Attractap-Bildschirmen anzeigen, welche Leser das können, sowie Admin-Einstellungen und Alarme.
 
 ## Deutsch: MQTT & IoT
@@ -313,7 +313,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Datenbank-Backend hinzufügen](https://docs.attraccess.org/de/developer/adding-a-database-backend.md): Schritte, um Attraccess ein weiteres relationales Backend hinzuzufügen, der Backup- und Restore-Vertrag, den es einhalten muss, und wie der einmalige SQLite-Import dazu passt.
 - [API-Log-Ziele](https://docs.attraccess.org/de/developer/logging.md): Wie die API Logs mit RoutedLogger an Ziele leitet, inklusive Treiber-Registrierung und Start-Lebenszyklus.
 - [API-Referenz](https://docs.attraccess.org/de/developer/api-reference.md): Beschreibt die REST-API mit OpenAPI-Dokumentation, generiertem API-Client und React-Query-Hooks, Authentifizierung und wichtigen Modulen.
-- [MCP-Server (KI-Clients)](https://docs.attraccess.org/de/developer/mcp.md): Erklärt, wie MCP-Clients per API-Token oder OAuth mit Attraccess verbunden werden, welche Tools es gibt, wie Berechtigungen wirken und wie das geprüfte Manifest gepflegt wird.
+- [MCP-Server (KI-Clients)](https://docs.attraccess.org/de/developer/mcp.md): Erklärt, wie MCP-Clients per API-Token oder OAuth verbunden werden, wie Berechtigungen die Tools bestimmen und wie du eine App widerrufst.
 - [KI-Agenten (llms.txt & WebMCP)](https://docs.attraccess.org/de/developer/ai-agents.md): Erklärt den llms.txt-Index und die experimentellen WebMCP-Tools der Dokumentation, das Ausprobieren in Chrome und das Hinzufügen von Seiten.
 - [Mitwirken](https://docs.attraccess.org/de/developer/contributing.md): Wie Sie zu Attraccess beitragen: Fork, Branch, Code-Stil, Tests, Issue-Tracking und Fehlermeldungen.
 

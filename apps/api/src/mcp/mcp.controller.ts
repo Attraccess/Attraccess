@@ -48,10 +48,12 @@ export class McpController {
       userAgent: req.headers['user-agent'],
       host: req.headers.host,
     };
+    const permissions = (req.user as { effectivePermissions?: Set<string> } | undefined)?.effectivePermissions;
     const server = createMcpServer(
       this.registry,
       (restRequest) => this.gateway.execute(restRequest, caller),
       this.config.get<AppConfigType>('app')?.VERSION ?? '0.0.0',
+      permissions ?? new Set<string>(),
     );
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on('close', () => {

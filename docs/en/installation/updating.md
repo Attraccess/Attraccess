@@ -24,8 +24,7 @@ Check the [release notes](https://github.com/Attraccess/Attraccess/releases) for
 > **Attractap readers pair again after the release that removes token sign-in (Attractap firmware 2.6.0).**
 > Its first start deletes every reader record, together with reader names, resource links, per-reader
 > settings and the card writer's reader choice. Every reader has to be paired again. Readers that still
-> sign in with a token cannot update over the air; flash them to firmware 2.6.0 over USB with the web
-> flasher first. See [After the upgrade: every reader pairs again](attractap/pairing.md#after-the-upgrade-every-reader-pairs-again).
+> sign in with a token update over the air first and then show their pairing code. See [After the upgrade: every reader pairs again](attractap/pairing.md#after-the-upgrade-every-reader-pairs-again).
 
 ## Moving from SQLite to PostgreSQL
 

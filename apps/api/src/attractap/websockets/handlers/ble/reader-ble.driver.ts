@@ -1,7 +1,8 @@
 import { PluginBleError, type PluginBleAdvertisement } from '@attraccess/plugins-backend-sdk';
 import type { BleSessionClock } from '@attraccess/plugins-backend-sdk/internal';
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { WebSocket } from 'ws';
+import { ClusterService } from '../../../../cluster/cluster.service';
 import type { PluginBleMetrics } from '../../../../metrics/definitions/plugin-ble.metrics';
 import { PLUGIN_BLE_METRICS } from '../../../../metrics/definitions/tokens';
 import type {
@@ -12,6 +13,7 @@ import type {
 import { WebsocketService } from '../../websocket.service';
 import { AttractapEventType, type AttractapEvent, type AuthenticatedWebSocket } from '../../websocket.types';
 import { BLE_PROTOCOL_VERSION, loggableInt } from './ble-wire';
+import { ClusterBleRouter } from './cluster-ble-router';
 import { ReaderBleChannel } from './reader-ble-channel';
 import { ReaderBleWatch } from './reader-ble-watch';
 
@@ -29,9 +31,12 @@ const realClock: BleSessionClock = {
  * protocol v1 (see `ble-wire.ts`). One BLE owner (scan or session) per reader connection; conflicts are refused
  * with `READER_BUSY`, never queued. Everything is bound to the socket instance it started on. The advertisement
  * watch (`reader-ble-watch.ts`) is no owner: it runs beside scans and sessions.
+ *
+ * With Valkey (ATT-1163) every call goes to the API instance holding the reader's newest websocket
+ * (`cluster-ble-router.ts`); this instance's own readers take the local path below, unchanged.
  */
 @Injectable()
-export class ReaderBleDriver implements BleTransportDriver {
+export class ReaderBleDriver implements BleTransportDriver, OnModuleDestroy {
   private readonly logger = new Logger('ReaderBleDriver');
   private readonly channels = new WeakMap<AuthenticatedWebSocket, ReaderBleChannel>();
   /** Overridable for tests. */
@@ -40,16 +45,42 @@ export class ReaderBleDriver implements BleTransportDriver {
     clock: () => this.clock,
     logger: () => this.logger,
     metrics: () => this.metrics,
-    readerStatus: (readerId) => this.readerStatus(readerId),
+    readerStatus: (readerId) => this.localStatus(readerId),
     currentSocket: (readerId) => this.currentSocket(readerId),
   });
+  /** Only with Valkey: routes calls for readers held by other instances, and serves theirs. */
+  readonly router: ClusterBleRouter | null;
 
   constructor(
     private readonly websocketService: WebsocketService,
     @Optional() @Inject(PLUGIN_BLE_METRICS) private readonly metrics?: PluginBleMetrics,
-  ) {}
+    @Optional() cluster?: ClusterService,
+  ) {
+    this.router = cluster?.enabled
+      ? new ClusterBleRouter(
+          cluster,
+          {
+            readerStatus: (readerId) => this.localStatus(readerId),
+            scan: (request) => this.channelFor(request.readerId, 'scan').scan(request),
+            connect: (request) => this.channelFor(request.readerId, 'connect').connect(request),
+            setWatch: (request) => this.watch.set(request),
+            hasSocket: (readerId) => this.currentSocket(readerId) !== undefined,
+            releaseReader: (readerId) => this.releaseReader(readerId),
+          },
+          () => this.logger,
+        )
+      : null;
+  }
 
-  readerStatus(readerId: number): BleReaderStatus {
+  onModuleDestroy(): void {
+    this.router?.stop();
+  }
+
+  readerStatus(readerId: number): BleReaderStatus | Promise<BleReaderStatus> {
+    return this.router ? this.router.readerStatus(readerId) : this.localStatus(readerId);
+  }
+
+  private localStatus(readerId: number): BleReaderStatus {
     const socket = this.currentSocket(readerId);
     if (!socket) return { status: 'offline' };
     const ble = socket.state.ble;
@@ -59,15 +90,18 @@ export class ReaderBleDriver implements BleTransportDriver {
   }
 
   scan(request: Parameters<BleTransportDriver['scan']>[0]): Promise<PluginBleAdvertisement[]> {
+    if (this.router) return this.router.scan(request);
     return this.channelFor(request.readerId, 'scan').scan(request);
   }
 
   connect(request: Parameters<BleTransportDriver['connect']>[0]): Promise<BleDriverLink> {
+    if (this.router) return this.router.connect(request);
     return this.channelFor(request.readerId, 'connect').connect(request);
   }
 
   setWatch(request: Parameters<NonNullable<BleTransportDriver['setWatch']>>[0]): void {
-    this.watch.set(request);
+    if (this.router) this.router.setWatch(request);
+    else this.watch.set(request);
   }
 
   /** Inbound BLE_* message of a reader. Unknown versions, sessions and requests are dropped and logged. */
@@ -136,6 +170,16 @@ export class ReaderBleDriver implements BleTransportDriver {
     this.watch.readerAnnounced(socket);
   }
 
+  /**
+   * The reader signed in on another API instance: like `readerConnected` for a newer local connection, the BLE work
+   * and the watch on this instance's connections of it are gone.
+   */
+  private releaseReader(readerId: number): void {
+    for (const socket of [...this.websocketService.sockets.values()]) {
+      if (socket.readerId === readerId) this.socketClosed(socket);
+    }
+  }
+
   /** The newest open connection of the reader: a stale one that did not close yet is never used for new work. */
   private currentSocket(readerId: number): AuthenticatedWebSocket | undefined {
     let current: AuthenticatedWebSocket | undefined;
@@ -146,7 +190,7 @@ export class ReaderBleDriver implements BleTransportDriver {
   }
 
   private channelFor(readerId: number, operation: string): ReaderBleChannel {
-    const status = this.readerStatus(readerId);
+    const status = this.localStatus(readerId);
     if (status.status === 'unsupported') {
       throw new PluginBleError('READER_UNSUPPORTED', 'The reader firmware cannot do plugin BLE', {
         operation,

@@ -25,8 +25,11 @@ import { NpmPluginService } from './npm-plugin.service';
 import { PluginAdministrationService } from './plugin-administration.service';
 
 import { PluginService } from './plugin.service';
+import { isPluginRestartRequired } from './runtime/restart-required';
+import { frontendAssetRoot } from './runtime/frontend-snapshots';
+import { isPluginRemoved } from './runtime/removed-plugins';
 
-import { AuthenticatedRequest, Auth } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedRequest, Auth, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 
 import { randomUUID } from 'crypto';
 
@@ -39,6 +42,8 @@ import { Response } from 'express';
 import { FileUpload } from '../common/types/file-upload.types';
 
 import { PluginSystemStatusDto } from './dto/plugin-system-status.dto';
+
+import { RestartPluginSystemResponseDto } from './dto/restart-plugin-system-response.dto';
 
 import { RetryPluginResponseDto } from './dto/retry-plugin-response.dto';
 
@@ -88,6 +93,7 @@ export class PluginController {
   @Post('registries')
   @ApiResponse({ status: 201, type: PluginRegistryDto })
   @Auth('system.plugins.manage')
+  @NotAnMcpTool('Secret management: stores an npm registry and its access token')
   addRegistry(@Body() body: AddPluginRegistryDto, @Req() req: AuthenticatedRequest) {
     return this.pluginAdministration.addRegistry(body, auditActorOf(req.user));
   }
@@ -101,6 +107,7 @@ export class PluginController {
 
   @Delete('registries/:registryId')
   @Auth('system.plugins.manage')
+  @NotAnMcpTool('Secret management: removes an npm registry and its stored access token')
   removeRegistry(@Param('registryId') registryId: string, @Req() req: AuthenticatedRequest) {
     return this.pluginAdministration.removeRegistry(registryId, auditActorOf(req.user));
   }
@@ -158,6 +165,7 @@ export class PluginController {
 
   @Post('installed/:packageName/remove')
   @Auth('system.plugins.manage')
+  @NotAnMcpTool('Host lifecycle: removes executable plugin code')
   async removePackageGraph(
     @Param('packageName') packageName: string,
     @Body() body: RemoveInstalledPluginDto,
@@ -173,6 +181,7 @@ export class PluginController {
 
   @Post('npm/:packageName/versions/:version')
   @Auth('system.plugins.manage')
+  @NotAnMcpTool('Host lifecycle: installs executable plugin code')
   installPackage(
     @Param('packageName') packageName: string,
     @Param('version') version: string,
@@ -190,6 +199,7 @@ export class PluginController {
 
   @Post('npm/:packageName')
   @Auth('system.plugins.manage')
+  @NotAnMcpTool('Host lifecycle: installs executable plugin code')
   installPackageSpec(
     @Param('packageName') packageName: string,
     @Body('spec') spec = 'latest',
@@ -202,6 +212,7 @@ export class PluginController {
 
   @Delete('installed/:packageName')
   @Auth('system.plugins.manage')
+  @NotAnMcpTool('Host lifecycle: removes executable plugin code')
   async removeInstalledPackage(@Param('packageName') packageName: string, @Req() req: AuthenticatedRequest) {
     await this.pluginAdministration.removeInstalled(packageName, auditActorOf(req.user));
     return { ok: true };
@@ -222,6 +233,7 @@ export class PluginController {
 
   @Post('update-policy')
   @Auth('system.plugins.manage')
+  @NotAnMcpTool('Host lifecycle: changes automatic plugin updates, which install code')
   setUpdatePolicy(@Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
     return this.pluginAdministration.setUpdatePolicy(body, auditActorOf(req.user));
   }
@@ -241,6 +253,7 @@ export class PluginController {
 
   @Post('installed/:packageName/spec')
   @Auth('system.plugins.manage')
+  @NotAnMcpTool('Host lifecycle: changes which plugin code is installed')
   updateInstalledPackageSpec(
     @Param('packageName') packageName: string,
     @Body('requestedSpec') requestedSpec: string,
@@ -251,6 +264,7 @@ export class PluginController {
 
   @Post('installed/:packageName/update-override')
   @Auth('system.plugins.manage')
+  @NotAnMcpTool('Host lifecycle: changes which plugin code is installed')
   updateInstalledPackageOverride(
     @Param('packageName') packageName: string,
     @Body('updateOverride') updateOverride: 'inherit' | 'off' | 'patch' | 'minor' | 'follow',
@@ -262,6 +276,7 @@ export class PluginController {
   @Post('installed/:packageName/update-policy')
   @ApiResponse({ status: 201, type: InstalledNpmPluginDto })
   @Auth('system.plugins.manage')
+  @NotAnMcpTool('Host lifecycle: changes automatic plugin updates, which install code')
   updateInstalledPackagePolicy(
     @Param('packageName') packageName: string,
     @Body() body: UpdateInstalledPluginPolicyDto,
@@ -285,6 +300,7 @@ export class PluginController {
   @Post('installed/:packageName/versions/:version')
   @ApiResponse({ status: 201, type: InstalledNpmPluginDto })
   @Auth('system.plugins.manage')
+  @NotAnMcpTool('Host lifecycle: replaces executable plugin code')
   replaceInstalledPackage(
     @Param('packageName') packageName: string,
     @Param('version') version: string,
@@ -302,7 +318,8 @@ export class PluginController {
     type: [LoadedPluginManifest],
   })
   getAllPlugins() {
-    return PluginService.getPluginsWithLoadStatus();
+    // A removed plugin runs until the restart, but it is gone for the admin and its frontend files are: not listed.
+    return PluginService.getPluginsWithLoadStatus().filter((plugin) => !isPluginRemoved(plugin.id));
   }
 
   @Get('status')
@@ -310,13 +327,31 @@ export class PluginController {
   @ApiOperation({ summary: 'Get plugin system status', operationId: 'getPluginSystemStatus' })
   @ApiResponse({ status: 200, type: PluginSystemStatusDto })
   getPluginSystemStatus(): PluginSystemStatusDto {
-    return { disabled: arePluginsDisabled(), instanceId: PLUGIN_SYSTEM_INSTANCE_ID };
+    return {
+      disabled: arePluginsDisabled(),
+      instanceId: PLUGIN_SYSTEM_INSTANCE_ID,
+      restartRequired: isPluginRestartRequired(),
+    };
+  }
+
+  @Post('restart')
+  @Auth('system.plugins.manage')
+  @NotAnMcpTool('Host lifecycle: restarts the API process')
+  @ApiOperation({
+    summary: 'Restart the API process to apply pending plugin changes',
+    operationId: 'restartPluginSystem',
+  })
+  @ApiResponse({ status: 201, type: RestartPluginSystemResponseDto })
+  async restartPluginSystem(@Req() req: AuthenticatedRequest): Promise<RestartPluginSystemResponseDto> {
+    await this.pluginAdministration.restart(auditActorOf(req.user));
+    return { ok: true };
   }
 
   @Post(':pluginId/retry')
   @Auth('system.plugins.manage')
   @ApiOperation({ summary: 'Retry a failed plugin on restart', operationId: 'retryPlugin' })
   @ApiResponse({ status: 201, type: RetryPluginResponseDto })
+  @NotAnMcpTool('Host lifecycle: restarts executable plugin code')
   async retryPlugin(
     @Param('pluginId') pluginId: string,
     @Req() req: AuthenticatedRequest,
@@ -351,8 +386,9 @@ export class PluginController {
     }
 
     const segments = frontendAssetSegments(filePath);
+    // An update waiting for the restart keeps serving the frontend of the version that runs.
     const opened = openFrontendAsset(
-      PluginService.PLUGIN_PATH,
+      frontendAssetRoot(PluginService.PLUGIN_PATH, plugin),
       plugin.pluginDirectory,
       plugin.main.frontend.directory,
       segments,
@@ -403,6 +439,7 @@ export class PluginController {
     description: 'The plugin has been deleted',
   })
   @Auth('system.plugins.manage')
+  @NotAnMcpTool('Host lifecycle: removes executable plugin code')
   async deletePlugin(@Param('pluginId') pluginId: string, @Req() req: AuthenticatedRequest) {
     await this.pluginAdministration.deletePlugin(pluginId, auditActorOf(req.user));
   }

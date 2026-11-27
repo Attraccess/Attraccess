@@ -11,6 +11,13 @@ export const VALKEY_CLIENT = 'VALKEY_CLIENT';
 // during an outage that left callers waiting about 20 s for the 503; keep the ioredis 5 delay (linear, at most 2 s).
 export const valkeyRetryDelay = (times: number): number => Math.min(times * 50, 2000);
 
+/**
+ * A Valkey that keeps the connection open but stops answering (frozen, or a network partition without a reset) never
+ * makes ioredis reconnect, so without a timeout every request that needs Valkey would hang and run late once it
+ * answers again. Subscribers (`duplicate`) must turn it off: their SUBSCRIBE waits until Valkey is reachable.
+ */
+export const VALKEY_COMMAND_TIMEOUT_MS = 5_000;
+
 @Injectable()
 export class ValkeyClientService implements OnApplicationShutdown {
   public readonly client: Redis | null;
@@ -30,6 +37,7 @@ export class ValkeyClientService implements OnApplicationShutdown {
         enableReadyCheck: true,
         maxRetriesPerRequest: 3,
         retryStrategy: valkeyRetryDelay,
+        commandTimeout: VALKEY_COMMAND_TIMEOUT_MS,
       });
     } catch (error) {
       // The URL error carries the whole URL, password included, in `input`; rethrow without it.

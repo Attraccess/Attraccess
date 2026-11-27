@@ -81,10 +81,10 @@
     "installTitle": "Install {{pluginName}}?",
     "installDescription": "Review the package source and requested permissions before installing.",
     "installApproval": "I acknowledge this source and its requested permissions.",
-    "restartWarning": "Installing this plugin requires an application restart to activate it.",
+    "restartWarning": "The plugin takes effect after a restart. Use “Restart now” in the banner when you are ready.",
     "cancel": "Cancel",
     "confirmInstall": "Install plugin",
-    "installSuccess": "Plugin installed. The app will restart in a few seconds to activate it.",
+    "installSuccess": "Plugin installed. It takes effect after a restart; use “Restart now” in the banner.",
     "installError": "The plugin was not installed.",
     "installPermissionHelp": "Sign in with a role that can manage plugins, then try again.",
     "installRouteHelp": "Reload Attraccess to pick up the latest client. If this persists, check that the frontend and API are running the same version.",
@@ -156,8 +156,8 @@
     "title": "Remove plugin?",
     "cancel": "Cancel",
     "delete": "Remove",
-    "messageRegistry": "Remove the plugin {{pluginName}}? Its code and runtime registrations will be removed and the app will reload. Its data and secrets are kept, so installing it again continues with them.",
-    "messageUploaded": "Remove the plugin {{pluginName}}? Its code, runtime registrations and all of its stored data will be deleted permanently, and the app will reload. Create a backup first if you might need the data.",
+    "messageRegistry": "Remove the plugin {{pluginName}}? Its code is removed but keeps running until Attraccess restarts; the page reloads now. Its data and secrets are kept, so installing it again continues with them.",
+    "messageUploaded": "Remove the plugin {{pluginName}}? Its code and all of its stored data will be deleted permanently. Its code keeps running until Attraccess restarts; the page reloads now. Create a backup first if you might need the data.",
     "messageRefused": "Remove the refused plugin {{pluginName}}? Its files will be removed without running its code, and the app will reload. Its stored data stays in the database until a compatible version takes it over."
   },
   "error": {
@@ -177,21 +177,19 @@
   "success": {
     "replace": {
       "title": "Plugin version replaced",
-      "description": "The app will restart in a few seconds to activate the selected version."
+      "description": "The selected version takes effect after a restart; use “Restart now” in the banner."
     },
     "delete": {
       "title": "Plugin removed",
-      "description": "The app will reload in a few seconds to drop the plugin's code."
+      "description": "The change takes effect after Attraccess restarts; use “Restart now” in the banner."
     }
   },
   "versionManagement": {
     "title": "Manage {{pluginName}} version",
-    "current": "Current version: {{version}}",
     "loading": "Loading available versions...",
-    "selected": "Selected version: {{version}}",
     "spec": "Requested version or channel",
     "autoUpdate": "Plugin automatic update policy",
-    "savePolicy": "Save version policy",
+    "savePolicy": "Save update settings",
     "policySaved": "Plugin version policy saved",
     "policyError": "Could not save plugin version policy",
     "overrides": {
@@ -204,19 +202,34 @@
     "published": "Published: {{date}}",
     "permissionApproval": "I approve these new permissions: {{permissions}}",
     "permissionRemovals": "Removed permissions: {{permissions}}",
-    "majorApproval": "I approve this major version update and its restart/downtime.",
+    "majorApproval": "I approve this major version update. It takes effect after a restart.",
     "deprecated": "Deprecated by publisher: {{notice}}",
     "integrity": "Integrity: {{integrity}}",
     "repository": "Release repository",
-    "downgradeWarning": "Downgrading can affect plugin data and requires an application restart.",
+    "downgradeWarning": "Downgrading can affect plugin data. It takes effect after a restart.",
     "cancel": "Cancel",
-    "update": "Update",
-    "downgrade": "Downgrade",
     "direction": {
       "current": "Current",
       "newer": "Newer",
       "older": "Older"
-    }
+    },
+    "currentHeading": "Current version",
+    "requestedSpec": "Requested: {{spec}}",
+    "availableHeading": "Available versions",
+    "noVersions": "No other versions are available.",
+    "detailsHeading": "Version {{version}}",
+    "settingsHeading": "Update settings",
+    "settingsDescription": "These rules decide which versions update checks offer. Saving them does not install anything.",
+    "specDescription": "An exact version, a range such as ^1.2.0, or a channel such as latest.",
+    "updateTo": "Update to {{version}}",
+    "downgradeTo": "Downgrade to {{version}}",
+    "notCompatible": "Not compatible: {{reason}}",
+    "notCompatibleNoReason": "Not compatible with this Attraccess version",
+    "installedNow": "Installed now",
+    "showOlderIncompatible": "Show {{count}} older incompatible versions",
+    "hideOlderIncompatible": "Hide older incompatible versions",
+    "details": "Release details",
+    "update": "Update"
   },
   "dependencies": {
     "title": "Plugin dependencies",

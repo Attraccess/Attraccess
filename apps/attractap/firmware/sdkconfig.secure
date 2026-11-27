@@ -24,7 +24,12 @@ CONFIG_SECURE_BOOT_V2_RSA_ENABLED=y
 # (RD_DIS stays writable) because the NVS (KEY4) HMAC key is burned read-protected
 # after Secure Boot is on. Right after that, RD_DIS MUST be write-protected
 # (WR_DIS_RD_DIS). The server may mark a reader "secured" only once the eFuse report
-# shows that lock. The firmware only reports the eFuses; it never writes one.
+# shows that lock. The firmware writes exactly two eFuse fields itself, both during a
+# "Secure this reader" conversion (ATT-1208, src/api/conversion/conversion_efuse.cpp):
+#   1. step 4, plain app: KEY0/KEY1 Secure Boot digests, on the server's burn command;
+#   2. step 8, this secure app: WR_DIS_RD_DIS, once the NVS migration read back and the
+#      KEY4 HMAC key is read-protected; release secure builds only (never secure-lab).
+# Everything else above is burned by the ESP-IDF bootloader and NVS code.
 CONFIG_SECURE_BOOT_V2_ALLOW_EFUSE_RD_DIS=y
 
 # --- Flash encryption: release mode, XTS-AES-128 (256-bit key) ---
@@ -65,6 +70,10 @@ CONFIG_ESP_CONSOLE_SECONDARY_NONE=y
 CONFIG_ESP_COREDUMP_ENABLE_TO_NONE=y
 # CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH is not set
 # CONFIG_ESP_COREDUMP_ENABLE is not set
+
+# --- The bootloader region is never written by a secure app (only the plain app's conversion client does, ATT-1208) ---
+CONFIG_SPI_FLASH_DANGEROUS_WRITE_ABORTS=y
+# CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED is not set
 
 # --- Bootloader logging off: the signed bootloader only fits 0x8000 this way ---
 CONFIG_BOOTLOADER_LOG_LEVEL_NONE=y

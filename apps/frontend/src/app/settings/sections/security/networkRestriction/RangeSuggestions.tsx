@@ -1,7 +1,7 @@
 import { Button } from '@heroui/react';
 import { PlusIcon } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { RangeSuggestionGroup } from './rangeSuggestions';
+import { RangeSuggestionGroup } from './buildRangeSuggestions';
 import en from './en.json';
 import de from './de.json';
 
