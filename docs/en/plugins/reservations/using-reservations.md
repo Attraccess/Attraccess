@@ -1,4 +1,5 @@
 # Using Reservations
+
 <!-- llms-description: How members book resources, check in, handle approvals and use calendar feeds with the Reservations plugin. -->
 
 > [!NOTE]
@@ -72,6 +73,10 @@ The sidebar entry **My reservations** lists your upcoming and past bookings with
 
 You can cancel pending and upcoming bookings there, end a running booking early and follow the link to your
 [calendar feeds](#calendar-feeds-ical).
+
+If a machine becomes hidden from you (see [Who can see the machine list](settings/overview.md)), your own bookings
+on it stay in the list and you can still open and cancel them. Everything else about the machine, such as its
+availability or other people's bookings, answers "not found".
 
 ## Approval
 
@@ -272,7 +277,9 @@ On your account page, the section **Calendar feeds (iCal)** lets you subscribe t
 - You can have several feeds (up to 20), each with a name.
 - Each feed has a **selection**. Combine one or more of: specific resources, resource groups, all resources you are
   introduced to, all resources you maintain, and only your own bookings.
-- Only resources you may see **at the time the calendar is requested** are included.
+- Only resources you may see **at the time the calendar is requested** are included (see
+  [Who can see the machine list](settings/overview.md)). Your **own bookings** stay in the feed even on a machine that
+  became hidden from you. You cannot save a feed that selects a machine you may not see.
 - Confirmed bookings appear as events, pending bookings as **tentative** events. Cancelled bookings disappear. The
   feed covers the last 30 days up to the booking horizon of each resource.
 - The title is "Resource – Name" for your own bookings, for resources you manage and for resources where you may see

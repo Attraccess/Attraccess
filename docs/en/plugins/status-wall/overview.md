@@ -30,6 +30,9 @@ whether the wall shows 4 or 60 machines, and they keep their places (sorted by n
 1. Open **Status walls** in the sidebar and choose **New status wall**.
 2. Enter a name and choose what the wall shows: **all resources**, or some resource groups and resources. A group
    shows every machine that is in it at the moment.
+   You can only select resources and groups you may see yourself (see
+   [Who can see the machine list](settings/overview.md)), and **all resources** is available only when your own machine
+   list is not narrowed. Otherwise saving is refused. This also applies when you edit a wall someone else set up.
 3. Save. The dialog shows the wall's link. Open it on the screen, or copy it to the screen's browser.
 
 You can set up as many walls as you like, for example one per hall. The **⋮** menu of a wall opens it, shows its link

@@ -1,4 +1,5 @@
 # Reservierungen nutzen
+
 <!-- llms-description: Wie Mitglieder mit dem Plugin Reservierungen Ressourcen buchen, einchecken, Genehmigungen abwickeln und Kalender-Feeds nutzen. -->
 
 > [!NOTE]
@@ -76,6 +77,10 @@ Der Seitenleisten-Eintrag **Meine Reservierungen** listet Ihre kommenden und ver
 
 Dort können Sie ausstehende und kommende Buchungen stornieren, eine laufende Buchung vorzeitig beenden und zu Ihren
 [Kalender-Feeds](#kalender-feeds-ical) wechseln.
+
+Wird eine Maschine für Sie verborgen (siehe [Wer die Maschinenliste sehen darf](settings/overview.md)), bleiben Ihre
+eigenen Buchungen darauf in der Liste und lassen sich weiter öffnen und stornieren. Alles andere zu dieser Maschine,
+etwa ihre Verfügbarkeit oder Buchungen anderer, antwortet mit „nicht gefunden“.
 
 ## Genehmigung
 
@@ -293,7 +298,10 @@ Auf Ihrer Kontoseite können Sie im Abschnitt **Kalender-Feeds (iCal)** Buchunge
 - Jeder Feed hat eine **Auswahl**. Kombinieren Sie eine oder mehrere der Optionen: bestimmte Ressourcen,
   Ressourcengruppen, alle Ressourcen, in die Sie eingewiesen sind, alle Ressourcen, die Sie warten, und nur Ihre
   eigenen Buchungen.
-- Enthalten sind nur Ressourcen, die Sie **zum Zeitpunkt des Kalenderabrufs** sehen dürfen.
+- Enthalten sind nur Ressourcen, die Sie **zum Zeitpunkt des Kalenderabrufs** sehen dürfen (siehe
+  [Wer die Maschinenliste sehen darf](settings/overview.md)). Ihre **eigenen Buchungen** bleiben auch dann im Feed,
+  wenn eine Maschine für Sie verborgen wurde. Ein Feed, der eine für Sie nicht sichtbare Maschine auswählt, lässt sich
+  nicht speichern.
 - Bestätigte Buchungen erscheinen als Termine, ausstehende als **vorläufige** Termine. Stornierte Buchungen
   verschwinden. Der Feed deckt die letzten 30 Tage bis zum Buchungshorizont der jeweiligen Ressource ab.
 - Der Titel lautet „Ressource – Name“ bei Ihren eigenen Buchungen, bei Ressourcen, die Sie verwalten, und bei

@@ -30,6 +30,10 @@ auf den Bildschirm, ob die Wand 4 oder 60 Maschinen zeigt, und behalten ihren Pl
 1. Öffne **Statuswände** in der Seitenleiste und wähle **Neue Statuswand**.
 2. Gib einen Namen ein und wähle, was die Wand zeigt: **alle Ressourcen** oder einzelne Ressourcengruppen und
    Ressourcen. Eine Gruppe zeigt jede Maschine, die gerade zu ihr gehört.
+   Wählen kannst du nur Ressourcen und Gruppen, die du selbst sehen darfst (siehe
+   [Wer die Maschinenliste sehen darf](settings/overview.md)), und **alle Ressourcen** nur, wenn deine eigene
+   Maschinenliste nicht eingeschränkt ist. Sonst wird das Speichern abgelehnt. Das gilt auch, wenn du eine Wand
+   bearbeitest, die jemand anderes eingerichtet hat.
 3. Speichere. Der Dialog zeigt den Link der Wand. Öffne ihn auf dem Bildschirm oder kopiere ihn in dessen Browser.
 
 Du kannst beliebig viele Wände einrichten, zum Beispiel eine je Halle. Das **⋮**-Menü einer Wand öffnet sie, zeigt

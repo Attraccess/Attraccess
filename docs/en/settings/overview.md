@@ -57,12 +57,18 @@ A machine hidden from someone answers `404` (resource not found), exactly like a
 
 Activity visibility (below) is applied on top: a machine you cannot see never shows up in the in-use list or live updates, whatever the activity setting says.
 
+The official plugins follow the setting too. A machine that is only in hidden resource groups additionally stays hidden in plugins, as before.
+
+- **Reservations:** availability, new bookings, the reservation settings of a machine, the manager pages and calendar feeds leave a hidden machine out or answer "not found". Managing a machine's reservations does not make it visible. You keep **your own bookings** on a machine that became hidden: they stay under **My reservations** with the machine name, you can still open and cancel them, and your calendar feeds keep them.
+- **Status walls:** whoever sets up a wall can only select machines and resource groups they may see, and **all resources** needs someone whose machine list is not narrowed.
+
 > [!WARNING]
-> Plugin pages and feeds, for example the reservations plugin, are not covered yet and may still list machines by name. Review the plugins you run before relying on this setting to hide your equipment list.
+> Plugins from other sources follow the setting only if they use the [visibility methods of the plugin SDK](plugins/developing-plugins.md#machine-visibility). Review them before relying on this setting to hide your equipment list. Attractap reader screens, notifications and emails of plugins are not narrowed by this setting.
 
 > [!NOTE]
-> Two places deliberately show machines regardless of this setting:
+> These places deliberately show machines regardless of this setting:
 >
+> - **Status wall links:** the public link of a status wall shows what the wall was set up with to anyone who has it.
 > - **Projects:** a project's usage history and statistics show its members the machines used in the project. This is project data shared with the project's members.
 > - **Reports:** the report export (**Export Resource Reports**, `resources.reports.export`) covers every machine.
 
