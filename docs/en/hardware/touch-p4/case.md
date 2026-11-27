@@ -84,9 +84,13 @@ faceplate's own business.
 - **Metal plates.** Around the tile opening a metal plate is a closed ring right over the NFC loop. It
   would act as a shorted turn and take the reader's field, which is why the board's own copper round the
   loop is open in one place ([design notes](hardware/touch-p4/design-notes.md#nfc)). The stripe slit
-  opens that ring; leave it open or fill it with something that does not conduct. Metal over the Wi-Fi
-  antenna costs 1.5 to 1.9 dB at 2.4 GHz, so a metal plate needs a window in the strip above the screen
-  window from X -7.5 to its right edge ([antenna](hardware/touch-p4/design-notes.md#antenna)). The discs
+  opens that ring; leave it open or fill it with something that does not conduct. A 1 mm aluminium
+  plate over the whole front, with only the screen window and the tile opening, needs no window for the
+  Wi-Fi antenna: in the full-wave model (27 November 2026, stand-in antenna, the case as built now) it
+  costs nothing at 2.4 GHz and 0.1 to 1.1 dB at 5 GHz, and a window above the screen wins back 0.3 dB at
+  most. Do not cut a notch open to the top edge over the antenna: that spoils the 2.4 GHz match. The
+  1.5 to 1.9 dB in the [antenna](hardware/touch-p4/design-notes.md#antenna) notes are for an older, shorter
+  plate on the old case. Check a metal plate with a range test on the real board. The discs
   stay clear of both: at least 17 mm from the NFC loop's copper and 30 mm from the antenna.
 - **Where the magnets sit.** They avoid the NFC loop (35 x 37 mm round the tile's centre), the Wi-Fi
   antenna (top right behind the strip above the display), the buzzer (X 36.6, Y -2.85) and the hall switch

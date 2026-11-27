@@ -89,9 +89,13 @@ Frontplatte.
   der NFC-Schleife. Er wirkte als Kurzschlusswindung und nähme dem Leser sein Feld; deshalb ist auch das
   Kupfer der Platine um die Schleife an einer Stelle offen ([Designnotizen](hardware/touch-p4/design-notes.md#nfc)).
   Der Schlitz für den Streifen öffnet diesen Ring; lassen Sie ihn offen oder füllen Sie ihn mit etwas, das
-  nicht leitet. Metall über der WLAN-Antenne kostet 1,5 bis 1,9 dB bei 2,4 GHz, eine Metallplatte braucht
-  deshalb ein Fenster im Streifen über dem Displayfenster, von X -7,5 bis zu ihrer rechten Kante
-  ([Antenne](hardware/touch-p4/design-notes.md#antenne)). Die Scheiben halten zu beidem Abstand: mindestens
+  nicht leitet. Eine 1 mm dicke Aluminiumplatte über
+  die ganze Front, nur mit Displayfenster und Kachelöffnung, braucht kein Fenster für die WLAN-Antenne: Im
+  Vollwellenmodell (27. November 2026, Ersatzantenne, das Gehäuse in seiner jetzigen Form) kostet sie bei 2,4 GHz
+  nichts und bei 5 GHz 0,1 bis 1,1 dB; ein Fenster über dem Display holt höchstens 0,3 dB zurück. Schneiden Sie
+  keine zur Oberkante offene Kerbe über der Antenne aus: Sie verdirbt die Anpassung bei 2,4 GHz. Die 1,5 bis
+  1,9 dB in den Notizen zur [Antenne](hardware/touch-p4/design-notes.md#antenne) gelten für eine ältere, kürzere
+  Platte am alten Gehäuse. Prüfen Sie eine Metallplatte mit einem Reichweitentest an der echten Platine. Die Scheiben halten zu beidem Abstand: mindestens
   17 mm zum Kupfer der NFC-Schleife und 30 mm zur Antenne.
 - **Wo die Magnete sitzen.** Sie meiden die NFC-Schleife (35 x 37 mm um die Mitte der Kachel), die
   WLAN-Antenne (oben rechts hinter dem Streifen über dem Display), den Buzzer (X 36,6, Y -2,85) und den
