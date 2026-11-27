@@ -10,8 +10,9 @@ cannot burn.
 Covered: eligibility, a read-only preflight (and one that fails on a simulated partition-table mismatch), the transfer
 with a reset in the middle that resumes, staging and verification on the reader, the server ending the conversion
 instead of sending the burn (the reader drops its staging, stays plain and boots normally), a retry that is cancelled
-during the transfer, and the eFuse blocks read over USB before and after: unchanged. Never runs on the secure-lab place,
-and no release secure image ever boots: it only lands in the inactive app slot and the staging region.
+during the transfer, and the eFuse blocks read over USB before and after: unchanged. Never runs on the secure-lab place
+or on a variant without a secure profile (Touch V1), and no release secure image ever boots: it only lands in the
+inactive app slot and the staging region.
 """
 
 import json
@@ -26,7 +27,12 @@ from attractap_lab.drivers import ESPToolDriver
 
 from conftest import PROFILE, open_console, reboot_reader
 
-pytestmark = pytest.mark.skipif(PROFILE != efuse.PLAIN, reason="the conversion runs on the plain lab reader only")
+pytestmark = [
+    pytest.mark.skipif(PROFILE != efuse.PLAIN, reason="the conversion runs on the plain lab reader only"),
+    # run.sh sets it for variants with a secure profile build; Touch V1 has none and is never converted.
+    pytest.mark.skipif(os.environ.get("READER_SECURE_CONVERSION") != "1",
+                       reason=f"{os.environ.get('READER_VARIANT') or 'this variant'} has no secure profile to convert to"),
+]
 
 PASSPHRASE = "hil-recovery-passphrase"
 POLL_SECONDS = 2

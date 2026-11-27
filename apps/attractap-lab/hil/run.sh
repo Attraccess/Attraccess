@@ -118,6 +118,15 @@ require_idf() {
   command -v idf.py >/dev/null || { echo "Source ESP-IDF export.sh first (or set READER_IMAGE/EMULATOR_IMAGE)" >&2; exit 1; }
 }
 
+# "Secure this reader" (ATT-1208) exists only for variants with a secure profile build: their plain build runs the
+# conversion client (the firmware's CMakeLists.txt reads the same ATTRACTAP_SECURE_PROFILE_BUILD switch). Touch V1
+# has none, so its runs build no secure image, keep the API's release-build gate and skip test_secure_conversion.py.
+READER_SECURE_CONVERSION=
+if grep -Eq '^[[:space:]]*set\(ATTRACTAP_SECURE_PROFILE_BUILD "?true"?\)' \
+  "$ROOT/apps/attractap/firmware/variants/$VARIANT.cmake" 2>/dev/null; then
+  READER_SECURE_CONVERSION=1
+fi
+
 # The second build of the reader's build directory: same sources, another version
 # string, so the reader can update from the base image to this one.
 READER_BASE_VERSION="${READER_BASE_VERSION:-$(head -n1 "$ROOT/apps/attractap/firmware/version.txt" 2>/dev/null || true)}"
@@ -163,7 +172,9 @@ elif [[ -z "${READER_IMAGE:-}" ]]; then
   # A plain lab image runs the "Secure this reader" conversion up to verify and refuses every burn (ATT-1208):
   # -DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=ON. Its conversion client needs sdkconfig.conversion, which ESP-IDF
   # applies only to a fresh sdkconfig: an older build directory's sdkconfig is dropped once.
-  grep -q '^CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED=y' "$build/sdkconfig" 2>/dev/null || rm -f "$build/sdkconfig"
+  if [[ -n "$READER_SECURE_CONVERSION" ]]; then
+    grep -q '^CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED=y' "$build/sdkconfig" 2>/dev/null || rm -f "$build/sdkconfig"
+  fi
   (cd "$firmware" && python3 tools/build_individual_ca_certs.py >/dev/null &&
     idf.py -B "$build" -DSDKCONFIG="$build/sdkconfig" -DATTRACTAP_VARIANT="$VARIANT" \
       -DATTRACTAP_LOG_LEVEL=DEBUG -DATTRACTAP_TEST_HOOKS=ON -DATTRACTAP_BEEPER_DEFAULT=OFF \
@@ -181,11 +192,13 @@ fi
 # "Secure this reader" on the plain place (test_secure_conversion.py, ATT-1208): the unsigned release secure
 # image of the variant, packaged like a release (secure_packaging.py), for the API to sign with the run's own
 # keys. The reader only streams it into its inactive slot and staging: its stop-before-burn build refuses the
-# burn, so this image never boots. Never on the secure-lab place, and only when run.sh built the stop-before-burn
-# reader itself (a supplied READER_IMAGE is not known to refuse burns). NO_CONVERSION_BUILD=1 skips it (tests skip).
+# burn, so this image never boots. Only for a variant with a secure profile, never on the secure-lab place, and only
+# when run.sh built the stop-before-burn reader itself (a supplied READER_IMAGE is not known to refuse burns).
+# NO_CONVERSION_BUILD=1 skips it (tests skip).
 SECURE_IMAGE_DIR=
 SECURE_IMAGE_MANIFEST=
-if [[ "$READER_PROFILE" == plain && -n "${built_plain_reader:-}" && "${NO_CONVERSION_BUILD:-}" != 1 ]]; then
+if [[ "$READER_PROFILE" == plain && -n "$READER_SECURE_CONVERSION" && -n "${built_plain_reader:-}" &&
+      "${NO_CONVERSION_BUILD:-}" != 1 ]]; then
   require_idf
   secure_build="$ROOT/apps/attractap/firmware/build/hil-secure-$VARIANT"
   (cd "$ROOT/apps/attractap/firmware" &&
@@ -312,6 +325,7 @@ GRPC_ENABLE_FORK_SUPPORT=0 PYTHONPATH="$HERE/../src:$HERE" LAB_PYTHON="$LAB_PYTH
   READER_OTA_IMAGE="${READER_OTA_IMAGE:-}" READER_BASE_VERSION="$READER_BASE_VERSION" READER_OTA_VERSION="$READER_OTA_VERSION" \
   OTA_ASSETS_DIR="$ATTRACTAP_FIRMWARE_ASSETS_DIR" \
   SECURE_IMAGE_DIR="$SECURE_IMAGE_DIR" SECURE_IMAGE_MANIFEST="$SECURE_IMAGE_MANIFEST" \
+  READER_SECURE_CONVERSION="$READER_SECURE_CONVERSION" \
   READER_IMAGE="$READER_IMAGE" READER_VARIANT="$VARIANT" READER_PROFILE="$READER_PROFILE" EMULATOR_IMAGE="$EMULATOR_IMAGE" \
   API_URL="http://127.0.0.1:$API_PORT" DATABASE_URL="$DATABASE_URL" \
   API_HOST="${API_HOST:-}" API_PORT="$API_PORT" READER_API_PORT="$READER_API_PORT" \

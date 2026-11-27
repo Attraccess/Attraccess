@@ -80,20 +80,27 @@ def test_matching_place_goes_on_to_the_build(tmp_path):
     assert code == 1 and "Source ESP-IDF export.sh first" in stderr
 
 
-def test_published_elf_is_the_flashed_build_not_the_ota_rebuild(tmp_path):
-    """The OTA build rewrites the reader's build directory; the symbols published for coredumps must stay the flashed ELF's."""
+VARIANTS = Path(__file__).parents[2] / "attractap" / "firmware" / "variants"
+
+
+def scratch_build(tmp_path):
+    """Stand-ins for the build tools and a scratch checkout (run.sh builds under its ROOT, never the real tree).
+
+    Each idf.py call is logged to ``idf-calls.txt``; the pnpm stand-in (the API start) keeps what the API would index
+    and its environment, then fails so run.sh stops. Returns the copied run.sh and the environment to run it with.
+    """
     bin_dir = tmp_path / "stubs"
     bin_dir.mkdir()
     # idf.py stand-in: its "ELF" names the version it was built with, so each build differs.
     (bin_dir / "idf.py").write_text(
-        '#!/bin/sh\nwhile [ $# -gt 0 ]; do case "$1" in -B) dir="$2";; -DATTRACTAP_VERSION_OVERRIDE=*) v="${1#*=}";; esac; shift; done\n'
+        f'#!/bin/sh\necho "$*" >>\'{tmp_path / "idf-calls.txt"}\'\n'
+        'while [ $# -gt 0 ]; do case "$1" in -B) dir="$2";; -DATTRACTAP_VERSION_OVERRIDE=*) v="${1#*=}";; esac; shift; done\n'
         'mkdir -p "$dir"; printf "elf:%s" "$v" >"$dir/attractap.elf"; printf "bin" >"$dir/attractap.bin"; printf "" >"$dir/flash_args"\n')
     (bin_dir / "esptool").write_text("#!/bin/sh\nwhile [ $# -gt 0 ]; do [ \"$1\" = -o ] && : >\"$2\"; shift; done\n")
-    # pnpm stand-in (the API start): keep what the API would index, then fail so run.sh stops.
-    (bin_dir / "pnpm").write_text(f"#!/bin/sh\ncp -r \"$ATTRACTAP_FIRMWARE_ASSETS_DIR\" '{tmp_path / 'published'}'\nexit 1\n")
+    (bin_dir / "pnpm").write_text(f"#!/bin/sh\ncp -r \"$ATTRACTAP_FIRMWARE_ASSETS_DIR\" '{tmp_path / 'published'}'\n"
+                                  f"env >'{tmp_path / 'api-env.txt'}'\nexit 1\n")
     for stub in ("idf.py", "esptool", "pnpm"):
         (bin_dir / stub).chmod(0o755)
-    # A scratch checkout: run.sh builds under its ROOT, which must not be the real tree.
     root = tmp_path / "checkout"
     (root / "apps/attractap-lab/hil").mkdir(parents=True)
     (root / "apps/attractap-lab/real-cards").mkdir()
@@ -101,11 +108,39 @@ def test_published_elf_is_the_flashed_build_not_the_ota_rebuild(tmp_path):
     (root / "apps/attractap/firmware/tools").mkdir(parents=True)
     (root / "apps/attractap/firmware/tools/build_individual_ca_certs.py").write_text("")
     (root / "apps/attractap/firmware/version.txt").write_text("9.9.9\n")
+    if VARIANTS.is_dir():  # absent in the Nix package build, which holds apps/attractap-lab only
+        shutil.copytree(VARIANTS, root / "apps/attractap/firmware/variants")
     run_sh = root / "apps/attractap-lab/hil/run.sh"
     shutil.copy(RUN_SH, run_sh)
-    # NO_CONVERSION_BUILD: this test is about the published ELF, not the "Secure this reader" image build.
-    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "EMULATOR_IMAGE": "/dev/null", "NO_CONVERSION_BUILD": "1",
+    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "EMULATOR_IMAGE": "/dev/null",
            "HIL_DATABASE_URL": "postgres://hil:hil@127.0.0.1:5432/hil"}
+    return run_sh, env
+
+
+@pytest.mark.skipif(not VARIANTS.is_dir(), reason="the firmware variants are not part of this package build")
+@pytest.mark.parametrize("variant, converted", [("attractap-touch-v2", True), ("attractap-touch", False)])
+def test_secure_conversion_only_for_variants_with_a_secure_profile(tmp_path, variant, converted):
+    """Touch V1 has no secure profile: no secure image build, no lab env for the API (ATT-1208)."""
+    run_sh, env = scratch_build(tmp_path)
+    code, _ = run(tmp_path, {**env, "LG_PLACE_NAME": f"{variant}-1"},
+                  place(f"board=attractap, profile=plain, variant={variant}"), run_sh)
+    assert code == 1
+    secure_builds = [call for call in (tmp_path / "idf-calls.txt").read_text().splitlines()
+                     if "-DATTRACTAP_SECURE_PROFILE=ON" in call]
+    if converted:
+        # The stand-in build has no profile marker, so the packaging stops run.sh before the API starts.
+        assert secure_builds and f"-DATTRACTAP_VARIANT={variant}" in secure_builds[0]
+        return
+    assert secure_builds == []
+    api_env = (tmp_path / "api-env.txt").read_text().splitlines()
+    assert not any(line.startswith("ATTRACTAP_CONVERSION_LAB_STOP_BEFORE_BURN=") for line in api_env)
+
+
+def test_published_elf_is_the_flashed_build_not_the_ota_rebuild(tmp_path):
+    """The OTA build rewrites the reader's build directory; the symbols published for coredumps must stay the flashed ELF's."""
+    run_sh, env = scratch_build(tmp_path)
+    # NO_CONVERSION_BUILD: this test is about the published ELF, not the "Secure this reader" image build.
+    env["NO_CONVERSION_BUILD"] = "1"
     code, _ = run(tmp_path, env, place("board=attractap, profile=plain, variant=attractap-touch-v2"), run_sh)
     published = tmp_path / "published"
     assert code == 1
