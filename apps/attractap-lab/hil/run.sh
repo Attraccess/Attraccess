@@ -121,6 +121,7 @@ require_idf() {
 # "Secure this reader" (ATT-1208) exists only for variants with a secure profile build: their plain build runs the
 # conversion client (the firmware's CMakeLists.txt reads the same ATTRACTAP_SECURE_PROFILE_BUILD switch). Touch V1
 # has none, so its runs build no secure image, keep the API's release-build gate and skip test_secure_conversion.py.
+# The grep reads the variant file itself, not what it include()s: enough for the HIL places' variants.
 READER_SECURE_CONVERSION=
 if grep -Eq '^[[:space:]]*set\(ATTRACTAP_SECURE_PROFILE_BUILD "?true"?\)' \
   "$ROOT/apps/attractap/firmware/variants/$VARIANT.cmake" 2>/dev/null; then
@@ -169,9 +170,10 @@ elif [[ -z "${READER_IMAGE:-}" ]]; then
   built_plain_reader=1
   firmware="$ROOT/apps/attractap/firmware"
   build="$firmware/build/hil-$VARIANT"
-  # A plain lab image runs the "Secure this reader" conversion up to verify and refuses every burn (ATT-1208):
-  # -DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=ON. Its conversion client needs sdkconfig.conversion, which ESP-IDF
-  # applies only to a fresh sdkconfig: an older build directory's sdkconfig is dropped once.
+  # For a variant with a secure profile, a plain lab image runs the "Secure this reader" conversion up to verify and
+  # refuses every burn (ATT-1208): -DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=ON. Its conversion client needs
+  # sdkconfig.conversion, which ESP-IDF applies only to a fresh sdkconfig: an older build directory's sdkconfig is
+  # dropped once.
   if [[ -n "$READER_SECURE_CONVERSION" ]]; then
     grep -q '^CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED=y' "$build/sdkconfig" 2>/dev/null || rm -f "$build/sdkconfig"
   fi
@@ -197,6 +199,8 @@ fi
 # NO_CONVERSION_BUILD=1 skips it (tests skip).
 SECURE_IMAGE_DIR=
 SECURE_IMAGE_MANIFEST=
+# Set below only for this run's own stop-before-burn reader, never inherited from the caller's shell.
+unset ATTRACTAP_CONVERSION_LAB_STOP_BEFORE_BURN
 if [[ "$READER_PROFILE" == plain && -n "$READER_SECURE_CONVERSION" && -n "${built_plain_reader:-}" &&
       "${NO_CONVERSION_BUILD:-}" != 1 ]]; then
   require_idf

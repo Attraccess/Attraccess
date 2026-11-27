@@ -517,6 +517,18 @@ failure or `LCD underrun` line, on a widget list slower than 3 s during the
 upload, and on the heap high-water marks. `crash-upload.json` and
 `crash-upload-backtrace.txt` hold the results.
 
+**"Secure this reader" (`test_secure_conversion.py`, plain place only).** For a
+variant with a secure profile (its variant file sets
+`ATTRACTAP_SECURE_PROFILE_BUILD` to `"true"`: Touch V2), `run.sh` builds the plain
+reader with `-DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=ON`, builds and packages the
+variant's release secure image, starts the API with
+`ATTRACTAP_CONVERSION_LAB_STOP_BEFORE_BURN=true` and sets
+`READER_SECURE_CONVERSION=1` for the tests. The conversion then runs up to
+verify, the server ends it instead of sending the burn, and the eFuses read over
+USB before and after must be equal. Touch V1 has no secure profile, so its runs
+build no secure image and skip the module. `NO_CONVERSION_BUILD=1` or a supplied
+`READER_IMAGE` skip it too.
+
 **RAM tests (`test_ram.py`).** Each workload resets the reader's heap high-water
 window (`system.heap.reset`), runs, and checks the lowest free internal heap and
 the smallest largest free block (`windowMinFree`, `windowMinLargest`) against

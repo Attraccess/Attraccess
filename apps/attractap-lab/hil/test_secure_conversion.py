@@ -33,7 +33,8 @@ pytestmark = [
     # names the variable, not the variant: run directly (without run.sh) it is unset for Touch V2 too.
     pytest.mark.skipif(os.environ.get("READER_SECURE_CONVERSION") != "1",
                        reason=f"READER_SECURE_CONVERSION is not 1 for {os.environ.get('READER_VARIANT') or 'this variant'}: "
-                              "run.sh sets it only for a variant with a secure profile (Touch V1 has none)"),
+                              "run.sh sets it only for a variant with a secure profile (Touch V1 has none); "
+                              "run the tests through hil/run.sh, which also builds the secure image"),
 ]
 
 PASSPHRASE = "hil-recovery-passphrase"

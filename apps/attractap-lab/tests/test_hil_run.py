@@ -108,8 +108,16 @@ def scratch_build(tmp_path):
     (root / "apps/attractap/firmware/tools").mkdir(parents=True)
     (root / "apps/attractap/firmware/tools/build_individual_ca_certs.py").write_text("")
     (root / "apps/attractap/firmware/version.txt").write_text("9.9.9\n")
-    if VARIANTS.is_dir():  # absent in the Nix package build, which holds apps/attractap-lab only
-        shutil.copytree(VARIANTS, root / "apps/attractap/firmware/variants")
+    variants = root / "apps/attractap/firmware/variants"
+    if VARIANTS.is_dir():
+        shutil.copytree(VARIANTS, variants)
+    else:  # the Nix package build holds apps/attractap-lab only: the two HIL variants' switch, as the firmware sets it
+        variants.mkdir()
+        (variants / "attractap-touch-v2.cmake").write_text('set(ATTRACTAP_SECURE_PROFILE_BUILD "true")\n')
+        (variants / "attractap-touch.cmake").write_text('set(ATTRACTAP_SECURE_PROFILE_BUILD "false")\n')
+    # secure_packaging stand-in: the stub build has no secure app to package, so it returns a made-up manifest entry.
+    (root / "apps/attractap/firmware/secure_packaging.py").write_text(
+        "def package_secure_images(build, out, name, variant):\n    return {'variant': variant}\n")
     run_sh = root / "apps/attractap-lab/hil/run.sh"
     shutil.copy(RUN_SH, run_sh)
     env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "EMULATOR_IMAGE": "/dev/null",
@@ -117,21 +125,35 @@ def scratch_build(tmp_path):
     return run_sh, env
 
 
-@pytest.mark.skipif(not VARIANTS.is_dir(), reason="the firmware variants are not part of this package build")
 @pytest.mark.parametrize("variant, converted", [("attractap-touch-v2", True), ("attractap-touch", False)])
 def test_secure_conversion_only_for_variants_with_a_secure_profile(tmp_path, variant, converted):
-    """Touch V1 has no secure profile: no secure image build, no lab env for the API (ATT-1208)."""
+    """Touch V1 has no secure profile: no secure image build, no lab env for the API, its sdkconfig kept (ATT-1208)."""
     run_sh, env = scratch_build(tmp_path)
+    sdkconfig = run_sh.parents[3] / f"apps/attractap/firmware/build/hil-{variant}/sdkconfig"
+    sdkconfig.parent.mkdir(parents=True)
+    sdkconfig.write_text("CONFIG_IDF_TARGET=\"esp32s3\"\n")  # an older build directory, without sdkconfig.conversion
     code, _ = run(tmp_path, {**env, "LG_PLACE_NAME": f"{variant}-1"},
                   place(f"board=attractap, profile=plain, variant={variant}"), run_sh)
     assert code == 1
     secure_builds = [call for call in (tmp_path / "idf-calls.txt").read_text().splitlines()
                      if "-DATTRACTAP_SECURE_PROFILE=ON" in call]
+    # The pnpm stand-in (the API start) runs after the secure image build and its packaging.
+    api_env = (tmp_path / "api-env.txt").read_text().splitlines()
+    lab_env = "ATTRACTAP_CONVERSION_LAB_STOP_BEFORE_BURN=true" in api_env
     if converted:
-        # The stand-in build has no profile marker, so the packaging stops run.sh before the API starts.
-        assert secure_builds and f"-DATTRACTAP_VARIANT={variant}" in secure_builds[0]
-        return
-    assert secure_builds == []
+        assert len(secure_builds) == 1 and f"-DATTRACTAP_VARIANT={variant}" in secure_builds[0]
+        assert lab_env and not sdkconfig.exists()
+    else:
+        assert secure_builds == [] and not lab_env and sdkconfig.exists()
+
+
+def test_inherited_lab_env_never_reaches_the_api(tmp_path):
+    """Only run.sh's own stop-before-burn build relaxes the API's release-build gate, not the caller's shell."""
+    run_sh, env = scratch_build(tmp_path)
+    code, _ = run(tmp_path, {**env, "LG_PLACE_NAME": "attractap-touch-1",
+                             "ATTRACTAP_CONVERSION_LAB_STOP_BEFORE_BURN": "true"},
+                  place("board=attractap, profile=plain, variant=attractap-touch"), run_sh)
+    assert code == 1
     api_env = (tmp_path / "api-env.txt").read_text().splitlines()
     assert not any(line.startswith("ATTRACTAP_CONVERSION_LAB_STOP_BEFORE_BURN=") for line in api_env)
 
