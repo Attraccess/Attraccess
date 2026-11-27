@@ -40,7 +40,7 @@ export default class WagoPlugin implements AttraccessFrontendPlugin {
     return [contribution];
   }
   getPluginName(): string {
-    return 'wago-plugin@0.2.1';
+    return 'wago-plugin@0.2.2';
   }
 
   getDependencies(): string[] {

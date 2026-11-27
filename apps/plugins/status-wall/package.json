@@ -1,6 +1,6 @@
 {
   "name": "@attraccess/plugin-status-wall",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.1-alpha.0",
   "description": "Official Attraccess plugin: live status walls for big screens.",
   "license": "SEE LICENSE IN LICENSE.md",
   "repository": {
@@ -30,7 +30,7 @@
   "attraccess": {
     "displayName": "Status Wall",
     "description": "Show which machines are free, in use or under maintenance on a big screen, without signing in.",
-    "host": "^2.0.0-0",
+    "host": "^2.0.0-beta.2",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "styles": "frontend/style.css",

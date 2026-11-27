@@ -1,6 +1,6 @@
 {
   "name": "wago",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "main": {
     "backend": { "directory": "dist", "entryPoint": "index.js" },
     "frontend": {
@@ -10,7 +10,7 @@
       "dashboardPaths": ["/wago"]
     }
   },
-  "attraccessVersion": { "min": "2.0.0-0" },
+  "attraccessVersion": { "min": "2.0.0-beta.2" },
   "license": { "required": true, "modules": ["wago"] },
   "permissions": ["PLUGIN_STORAGE", "ACCESS_MQTT_SERVERS", "TRIGGER_FLOWS", "MANAGE_SECRETS"]
 }

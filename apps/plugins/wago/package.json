@@ -1,6 +1,6 @@
 {
   "name": "@attraccess/plugin-wago",
-  "version": "0.2.1-alpha.0",
+  "version": "0.2.2-alpha.0",
   "description": "Attraccess integration for WAGO CC100 controllers. Operational control only: not a safety function, and not yet qualified for physical use.",
   "keywords": [
     "attraccess-plugin",
@@ -30,7 +30,7 @@
   "attraccess": {
     "displayName": "WAGO CC100",
     "description": "Discover, claim, and monitor WAGO CC100 controllers.",
-    "host": "^2.0.0-0",
+    "host": "^2.0.0-beta.2",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "styles": "frontend/style.css",

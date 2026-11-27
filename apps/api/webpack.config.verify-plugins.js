@@ -1,7 +1,12 @@
 const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
 const { DefinePlugin } = require('webpack');
 const { join } = require('path');
+const semver = require('semver');
 const apiPkg = require('./package.json');
+
+// The host under test is this checkout, which ships as the next release: a plugin that needs something added since the
+// last release declares that version as its minimum, before the release has raised package.json.
+const upcomingVersion = semver.inc(apiPkg.version || '0.0.0', 'prerelease');
 
 module.exports = {
   output: {
@@ -19,7 +24,7 @@ module.exports = {
       deleteOutputPath: true,
     }),
     new DefinePlugin({
-      'process.env.ATTRACCESS_VERSION': JSON.stringify(apiPkg.version || '0.0.0'),
+      'process.env.ATTRACCESS_VERSION': JSON.stringify(upcomingVersion),
     }),
   ],
 };
