@@ -31,16 +31,14 @@ Offizielle Plugins werden auf npm unter diesen Dist-Tags veröffentlicht:
 
 Jeder Attraccess-Host hat einen Plugin-Kanal, gesetzt über die Umgebungsvariable `ATTRACCESS_PLUGIN_CHANNEL` (siehe [Umgebungsvariablen](installation/environment-variables.md#plugins)):
 
-- **Release-Images** verwenden `latest`. Der Marktplatz zeigt und installiert die `latest`-Version, Vorabversionen werden nie automatisch installiert.
+- **Release-Images** verwenden `latest`. Der Marktplatz zeigt und installiert die `latest`-Version.
 - **Nightly-Images** (`nightly-<sha>`, `nightly-latest`) verwenden `next`. Ihr Marktplatz zeigt, und eine Installation ohne gewählte Version installiert, die höhere der Versionen `next` und `latest` eines Plugins, die der Host ausführen kann. Ein Plugin ohne `next`-Build oder mit einem `next`-Build, der einen neueren Host braucht, bleibt auf `latest`. `next` zeigt auf den neuesten Nightly-Build eines Plugins, der neuer sein kann als dein Image.
 
 Eine ausdrücklich gewählte Version (**Version verwalten** oder die API) hat immer Vorrang.
 
-### Nightly-Hosts folgen `next`
+### Nightly-Hosts und `next`
 
-Ein Plugin, das auf einem Nightly-Host über den Marktplatz oder über die API ohne Versionsangabe installiert wird, merkt sich `next` als gewünschte Version. Mit der Standard-Update-Regel bringen die [automatischen Updates](#automatische-updates) es dann auf den neuesten kompatiblen Build von `next` (oder von `latest`, falls höher): von Nightly zu Nightly und von einem Nightly zum Release. Nur Plugins, die `next` wünschen, werden auf Nightly-Builds gebracht. Diese Regel gilt nur, solange die globale Update-Regel nie gespeichert wurde; eine gespeicherte Regel gilt unverändert.
-
-Auf einem Release-Host installiert die Standard-Update-Regel nie eine Vorabversion.
+Ein Plugin, das auf einem Nightly-Host über den Marktplatz oder über die API ohne Versionsangabe installiert wird, merkt sich `next` als gewünschte Version. Der Host bietet dann neuere `next`-Builds (oder `latest`, falls höher) als Updates an: von Nightly zu Nightly und von einem Nightly zum Release. **Von selbst installiert er keinen davon**, bis ein Plugin-Verwalter die [automatischen Updates](#automatische-updates) einschaltet. Plugins, die `latest` wünschen, bekommen nur Releases angeboten. Ein Release-Host bietet über `next` nie einen Nightly-Build an.
 
 ### Ein Plugin auf `next` umstellen
 
@@ -50,32 +48,65 @@ Sobald ein Plugin einmal released wurde, bietet der Marktplatz eines Release-Hos
 
 ## Automatische Updates
 
-Attraccess hält über npm installierte Plugins aktuell. Das gilt für jeden Host, ob Release oder Nightly. Als ZIP-Datei hochgeladene Plugins werden nicht aktualisiert.
+Attraccess kann Updates von über npm installierten Plugins selbst installieren und zum Aktivieren neu starten. Das ist **auf jedem Host standardmäßig ausgeschaltet**, ob Release oder Nightly: Bis ein Plugin-Verwalter es einschaltet, installiert Attraccess kein Update und startet dafür nicht neu. Als ZIP-Datei hochgeladene Plugins werden nicht aktualisiert.
 
-- **Prüfungen:** Der Host fragt die Registry des Plugins etwa stündlich nach neuen Versionen, und erneut, wenn das Wartungsfenster beginnt. **Einstellungen → Plugins** zeigt an, wenn ein Update verfügbar ist, das der Host selbst installieren darf; neuere Versionen, die er nie automatisch installiert (siehe unten), stehen nur unter **Version verwalten**. Mit **Alle jetzt prüfen** auf dieser Seite prüfst du sofort.
-- **Wartungsfenster:** Updates werden nur in diesem Fenster installiert, standardmäßig von 03:00 bis 05:00 Uhr. Es gilt die Ortszeit des Servers; in den offiziellen Docker-Images ist das UTC, sofern du `TZ` nicht setzt.
-- **Was installiert wird:** Mit der Standard-Update-Regel das neueste kompatible Patch- oder Minor-Release. Nightly-Hosts bringen außerdem Plugins, die `next` wünschen, auf Nightly-Builds, wie oben beschrieben.
-- **Nie automatisch installiert:** eine neue Hauptversion, eine Version mit zusätzlichen Berechtigungen, eine als veraltet markierte Version, eine mit dem Host nicht kompatible Version, ein Update, für das weitere Plugins installiert oder geändert werden müssten, eine Version, die ein anderer npm-Benutzer veröffentlicht hat als die installierte, und jede Version aus einer Registry auf einem anderen Rechner ohne HTTPS. Solche installierst du selbst über **Version verwalten**.
-- **Neustart:** Nach der Installation der fälligen Updates startet Attraccess einmal neu, um sie zu aktivieren. Lege das Fenster in eine Zeit, in der eine kurze Unterbrechung vertretbar ist.
+**Die Suche nach Updates ist standardmäßig eingeschaltet** und installiert nichts. Etwa stündlich, und erneut, wenn ein Update-Zeitfenster beginnt, fragt der Host die Registry jedes Plugins nach neueren Versionen. **Einstellungen → Plugins** meldet die Updates, die der Update-Schritt und die Schutzregeln unten erlauben; neuere Versionen außerhalb davon stehen nur unter **Version verwalten**. Mit **Alle jetzt prüfen** auf dieser Seite prüfst du sofort.
+
+### Automatische Updates einschalten
+
+Dafür brauchst du die Berechtigung zum Verwalten von Plugins (`system.plugins.manage`).
+
+1. Öffne **Einstellungen → Plugins**. Oben steht der Bereich **Automatische Updates**.
+2. Schalte **Updates automatisch installieren** ein.
+3. Wähle den **größten Update-Schritt**:
+   - **Nur Patches**
+   - **Patches und Minor** (vorausgewählt; Minor-Releases von `0.x`-Versionen zählen als Minor)
+   - **Paketregel folgen**: Updates innerhalb der gewünschten Version, des Bereichs oder des Kanals jedes Plugins
+4. Wähle mindestens einen **Wochentag**, die **Startzeit**, die **Dauer** (1 Minute bis 24 Stunden) und die **Zeitzone**. Solange keine Zeitzone gespeichert wurde, ist die deines Browsers eingetragen.
+5. Prüfe das unter den Feldern angezeigte **nächste Update-Zeitfenster**, klicke auf **Automatische Updates einschalten** und bestätige.
+
+Zum Ausschalten schaltest du **Updates automatisch installieren** aus und speicherst. Ist **Nach Plugin-Updates suchen** ausgeschaltet, wird nichts gesucht und nichts installiert.
+
+### Das Update-Zeitfenster
+
+- Attraccess **installiert Updates und startet nur innerhalb des Zeitfensters neu**, an den gewählten Wochentagen. Nach der Installation der fälligen Updates startet es einmal neu. Der Neustart unterbricht die Nutzung kurz, wähle also eine Zeit, in der das vertretbar ist.
+- Ein Zeitfenster gehört zu dem Wochentag, an dem es beginnt, und darf über Mitternacht reichen: Ein Montagsfenster ab 23:00 Uhr für zwei Stunden endet am Dienstag um 01:00 Uhr.
+- Der Start ist eine Uhrzeit in der gewählten Zeitzone, die Zeitumstellung verschiebt ihn also nicht. Eine Startzeit, die in dieser Nacht übersprungen wird, rückt um die übersprungene Stunde vor; eine, die zweimal vorkommt, öffnet das Fenster beim ersten Mal. Die Dauer ist tatsächlich verstrichene Zeit. Die Zeitzone des Servers (`TZ`) spielt keine Rolle.
+- In den letzten zwei Minuten eines Zeitfensters (bei Fenstern unter vier Minuten: in der zweiten Hälfte) beginnt Attraccess keine Installation. Läuft eine Installation noch, wenn das Fenster endet, oder werden die automatischen Updates währenddessen ausgeschaltet, startet Attraccess dann nicht neu: Der Neustart folgt im nächsten Zeitfenster oder wenn Attraccess aus einem anderen Grund neu startet.
+
+### Was installiert wird
+
+- Die neueste Version, die der Update-Schritt erlaubt. Auf einem Nightly-Host wechseln Plugins, die `next` wünschen, mit **Patches und Minor** und **Paketregel folgen** auch auf neuere Nightly-Builds (**Nur Patches** hält sie an Ort und Stelle, außer bei Patch-Releases).
+- **Nie automatisch installiert:** eine neue Hauptversion, eine Version mit zusätzlichen Berechtigungen, eine als veraltet markierte Version, eine mit dem Host nicht kompatible Version, ein Update, für das weitere Plugins installiert oder geändert werden müssten, eine von einem anderen npm-Benutzer als die installierte veröffentlichte Version und jede Version aus einer Registry auf einem anderen Rechner, die kein HTTPS verwendet. Auf einem Release-Host werden auch keine Vorabversionen installiert, außer `prerelease` wurde über die [API](#api) auf `true` gesetzt. Solche installierst du selbst über **Version verwalten**.
 - **Fehler:** Kann ein Update nicht installiert werden, bleibt die installierte Version bestehen, das Server-Log nennt den Grund, und Attraccess versucht diese Version frühestens nach 24 Stunden erneut. Eine neuere Version wird ohne diese Pause versucht. Wird eine neue Version installiert, lädt aber nach dem Neustart nicht, kehrt Attraccess nicht zur vorherigen Version zurück: **Einstellungen → Plugins** zeigt den Fehler, und du kannst über **Version verwalten** eine andere Version wählen. Ein späteres Update wird weiterhin automatisch installiert.
-- **Audit-Log:** Jede automatische Installation, erfolgreich oder nicht, und ihre Aktivierung nach dem Neustart werden ohne Benutzer im Audit-Log festgehalten (angezeigt als **System oder anonym**).
+- **Audit-Log:** Änderungen an diesen Einstellungen werden mit dem Benutzer festgehalten, der sie vorgenommen hat. Jede automatische Installation, erfolgreich oder nicht, und ihre Aktivierung nach dem Neustart werden ohne Benutzer festgehalten (angezeigt als **System oder anonym**).
 
-### Automatische Updates ausschalten
+### Einstellungen für ein einzelnes Plugin
 
-Für ein einzelnes Plugin öffne **⋯ → Version verwalten**, stelle **Automatische Update-Regel des Plugins** auf **Aus** und speichere die Versionsregel. **Nur Patches** beschränkt das Plugin auf Patch-Releases.
-
-Für die globale Update-Regel gibt es noch keine Seite in der Weboberfläche. Ein Administrator, der Plugins verwalten darf, ändert sie mit `POST /api/plugins/update-policy`:
-
-- `{"checksEnabled": false}`: keine Update-Prüfungen und keine automatische Installation.
-- `{"mode": "off"}`: Updates werden nicht automatisch installiert.
-- `{"maintenanceWindow": {"startMinute": 60, "durationMinutes": 120}}`: Das Fenster läuft von 01:00 bis 03:00 Uhr.
-
-Auf einem Nightly-Host ersetzt das Speichern eines beliebigen Teils der globalen Update-Regel, auch nur des Wartungsfensters, den unter [Nightly-Hosts folgen `next`](#nightly-hosts-folgen-next) beschriebenen Nightly-Standard. Die gespeicherte Regel installiert keine Vorabversionen, solange du nicht `"prerelease": true` sendest. Um mit einer gespeicherten Regel weiter Nightly-Builds zu folgen, sende zusätzlich `{"mode": "follow", "prerelease": true}`. Jedes Plugin folgt dann seiner gewünschten Version oder seinem Kanal.
-
-Ein Plugin, dessen eigene Regel nicht **Globale Regel übernehmen** ist, verwendet diese anstelle des globalen Modus. Ausgeschaltete Update-Prüfungen (`checksEnabled: false`) gelten für alle Plugins.
+Unter **⋯ → Version verwalten** ersetzt die **Automatische Update-Regel des Plugins** den globalen Update-Schritt für dieses Plugin: **Aus**, **Nur Patches**, **Patches und Minor** oder **Paketregel folgen**; **Globale Regel übernehmen** verwendet den globalen. Der globale Schalter geht vor: **Solange die automatischen Updates ausgeschaltet sind, installiert keine Plugin-Einstellung etwas.** Wochentage und Zeitfenster gelten immer.
 
 > [!WARNING]
-> Eine gewünschte Version hält ein Plugin mit **Nur Patches** oder **Patches und Minor** nicht auf dieser Version: Installierst du eine ältere Version, kann das nächste Wartungsfenster sie wieder aktualisieren. Soll ein Plugin auf seiner aktuellen Version bleiben, stelle seine automatische Update-Regel auf **Aus**. Die gewünschte Version oder der Versionsbereich beschränkt automatische Updates nur mit **Paketregel folgen**.
+> Eine gewünschte Version hält ein Plugin mit **Nur Patches** oder **Patches und Minor** nicht auf dieser Version: Installierst du eine ältere Version, kann das nächste Update-Zeitfenster sie wieder aktualisieren. Soll ein Plugin auf seiner aktuellen Version bleiben, stelle seine automatische Update-Regel auf **Aus**. Die gewünschte Version oder der Versionsbereich beschränkt automatische Updates nur mit **Paketregel folgen**.
+
+### Nach einem Upgrade von Attraccess
+
+Eine Update-Richtlinie, die eine frühere Version über die API gespeichert hat, gilt nicht als eingeschaltet: Nach dem Upgrade sind die automatischen Updates **aus**. Ob der Host nach Updates sucht, bleibt erhalten, und das alte tägliche Zeitfenster bleibt als Zeitplan an jedem Wochentag in UTC erhalten. Plugin-Einstellungen außer **Globale Regel übernehmen** und **Aus** werden auf **Globale Regel übernehmen** zurückgesetzt. Das Server-Log meldet das einmal. Ein Plugin-Verwalter schaltet die automatischen Updates im Bereich ein.
+
+### API
+
+Der Bereich verwendet `GET` und `POST /api/plugins/update-policy` (Berechtigung `system.plugins.manage`). `POST` ändert die enthaltenen Felder:
+
+```json
+{
+  "checksEnabled": true,
+  "automaticUpdates": true,
+  "mode": "minor",
+  "schedule": { "weekdays": [1, 2, 3, 4, 5], "startMinute": 120, "durationMinutes": 120, "timeZone": "Europe/Berlin" },
+  "prerelease": false
+}
+```
+
+Wochentage sind von 1 (Montag) bis 7 (Sonntag) nummeriert, `startMinute` ist die Minute des Tages (120 ist 02:00 Uhr). Ohne Zeitzone verwendet der Host UTC. Ungültige Werte und das Einschalten ohne Wochentag werden mit `400` beantwortet.
 
 ## Plugin hochladen
 
