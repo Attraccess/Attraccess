@@ -269,11 +269,16 @@ export class FlowExecutionEngine {
       if (pluginNode.isInput) {
         return { payload: input, outputHandle: DEFAULT_OUTPUT_HANDLE };
       }
-      return pluginNode.execute(
+      const result = await pluginNode.execute(
         { id: node.id, type: node.type, data: node.data as Record<string, unknown> },
         input,
         this.context.buildExecutionContext(flowRunId, transactionManager, options, runResourceId),
       );
+      // A plugin node with one declared output (e.g. ['done']) continues on it when it names no handle.
+      if (result.outputHandle === undefined && pluginNode.outputs.length === 1) {
+        return { ...result, outputHandle: pluginNode.outputs[0] };
+      }
+      return result;
     }
 
     throw new Error(`No executor found for flow node type: ${node.type}`);

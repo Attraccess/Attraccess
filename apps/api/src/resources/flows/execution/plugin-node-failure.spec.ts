@@ -155,6 +155,28 @@ describe('plugin node failure behaviour', () => {
     expect(afterFailure).not.toHaveBeenCalled();
   });
 
+  it('continues on the sole declared output when a single-output plugin node names no handle', async () => {
+    const doneType = `plugin.failure-policy.done-${typeIndex++}`;
+    registerPluginFlowNodes('failure-policy', [
+      {
+        type: doneType,
+        label: 'Done only',
+        configSchema: {},
+        inputs: ['input'],
+        outputs: ['done'],
+        execute: async (_node, input) => ({ payload: input }),
+      },
+    ]);
+    buildDoorFlow(doneType, {});
+    scope.edgesBySourceAndHandle['engage|done'] = [{ source: 'engage', target: 'on-output' }];
+    delete scope.edgesBySourceAndHandle['engage|output'];
+
+    await expect(scope.service.handleResourceSessionStartedEvent(doorUnlockEvent())).resolves.toBeUndefined();
+
+    expect(afterOutput).toHaveBeenCalledTimes(1);
+    expect(afterFailure).not.toHaveBeenCalled();
+  });
+
   it('fails the flow when the failure hook throws or answers with an unknown behaviour', async () => {
     for (const getFailureBehavior of [
       () => {
