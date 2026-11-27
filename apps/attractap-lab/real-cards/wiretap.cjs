@@ -121,7 +121,7 @@ tls.TLSSocket.prototype.write = function (chunk, ...rest) {
 
 const originalOn = tls.TLSSocket.prototype.on;
 function wrapData(socket, listener) {
-  return function (chunk) {
+  return function (chunk, ...rest) {
     let drop = false;
     try {
       const sock = socketId(socket);
@@ -144,7 +144,7 @@ function wrapData(socket, listener) {
       socket.destroy();
       return undefined;
     }
-    return listener.apply(this, arguments);
+    return listener.call(this, chunk, ...rest);
   };
 }
 tls.TLSSocket.prototype.on = function (event, listener) {

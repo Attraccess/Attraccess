@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-console -- Command-line tool: its output is the point. */
 // Creates and drops the throwaway PostgreSQL database of a lab run (hil/run.sh, real-cards/run-real-card-session.sh).
 //   node throwaway-db.mjs create   prints the connection URL of a new, empty database
 //   node throwaway-db.mjs drop URL drops the database URL names
@@ -7,6 +8,7 @@ import { existsSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { loadEnvFile } from 'node:process';
 import { fileURLToPath } from 'node:url';
+// eslint-disable-next-line @nx/enforce-module-boundaries -- Lab tooling runs the API's database provider script as is; nothing is bundled.
 import { postgresProvider, describeLocation } from '../../api/scripts/lib/database-provider.mjs';
 
 const envFile = fileURLToPath(new URL('../../../.env', import.meta.url));

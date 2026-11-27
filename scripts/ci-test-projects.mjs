@@ -1,6 +1,5 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 export function selectTests(nodes, group) {
   if (!['core', 'plugins', 'software'].includes(group)) throw new Error(`Unknown test group: ${group}`);
@@ -54,7 +53,7 @@ export async function main(args = process.argv.slice(2)) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+if (import.meta.main) {
   main()
     .then((code) => {
       process.exitCode = code;

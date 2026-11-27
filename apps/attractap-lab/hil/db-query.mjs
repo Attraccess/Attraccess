@@ -5,6 +5,7 @@
 // {"rows": [[...], ...], "columns": [...], "changes": n} on stdout. bytea values come back as {"$bytes": "<base64>"}.
 // The database is DATABASE_URL, like the seed script (apps/api/scripts/seed-dev-user.mjs).
 import pg from 'pg';
+// eslint-disable-next-line @nx/enforce-module-boundaries -- Lab tooling runs the API's database provider script as is; nothing is bundled.
 import { postgresProvider, toPositionalParameters } from '../../api/scripts/lib/database-provider.mjs';
 
 // bigint (int8: bigint columns, COUNT) arrives as a number, as the API reads it (database/postgres/postgres-connection.ts);

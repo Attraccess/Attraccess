@@ -4,6 +4,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import { fixtureGitEnv } from './test-utils/git-env.mjs';
 
 function checkHost(functionName, functions) {
   const result = spawnSync(
@@ -132,7 +133,7 @@ test('worktree creation refuses an unsupported DATABASE_TYPE before creating the
   ]) {
     copyFileSync(file, path.join(repo, file));
   }
-  const git = (...args) => spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+  const git = (...args) => spawnSync('git', args, { cwd: repo, encoding: 'utf8', env: fixtureGitEnv() });
   writeFileSync(path.join(repo, 'scripts/setup-dev-dependencies.sh'), '#!/bin/sh\ntouch "$PWD/bootstrapped"\n', {
     mode: 0o755,
   });
@@ -143,7 +144,7 @@ test('worktree creation refuses an unsupported DATABASE_TYPE before creating the
     spawnSync('sh', [path.join(repo, 'scripts/create-worktree.sh'), path.join(root, name), name, 'main'], {
       cwd: repo,
       encoding: 'utf8',
-      env: { ...process.env, DATABASE_TYPE: databaseType },
+      env: { ...fixtureGitEnv(), DATABASE_TYPE: databaseType },
     });
 
   const refused = create('wt-bad', 'oracle');

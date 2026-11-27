@@ -4,7 +4,6 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire, isBuiltin } from 'node:module';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 // Compiled into main.js; the plugin loader hands plugins that instance (see HOST_BUNDLED_MODULES in the API).
 const hostBundled = new Set(['@attraccess/plugins-backend-sdk']);
@@ -157,7 +156,6 @@ export function main(apiDirectory = '/app/dist/apps/api') {
   process.stdout.write('Server image verified.\n');
 }
 
-// import.meta.url is the real path; argv[1] may go through a symlink.
-if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
+if (import.meta.main) {
   main();
 }

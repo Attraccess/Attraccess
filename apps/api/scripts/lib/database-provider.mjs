@@ -3,8 +3,6 @@
 // Plain Node only: the production image has no TypeScript sources and only ships this folder beside the script, so
 // nothing here may import a .ts file. The only dependency is the `pg` driver the deployed API package ships.
 // PostgreSQL is the only runtime database: DATABASE_TYPE may be unset or `postgres`, and DATABASE_URL names it.
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 export const DEFAULT_DATABASE_TYPE = 'postgres';
 
@@ -154,7 +152,7 @@ export function resolveDatabaseProvider(env = process.env) {
 }
 
 // Used by the shell setup scripts: `node database-provider.mjs` validates DATABASE_TYPE and prints the type.
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (import.meta.main) {
   try {
     process.stdout.write(`${parseDatabaseType(process.env)}\n`);
   } catch (error) {
