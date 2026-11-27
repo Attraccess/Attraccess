@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   devOnlyPackages,
   installedDevOnlyPackages,
@@ -43,6 +45,12 @@ test('reports a required package that is not installed next to the bundle', () =
   assert.deepEqual(unresolvablePackages(entry), ['absent-package-for-test']);
 });
 
+// A changed bundle format would otherwise leave an empty list, which resolves trivially.
+test('fails when the bundle yields no package requires to check', () => {
+  const entry = write('main.js', 'import("present"); require("./local"); require("node:fs");');
+  assert.throws(() => unresolvablePackages(entry), /No package requires found/);
+});
+
 test('finds development-only packages as direct and as transitive dependencies', () => {
   write('node_modules/glob/package.json');
   write('node_modules/.pnpm/@nestjs+testing@12.0.0_peer/package.json');
@@ -76,4 +84,13 @@ test('development-only packages stay out of the production manifests', () => {
     [...devOnlyPackages, ...transitiveOnlyPackages].filter((name) => name in root || name in api),
     [],
   );
+});
+
+// This machine has no /app/dist/apps/api, so a check that really runs has to fail.
+test('runs the checks when started through a symlink', () => {
+  const link = join(directory, 'verify.mjs');
+  symlinkSync(fileURLToPath(new URL('./verify-server-image.mjs', import.meta.url)), link);
+  const run = spawnSync(process.execPath, [link], { encoding: 'utf8' });
+  assert.notEqual(run.status, 0);
+  assert.match(run.stderr, /main\.js/);
 });

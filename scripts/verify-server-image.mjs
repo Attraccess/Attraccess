@@ -54,7 +54,9 @@ export function requiredPackages(source) {
 
 export function unresolvablePackages(entryFile) {
   const { resolve } = createRequire(entryFile);
-  return requiredPackages(fs.readFileSync(entryFile, 'utf8')).filter((name) => {
+  const names = requiredPackages(fs.readFileSync(entryFile, 'utf8'));
+  if (!names.length) throw new Error(`No package requires found in ${entryFile}, so none were checked`);
+  return names.filter((name) => {
     try {
       resolve(name);
       return false;
@@ -98,6 +100,7 @@ function assertNone(problem, found) {
 function loadNativeAddons(apiDirectory) {
   const apiRequire = createRequire(path.join(apiDirectory, 'main.js'));
   apiRequire('bcrypt').hashSync('probe', 4);
+  apiRequire('sharp'); // loads libvips
   const Database = apiRequire('better-sqlite3');
   new Database(':memory:').close();
   // A transitive dependency of the mailer: only pnpm's hoisted directory reaches it.
@@ -127,6 +130,7 @@ export function main(apiDirectory = '/app/dist/apps/api') {
   process.stdout.write('Server image verified.\n');
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+// import.meta.url is the real path; argv[1] may go through a symlink.
+if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
   main();
 }
