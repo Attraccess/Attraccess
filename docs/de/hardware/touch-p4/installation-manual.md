@@ -21,7 +21,7 @@ Ein Leser braucht fünf gedruckte Teile für die Wand und sechs für den Tisch. 
 | --- | --- | --- | --- | --- |
 | Kappe (vordere Schale) | `attractap-cap.3mf` | 1 | RAL 5021 | ihrer Vorderseite |
 | Frontplatte (Abdeckung der Front) | `attractap-faceplate.3mf`, oder `attractap-faceplate-logo.3mf` mit Schriftzug | 1 | RAL 5021, Streifen und Schriftzug weiß | ihrer Vorderseite |
-| Tap-Kachel | `attractap-tile.3mf` | 1 | Oberseite und Schlüsselloch schwarz, Körper reines Weiß | ihrer Rückseite |
+| Tap-Kachel | `attractap-tile.3mf` | 1 | Oberseite und Schlüsselloch schwarz, Körper reines Weiß (er führt das Licht der LEDs) | ihrer Rückseite |
 | Dock (Rückplatte) | `attractap-dock.3mf` | 1 | Marmorweiß | ihrer Rückseite |
 | Displayrahmen | `attractap-display-frame.3mf` | 1 | Beliebig | seiner Platinenseite |
 | Ständer (nur Tisch) | `attractap-stand.3mf` | 1 | Marmorweiß | seiner Tischseite |
@@ -61,7 +61,7 @@ Die kurzen Einschmelzmuttern gehen direkt von oben in die Schraubdome. Die beide
 5. Prüfen Sie, dass nichts in den Schlitz zwischen unterer Wand und Sicherungsleiste hineinragt. Die Zunge des Docks muss dort hineingleiten.
 6. Lassen Sie alles abkühlen und drehen Sie dann einmal eine M3-Schraube durch jede Einschmelzmutter.
 7. Geben Sie einen Tropfen Sekundenkleber in den Ring auf der Innenseite des Docks und drücken Sie den Magneten hinein, mit beliebiger Seite nach oben. Er darf nicht über den Ring hinausstehen.
-8. Schieben Sie die Tap-Kachel von hinten in die Kappe, die schwarze Oberseite voran, durch die quadratische Öffnung unter dem Displayfenster. Ihr Flansch schlägt innen an der Frontwand an. Die Kerbe im Flansch geht um den Platinen-Schraubdom daneben. Die Kachel bleibt lose, bis die Platine sie hält.
+8. Schieben Sie die Tap-Kachel von hinten in die Kappe, die schwarze Oberseite voran, durch die quadratische Öffnung unter dem Displayfenster. Drehen Sie sie so, dass die Kerbe in ihrem Flansch um den Platinen-Schraubdom neben der Öffnung geht; der Kanal in ihrer Rückseite zeigt dann zu Ihnen. Ihr Flansch schlägt innen an der Frontwand an. Die Kachel bleibt lose, bis die Platine sie hält.
 
 ## Den Leser zusammenbauen
 
@@ -80,7 +80,7 @@ Alles ist in der Reihenfolge, in der es eingesetzt wird, aus der Kappe herausgeh
 7. Kleben Sie eine leitfähige Dichtung auf mindestens zwei der vier blanken quadratischen Pads auf der Seite der Platine ohne Bauteile (die goldenen Quadrate hinter der Stelle, an der das Display liegen wird), zwei weit voneinander entfernt. Die Dichtungen drücken gegen die Metallrückseite des Displays, wenn die Platine eingesetzt wird.
 8. Heben Sie das Ende des Flexkabels, den schmalen Streifen mit den Kontakten, von der Metallrückseite ab. Halten Sie die Platine mit den Bauteilen zu Ihnen und der Ethernet-Buchse zum unteren Ende der Kappe. Fädeln Sie das Ende des Flexkabels von der Seite ohne Bauteile durch den Schlitz in der Mitte der Platine und senken Sie die Platine dann auf die vier Schraubdome. Der Teil mit dem Chip bleibt flach auf der Rückseite des Displays; nur der schmale Streifen biegt sich durch den Schlitz.
 9. Stecken Sie das Flexkabel in seinen Anschluss auf der Platine und schließen Sie den Verriegelungsbügel.
-10. Befestigen Sie die Platine mit den vier M3 × 4 Schrauben. Handfest genügt; die Einschmelzmuttern sitzen in Kunststoff.
+10. Befestigen Sie die Platine mit den vier M3 × 4 Schrauben. Handfest genügt; die Einschmelzmuttern sitzen in Kunststoff. Die Platine liegt jetzt flach auf der Rückseite der Tap-Kachel, klemmt die Kachel ein und wird von ihr an der Ecke gehalten, die keine Schraube hat. Steht eine Ecke der Platine von ihrem Schraubdom ab, ist die Rückseite der Kachel zu dick: Schleifen Sie sie plan und versuchen Sie es erneut.
 11. Versorgen Sie die Platine über USB-C und prüfen Sie Display, Touch, LEDs und Buzzer, bevor der Leser an die Wand kommt. USB-C, Reset und Boot sind nur erreichbar, solange der Leser nicht am Dock hängt.
 12. Drehen Sie den Leser mit der Front nach oben. Kleben Sie dünnes doppelseitiges Klebeband auf die Front der Kappe nahe den Kanten und zwischen Displayfenster und Kachel, setzen Sie dann die Frontplatte über Kachel und Glas und drücken Sie sie rundum an. Ihre Kante schließt mit den Seiten der Kappe ab.
 
@@ -213,6 +213,6 @@ Nichts davon wurde an echten Teilen geprüft. Jeder Punkt kann einen Schritt ode
 - [ ] **Schwenkbewegung beim Einhängen.** In CAD kollisionsfrei bei fünf Winkeln zwischen 7° und geschlossen, nachdem die Zunge des Docks am 19. Nov. 2026 angeschrägt wurde. Docks, die vorher geslict wurden, müssen neu geslict werden.
 - [ ] **Zugentlastung.** Die Kabelbinder-Sättel in der Kappe und die Kabelbinder-Rippen im Ständer wurden am 19. Nov. 2026 hinzugefügt und sind nur in CAD geprüft. Fädeln Sie beim ersten Druck einen Kabelbinder ein und ziehen Sie am Kabel. Die Kabelaussparung des Ständers wurde in derselben Änderung auf 11 mm erhöht; vorher war sie für ein Ethernet-Kabel zu niedrig. Kappen und Ständer, die vorher geslict wurden, müssen neu geslict werden.
 - [ ] **Kabelweg in die Wand.** Am 19. Nov. 2026 modelliert, mit einem 5,5-mm-Ethernet-Kabel bei 18 mm Biegeradius und einer 3,5-mm-Stromleitung; in CAD kollidiert nichts. Mit echten Kabeln nicht erprobt. Der Weg aus einer Unterputzdose ist nicht modelliert.
-- [ ] **Frontplatte und Tap-Kachel.** Neu am 27. Nov. 2026 und nur im CAD geprüft: wie gleichmäßig der Rand der Kachel leuchtet (die LEDs liegen nur unter der oberen und unteren Kante), ob die Kachel ohne Spiel sitzt und wie gut dünnes Klebeband die Frontplatte hält. Die Abbildungen zeigen beide Teile noch nicht.
+- [ ] **Frontplatte und Tap-Kachel.** Neu am 27. Nov. 2026 und nur im CAD geprüft; die Kachel wurde am selben Tag für den Ring aus 16 LEDs der Platine vergrößert. Wie gleichmäßig und hell der Rand der Kachel leuchtet, ob die Kachel die Ecke der Platine ohne Schraube ohne Spiel hält und wie gut dünnes Klebeband die Frontplatte hält. Die Abbildungen zeigen beide Teile noch nicht.
 - [ ] **Passung der Einschmelzmuttern.** Die gedruckten Löcher sind 4,0 mm für gängige M3-Einschmelzmuttern. Prüfen Sie sie gegen die Einschmelzmuttern, die Sie kaufen.
 - [ ] **Betrieb im Freien.** Es gibt keine Dichtungen; die Buzzerlöcher und Kabelaussparungen sind offen, und ABS+ altert im Sonnenlicht. Behandeln Sie es als nur für Innenräume: Eine abgedichtete Variante bräuchte außerdem ein auf die im Freien erlaubten Kanäle beschränktes WLAN.

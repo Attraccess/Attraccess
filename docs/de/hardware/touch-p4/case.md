@@ -18,10 +18,22 @@ passt in beide. Noch nichts wurde gedruckt oder anprobiert: siehe [Noch nicht ge
   Unterkante. Das Logo ist Sache der Frontplatte: Die gedruckte gibt es als zweite Datei mit eingelegtem
   Attraccess-Schriftzug, andere Frontplatten (Aluminium, Holz, das Logo eines Kunden) bringen ihr eigenes mit.
   Leser werden mit dem Attraccess-Schriftzug ausgeliefert, sofern ein Kunde nichts anderes wünscht.
-- **Tap-Kachel**: das Kartenziel über der NFC-Antenne, 36 mm im Quadrat und 1,8 mm über der Frontplatte:
+- **Tap-Kachel**: das Kartenziel über der NFC-Antenne, 40,8 mm im Quadrat und 1,8 mm über der Frontplatte:
   eine schwarze Oberseite mit weißem Schlüsselloch auf einem weißen Körper. Ihr Flansch sitzt hinter der
-  Frontwand der Kappe, so lässt sie sich von außen nicht abhebeln. Die 16 LEDs der Platine leuchten von
-  hinten hinein und lassen den weißen Rand um die schwarze Oberseite leuchten.
+  Frontwand der Kappe, so lässt sie sich von außen nicht abhebeln.
+  - **Licht.** Die 16 LEDs der Platine bilden einen quadratischen Ring, auf jeder Seite 21,4 mm von der Mitte
+    der Kachel, 10,7 mm voneinander entfernt. Der weiße Rand um die schwarze Oberseite ist 2 mm breit
+    (21,4 ± 1 mm von der Mitte) und liegt genau über ihnen.
+  - **Lichtkanal.** Die LEDs leuchten in einen Kanal in der Rückseite der Kachel, 2,3 mm breit und 2,5 mm tief,
+    der um den ganzen Ring läuft. Seine weißen Wände leiten das Licht seitlich zwischen die LEDs, und zwischen
+    Kanal und Rand liegen nur 2,8 mm weißer Kunststoff, etwa halb so viel wie bei einer massiven Kachel.
+  - **Kern.** Innerhalb des Rings bleibt die Kachel weiß. In weißem Kunststoff wird Licht gestreut, nicht
+    geführt: Ein weißer Kern wirft, was nach innen streut, zum Rand zurück, ein schwarzer würde es schlucken
+    und den Rand dunkler machen. Die schwarze Oberseite verdeckt den Kern.
+  - **Halt für die Platine.** Die Kachel ist zwischen der Frontwand der Kappe und der Platine eingeklemmt,
+    ihre Rückseite liegt rund um die NFC-Schleife flach auf der Platine. So hält sie die Ecke der Platine, die
+    keine Schraube hat (von vorn gesehen unten links). Von den beiden Platinenschrauben rechts der Kachel (von
+    vorn gesehen) sitzt die obere in einer Kerbe im Flansch, die untere bleibt frei von seiner gerundeten Ecke.
 - **Dock**: die Rückplatte, 13,9 mm von der Bestückungsseite der Platine entfernt. Sie wird an die Wand
   geschraubt (fünf Löcher; das untere Paar entspricht dem 60-mm-Abstand einer Unterputzdose) oder auf den
   Ständer. Unter der Ethernet-Buchse und dem PoE-Modul hat die Platte 0,8 mm tiefe Aussparungen und unter
@@ -70,7 +82,7 @@ Die Hardware (Einschmelzmuttern, Schrauben, Klebeband, Kabelbinder) ist in der
 | [`cad/attractap-assembly.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-assembly.step) | Der ganze Leser zusammengebaut, für andere CAD-Programme. |
 | Platinen-Attrappe: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.stl) | Druckbarer Platzhalter für die Platine, um die Passung zu prüfen, bevor die echte Platine vorliegt. |
 | Display-Attrappe: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.stl) | Platzhalter für das Display, mit den angenommenen Displaymaßen (siehe [Noch nicht geprüft](#noch-nicht-geprüft)). |
-| [`board/attractap-touch-p4.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/board/attractap-touch-p4.step) | Die Platine allein (ohne Bauteile), aus dem aktuellen Layout exportiert. Die Konstruktion enthält die Platine in dem Stand, den sie beim Zeichnen des Gehäuses hatte; gleichen Sie sie nach einer Änderung der Platinenkontur mit dieser Datei ab. |
+| [`board/attractap-touch-p4.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/board/attractap-touch-p4.step) | Die Platine allein (ohne Bauteile), aus dem aktuellen Layout exportiert. Die Konstruktion enthält diese Datei, am 27. November 2026 für den LED-Ring und die verschobenen Befestigungslöcher neu importiert; importieren Sie sie nach einer Änderung der Platinenkontur oder der Löcher erneut. |
 | [`logo/attraccess-wordmark.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-wordmark.svg), [`attraccess-keyhole.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-keyhole.svg), [`attraccess-logo-mono.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-logo-mono.svg) | Logo-Umrisse für die Einlagen der Frontplatte und der Tap-Kachel; das Logo im Bestückungsdruck der Platine wird aus demselben Ordner gezeichnet. |
 | [`manual/`](https://github.com/Attraccess/Attraccess/tree/main/apps/attractap/hardware/touch-p4/case/manual) | Die Szenendatei, aus der die Abbildungen der Anleitung gerendert werden, und die Skripte, die Abbildungen und PDF erzeugen (siehe [Das Design ändern](#das-design-ändern)). |
 
@@ -150,6 +162,17 @@ schreiben Step-Dateien dafür und nutzen `rsvg-convert` für Beschriftungen.
   - Die Buchse andersherum zu drehen geht nicht ohne ein längeres Gehäuse: Unter dem Display schrumpft ihr
     Steckerraum von 51 auf 32 mm, und ein Kabel aus der Wand bräuchte einen Stecker, der 12 mm unter der
     Buchse endet.
+- **Tap-Kachel und LED-Ring.** Am 27. November 2026 für den Ring aus 16 LEDs der Platine geändert und nur im CAD
+  geprüft.
+  - Wie gleichmäßig und wie hell der Rand leuchtet. Der Lichtkanal und die 2,8 mm Weiß darüber sind ein erster
+    Ansatz; Lichtflecken auf dem Rand sprächen für einen tieferen Kanal oder kleine schwarze Masken über den
+    LEDs, ein zu dunkler Rand für eine dünnere Decke.
+  - Ob die Rückseite der Kachel die untere linke Ecke der Platine (von vorn gesehen) ohne Spiel hält. Sie liegt
+    im CAD ohne Spalt auf der Platine. Sitzt die Platine dann nicht auf allen vier Schraubdomen, schleifen Sie
+    die Rückseite der Kachel ab.
+  - Nach hinten (zur Wand) stützt diese Ecke nur die Platine selbst: Das Dock hat dahinter seine Kabelöffnung.
+    Eine auf die Kachel gedrückte Karte biegt sie elastisch zurück, geschätzt um 0,1 mm bei 5 N auf die Mitte
+    der Kachel.
 - **Einschmelzmuttern nahe der Frontfläche.** Nur 2,9 mm liegen zwischen Platine und Frontwand. Die Löcher
   für die Einschmelzmuttern der vier Platinen-Schraubdome sind 3,2 mm tief (`pcb_ins_depth`), reichen also
   0,3 mm in die 2,4 mm dicke Frontwand und lassen 2,1 mm stehen. Prüfen Sie beim ersten Druck, dass das

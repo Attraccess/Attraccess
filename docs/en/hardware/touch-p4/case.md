@@ -17,10 +17,21 @@ both. Nothing has been printed or test-fitted yet: see [Not yet verified](#not-y
   logo is the faceplate's business: the printed one comes as a second file with the Attraccess wordmark
   inlaid, and other faceplates (aluminium, wood, a customer's logo) bring their own. Readers ship with
   the Attraccess wordmark unless a customer asks otherwise.
-- **Tap tile**: the card target over the NFC antenna, 36 mm square and 1.8 mm proud of the faceplate:
+- **Tap tile**: the card target over the NFC antenna, 40.8 mm square and 1.8 mm proud of the faceplate:
   a black top with a white keyhole on a white body. Its flange sits behind the cap's front wall, so it
-  cannot be pried off from outside. The board's 16 LEDs shine into it from behind and light up the
-  white rim round the black top.
+  cannot be pried off from outside.
+  - **Light.** The board's 16 LEDs form a square ring 21.4 mm from the tile's centre on every side, 10.7 mm
+    apart. The white rim round the black top is 2 mm wide (21.4 ± 1 mm from the centre), right over them.
+  - **Light channel.** The LEDs shine into a channel in the tile's back, 2.3 mm wide and 2.5 mm deep, that
+    runs round the whole ring. Its white walls carry the light sideways between the LEDs, and only 2.8 mm
+    of white plastic lie between the channel and the rim, about half of a solid tile.
+  - **Core.** Inside the ring the tile stays white. In white plastic light scatters instead of being guided:
+    a white core sends what strays inwards back towards the rim, while a black one would absorb it and
+    dim the rim. The black top hides the core.
+  - **Holding the board.** The tile is clamped between the cap's front wall and the board, its back flat
+    on the board round the NFC loop. That holds the corner of the board that has no screw (lower left
+    seen from the front). Of the two board screws right of the tile (seen from the front), the upper one
+    sits in a notch in the flange and the lower one clears its rounded corner.
 - **Dock**: the back plate, 13.9 mm from the board's component side. It is screwed to the wall (five
   holes; the lower pair matches the 60 mm spacing of a flush-mount box) or onto the stand. Under the
   Ethernet jack and the PoE module the plate has recesses 0.8 mm deep, and a window through it under
@@ -69,7 +80,7 @@ The hardware (heat-set inserts, screws, tape, cable ties) is listed in the
 | [`cad/attractap-assembly.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-assembly.step) | The whole reader assembled, for other CAD tools. |
 | Mock board: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.stl) | Printable stand-in for the board, to check the fit before the real board is at hand. |
 | Mock display: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.stl) | Stand-in for the display, with the assumed display dimensions (see [Not yet verified](#not-yet-verified)). |
-| [`board/attractap-touch-p4.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/board/attractap-touch-p4.step) | The bare board (no parts) exported from the current layout. The design embeds the board as it was when the case was drawn; check it against this file after a change to the board outline. |
+| [`board/attractap-touch-p4.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/board/attractap-touch-p4.step) | The bare board (no parts) exported from the current layout. The design embeds this file, re-imported on 27 November 2026 for the LED ring and the moved mounting holes; import it again after a change to the board outline or holes. |
 | [`logo/attraccess-wordmark.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-wordmark.svg), [`attraccess-keyhole.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-keyhole.svg), [`attraccess-logo-mono.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-logo-mono.svg) | Logo outlines for the inlays of the faceplate and the tap tile; the board's silkscreen logo is drawn from the same folder. |
 | [`manual/`](https://github.com/Attraccess/Attraccess/tree/main/apps/attractap/hardware/touch-p4/case/manual) | The scene file the manual's figures are rendered from, and the scripts that make the figures and the PDF (see [Changing the design](#changing-the-design)). |
 
@@ -148,6 +159,17 @@ files for it, and use `rsvg-convert` for labels.
     edge); the tape on the LCD is the insulation.
   - Turning the jack the other way does not work without a longer case: below the display its plug
     room shrinks from 51 to 32 mm, and a wall cable would need a plug ending 12 mm below the jack.
+- **Tap tile and LED ring.** Changed on 27 November 2026 for the board's ring of 16 LEDs and checked in CAD
+  only.
+  - How evenly and how brightly the rim lights up. The light channel and the 2.8 mm of white over it are
+    a first guess; LED spots on the rim would call for a deeper channel or small black masks over the
+    LEDs, and a dim rim for a thinner roof.
+  - Whether the tile's back holds the board's lower left corner (seen from the front) without play. It
+    lies on the board with no gap in CAD. If the board then does not sit on all four bosses, sand the
+    tile's back.
+  - Backwards (towards the wall) nothing but the board itself supports that corner: the dock has its
+    cable opening behind it. A card pressed on the tile bends it back elastically, by an estimated
+    0.1 mm for 5 N on the tile's centre.
 - **Inserts close to the front face.** Only 2.9 mm lie between the board and the front wall. The
   insert holes of the four PCB bosses are 3.2 mm deep (`pcb_ins_depth`), reaching 0.3 mm into the
   2.4 mm front wall and leaving 2.1 mm. Check on the first print that pressing the inserts in does

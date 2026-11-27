@@ -21,7 +21,7 @@ One reader needs five printed parts for the wall, six for the desk. The print fi
 | --- | --- | --- | --- | --- |
 | Cap (front shell) | `attractap-cap.3mf` | 1 | RAL 5021 | its front face |
 | Faceplate (cover over the front) | `attractap-faceplate.3mf`, or `attractap-faceplate-logo.3mf` with the wordmark | 1 | RAL 5021, stripe and wordmark white | its front face |
-| Tap tile | `attractap-tile.3mf` | 1 | Black top and keyhole, plain white body | its back |
+| Tap tile | `attractap-tile.3mf` | 1 | Black top and keyhole, plain white body (it carries the LEDs' light) | its back |
 | Dock (back plate) | `attractap-dock.3mf` | 1 | Marble white | its back |
 | Display frame | `attractap-display-frame.3mf` | 1 | Any | its PCB side |
 | Stand (desk only) | `attractap-stand.3mf` | 1 | Marble white | its desk face |
@@ -61,7 +61,7 @@ The short inserts go straight down into the bosses. The two standard ones enter 
 5. Check that nothing sticks out into the slot between bottom wall and lock bar. The dock's tongue has to slide in there.
 6. Let everything cool, then run an M3 screw through each insert once.
 7. Put a drop of superglue into the ring on the dock's inner face and press the magnet in, either side up. It must not stand above the ring.
-8. Push the tap tile into the cap from behind, black top first, through the square opening below the display window. Its flange stops against the inside of the front wall. The notch in the flange goes round the PCB boss beside it. The tile stays loose until the PCB holds it.
+8. Push the tap tile into the cap from behind, black top first, through the square opening below the display window. Turn it so the notch in its flange goes round the PCB boss beside the opening; the channel in its back then faces you. Its flange stops against the inside of the front wall. The tile stays loose until the PCB holds it.
 
 ## Assemble the reader
 
@@ -80,7 +80,7 @@ Everything is shown lifted out of the cap in the order it goes in, lowest first.
 7. Stick a conductive gasket onto at least two of the four bare square pads on the PCB's side without components (the gold squares behind where the display will lie), two far apart from each other. The gaskets press against the display's metal back when the PCB goes in.
 8. Lift the end of the flex, the narrow strip with the contacts, off the metal back. Hold the PCB with its components facing you and the Ethernet jack toward the bottom of the cap. Thread the flex's end through the slot in the middle of the PCB from the side without components, then lower the PCB onto the four bosses. The part with the chip stays flat on the display's back; only the narrow strip bends through the slot.
 9. Plug the flex into its connector on the PCB and close the latch.
-10. Fasten the PCB with the four M3 × 4 screws. Hand-tight is enough; the inserts sit in plastic.
+10. Fasten the PCB with the four M3 × 4 screws. Hand-tight is enough; the inserts sit in plastic. The PCB now lies flat on the back of the tap tile, which clamps the tile and holds the corner of the PCB that has no screw. If a corner of the PCB stands off its boss, the tile's back is too thick: sand it flat and try again.
 11. Power the board over USB-C and check display, touch, LEDs and buzzer before the reader goes on the wall. USB-C, reset and boot are only reachable while the reader is off the dock.
 12. Turn the reader face-up. Stick thin double-sided tape onto the cap's front near the edges and between the display window and the tile, then lower the faceplate over the tile and the glass and press it down all round. Its edge lines up with the cap's sides.
 
@@ -213,6 +213,6 @@ Nothing below has been checked on real parts. Each item can change a step or a p
 - [ ] **Swing-on motion.** Collision-free in CAD at five angles between 7° and closed, after the dock's tongue was tapered on 19 Nov 2026. Docks sliced before that need re-slicing.
 - [ ] **Strain relief.** The tie saddles in the cap and the tie fins in the stand were added on 19 Nov 2026 and are checked in CAD only. On the first print, thread a tie and pull on the cable. The stand's cable notch was raised to 11 mm in the same change; before, it was too low for an Ethernet cable. Caps and stands sliced before that need re-slicing.
 - [ ] **Cable route into the wall.** Modelled on 19 Nov 2026 with a 5.5 mm Ethernet cable at 18 mm bend radius and a 3.5 mm power lead; nothing collides in CAD. Not tried with real cables. The route from a flush-mount box is not modelled.
-- [ ] **Faceplate and tap tile.** New on 27 Nov 2026 and checked in CAD only: how evenly the tile's rim lights up (the LEDs sit under the top and bottom edges only), whether the tile sits without play, and how well thin tape holds the faceplate. The figures do not show either part yet.
+- [ ] **Faceplate and tap tile.** New on 27 Nov 2026 and checked in CAD only; the tile was enlarged the same day for the board's ring of 16 LEDs. How evenly and brightly the tile's rim lights up, whether the tile holds the PCB's screwless corner without play, and how well thin tape holds the faceplate. The figures do not show either part yet.
 - [ ] **Insert fit.** The printed holes are 4.0 mm for common M3 inserts. Check them against the inserts you buy.
 - [ ] **Outdoor use.** There are no seals; the buzzer holes and cable notches are open, and ABS+ ages in sunlight. Treat it as indoor only: a sealed variant would also need Wi-Fi limited to the channels allowed outdoors.
