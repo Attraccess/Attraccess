@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
   archive: vi.fn(),
   restore: vi.fn(),
   remove: vi.fn(),
+  rename: vi.fn(),
 }));
 
 vi.mock('../../../../hooks/useAuth', () => ({
@@ -23,7 +24,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     return { data: state.meters };
   },
   useCreateResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useUpdateResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateResourceMeter: () => ({ mutateAsync: state.rename, isPending: false }),
   useArchiveResourceMeter: () => ({ mutateAsync: state.archive, isPending: false }),
   useRestoreResourceMeter: () => ({ mutateAsync: state.restore, isPending: false }),
   useDeleteResourceMeter: () => ({ mutateAsync: state.remove, isPending: false }),
@@ -111,7 +112,7 @@ describe('removing meters', () => {
   });
 
   it.each([
-    ['METER_IN_USE', en.errorInUse],
+    ['METER_IN_USE', en.errorInUseDelete],
     ['METER_HAS_HISTORY', en.errorHasHistory],
     ['SOMETHING_ELSE', en.errorAction],
   ])('explains a %s refusal', async (code, message) => {
@@ -120,9 +121,29 @@ describe('removing meters', () => {
     render(<MetersCard resourceId={7} />);
     fireEvent.click(screen.getByRole('button', { name: en.delete }));
     fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: en.delete }));
-    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
     expect(state.invalidate).toHaveBeenCalled();
+  });
+
+  it('does not tell someone who is archiving a meter in use to archive it', async () => {
+    state.archive.mockRejectedValue(Object.assign(new Error('Conflict'), { body: { message: 'METER_IN_USE' } }));
+    render(<MetersCard resourceId={7} />);
+    fireEvent.click(screen.getByRole('button', { name: en.archive }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: en.archive }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(en.errorInUse);
+    expect(screen.getByRole('alert')).not.toHaveTextContent(/archive it/i);
+  });
+
+  it('leaves only the name editor in place while a meter is renamed', () => {
+    state.meters = [meter(1, 'Energy', { deletable: true })];
+    render(<MetersCard resourceId={7} />);
+    fireEvent.click(screen.getByRole('button', { name: en.rename }));
+    expect(button(en.archive)).not.toBeInTheDocument();
+    expect(button(en.delete)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: en.cancel }));
+    expect(button(en.archive)).toBeInTheDocument();
+    expect(button(en.delete)).toBeInTheDocument();
   });
 
   it('lists archived meters in a collapsed section with restore and rename', async () => {
@@ -151,6 +172,14 @@ describe('removing meters', () => {
     fireEvent.click(screen.getByRole('button', { name: /Archived meters/ }));
     expect(button(en.delete)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: en.restore }));
-    expect(await screen.findByText(en.errorNameExists)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(en.errorNameExists);
+
+    // Renaming settles the clash, so the message goes.
+    state.rename.mockResolvedValue({ id: 2, name: 'Older water' });
+    fireEvent.click(screen.getByRole('button', { name: en.rename }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Older water' } });
+    fireEvent.click(screen.getByRole('button', { name: en.save }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(state.rename).toHaveBeenCalledWith({ path: { resourceId: 7, meterId: 2 }, body: { name: 'Older water' } });
   });
 });

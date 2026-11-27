@@ -30,7 +30,8 @@
   "deleteMessage": "This meter never recorded anything. It is removed for good. Flow nodes that use it become invalid until you choose another meter.",
   "archivedTitle": "Archived meters ({{count}})",
   "archivedAt": "Archived: {{time}}",
-  "errorInUse": "A running session uses this meter. Try again after the session has ended. To take a meter out of use, archive it.",
+  "errorInUse": "A running session uses this meter. Try again after the session has ended.",
+  "errorInUseDelete": "A running session uses this meter. Try again after the session has ended. To take a meter out of use, archive it.",
   "errorHasHistory": "This meter has recorded history and cannot be deleted. Archive it instead.",
   "errorNameExists": "An active meter already has this name. Rename one of the two first.",
   "errorAction": "Unable to change the meter. Try again."

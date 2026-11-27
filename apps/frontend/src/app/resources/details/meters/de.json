@@ -30,7 +30,8 @@
   "deleteMessage": "Dieser Zähler hat noch nie etwas erfasst. Er wird endgültig entfernt. Flow-Knoten, die ihn verwenden, werden ungültig, bis du einen anderen Zähler auswählst.",
   "archivedTitle": "Archivierte Zähler ({{count}})",
   "archivedAt": "Archiviert: {{time}}",
-  "errorInUse": "Eine laufende Sitzung verwendet diesen Zähler. Versuche es nach dem Ende der Sitzung erneut. Um einen Zähler außer Betrieb zu nehmen, archiviere ihn.",
+  "errorInUse": "Eine laufende Sitzung verwendet diesen Zähler. Versuche es nach dem Ende der Sitzung erneut.",
+  "errorInUseDelete": "Eine laufende Sitzung verwendet diesen Zähler. Versuche es nach dem Ende der Sitzung erneut. Um einen Zähler außer Betrieb zu nehmen, archiviere ihn.",
   "errorHasHistory": "Dieser Zähler hat einen Verlauf und kann nicht gelöscht werden. Archiviere ihn stattdessen.",
   "errorNameExists": "Ein aktiver Zähler hat bereits diesen Namen. Benenne zuerst einen der beiden um.",
   "errorAction": "Der Zähler konnte nicht geändert werden. Versuche es erneut."

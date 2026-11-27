@@ -16,16 +16,22 @@ export function MeterNameEditor({
   resourceId,
   meter,
   onSaved,
+  onEditingChange,
 }: {
   resourceId: number;
   meter?: ResourceMeterDto;
   onSaved?: (meter: ResourceMeterDto) => void;
+  onEditingChange?: (editing: boolean) => void;
 }) {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
   const canEdit = hasPermission('resources.update');
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditingState] = useState(false);
+  const setEditing = (next: boolean) => {
+    setEditingState(next);
+    onEditingChange?.(next);
+  };
   const [name, setName] = useState(meter?.name ?? '');
   const [error, setError] = useState(false);
   const create = useCreateResourceMeter();

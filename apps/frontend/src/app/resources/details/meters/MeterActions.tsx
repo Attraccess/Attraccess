@@ -28,6 +28,7 @@ export function MeterActions({ resourceId, meter }: { resourceId: number; meter:
   const { hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [errorKey, setErrorKey] = useState<string>();
+  const [renaming, setRenaming] = useState(false);
   const archive = useArchiveResourceMeter();
   const restore = useRestoreResourceMeter();
   const remove = useDeleteResourceMeter();
@@ -36,12 +37,14 @@ export function MeterActions({ resourceId, meter }: { resourceId: number; meter:
 
   // A refusal is shown here, so the confirmation dialog closes either way. The list is reloaded either way too:
   // a refusal means it was out of date.
-  const run = async (action: () => Promise<unknown>) => {
+  // `messages` overrides the text of a refusal for the action at hand.
+  const run = async (action: () => Promise<unknown>, messages: Record<string, string> = {}) => {
     setErrorKey(undefined);
     try {
       await action();
     } catch (error) {
-      setErrorKey(ERROR_KEYS[getApiErrorMessage(error as Error)] ?? 'errorAction');
+      const code = getApiErrorMessage(error as Error);
+      setErrorKey(messages[code] ?? ERROR_KEYS[code] ?? 'errorAction');
     }
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: UseListResourceMetersKeyFn({ path: { resourceId } }) }),
@@ -53,7 +56,7 @@ export function MeterActions({ resourceId, meter }: { resourceId: number; meter:
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex flex-wrap items-start justify-end gap-2">
-        {meter.archivedAt && (
+        {!renaming && meter.archivedAt && (
           <Button
             size="sm"
             variant="secondary"
@@ -64,8 +67,14 @@ export function MeterActions({ resourceId, meter }: { resourceId: number; meter:
             {t('restore')}
           </Button>
         )}
-        <MeterNameEditor resourceId={resourceId} meter={meter} />
-        {!meter.archivedAt && (
+        {/* A new name settles a name clash, and an older message would no longer be true. */}
+        <MeterNameEditor
+          resourceId={resourceId}
+          meter={meter}
+          onSaved={() => setErrorKey(undefined)}
+          onEditingChange={setRenaming}
+        />
+        {!renaming && !meter.archivedAt && (
           <ConfirmableButton
             label={t('archive')}
             status="warning"
@@ -75,18 +84,23 @@ export function MeterActions({ resourceId, meter }: { resourceId: number; meter:
             onConfirm={() => run(() => archive.mutateAsync({ path }))}
           />
         )}
-        {meter.deletable && (
+        {!renaming && meter.deletable && (
           <ConfirmableButton
             label={t('delete')}
             status="error"
             buttonProps={{ size: 'sm' }}
             isDisabled={pending}
             confirm={{ title: t('deleteTitle', { name: meter.name }), message: t('deleteMessage') }}
-            onConfirm={() => run(() => remove.mutateAsync({ path }))}
+            onConfirm={() => run(() => remove.mutateAsync({ path }), { METER_IN_USE: 'errorInUseDelete' })}
           />
         )}
       </div>
-      {errorKey && <StatusAlert status="danger">{t(errorKey)}</StatusAlert>}
+      {errorKey && (
+        // HeroUI's Alert is presentational: without the role, screen readers do not hear the refusal.
+        <div role="alert">
+          <StatusAlert status="danger">{t(errorKey)}</StatusAlert>
+        </div>
+      )}
     </div>
   );
 }
