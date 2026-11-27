@@ -36,8 +36,10 @@ const REAL_TIMERS = [
 describe('automatic plugin updates (integration)', () => {
   const fixture = setupNpmPluginFixture();
   const previousChannel = process.env.ATTRACCESS_PLUGIN_CHANNEL;
-  const outsideWindow = new Date(2026, 10, 26, 12, 0);
-  const inWindow = new Date(2026, 10, 27, 3, 30);
+  // Monday 2026-11-30. The schedule is in Europe/Berlin (UTC+1), the instants in UTC: independent of the server zone.
+  const outsideWindow = new Date('2026-11-30T12:00:00Z');
+  const inWindow = new Date('2026-11-30T02:30:00Z');
+  const EVERY_MONDAY = { weekdays: [1], startMinute: 180, durationMinutes: 120, timeZone: 'Europe/Berlin' };
 
   beforeEach(() => {
     process.env.ATTRACCESS_PLUGIN_CHANNEL = 'next';
@@ -50,7 +52,15 @@ describe('automatic plugin updates (integration)', () => {
     else process.env.ATTRACCESS_PLUGIN_CHANNEL = previousChannel;
   });
 
-  async function host(options: { permissionsOfNewVersions?: string[]; installed?: string; published?: string[] } = {}) {
+  type HostOptions = {
+    permissionsOfNewVersions?: string[];
+    installed?: string;
+    published?: string[];
+    /** Leave the update policy as a fresh host has it, with automatic updates off. */
+    defaultPolicy?: boolean;
+  };
+
+  async function host(options: HostOptions = {}) {
     const stored: Record<string, string> = {};
     const service = new NpmPluginService({
       getPlainSetting: async (_parent: string, key: string) => stored[key],
@@ -106,13 +116,14 @@ describe('automatic plugin updates (integration)', () => {
       await service.install(name, undefined);
     }
     restart.mockClear();
+    if (!options.defaultPolicy) await service.setUpdatePolicy({ automaticUpdates: true, schedule: EVERY_MONDAY });
     for (const name of [NAME, OTHER])
       for (const version of options.published ?? [MIDDLE, NEWEST])
         await publish(name, version, options.permissionsOfNewVersions);
     const versions = () => Object.fromEntries(service.listInstalled().map((plugin) => [plugin.name, plugin.version]));
     const runAt = async (now: Date) => {
       jest.setSystemTime(now);
-      await scheduler.run(now);
+      await scheduler.run();
     };
     const rows = () => audit.record.mock.calls.map(([event]) => projectAuditRow(event));
     return { service, scheduler, restart, audit, download, publish, versions, runAt, rows };
@@ -198,7 +209,8 @@ describe('automatic plugin updates (integration)', () => {
     const attempts = download.mock.calls.length;
     const notCalled = { applyAutomaticUpdate: jest.fn() };
     const restarted = new PluginUpdateScheduler(service, notCalled as never, { requestRestart: restart } as never);
-    await restarted.run(new Date(inWindow.getTime() + 5 * 60_000));
+    jest.setSystemTime(new Date(inWindow.getTime() + 5 * 60_000));
+    await restarted.run();
     expect(notCalled.applyAutomaticUpdate).not.toHaveBeenCalled();
     expect(download).toHaveBeenCalledTimes(attempts);
 
@@ -214,7 +226,7 @@ describe('automatic plugin updates (integration)', () => {
     );
     const anHourLater = new Date(inWindow.getTime() + 61 * 60_000);
     jest.setSystemTime(anHourLater);
-    await next.run(anHourLater);
+    await next.run();
     expect(versions()[NAME]).toBe('0.3.0-nightly.4.1');
   });
 
@@ -233,38 +245,70 @@ describe('automatic plugin updates (integration)', () => {
     expect(rows()).toEqual([]);
   });
 
+  it.each(['next', 'latest'])(
+    'on a fresh %s host, offers updates and never installs or restarts, in or outside any hour',
+    async (channel) => {
+      process.env.ATTRACCESS_PLUGIN_CHANNEL = channel;
+      const { service, restart, versions, runAt, rows } = await host({
+        defaultPolicy: true,
+        installed: '1.0.0',
+        published: ['1.0.1'],
+      });
+      expect(await service.getUpdatePolicy()).toMatchObject({ checksEnabled: true, automaticUpdates: false });
+
+      for (let hour = 0; hour < 24; hour += 1) await runAt(new Date(Date.UTC(2026, 10, 30, hour, 30)));
+
+      expect(service.listInstalled().map((plugin) => plugin.updateCheck)).toEqual(
+        [NAME, OTHER].map(() => expect.objectContaining({ state: 'available', candidate: '1.0.1' })),
+      );
+      expect(versions()).toEqual({ [NAME]: '1.0.0', [OTHER]: '1.0.0' });
+      expect(restart).not.toHaveBeenCalled();
+      expect(rows()).toEqual([]);
+    },
+  );
+
+  it.each(['inherit', 'patch', 'minor', 'follow'] as const)(
+    'installs nothing with the switch off, whatever the plugin override says (%s)',
+    async (override) => {
+      const { service, restart, versions, runAt } = await host({ installed: '1.0.0', published: ['1.0.1'] });
+      await service.setUpdatePolicy({ automaticUpdates: false });
+      await service.updateOverride(NAME, override);
+      await runAt(inWindow);
+      expect(versions()).toEqual({ [NAME]: '1.0.0', [OTHER]: '1.0.0' });
+      expect(restart).not.toHaveBeenCalled();
+    },
+  );
+
+  it('lets a plugin widen to follow while the global step is patch', async () => {
+    const { service, versions, runAt } = await host();
+    await service.setUpdatePolicy({ mode: 'patch' });
+    await service.updateOverride(NAME, 'follow');
+    await runAt(inWindow);
+    // A nightly step is more than a patch step: only the plugin that was widened takes it.
+    expect(versions()).toEqual({ [NAME]: NEWEST, [OTHER]: OLD });
+  });
+
   it.each([
     ['checks are disabled', { checksEnabled: false }],
-    ['the global mode is off', { mode: 'off' as const }],
-    ['a saved policy excludes prereleases', { prerelease: false }],
+    ['the step limit is patch', { mode: 'patch' }],
+    ['another weekday is chosen', { schedule: { weekdays: [2] } }],
+    ['the window is at another time', { schedule: { startMinute: 12 * 60, durationMinutes: 10 } }],
+    ['the same clock time is meant in another zone', { schedule: { timeZone: 'America/New_York' } }],
   ])('installs nothing when %s', async (_label, patch) => {
-    const { service, versions, runAt } = await host();
+    const { service, restart, versions, runAt } = await host();
     await service.setUpdatePolicy(patch);
     await runAt(inWindow);
     expect(versions()).toEqual({ [NAME]: OLD, [OTHER]: OLD });
+    expect(restart).not.toHaveBeenCalled();
   });
 
-  it.each([
-    [{}, OLD],
-    [{ mode: 'follow' as const }, OLD],
-    [{ mode: 'follow' as const, prerelease: true }, NEWEST],
-  ])('on a next host, a saved policy replaces the nightly default: saving %j ends at %s', async (patch, expected) => {
-    const { service, versions, runAt } = await host();
-    // Saving only the window still saves a policy, and it does not take over the next-host prerelease flag.
-    await service.setUpdatePolicy({ maintenanceWindow: { startMinute: 180, durationMinutes: 120 } });
-    await service.setUpdatePolicy(patch);
-    await runAt(inWindow);
-    expect(versions()[NAME]).toBe(expected);
-  });
-
-  it('keeps a plugin that requests latest off nightlies after only the window was saved on a next host', async () => {
+  it('on a next host with automatic updates on, plugins that request latest stay off nightlies', async () => {
     const { service, publish, versions, runAt } = await host();
     await service.updateRequestedSpec(NAME, 'latest');
     await publish(NAME, '0.4.0-nightly.1.1');
-    await service.setUpdatePolicy({ maintenanceWindow: { startMinute: 180, durationMinutes: 120 } });
     await runAt(inWindow);
-    expect(versions()[NAME]).toBe(OLD);
-    expect(await service.getUpdatePolicy()).toMatchObject({ prerelease: false });
+    // The registry's latest is this prerelease too, but only a plugin that requests next follows prereleases.
+    expect(versions()).toEqual({ [NAME]: OLD, [OTHER]: NEWEST });
   });
 
   it('on a release host, installs the newest patch or minor release and no prerelease or major', async () => {
@@ -279,12 +323,5 @@ describe('automatic plugin updates (integration)', () => {
 
     expect(versions()).toEqual({ [NAME]: '1.1.0', [OTHER]: '1.1.0' });
     expect(restart).toHaveBeenCalledTimes(1);
-  });
-
-  it('respects a saved maintenance window', async () => {
-    const { service, versions, runAt } = await host();
-    await service.setUpdatePolicy({ maintenanceWindow: { startMinute: 12 * 60, durationMinutes: 10 } });
-    await runAt(inWindow);
-    expect(versions()[NAME]).toBe(OLD);
   });
 });

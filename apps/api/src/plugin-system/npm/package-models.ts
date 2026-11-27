@@ -1,3 +1,4 @@
+import type { PluginUpdatePolicy } from './update-policy';
 import { BadRequestException } from '@nestjs/common';
 import * as semver from 'semver';
 import { randomUUID, createHash } from 'crypto';
@@ -52,6 +53,7 @@ export type InstalledNpmPlugin = {
     error: string | null;
   };
   knownGoodVersion?: string | null;
+  updateSettingsVersion?: number;
   /** The last version the host failed to install on its own; it is not retried for a while. */
   autoUpdateFailure?: { version: string; failedAt: string };
 };
@@ -114,10 +116,28 @@ export function readInstalledNpmPlugins(): Array<InstalledNpmPlugin & { pendingA
       installedAt: record.installedAt ?? new Date(0).toISOString(),
       activatedAt: record.activatedAt ?? new Date(0).toISOString(),
       lastError: record.lastError ?? null,
-      updateOverride: record.updateOverride ?? 'inherit',
+      updateOverride: storedUpdateOverride(record),
       updateCheck: record.updateCheck ?? null,
       knownGoodVersion: record.knownGoodVersion ?? null,
+      updateSettingsVersion: UPDATE_SETTINGS_VERSION,
     }));
+  } catch {
+    return [];
+  }
+}
+
+/** The stored records from before the opt-in, with the override each loses by it (null when it keeps its meaning). */
+export function pluginsWithLegacyUpdateSettings(): Array<{ name: string; override: string | null }> {
+  const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
+  if (!existsSync(statePath)) return [];
+  try {
+    const records = JSON.parse(readFileSync(statePath, 'utf8')) as InstalledNpmPlugin[];
+    return records
+      .filter((record) => record.updateSettingsVersion !== UPDATE_SETTINGS_VERSION)
+      .map(({ name, updateOverride }) => ({
+        name,
+        override: updateOverride && !['inherit', 'off'].includes(updateOverride) ? updateOverride : null,
+      }));
   } catch {
     return [];
   }
@@ -341,21 +361,23 @@ export function packageName(value: unknown): string | null {
   return typeof name === 'string' ? name : null;
 }
 
-export const UPDATE_POLICY_KEY = 'update-policy';
+export {
+  DEFAULT_PLUGIN_UPDATE_POLICY,
+  PluginUpdatePolicy,
+  UPDATE_POLICY_KEY,
+  patchUpdatePolicy,
+  readStoredUpdatePolicy,
+  sameUpdatePolicy,
+} from './update-policy';
 
-export type PluginUpdatePolicy = {
-  checksEnabled: boolean;
-  mode: 'off' | 'patch' | 'minor' | 'follow';
-  maintenanceWindow: { startMinute: number; durationMinutes: number };
-  prerelease: boolean;
-};
+/** Marks records whose `updateOverride` was written since automatic updates became opt-in. */
+export const UPDATE_SETTINGS_VERSION = 2;
 
-export const DEFAULT_PLUGIN_UPDATE_POLICY: PluginUpdatePolicy = {
-  checksEnabled: true,
-  mode: 'minor',
-  maintenanceWindow: { startMinute: 180, durationMinutes: 120 },
-  prerelease: false,
-};
+/** An earlier override other than off could install on its own, so it falls back to the global (off) setting. */
+function storedUpdateOverride(record: InstalledNpmPlugin): NonNullable<InstalledNpmPlugin['updateOverride']> {
+  const override = record.updateOverride ?? 'inherit';
+  return record.updateSettingsVersion === UPDATE_SETTINGS_VERSION || override === 'off' ? override : 'inherit';
+}
 export function samePermissions(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((permission) => right.includes(permission));
 }
@@ -391,44 +413,22 @@ export function matchesSpec(
 ): boolean {
   return version === resolvedVersion || version === spec || semver.satisfies(version, spec, { includePrerelease });
 }
-export function normalizeUpdatePolicy(value: unknown): PluginUpdatePolicy {
-  const candidate = value as Partial<PluginUpdatePolicy>;
-  const mode = ['off', 'patch', 'minor', 'follow'].includes(candidate?.mode ?? '')
-    ? (candidate.mode as PluginUpdatePolicy['mode'])
-    : DEFAULT_PLUGIN_UPDATE_POLICY.mode;
-  const startMinute = candidate?.maintenanceWindow?.startMinute;
-  const durationMinutes = candidate?.maintenanceWindow?.durationMinutes;
-  if (!Number.isInteger(startMinute) || startMinute < 0 || startMinute >= 24 * 60)
-    throw new BadRequestException('Maintenance window start must be a minute of the day');
-  if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 24 * 60)
-    throw new BadRequestException('Maintenance window duration must be between 1 and 1440 minutes');
-  return {
-    checksEnabled:
-      typeof candidate?.checksEnabled === 'boolean'
-        ? candidate.checksEnabled
-        : DEFAULT_PLUGIN_UPDATE_POLICY.checksEnabled,
-    mode,
-    prerelease:
-      typeof candidate?.prerelease === 'boolean' ? candidate.prerelease : DEFAULT_PLUGIN_UPDATE_POLICY.prerelease,
-    maintenanceWindow: { startMinute, durationMinutes },
-  };
-}
 export function eligibleForPolicy(
   candidate: InstalledNpmPluginVersion,
   installed: InstalledNpmPlugin,
   policy: PluginUpdatePolicy,
   resolvedRequestedVersion?: string,
-  /** The host's default policy on a `next` host, which lets plugins requesting `next` follow it through prereleases. */
-  channelDefault = false,
+  /** On a `next` host, plugins that request `next` follow it through prereleases. */
+  nextHost = false,
 ): boolean {
   const override = installed.updateOverride ?? 'inherit';
   const checksEnabled = override !== 'off' && policy.checksEnabled;
   const mode = effectiveUpdateMode(policy.mode, override);
   if (!checksEnabled || mode === 'off' || candidate.deprecated || candidate.permissionAdditions.length > 0)
     return false;
-  // Only the plugins that request `next` follow it through prereleases, and only under a `next` host's default.
+  // This says what may be offered. Whether the host installs it is the global switch's and the schedule's decision.
   const followsChannel =
-    channelDefault && installed.requestedSpec === 'next' && candidate.version === resolvedRequestedVersion;
+    nextHost && installed.requestedSpec === 'next' && candidate.version === resolvedRequestedVersion;
   if (!policy.prerelease && !followsChannel && semver.prerelease(candidate.version)) return false;
   if (candidate.semverImpact === 'major') return false;
   if (followsChannel && mode === 'minor') return true;
@@ -439,18 +439,9 @@ export function eligibleForPolicy(
 export function effectiveUpdateMode(
   globalMode: PluginUpdatePolicy['mode'],
   override: NonNullable<InstalledNpmPlugin['updateOverride']>,
-): PluginUpdatePolicy['mode'] {
+): NonNullable<InstalledNpmPlugin['updateOverride']> | PluginUpdatePolicy['mode'] {
   if (override === 'inherit') return globalMode;
   return override;
-}
-export function sameUpdatePolicy(left: PluginUpdatePolicy, right: PluginUpdatePolicy): boolean {
-  return (
-    left.checksEnabled === right.checksEnabled &&
-    left.mode === right.mode &&
-    left.prerelease === right.prerelease &&
-    left.maintenanceWindow.startMinute === right.maintenanceWindow.startMinute &&
-    left.maintenanceWindow.durationMinutes === right.maintenanceWindow.durationMinutes
-  );
 }
 export function isDistTag(spec: string): boolean {
   return !semver.valid(spec) && !semver.validRange(spec);

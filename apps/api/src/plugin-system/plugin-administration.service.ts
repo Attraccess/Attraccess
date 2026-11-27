@@ -53,9 +53,12 @@ export class PluginAdministrationService {
     const policy = await this.npmPluginService.setUpdatePolicy(body);
     await this.record(actor, 'plugin.update_policy_updated', 1, 'plugin-policy', {
       checksEnabled: policy.checksEnabled ? 1 : 0,
+      automaticUpdates: policy.automaticUpdates ? 1 : 0,
       updateMode: policy.mode,
-      maintenanceStartMinute: policy.maintenanceWindow.startMinute,
-      maintenanceDurationMinutes: policy.maintenanceWindow.durationMinutes,
+      maintenanceWeekdays: policy.schedule.weekdays.join(','),
+      maintenanceStartMinute: policy.schedule.startMinute,
+      maintenanceDurationMinutes: policy.schedule.durationMinutes,
+      maintenanceTimeZone: policy.schedule.timeZone ?? 'UTC',
       prerelease: policy.prerelease ? 1 : 0,
     });
     return policy;

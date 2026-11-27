@@ -227,7 +227,7 @@ jobs:
           ghcr-token: ${{ secrets.GITHUB_TOKEN }}
           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
-          # Nightly hosts install and follow the `next` plugin builds that match them.
+          # Nightly hosts install the `next` plugin builds and offer newer ones (automatic updates stay opt-in).
           plugin-channel: next
 
       # An older run finishing late must not move nightly-latest backwards; its nightly-<sha7> image stays.

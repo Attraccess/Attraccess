@@ -1,4 +1,4 @@
-import { Inject, Injectable, OnApplicationBootstrap, OnModuleInit, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleInit, Optional } from '@nestjs/common';
 
 import { AUDIT_RECORDER, auditActorOf, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '../audit/recorder/audit-event';
 import { AuditQueryService } from '../audit/audit-query.service';
@@ -88,6 +88,11 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
   }
 
   async onApplicationBootstrap(): Promise<void> {
+    try {
+      await this.installation.persistUpdateOptIn();
+    } catch (error) {
+      new Logger(NpmPluginService.name).warn(`Could not store the opt-in update settings: ${String(error)}`);
+    }
     if (!this.audit || !this.auditQuery) return;
     const manifests = PluginService.getPluginsWithLoadStatus();
     for (const installed of readInstalledNpmPlugins()) {
@@ -252,7 +257,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     return this.installation.getUpdatePolicy();
   }
 
-  async setUpdatePolicy(patch: Partial<PluginUpdatePolicy>): Promise<PluginUpdatePolicy> {
+  async setUpdatePolicy(patch: unknown): Promise<PluginUpdatePolicy> {
     return this.installation.setUpdatePolicy(patch);
   }
 

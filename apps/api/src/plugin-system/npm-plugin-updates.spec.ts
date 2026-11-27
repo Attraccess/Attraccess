@@ -620,7 +620,7 @@ describe('NpmPluginService', () => {
     );
     let rawPolicy = JSON.stringify({
       checksEnabled: true,
-      mode: 'patch',
+      mode: 'minor',
       prerelease: false,
       maintenanceWindow: { startMinute: 0, durationMinutes: 60 },
     });
@@ -641,7 +641,7 @@ describe('NpmPluginService', () => {
       )
       .mockResolvedValue([
         {
-          version: '1.0.1',
+          version: '1.1.0',
           direction: 'newer',
           compatible: true,
           reason: null,
@@ -655,14 +655,14 @@ describe('NpmPluginService', () => {
           integrity: 'sha512-test',
           repository: null,
           homepage: null,
-          semverImpact: 'patch',
+          semverImpact: 'minor',
           matchesRequestedSpec: true,
         },
       ] as never);
 
     const updateCheck = service.checkInstalled(name);
     await new Promise((resolve) => setImmediate(resolve));
-    await service.setUpdatePolicy({ mode: 'off' });
+    await service.setUpdatePolicy({ mode: 'patch' });
     if (!releaseCandidates) throw new Error('Expected update check to request candidates');
     releaseCandidates([]);
 
@@ -794,6 +794,7 @@ describe('NpmPluginService', () => {
           version: '1.0.0',
           requestedSpec: '^1.0.0',
           updateOverride: 'minor',
+          updateSettingsVersion: 2,
           registryId: 'npm',
           registryUrl: 'https://registry.npmjs.org',
           integrity: 'sha512-test',

@@ -17,13 +17,15 @@ import {
 } from '@nestjs/common';
 
 import { resolvePluginChannel } from '../config/app.config';
-import { ApiTags, ApiConsumes, ApiOperation, ApiParam, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiBody, ApiConsumes, ApiOperation, ApiParam, ApiResponse, ApiQuery } from '@nestjs/swagger';
 
 import { auditActorOf } from '../audit/recorder/audit-event';
 
 import { NpmPluginService } from './npm-plugin.service';
 
 import { PluginAdministrationService } from './plugin-administration.service';
+
+import { PluginUpdatePolicyDto, UpdatePluginUpdatePolicyDto } from './dto/plugin-update-policy.dto';
 
 import { PluginService } from './plugin.service';
 
@@ -223,12 +225,15 @@ export class PluginController {
   }
 
   @Get('update-policy')
+  @ApiResponse({ status: 200, type: PluginUpdatePolicyDto })
   @Auth('system.plugins.manage')
   updatePolicy() {
     return this.npmPluginService.getUpdatePolicy();
   }
 
   @Post('update-policy')
+  @ApiBody({ type: UpdatePluginUpdatePolicyDto })
+  @ApiResponse({ status: 201, type: PluginUpdatePolicyDto })
   @Auth('system.plugins.manage')
   @NotAnMcpTool('Host lifecycle: changes automatic plugin updates, which install code')
   setUpdatePolicy(@Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {

@@ -176,7 +176,11 @@ export const registry = { registryId: identifier, registryName: text, registryUr
 
 export const policy = {
   checksEnabled: flag,
+  automaticUpdates: flag,
   updateMode: enumeration('off', 'patch', 'minor', 'follow'),
+  // ISO weekdays, comma separated; empty while no day is chosen.
+  maintenanceWeekdays: (v: unknown) => typeof v === 'string' && /^([1-7](,[1-7]){0,6})?$/.test(v),
+  maintenanceTimeZone: text,
   maintenanceStartMinute: count,
   maintenanceDurationMinutes: count,
   prerelease: flag,

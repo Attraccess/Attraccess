@@ -219,7 +219,7 @@ describe('plugin channel', () => {
     const policy = DEFAULT_PLUGIN_UPDATE_POLICY;
     const next = '0.3.0-nightly.5.1';
 
-    it('lets a plugin requesting next follow a newer nightly under the host default', () => {
+    it('offers a plugin requesting next a newer nightly on a next host', () => {
       expect(eligibleForPolicy(candidate(next), installed('next'), policy, next, true)).toBe(true);
     });
 
@@ -268,29 +268,16 @@ describe('plugin channel', () => {
       expect(eligibleForPolicy(candidate(next), installed('next', override), policy, next, true)).toBe(false);
     });
 
-    it('does not apply to an explicitly saved policy', () => {
-      expect(eligibleForPolicy(candidate(next), installed('next'), DEFAULT_PLUGIN_UPDATE_POLICY, next, false)).toBe(
-        false,
-      );
-      const savedWithPrereleases = { ...DEFAULT_PLUGIN_UPDATE_POLICY, prerelease: true };
-      expect(eligibleForPolicy(candidate(next), installed('next'), savedWithPrereleases, next, false)).toBe(false);
+    it('offers it whatever was saved, because offering installs nothing', () => {
+      for (const saved of [
+        { ...DEFAULT_PLUGIN_UPDATE_POLICY, prerelease: false },
+        { ...DEFAULT_PLUGIN_UPDATE_POLICY, automaticUpdates: true, mode: 'follow' as const },
+      ])
+        expect(eligibleForPolicy(candidate(next), installed('next'), saved, next, true)).toBe(true);
     });
 
-    it('treats a missing stored policy as the channel default and a stored one as explicit', async () => {
-      process.env.ATTRACCESS_PLUGIN_CHANNEL = 'next';
-      const getPlainSetting = jest.fn().mockResolvedValue(undefined);
-      const { service } = serviceWith({}, 'next', { getPlainSetting });
-      // The policy reads the same on every host, so a client that saves it back does not allow prereleases.
-      await expect(service.getUpdatePolicy()).resolves.toEqual(DEFAULT_PLUGIN_UPDATE_POLICY);
-      getPlainSetting.mockResolvedValue(
-        JSON.stringify({
-          mode: 'minor',
-          checksEnabled: true,
-          prerelease: false,
-          maintenanceWindow: { startMinute: 0, durationMinutes: 60 },
-        }),
-      );
-      await expect(service.getUpdatePolicy()).resolves.toMatchObject({ prerelease: false });
+    it('offers no nightly through next on a latest host', () => {
+      expect(eligibleForPolicy(candidate(next), installed('next'), policy, next, false)).toBe(false);
     });
 
     it('keeps the stable default on a latest host', async () => {

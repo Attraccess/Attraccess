@@ -318,7 +318,8 @@ describe('administration lifecycle hooks', () => {
       setUpdatePolicy: jest.fn().mockResolvedValue({
         checksEnabled: true,
         mode: 'minor',
-        maintenanceWindow: { startMinute: 180, durationMinutes: 60 },
+        automaticUpdates: true,
+        schedule: { weekdays: [1, 5], startMinute: 180, durationMinutes: 60, timeZone: 'Europe/Berlin' },
         prerelease: false,
       }),
     };

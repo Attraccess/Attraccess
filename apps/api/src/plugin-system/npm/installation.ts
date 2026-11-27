@@ -14,10 +14,11 @@ import {
   eligibleForPolicy,
   isDistTag,
   sameUpdatePolicy,
-  DEFAULT_PLUGIN_UPDATE_POLICY,
+  patchUpdatePolicy,
+  readStoredUpdatePolicy,
+  pluginsWithLegacyUpdateSettings,
   REGISTRY_PARENT,
   UPDATE_POLICY_KEY,
-  normalizeUpdatePolicy,
   PluginInstallPlan,
   TRANSACTION_FILE,
   backupDirectoryName,
@@ -330,8 +331,7 @@ export class NpmInstallation {
       current.registryId !== installed.registryId ||
       (policy !== undefined && currentPolicy !== undefined && !sameUpdatePolicy(currentPolicy, policy));
     try {
-      const stored = await this.readUpdatePolicy();
-      policy = stored.policy;
+      policy = await this.getUpdatePolicy();
       if (!policy.checksEnabled) return installed;
       const channel = resolvePluginChannel();
       const candidates = await this.plan.installedVersionCandidates(name);
@@ -353,7 +353,7 @@ export class NpmInstallation {
               item.direction === 'newer' &&
               item.compatible &&
               !automaticUpdateRefusal(item, current) &&
-              eligibleForPolicy(item, current, policy, requested?.version, !stored.explicit && channel === 'next'),
+              eligibleForPolicy(item, current, policy, requested?.version, channel === 'next'),
           )
           .sort((left, right) => semver.rcompare(left.version, right.version));
         const blocked = candidates.some((item) => item.direction === 'newer' && item.compatible) && !candidate;
@@ -495,29 +495,43 @@ export class NpmInstallation {
   }
 
   async getUpdatePolicy(): Promise<PluginUpdatePolicy> {
-    return (await this.readUpdatePolicy()).policy;
+    return readStoredUpdatePolicy(await this.settings.getPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY)).policy;
+  }
+
+  async setUpdatePolicy(patch: unknown): Promise<PluginUpdatePolicy> {
+    return this.state.mutateInstalls(async () => {
+      const policy = patchUpdatePolicy(await this.getUpdatePolicy(), patch);
+      await this.storeUpdatePolicy(policy);
+      return policy;
+    });
+  }
+
+  private storeUpdatePolicy(policy: PluginUpdatePolicy): Promise<void> {
+    return this.settings.setPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY, JSON.stringify(policy));
   }
 
   /**
-   * `explicit` is false while no policy was ever saved. Then, on a `next` host, plugins that request `next` also follow
-   * it through prereleases (see `eligibleForPolicy`); the policy itself is the same on every host.
+   * Writes down, once, that automatic updates became opt-in: a policy and plugin overrides saved before that are stored
+   * in their new, switched-off form. Reading already treats them that way, so this only makes it permanent and says so.
    */
-  private async readUpdatePolicy(): Promise<{ policy: PluginUpdatePolicy; explicit: boolean }> {
-    const fallback = DEFAULT_PLUGIN_UPDATE_POLICY;
-    const raw = await this.settings.getPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY);
-    if (!raw) return { policy: fallback, explicit: false };
-    try {
-      return { policy: normalizeUpdatePolicy(JSON.parse(raw)), explicit: true };
-    } catch {
-      return { policy: fallback, explicit: false };
-    }
-  }
-
-  async setUpdatePolicy(patch: Partial<PluginUpdatePolicy>): Promise<PluginUpdatePolicy> {
-    return this.state.mutateInstalls(async () => {
-      const policy = normalizeUpdatePolicy({ ...(await this.readUpdatePolicy()).policy, ...patch });
-      await this.settings.setPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY, JSON.stringify(policy));
-      return policy;
+  async persistUpdateOptIn(): Promise<void> {
+    await this.state.mutateInstalls(async () => {
+      const reset = pluginsWithLegacyUpdateSettings();
+      if (reset.length > 0) {
+        await this.state.writeRecords(readInstalledNpmPlugins());
+        const overrides = reset.filter(({ override }) => override).map(({ name, override }) => `${name} (${override})`);
+        if (overrides.length > 0)
+          this.logger.warn(
+            `Automatic plugin updates are now opt-in. Reset these plugin update overrides to inherit: ${overrides.join(', ')}`,
+          );
+      }
+      const stored = readStoredUpdatePolicy(await this.settings.getPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY));
+      if (!stored.legacy) return;
+      await this.storeUpdatePolicy(stored.policy);
+      this.logger.warn(
+        'Automatic plugin updates are now opt-in. The update policy saved by an earlier version has automatic updates ' +
+          'off; turn them on under Settings → Plugins.',
+      );
     });
   }
 }
