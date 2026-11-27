@@ -57,17 +57,18 @@ Every Attraccess host has a plugin channel, set by the `ATTRACCESS_PLUGIN_CHANNE
 - **Release images** use `latest`. The marketplace shows and installs the `latest` version.
 - **Nightly images** (`nightly-<sha>`, `nightly-latest`) use `next`. Their marketplace shows, and an install without a chosen version installs, the higher of the `next` and `latest` versions of a plugin that the host can run. A plugin without a `next` build, or whose `next` build needs a newer host, stays on `latest`. `next` points to the newest nightly build of a plugin, which can be newer than your image.
 
-The version you choose explicitly (**Manage version** or the API) always wins.
+A version you choose explicitly (**Manage version** or the API) wins. The exception is `next` on a nightly host: it follows the rule above and gives the higher of `next` and `latest`.
 
 ### Nightly hosts and `next`
 
-A plugin installed on a nightly host from the marketplace, or through the API without a version, records `next` as its requested version. The host then offers newer `next` builds (or `latest`, if that is higher) as updates: from one nightly to the next, and from a nightly to the release. **It installs none of them on its own** until a plugin manager turns [automatic updates](#automatic-updates) on. Plugins that request `latest` are offered releases only. A release host never offers a nightly build through `next`.
+A plugin installed on a nightly host from the marketplace, or through the API without a version, records `next` as its requested version. The host then offers newer `next` builds (or `latest`, if that is higher) as updates: from one nightly to the next, and from a nightly to the release. **It installs none of them on its own** until a plugin manager turns [automatic updates](#automatic-updates) on. Plugins that request `latest` are offered releases only, and a release host never offers a nightly build through `next`, unless `prerelease` was set to `true` through the [API](#api).
 
 ### The Manage version dialog
 
 The **Manage version** dialog shows the current version, the available versions (versions that cannot be installed
 say why; older ones of those are folded away behind **Show … older incompatible versions**), the changes and approvals of the version you select, and the package's **Update settings**. Saving the
-update settings only changes which versions update checks offer; it installs nothing. **Update to …** or
+update settings only changes which versions update checks offer and [automatic updates](#automatic-updates) may
+install; it installs nothing right away. **Update to …** or
 **Downgrade to …** installs the selected version, which takes effect after a [restart](#restart-to-apply-changes).
 
 ### Switching a plugin to `next`
@@ -80,7 +81,7 @@ Once a plugin has had a release, the marketplace of a release host offers only r
 
 Attraccess can install updates of plugins installed from npm on its own and restart to activate them. This is **off by default on every host**, release and nightly: until a plugin manager turns it on, Attraccess installs no update and restarts for none. Plugins uploaded as a ZIP file are not updated.
 
-**Looking for updates is on by default** and installs nothing. About once an hour, and again when an update window opens, the host asks each plugin's registry for newer versions. **Settings → Plugins** announces the updates the update step and the safeguards below allow; newer versions outside them are listed only under **Manage version**. **Check all now** on that page checks at once.
+**Looking for updates is on by default** and installs nothing. About once an hour, and again when an update window opens, the host asks each plugin's registry for newer versions. **Settings → Plugins** announces the updates the update step and the safeguards below allow; newer versions outside them are listed only under **Manage version**. Whether an update needs additional plugins is only checked when it is installed, so such an update is announced too. **Check all now** on that page checks at once.
 
 ### Turning automatic updates on
 
@@ -106,21 +107,21 @@ To turn them off again, switch **Install updates automatically** off and save. W
 
 ### What is installed
 
-- The newest version the update step allows. On a nightly host, plugins that request `next` also move to newer nightly builds with **Patch and minor** and **Follow package policy** (**Patch only** keeps them where they are, except for patch releases).
-- **Never installed automatically:** a new major version, a version that asks for more permissions, a deprecated version, a version that is not compatible with the host, an update that would also need other plugins installed or changed, a version published by a different npm user than the installed one, and any version from a registry on another machine that does not use HTTPS. On a release host, prereleases are not installed either, unless `prerelease` was set to `true` through the [API](#api). Install those yourself with **Manage version**.
+- The newest version the update step allows. On a nightly host, plugins that request `next` also move to newer nightly builds with **Patch and minor** and **Follow package policy** (with **Patch only** they do not move to newer nightly builds, only to patch releases).
+- **Never installed automatically:** a new major version, a version that asks for more permissions, a deprecated version, a version that is not compatible with the host, an update that would also need other plugins installed or changed, a version published by a different npm user than the installed one, and any version from a registry on another machine that does not use HTTPS. Prereleases are not installed either, except for the `next` channel builds of plugins that request `next` on a nightly host, or if `prerelease` was set to `true` through the [API](#api). Install those yourself with **Manage version**.
 - **Failures:** if an update cannot be installed, the installed version stays, the server log names the reason and Attraccess tries that version again after 24 hours at the earliest. A newer version is tried without this pause. If a new version is installed but fails to load after the restart, Attraccess does not go back to the previous version: **Settings → Plugins** shows the error, and you can choose another version with **Manage version**. A later update is still installed automatically.
 - **Audit log:** changes to these settings are recorded with the user who made them. Each automatic installation, successful or not, and its activation after the restart are recorded without a user (shown as **System or anonymous**).
 
 ### Settings for a single plugin
 
-Under **⋯ → Manage version**, **Plugin automatic update policy** replaces the global update step for that plugin: **Off**, **Patch only**, **Patch and minor** or **Follow package policy**; **Inherit global policy** uses the global one. The global switch comes first: **while automatic updates are off, no plugin setting installs anything**. The weekdays and the window always apply.
+Under **⋯ → Manage version → Update settings**, **Plugin automatic update policy** replaces the global update step for that plugin: **Off**, **Patch only**, **Patch and minor** or **Follow package policy**; **Inherit global policy** uses the global one. The global switch comes first: **while automatic updates are off, no plugin setting installs anything**. The weekdays and the window always apply.
 
 > [!WARNING]
 > A requested version does not hold a plugin at that version under **Patch only** or **Patch and minor**: if you install an older version, the next update window can update it again. To keep a plugin at its current version, set its automatic update policy to **Off**. The requested version or range limits automatic updates only with **Follow package policy**.
 
 ### After upgrading Attraccess
 
-An update policy saved through the API by an earlier version does not count as turned on: after the upgrade, automatic updates are **off**. Whether the host looks for updates is kept, and the old daily window is kept as a schedule on every weekday in UTC. Plugin settings other than **Inherit global policy** and **Off** are reset to **Inherit global policy**. The server log says so once. A plugin manager turns automatic updates on in the panel.
+An update policy saved through the API by an earlier version does not count as turned on: after the upgrade, automatic updates are **off**. Whether the host looks for updates is kept, and the old daily window is kept as a schedule on every weekday in UTC. Per-plugin update policies other than **Inherit global policy** and **Off** are reset to **Inherit global policy**. The server log says so once. A plugin manager turns automatic updates on in the panel.
 
 ### API
 
@@ -136,7 +137,7 @@ The panel uses `GET` and `POST /api/plugins/update-policy` (permission `system.p
 }
 ```
 
-Weekdays are numbered from 1 (Monday) to 7 (Sunday), and `startMinute` is the minute of the day (120 is 02:00). Without a time zone the host uses UTC. Invalid values, and switching on without a weekday, are answered with `400`.
+Weekdays are numbered from 1 (Monday) to 7 (Sunday), and `startMinute` is the minute of the day (120 is 02:00). Without a time zone the host uses UTC. Invalid values, unknown fields (including the former `maintenanceWindow`) and switching on without a weekday are answered with `400`.
 
 ## Uploading a Plugin
 
