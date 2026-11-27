@@ -127,32 +127,61 @@
   },
   "noPermissions": "Keine angefordert",
   "updatePolicy": {
-    "title": "Automatische Updates",
-    "description": "Installierte Pakete werden nur in ihrer ursprünglichen Registry geprüft. Hauptversionen, neue Berechtigungen, Vorabversionen und veraltete Pakete werden nie automatisch installiert.",
-    "enabled": "Nach Updates suchen",
-    "enabledHint": "Deaktivierte Prüfungen lassen installierte Pakete unverändert.",
-    "mode": "Standard-Update-Regel",
-    "modeHint": "Ein Plugin kann eine strengere Regel verwenden.",
-    "prerelease": "Vorabversionen erlauben",
-    "prereleaseHint": "Vorabversionen werden nie automatisch installiert.",
     "checkNow": "Alle jetzt prüfen",
     "checked": "Plugin-Update-Prüfungen abgeschlossen",
     "checkError": "Plugin-Updates konnten nicht geprüft werden",
-    "saved": "Update-Regel gespeichert",
-    "saveError": "Update-Regel konnte nicht gespeichert werden",
     "available": "Update verfügbar",
     "availableTitle": "Plugin-Updates sind verfügbar",
-    "availableDescription": {
-      "one": "Ein installiertes Marketplace-Plugin hat ein Update. Attraccess installiert es im Wartungsfenster und startet danach neu, sofern es keine weiteren Plugin-Änderungen braucht und die Installation nicht fehlgeschlagen ist. Sie können es auch jetzt prüfen und installieren.",
-      "many": "{{count}} installierte Marketplace-Plugins haben ein Update. Attraccess installiert sie im Wartungsfenster und startet danach neu, sofern ein Update keine weiteren Plugin-Änderungen braucht und seine Installation nicht fehlgeschlagen ist. Sie können sie auch jetzt prüfen und installieren."
-    },
     "reviewUpdates": "Updates prüfen",
-    "modes": {
-      "off": "Aus",
+    "availableDescription": {
+      "one": "Für ein installiertes Marktplatz-Plugin gibt es ein Update.",
+      "many": "Für {{count}} installierte Marktplatz-Plugins gibt es Updates."
+    },
+    "installsInWindow": "Automatische Updates sind eingeschaltet: Attraccess installiert die Updates, die seine Schutzregeln erlauben, im nächsten Update-Zeitfenster und startet dann neu. Du kannst sie auch jetzt prüfen und installieren.",
+    "manualOnly": "Automatische Updates sind ausgeschaltet, es wird also nichts von selbst installiert. Prüfe die Updates, um sie zu installieren."
+  },
+  "autoUpdates": {
+    "title": "Automatische Updates",
+    "description": "Attraccess darf Plugin-Updates selbst installieren und neu starten, nur zu den Zeiten, die du wählst.",
+    "checks": "Nach Plugin-Updates suchen",
+    "enabled": "Updates automatisch installieren",
+    "offHint": "Aus: Attraccess zeigt verfügbare Updates an, installiert aber nichts und startet dafür nicht neu.",
+    "needsChecks": "Die Update-Suche ist ausgeschaltet, es wird also nichts installiert.",
+    "step": "Größter Update-Schritt",
+    "stepHint": "Ein Plugin kann unter „Version verwalten“ eine eigene Einstellung haben.",
+    "steps": {
       "patch": "Nur Patches",
       "minor": "Patches und Minor",
       "follow": "Paketregel folgen"
-    }
+    },
+    "weekdays": "Wochentage",
+    "weekdaysRequired": "Wähle mindestens einen Wochentag.",
+    "weekday": {
+      "1": "Montag",
+      "2": "Dienstag",
+      "3": "Mittwoch",
+      "4": "Donnerstag",
+      "5": "Freitag",
+      "6": "Samstag",
+      "7": "Sonntag"
+    },
+    "start": "Startzeit",
+    "duration": "Dauer (Minuten)",
+    "durationHint": "1 bis 1440. Ein Zeitfenster darf über Mitternacht reichen.",
+    "timeZone": "Zeitzone",
+    "timeZoneHint": "Die Startzeit ist eine Uhrzeit in dieser Zone.",
+    "nextWindow": "Nächstes Update-Zeitfenster: {{start}} bis {{end}} ({{timeZone}})",
+    "openWindow": "Update-Zeitfenster ist jetzt offen: {{start}} bis {{end}} ({{timeZone}})",
+    "restartNote": "Attraccess startet in diesem Zeitfenster neu, wenn es ein Update installiert hat.",
+    "save": "Speichern",
+    "turnOn": "Automatische Updates einschalten",
+    "discard": "Änderungen verwerfen",
+    "cancel": "Abbrechen",
+    "confirmTitle": "Automatische Updates einschalten?",
+    "confirmMessage": "Attraccess installiert dann Plugin-Updates selbst und startet in den geplanten Zeitfenstern neu. Der Neustart unterbricht die Nutzung kurz.",
+    "saved": "Einstellungen für automatische Updates gespeichert",
+    "saveError": "Die Einstellungen für automatische Updates konnten nicht gespeichert werden",
+    "loadError": "Die Einstellungen für automatische Updates konnten nicht geladen werden"
   },
   "deleteTooltip": "Plugin entfernen",
   "deleteConfirmation": {
@@ -219,7 +248,8 @@
       "current": "Aktuell",
       "newer": "Neuer",
       "older": "Älter"
-    }
+    },
+    "automaticUpdatesOff": "Automatische Updates sind für dieses Attraccess ausgeschaltet. Diese Einstellung installiert nichts, bis sie unter „Automatische Updates“ eingeschaltet werden."
   },
   "dependencies": {
     "title": "Plugin-Abhängigkeiten",

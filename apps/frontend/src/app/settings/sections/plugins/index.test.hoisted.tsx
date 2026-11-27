@@ -37,6 +37,9 @@ const hoisted = vi.hoisted(() => ({
   errorToast: vi.fn(),
   showToast: vi.fn(),
   plugins: [] as unknown[],
+  /** The stored update policy; an Error makes loading it fail. */
+  updatePolicy: undefined as unknown,
+  setUpdatePolicyMock: vi.fn(),
   pluginSystemStatus: { disabled: false, instanceId: 'original-instance' },
   deleteOptions: undefined as DeleteOptions | undefined,
 }));
@@ -54,6 +57,16 @@ vi.mock('@attraccess/react-query-client', async () => {
   return {
     UsePluginControllerInstalledPackagesKeyFn: () => ['installed'],
     UsePluginControllerListRegistriesKeyFn: () => ['registries'],
+    UsePluginControllerUpdatePolicyKeyFn: () => ['update-policy'],
+    usePluginControllerUpdatePolicy: () =>
+      useQuery({
+        queryKey: ['update-policy'],
+        queryFn: async () => {
+          if (hoisted.updatePolicy instanceof Error) throw hoisted.updatePolicy;
+          return hoisted.updatePolicy;
+        },
+      }),
+    usePluginControllerSetUpdatePolicy: () => ({ mutateAsync: hoisted.setUpdatePolicyMock, isPending: false }),
     usePluginControllerInstalledPackages: (_clientOptions: unknown, _key: unknown, options: object) =>
       useQuery({ queryKey: ['installed'], queryFn: () => fetchJson('/api/plugins/installed'), ...options }),
     usePluginControllerListRegistries: (_clientOptions: unknown, _key: unknown, options: object) =>
@@ -152,6 +165,15 @@ vi.mock('../../../../components/toastProvider', () => ({
 
 export { hoisted };
 
+/** What a host answers before anybody saved a policy. */
+export const DEFAULT_UPDATE_POLICY = {
+  checksEnabled: true,
+  automaticUpdates: false,
+  mode: 'minor',
+  schedule: { weekdays: [] as number[], startMinute: 180, durationMinutes: 120, timeZone: null as string | null },
+  prerelease: false,
+};
+
 let queryClient = new QueryClient();
 function QueryWrapper({ children }: PropsWithChildren) {
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
@@ -181,6 +203,9 @@ export function resetTestFixture() {
   hoisted.successToast.mockReset();
   hoisted.errorToast.mockReset();
   hoisted.plugins = [];
+  hoisted.updatePolicy = DEFAULT_UPDATE_POLICY;
+  hoisted.setUpdatePolicyMock.mockReset();
+  hoisted.setUpdatePolicyMock.mockImplementation(async ({ body }: { body: unknown }) => body);
   hoisted.pluginSystemStatus = { disabled: false, instanceId: 'original-instance' };
   hoisted.deleteOptions = undefined;
   hoisted.statusRefetchMock.mockResolvedValue({ data: hoisted.pluginSystemStatus });

@@ -5,6 +5,7 @@ import {
   usePluginControllerInstalledPackageVersions,
   usePluginControllerReplaceInstalledPackage,
   usePluginControllerUpdateInstalledPackagePolicy,
+  usePluginControllerUpdatePolicy,
 } from '@attraccess/react-query-client';
 import { Input, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
@@ -33,6 +34,7 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
   const toast = useToastMessage();
   const { installedByName, mergeInstalled } = useInstalledNpmPlugins();
   const installed = installedByName.get(plugin.name);
+  const { data: globalUpdatePolicy } = usePluginControllerUpdatePolicy();
   const { mutateAsync: replaceInstalledPlugin } = usePluginControllerReplaceInstalledPackage();
   const { mutateAsync: updateInstalledPluginPolicy } = usePluginControllerUpdateInstalledPackagePolicy();
 
@@ -141,6 +143,11 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
             }))}
             aria-label={t('versionManagement.autoUpdate')}
           />
+          {globalUpdatePolicy && !globalUpdatePolicy.automaticUpdates ? (
+            <p className="text-sm text-muted" data-cy="plugins-list-override-inactive-hint">
+              {t('versionManagement.automaticUpdatesOff')}
+            </p>
+          ) : null}
           <Button variant="secondary" size="sm" onPress={() => void saveVersionPolicy()}>
             {t('versionManagement.savePolicy')}
           </Button>

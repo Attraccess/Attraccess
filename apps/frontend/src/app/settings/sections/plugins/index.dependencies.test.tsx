@@ -292,9 +292,9 @@ describe('plugin version management', () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '2.0.0 Newer' }));
     expect(screen.getByRole('checkbox')).not.toBeChecked();
-    expect(screen.getByRole('switch')).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: /I approve/ })).not.toBeChecked();
     await user.click(screen.getByRole('checkbox'));
-    await user.click(screen.getByRole('switch'));
+    await user.click(screen.getByRole('switch', { name: /I approve/ }));
     await user.click(screen.getByRole('button', { name: 'Update' }));
     await waitFor(() =>
       expect(hoisted.replaceInstalledPackageMock).toHaveBeenCalledWith({

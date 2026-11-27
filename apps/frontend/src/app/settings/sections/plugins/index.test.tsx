@@ -155,7 +155,7 @@ describe('PluginsSection', () => {
     expect(await screen.findByText('Plugin updates are available')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'One installed marketplace plugin has an update. Attraccess installs it in the maintenance window and then restarts, unless it needs other plugin changes or installing it failed. You can also review and install it now.',
+        'One installed marketplace plugin has an update. Automatic updates are off, so nothing is installed on its own. Review the updates to install them.',
       ),
     ).toBeInTheDocument();
     expect(hoisted.checkAllInstalledPackagesMock).toHaveBeenCalledOnce();
