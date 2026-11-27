@@ -19,7 +19,7 @@ import type {
   UsageSessionWithParties,
 } from '@attraccess/application-models';
 import { Injectable } from '@nestjs/common';
-import { EntityManager, In, IsNull, Not } from 'typeorm';
+import { EntityManager, In, IsNull } from 'typeorm';
 import {
   ContinuationDraft,
   DoorActionDraft,
