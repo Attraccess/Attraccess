@@ -19,10 +19,11 @@ Ein Leser braucht fünf gedruckte Teile für die Wand und sechs für den Tisch. 
 
 | Gedrucktes Teil | Datei | Anz. | Farbe | Wird liegend gedruckt auf |
 | --- | --- | --- | --- | --- |
-| Kappe (vordere Schale) | `attractap-cap.3mf`, oder `attractap-cap-multicolor.3mf` mit Logo-Einlagen | 1 | RAL 5021 | ihrer Vorderseite |
+| Kappe (vordere Schale) | `attractap-cap.3mf` | 1 | RAL 5021 | ihrer Vorderseite |
+| Frontplatte (Abdeckung der Front) | `attractap-faceplate.3mf`, oder `attractap-faceplate-logo.3mf` mit Schriftzug | 1 | RAL 5021, Streifen und Schriftzug weiß | ihrer Vorderseite |
+| Tap-Kachel | `attractap-tile.3mf` | 1 | Oberseite und Schlüsselloch schwarz, Körper reines Weiß | ihrer Oberseite |
 | Dock (Rückplatte) | `attractap-dock.3mf` | 1 | Marmorweiß | ihrer Rückseite |
 | Displayrahmen | `attractap-display-frame.3mf` | 1 | Beliebig | seiner Platinenseite |
-| LED-Diffusor | `attractap-led-diffuser.3mf` | 2 | Natur oder reines Weiß | seiner Platinenseite |
 | Ständer (nur Tisch) | `attractap-stand.3mf` | 1 | Marmorweiß | seiner Tischseite |
 
 | Hardware | Anz. | Wohin sie gehört |
@@ -32,6 +33,7 @@ Ein Leser braucht fünf gedruckte Teile für die Wand und sechs für den Tisch. 
 | M3 × 4 Linsenkopfschraube | 4 | Platine an Kappe |
 | M3 × 8 Senkkopfschraube, idealerweise Torx mit Stift | 2 | Sicherungsschrauben, von unten |
 | Doppelseitiges Klebeband, 0,3 mm dick | 3 Streifen | Displayglas an Rahmen |
+| Dünnes doppelseitiges Klebeband, höchstens 0,15 mm | etwa 4 Streifen | Frontplatte an Kappe. Dickeres Band lässt das Glas hinter der Frontplatte versinken |
 | Polyimidband (Kapton), 25 mm breit | 30 mm, plus 80 mm | Rückseite des Displays, über den Lötpins der Ethernet-Buchse (Ethernet-Version); über dem Flexkabel des Displays dort, wo es das Display verlässt |
 | Leitfähige Dichtung, Gewebe über Schaumstoff, 5 × 5 mm, etwa 2 mm dick, selbstklebend | 2 bis 4 | Auf den blanken quadratischen Masse-Pads auf der Displayseite der Platine, gegen die Metallrückseite des Displays. Sie legt die Metallrückseite auf Masse, was der Leser braucht, um den Test auf elektrostatische Entladung zu bestehen |
 | Neodym-Scheibenmagnet, 10 mm Durchmesser, 3 mm dick | 1 | Ring auf der Innenseite des Docks. Der Leser erfasst ihn und weiß so, wann er vom Dock genommen wird |
@@ -46,7 +48,7 @@ Die Platinenschrauben sind M3 × 4. Frühere Stücklisten nannten M3 × 6, aber 
 
 ## Die gedruckten Teile vorbereiten
 
-Sechs Einschmelzmuttern kommen in die Kappe, der Magnet ins Dock, dann die beiden LED-Diffusoren in die Kappe. Erledigen Sie alle Arbeiten mit Hitze, bevor Elektronik auf dem Tisch liegt.
+Sechs Einschmelzmuttern kommen in die Kappe, der Magnet ins Dock, dann die Tap-Kachel in die Kappe. Erledigen Sie alle Arbeiten mit Hitze, bevor Elektronik auf dem Tisch liegt.
 
 ![Kappe mit der Vorderseite nach unten, vier kurze Einschmelzmuttern über den Platinen-Schraubdomen, zwei Standard-Einschmelzmuttern vor der unteren Wand und die beiden Sättel für Kabelbinder markiert](../../../_media/hardware/touch-p4/manual/02-inserts.png)
 
@@ -54,18 +56,18 @@ Die kurzen Einschmelzmuttern gehen direkt von oben in die Schraubdome. Die beide
 
 1. Legen Sie die Kappe mit der Vorderseite nach unten auf ein weiches Tuch, die Innenseite zeigt nach oben.
 2. Heizen Sie den Lötkolben auf etwa 250 °C auf.
-3. Drücken Sie in jeden der vier Platinen-Schraubdome eine kurze Einschmelzmutter, bündig mit der Oberseite des Schraubdoms oder 0,2 mm darunter. Eine überstehende Einschmelzmutter hebt die Platine an und lockert das Display dahinter. Diese Löcher enden 1,5 mm hinter der Frontfläche: Nehmen Sie den Kolben weg, sobald die Einschmelzmutter bündig sitzt, sonst kann die Front Spuren bekommen.
+3. Drücken Sie in jeden der vier Platinen-Schraubdome eine kurze Einschmelzmutter, bündig mit der Oberseite des Schraubdoms oder 0,2 mm darunter. Eine überstehende Einschmelzmutter hebt die Platine an und lockert das Display dahinter. Diese Löcher enden 1,1 mm hinter der Front der Kappe: Nehmen Sie den Kolben weg, sobald die Einschmelzmutter bündig sitzt, sonst kann sich die Front wölben und die Frontplatte anheben.
 4. Stellen Sie die Kappe auf ihre Oberkante, die untere Wand zeigt nach oben. Setzen Sie eine Standard-Einschmelzmutter auf die Lötkolbenspitze, führen Sie sie durch eines der beiden runden Löcher in der unteren Wand und über den Schlitz hinweg und drücken Sie sie in die Sicherungsleiste, bis sie bündig sitzt. Wiederholen Sie das für das zweite Loch.
 5. Prüfen Sie, dass nichts in den Schlitz zwischen unterer Wand und Sicherungsleiste hineinragt. Die Zunge des Docks muss dort hineingleiten.
 6. Lassen Sie alles abkühlen und drehen Sie dann einmal eine M3-Schraube durch jede Einschmelzmutter.
 7. Geben Sie einen Tropfen Sekundenkleber in den Ring auf der Innenseite des Docks und drücken Sie den Magneten hinein, mit beliebiger Seite nach oben. Er darf nicht über den Ring hinausstehen.
-8. Setzen Sie die beiden LED-Diffusoren von hinten in die Kappe: die vier Pillen in die vier Lichtfenster, die Seite mit den vier Trichtern zu Ihnen. Eine Reihe liegt über dem Kartenziel, eine darunter. Sie bleiben lose, bis die Platine sie hält.
+8. Schieben Sie die Tap-Kachel von hinten in die Kappe, die schwarze Oberseite voran, durch die quadratische Öffnung unter dem Displayfenster. Ihr Flansch schlägt innen an der Frontwand an. Die Kerbe im Flansch geht um den Platinen-Schraubdom daneben. Die Kachel bleibt lose, bis die Platine sie hält.
 
 ## Den Leser zusammenbauen
 
 Alles wird von hinten in die Kappe mit der Vorderseite nach unten gelegt, in dieser Reihenfolge: Display auf seinem Rahmen, Platine, vier Schrauben. Bei der Ethernet-Version brauchen Platine und Display vorher je einen Vorbereitungsschritt.
 
-![Explosionsansicht des Stapels: Kappe, LED-Diffusoren, Display, Displayrahmen, Platine und vier Schrauben](../../../_media/hardware/touch-p4/manual/03-reader-stack.png)
+![Explosionsansicht des Stapels: Kappe, Display, Displayrahmen, Platine und vier Schrauben](../../../_media/hardware/touch-p4/manual/03-reader-stack.png)
 
 Alles ist in der Reihenfolge, in der es eingesetzt wird, aus der Kappe herausgehoben dargestellt, das unterste zuerst.
 
@@ -80,6 +82,7 @@ Alles ist in der Reihenfolge, in der es eingesetzt wird, aus der Kappe herausgeh
 9. Stecken Sie das Flexkabel in seinen Anschluss auf der Platine und schließen Sie den Verriegelungsbügel.
 10. Befestigen Sie die Platine mit den vier M3 × 4 Schrauben. Handfest genügt; die Einschmelzmuttern sitzen in Kunststoff.
 11. Versorgen Sie die Platine über USB-C und prüfen Sie Display, Touch, LEDs und Buzzer, bevor der Leser an die Wand kommt. USB-C, Reset und Boot sind nur erreichbar, solange der Leser nicht am Dock hängt.
+12. Drehen Sie den Leser mit der Front nach oben. Kleben Sie dünnes doppelseitiges Klebeband auf die Front der Kappe nahe den Kanten und zwischen Displayfenster und Kachel, setzen Sie dann die Frontplatte über Kachel und Glas und drücken Sie sie rundum an. Ihre Kante schließt mit den Seiten der Kappe ab.
 
 ## Das Dock an einer Wand montieren
 
@@ -210,6 +213,6 @@ Nichts davon wurde an echten Teilen geprüft. Jeder Punkt kann einen Schritt ode
 - [ ] **Schwenkbewegung beim Einhängen.** In CAD kollisionsfrei bei fünf Winkeln zwischen 7° und geschlossen, nachdem die Zunge des Docks am 19. Nov. 2026 angeschrägt wurde. Docks, die vorher geslict wurden, müssen neu geslict werden.
 - [ ] **Zugentlastung.** Die Kabelbinder-Sättel in der Kappe und die Kabelbinder-Rippen im Ständer wurden am 19. Nov. 2026 hinzugefügt und sind nur in CAD geprüft. Fädeln Sie beim ersten Druck einen Kabelbinder ein und ziehen Sie am Kabel. Die Kabelaussparung des Ständers wurde in derselben Änderung auf 11 mm erhöht; vorher war sie für ein Ethernet-Kabel zu niedrig. Kappen und Ständer, die vorher geslict wurden, müssen neu geslict werden.
 - [ ] **Kabelweg in die Wand.** Am 19. Nov. 2026 modelliert, mit einem 5,5-mm-Ethernet-Kabel bei 18 mm Biegeradius und einer 3,5-mm-Stromleitung; in CAD kollidiert nichts. Mit echten Kabeln nicht erprobt. Der Weg aus einer Unterputzdose ist nicht modelliert.
-- [ ] **LED-Helligkeit** durch marmorweiße Diffusoren im Vergleich zu naturfarbenen.
+- [ ] **Frontplatte und Tap-Kachel.** Neu am 27. Nov. 2026 und nur im CAD geprüft: wie gleichmäßig der Rand der Kachel leuchtet (die LEDs liegen nur unter der oberen und unteren Kante), ob die Kachel ohne Spiel sitzt und wie gut dünnes Klebeband die Frontplatte hält. Die Abbildungen zeigen beide Teile noch nicht.
 - [ ] **Passung der Einschmelzmuttern.** Die gedruckten Löcher sind 4,0 mm für gängige M3-Einschmelzmuttern. Prüfen Sie sie gegen die Einschmelzmuttern, die Sie kaufen.
 - [ ] **Betrieb im Freien.** Es gibt keine Dichtungen; die Buzzerlöcher und Kabelaussparungen sind offen, und ABS+ altert im Sonnenlicht. Behandeln Sie es als nur für Innenräume: Eine abgedichtete Variante bräuchte außerdem ein auf die im Freien erlaubten Kanäle beschränktes WLAN.

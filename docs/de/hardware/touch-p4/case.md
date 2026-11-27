@@ -11,8 +11,17 @@ passt in beide. Noch nichts wurde gedruckt oder anprobiert: siehe [Noch nicht ge
 
 ## So funktioniert es
 
-- **Kappe**: die vordere Schale. Sie trägt das Display bündig mit der Front und die Platine. Acht
-  Lichtfenster für die Status-LEDs, der Attraccess-Schriftzug und ein Tap-Ring über der NFC-Antenne.
+- **Kappe**: die vordere Schale. Sie trägt das Display und die Platine; ihre Front ist eine schlichte,
+  1,4 mm dicke Wand.
+- **Frontplatte**: eine 1 mm dicke Abdeckung über die ganze Front, auf die Kappe geklebt; das Displayglas
+  liegt bündig mit ihr. Standardmäßig ist sie schlicht, mit einem weißen Streifen von der Tap-Kachel bis zur
+  Unterkante. Das Logo ist Sache der Frontplatte: Die gedruckte gibt es als zweite Datei mit eingelegtem
+  Attraccess-Schriftzug, andere Frontplatten (Aluminium, Holz, das Logo eines Kunden) bringen ihr eigenes mit.
+  Leser werden mit dem Attraccess-Schriftzug ausgeliefert, sofern ein Kunde nichts anderes wünscht.
+- **Tap-Kachel**: das Kartenziel über der NFC-Antenne, 36 mm im Quadrat und 1,8 mm über der Frontplatte:
+  eine schwarze Oberseite mit weißem Schlüsselloch auf einem weißen Körper. Ihr Flansch sitzt hinter der
+  Frontwand der Kappe, so lässt sie sich von außen nicht abhebeln. Die acht LEDs der Platine leuchten von
+  hinten hinein und lassen den weißen Rand um die schwarze Oberseite leuchten.
 - **Dock**: die Rückplatte, 13,9 mm von der Bestückungsseite der Platine entfernt. Sie wird an die Wand
   geschraubt (fünf Löcher; das untere Paar entspricht dem 60-mm-Abstand einer Unterputzdose) oder auf den
   Ständer. Unter der Ethernet-Buchse und dem PoE-Modul hat die Platte 0,8 mm tiefe Aussparungen und unter
@@ -44,10 +53,10 @@ Jede 3MF-Datei liegt bereits auf ihrer Druckfläche. Drucken Sie sie in ABS+ (si
 | Teil | Druckdatei | CAD | Anz. | Farbe | Liegt auf |
 | --- | --- | --- | --- | --- | --- |
 | Kappe | [`attractap-cap.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-cap.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-cap.step) | 1 | RAL 5021 | ihrer Vorderseite |
-| Kappe, mehrfarbig (Logo als separate Objekte) | [`attractap-cap-multicolor.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-cap-multicolor.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-cap-multicolor.step) | statt der Kappe | RAL 5021, Logo nach Wahl | ihrer Vorderseite |
+| Frontplatte | [`attractap-faceplate.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-faceplate.3mf), mit Schriftzug [`attractap-faceplate-logo.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-faceplate-logo.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-faceplate.step), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-faceplate-logo.step) | 1 | RAL 5021, Streifen und Schriftzug weiß | ihrer Vorderseite |
+| Tap-Kachel | [`attractap-tile.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-tile.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-tile.step) | 1 | Oberseite und Schlüsselloch schwarz, Körper reines Weiß (er führt das Licht der LEDs) | ihrer Oberseite |
 | Dock | [`attractap-dock.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-dock.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-dock.step) | 1 | Marmorweiß | seiner Rückseite |
 | Displayrahmen | [`attractap-display-frame.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-display-frame.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-display-frame.step) | 1 | Beliebig | seiner Platinenseite |
-| LED-Diffusor | [`attractap-led-diffuser.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-led-diffuser.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-led-diffuser.step) | 2 | Natur oder reines Weiß | seiner Platinenseite |
 | Ständer (nur Tisch) | [`attractap-stand.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-stand.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-stand.step) | 1 | Marmorweiß | seiner Tischseite |
 
 Die Hardware (Einschmelzmuttern, Schrauben, Klebeband, Kabelbinder) ist in der
@@ -62,7 +71,7 @@ Die Hardware (Einschmelzmuttern, Schrauben, Klebeband, Kabelbinder) ist in der
 | Platinen-Attrappe: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.stl) | Druckbarer Platzhalter für die Platine, um die Passung zu prüfen, bevor die echte Platine vorliegt. |
 | Display-Attrappe: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.stl) | Platzhalter für das Display, mit den angenommenen Displaymaßen (siehe [Noch nicht geprüft](#noch-nicht-geprüft)). |
 | [`board/attractap-touch-p4.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/board/attractap-touch-p4.step) | Die Platine allein (ohne Bauteile), aus dem aktuellen Layout exportiert. Die Konstruktion enthält die Platine in dem Stand, den sie beim Zeichnen des Gehäuses hatte; gleichen Sie sie nach einer Änderung der Platinenkontur mit dieser Datei ab. |
-| [`logo/attraccess-wordmark.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-wordmark.svg), [`attraccess-keyhole.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-keyhole.svg), [`attraccess-logo-mono.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-logo-mono.svg) | Logo-Umrisse für die Einlagen der Kappe; das Logo im Bestückungsdruck der Platine wird aus demselben Ordner gezeichnet. |
+| [`logo/attraccess-wordmark.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-wordmark.svg), [`attraccess-keyhole.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-keyhole.svg), [`attraccess-logo-mono.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-logo-mono.svg) | Logo-Umrisse für die Einlagen der Frontplatte und der Tap-Kachel; das Logo im Bestückungsdruck der Platine wird aus demselben Ordner gezeichnet. |
 | [`manual/`](https://github.com/Attraccess/Attraccess/tree/main/apps/attractap/hardware/touch-p4/case/manual) | Die Szenendatei, aus der die Abbildungen der Anleitung gerendert werden, und die Skripte, die Abbildungen und PDF erzeugen (siehe [Das Design ändern](#das-design-ändern)). |
 
 ## Drucken
@@ -82,8 +91,8 @@ Die Hardware (Einschmelzmuttern, Schrauben, Klebeband, Kabelbinder) ist in der
 - **Parameter**: Der Tiefenaufbau ist parametrisch (`plate_t`, `cav`, `pcb_t`, `disp_gap`, `disp_t`,
   `lens_t`, `tape_t`, `lens_recess`, `wall`, `pcb_ins_depth`). Positionen in X und Y sind einfache Zahlen,
   die der Platine entnommen sind.
-- **Export**: Führen Sie nach einer Änderung `cad/tools/export_parts.py` aus. Es schreibt Kappe (einfach und
-  mehrfarbig), Dock, Displayrahmen, LED-Diffusor, Display-Attrappe und die Baugruppe; Ständer und
+- **Export**: Führen Sie nach einer Änderung `cad/tools/export_parts.py` aus. Es schreibt Kappe,
+  Frontplatte (schlicht und mit Schriftzug), Tap-Kachel, Dock, Displayrahmen, Display-Attrappe und die Baugruppe; Ständer und
   Platinen-Attrappe exportiert es nicht. In SolidCraft 0.45.0 bleibt die Option, die Teile auf ihre
   Druckfläche legt, ohne Wirkung; deshalb dreht das Skript jedes Teil vor dem Export mit einer
   vorübergehenden Verschiebung.
@@ -91,7 +100,8 @@ Die Hardware (Einschmelzmuttern, Schrauben, Klebeband, Kabelbinder) ist in der
   Körpern zur Illustration; Druckdateien kommen nie daraus. Sie, die Renderings auf dieser Seite und die
   Abbildungen der Anleitung zeigen noch einen früheren Tiefenaufbau: eine um 0,64 mm tiefere Kappe, mit dem
   Display 2 mm von der Platine entfernt, und den früheren Weg des Display-Flexkabels durch die Platine unterhalb des
-  Displays.
+  Displays. Außerdem zeigen sie noch die alte Front mit Lichtfenstern, LED-Diffusoren und Einlagen in der Kappe,
+  von vor der Frontplatte und der Tap-Kachel (27. November 2026).
 
 Die Skripte sind reines Python ohne Abhängigkeiten; führen Sie sie mit `python3 -I` aus. Sie steuern
 SolidCraft über sein Kommandozeilenwerkzeug (der Pfad am Anfang jedes Skripts ist der für macOS) oder
@@ -99,7 +109,7 @@ schreiben Step-Dateien dafür und nutzen `rsvg-convert` für Beschriftungen.
 
 | Skript | Was es erzeugt |
 | --- | --- |
-| `cad/tools/export_parts.py` | STEP-, 3MF- und STL-Dateien von Kappe, Dock, Displayrahmen, LED-Diffusor, Display-Attrappe und Baugruppe |
+| `cad/tools/export_parts.py` | STEP-, 3MF- und STL-Dateien von Kappe, Frontplatte, Tap-Kachel, Dock, Displayrahmen, Display-Attrappe und Baugruppe |
 | `manual/tools/scenes.py`, `scenelib.py` | Szenen, Kameras und Beschriftungen der Abbildungen der Anleitung |
 | `manual/tools/gen_hardware.py`, `gen_strain_relief.py`, `gen_wall_route.py` | Step-Dateien, die der Szenendatei der Anleitung Schrauben, Einschmelzmuttern, Kabel und Kabelbinder hinzufügen |
 | `manual/tools/drill.py` | Die Bohrschablone |

@@ -11,8 +11,16 @@ both. Nothing has been printed or test-fitted yet: see [Not yet verified](#not-y
 
 ## How it works
 
-- **Cap**: the front shell. It carries the display, flush with the front, and the board. Eight light
-  windows for the status LEDs, the Attraccess wordmark and a tap ring over the NFC antenna.
+- **Cap**: the front shell. It carries the display and the board; its front is a plain 1.4 mm wall.
+- **Faceplate**: a 1 mm cover over the whole front, stuck onto the cap; the display's glass lies flush
+  with it. It is plain by default, with a white stripe from the tap tile down to the bottom edge. The
+  logo is the faceplate's business: the printed one comes as a second file with the Attraccess wordmark
+  inlaid, and other faceplates (aluminium, wood, a customer's logo) bring their own. Readers ship with
+  the Attraccess wordmark unless a customer asks otherwise.
+- **Tap tile**: the card target over the NFC antenna, 36 mm square and 1.8 mm proud of the faceplate:
+  a black top with a white keyhole on a white body. Its flange sits behind the cap's front wall, so it
+  cannot be pried off from outside. The board's eight LEDs shine into it from behind and light up the
+  white rim round the black top.
 - **Dock**: the back plate, 13.9 mm from the board's component side. It is screwed to the wall (five
   holes; the lower pair matches the 60 mm spacing of a flush-mount box) or onto the stand. Under the
   Ethernet jack and the PoE module the plate has recesses 0.8 mm deep, and a window through it under
@@ -44,10 +52,10 @@ Each 3MF already lies on its print face. Print them in ABS+ (see [Printing](#pri
 | Part | Print file | CAD | Qty | Colour | Lies on |
 | --- | --- | --- | --- | --- | --- |
 | Cap | [`attractap-cap.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-cap.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-cap.step) | 1 | RAL 5021 | its front face |
-| Cap, multi-colour (logo as separate objects) | [`attractap-cap-multicolor.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-cap-multicolor.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-cap-multicolor.step) | instead of the cap | RAL 5021, logo to taste | its front face |
+| Faceplate | [`attractap-faceplate.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-faceplate.3mf), with the wordmark [`attractap-faceplate-logo.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-faceplate-logo.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-faceplate.step), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-faceplate-logo.step) | 1 | RAL 5021, stripe and wordmark white | its front face |
+| Tap tile | [`attractap-tile.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-tile.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-tile.step) | 1 | Black top and keyhole, plain white body (it carries the LEDs' light) | its top |
 | Dock | [`attractap-dock.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-dock.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-dock.step) | 1 | Marble white | its back |
 | Display frame | [`attractap-display-frame.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-display-frame.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-display-frame.step) | 1 | Any | its board side |
-| LED diffuser | [`attractap-led-diffuser.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-led-diffuser.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-led-diffuser.step) | 2 | Natural or plain white | its board side |
 | Stand (desk only) | [`attractap-stand.3mf`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-stand.3mf) | [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-stand.step) | 1 | Marble white | its desk face |
 
 The hardware (heat-set inserts, screws, tape, cable ties) is listed in the
@@ -62,7 +70,7 @@ The hardware (heat-set inserts, screws, tape, cable ties) is listed in the
 | Mock board: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.stl) | Printable stand-in for the board, to check the fit before the real board is at hand. |
 | Mock display: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.stl) | Stand-in for the display, with the assumed display dimensions (see [Not yet verified](#not-yet-verified)). |
 | [`board/attractap-touch-p4.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/board/attractap-touch-p4.step) | The bare board (no parts) exported from the current layout. The design embeds the board as it was when the case was drawn; check it against this file after a change to the board outline. |
-| [`logo/attraccess-wordmark.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-wordmark.svg), [`attraccess-keyhole.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-keyhole.svg), [`attraccess-logo-mono.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-logo-mono.svg) | Logo outlines for the inlays of the cap; the board's silkscreen logo is drawn from the same folder. |
+| [`logo/attraccess-wordmark.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-wordmark.svg), [`attraccess-keyhole.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-keyhole.svg), [`attraccess-logo-mono.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-logo-mono.svg) | Logo outlines for the inlays of the faceplate and the tap tile; the board's silkscreen logo is drawn from the same folder. |
 | [`manual/`](https://github.com/Attraccess/Attraccess/tree/main/apps/attractap/hardware/touch-p4/case/manual) | The scene file the manual's figures are rendered from, and the scripts that make the figures and the PDF (see [Changing the design](#changing-the-design)). |
 
 ## Printing
@@ -82,14 +90,16 @@ The hardware (heat-set inserts, screws, tape, cable ties) is listed in the
 - **Parameters**: the depth stack is parametric (`plate_t`, `cav`, `pcb_t`, `disp_gap`, `disp_t`,
   `lens_t`, `tape_t`, `lens_recess`, `wall`, `pcb_ins_depth`). X and Y positions are plain numbers
   taken from the board.
-- **Export**: after a change, run `cad/tools/export_parts.py`. It writes cap (plain and
-  multi-colour), dock, display frame, LED diffuser, mock display and the assembly; stand and mock
+- **Export**: after a change, run `cad/tools/export_parts.py`. It writes cap,
+  the faceplate (plain and with the wordmark), tap tile, dock, display frame, mock display and the assembly; stand and mock
   board are not exported by it. In SolidCraft 0.45.0 the option that lays parts on their print face
   has no effect, so the script turns each part with a temporary move before the export.
 - **Manual scenes**: `manual/attractap-manual-scenes.sc` is a copy of the design with extra bodies
   for illustration; print files never come from it. It, the renders on this page and the manual's
   figures still show an earlier depth stack: a cap 0.64 mm deeper, with the display 2 mm off the board,
-  and the display flex's earlier route through the board below the display.
+  and the display flex's earlier route through the board below the display. They also still show the
+  old front with light windows, LED diffusers and inlays in the cap, from before the faceplate and the
+  tap tile (27 November 2026).
 
 The scripts are plain Python without dependencies; run them with `python3 -I`. They drive SolidCraft
 through its command-line tool (the path at the top of each script is the macOS one) or write step
@@ -97,7 +107,7 @@ files for it, and use `rsvg-convert` for labels.
 
 | Script | What it makes |
 | --- | --- |
-| `cad/tools/export_parts.py` | STEP, 3MF and STL files of cap, dock, display frame, LED diffuser, mock display and assembly |
+| `cad/tools/export_parts.py` | STEP, 3MF and STL files of cap, faceplate, tap tile, dock, display frame, mock display and assembly |
 | `manual/tools/scenes.py`, `scenelib.py` | Scenes, cameras and labels of the manual's figures |
 | `manual/tools/gen_hardware.py`, `gen_strain_relief.py`, `gen_wall_route.py` | Step files that add screws, inserts, cables and cable ties to the manual's scene file |
 | `manual/tools/drill.py` | The drilling template |

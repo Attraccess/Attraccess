@@ -1,5 +1,5 @@
-"""Exports the files of the case's parts from the design: cap (plain and multi-colour), dock, display frame, LED
-diffuser, mock display and the whole assembly.
+"""Exports the files of the case's parts from the design: cap, faceplate (plain and with the wordmark), tap tile, dock,
+display frame, mock display and the whole assembly.
 
     python3 -I export_parts.py [design.sc] [output folder]
 
@@ -34,9 +34,11 @@ def move(bodies, name, **how):
 def groups(design):
     """The exports as lists of commands. Each list runs on a fresh copy of the design."""
     body = {b["name"]: b for b in design["bodies"]}
-    depth = next(p["value"] for p in design["params"] if p["name"] == "D")
-    inlays = ["Tap inlay"] + sorted((n for n in body if n.startswith("Wordmark inlay")), key=lambda n: (len(n), n)) + ["Keyhole inlay"]
-    assembly = [n for n in body if n != "Ethernet plug (ref)" and "render prop" not in n]
+    depth = next(p["value"] for p in design["params"] if p["name"] == "D")    # front of the faceplate
+    wordmark = sorted((n for n in body if n.startswith("Wordmark inlay")), key=lambda n: (len(n), n))
+    faceplate = ["Faceplate", "Faceplate stripe"]
+    tile = ["Tile", "Tile top", "Tile inlay", "Tile keyhole"]
+    assembly = [n for n in body if n != "Ethernet plug (ref)" and "render prop" not in n and n not in wordmark]
     face_down = {"origin": [0, 0, 0], "axis": [1, 0, 0], "angle": "180 deg"}      # front face down: half a turn about X
 
     def centred(name):
@@ -44,22 +46,37 @@ def groups(design):
         return [-x, -y, -body[name]["bbox"]["min"][2]]
 
     cap_x, cap_y, _ = body["Cap"]["center_of_mass"]
+    plate_y = (body["Faceplate"]["bbox"]["min"][1] + body["Faceplate"]["bbox"]["max"][1]) / 2
+    tile_y = (body["Tile"]["bbox"]["min"][1] + body["Tile"]["bbox"]["max"][1]) / 2
+    tile_top = body["Tile top"]["bbox"]["max"][2]
+    # the faceplate with the wordmark: the letters are cut out of it and filled with the inlays
+    logo = {"command": "solid.combine", "params": {"name": "FaceplateLogo", "target": "Faceplate", "tools": wordmark,
+                                                   "operation": "cut", "keep_tools": True}}
     return [
-        [export("attractap-cap.step", ["Cap"]), export("attractap-cap-multicolor.step", ["Cap"] + inlays),
-         export("attractap-display-frame.step", ["Display frame"]), export("attractap-led-diffuser.step", ["LED diffuser"]),
+        [export("attractap-cap.step", ["Cap"]), export("attractap-faceplate.step", faceplate),
+         export("attractap-tile.step", tile), export("attractap-display-frame.step", ["Display frame"]),
          export("attractap-dock.step", ["Dock"]), export("attractap-assembly.step", assembly)],
-        # the cap lies on its front face; the multi-colour file keeps the inlays in place, the plain one is centred
-        [move(["Cap"] + inlays, "CapLay", translate=[0, 0, depth], **face_down),
-         export("attractap-cap-multicolor.3mf", ["Cap"] + inlays, **FINE),
+        [logo, export("attractap-faceplate-logo.step", faceplate + wordmark)],
+        # the cap lies on its front face, centred
+        [move(["Cap"], "CapLay", translate=[0, 0, body["Cap"]["bbox"]["max"][2]], **face_down),
          move(["Cap"], "CapCentre", translate=[-cap_x, cap_y, 0]),
          export("attractap-cap.3mf", ["Cap"], **FINE)],
+        # the faceplate lies on its front face, its objects in place for the colours
+        [move(faceplate, "PlateLay", translate=[0, 0, depth], **face_down),
+         move(faceplate, "PlateCentre", translate=[0, plate_y, 0]),
+         export("attractap-faceplate.3mf", faceplate, **FINE)],
+        [logo, move(faceplate + wordmark, "PlateLay", translate=[0, 0, depth], **face_down),
+         move(faceplate + wordmark, "PlateCentre", translate=[0, plate_y, 0]),
+         export("attractap-faceplate-logo.3mf", faceplate + wordmark, **FINE)],
+        # the tile lies on its black top
+        [move(tile, "TileLay", translate=[0, 0, tile_top], **face_down),
+         move(tile, "TileCentre", translate=[0, tile_y, 0]),
+         export("attractap-tile.3mf", tile, **FINE)],
         # the dock lies on its back, as it is in the design
         [move(["Dock"], "DockCentre", translate=centred("Dock")), export("attractap-dock.3mf", ["Dock"], **FINE)],
-        # frame and diffuser lie on their board side
+        # the frame lies on its board side
         [move(["Display frame"], "FrameLay", translate=centred("Display frame")),
          export("attractap-display-frame.3mf", ["Display frame"], **FINE)],
-        [move(["LED diffuser"], "DiffuserLay", translate=centred("LED diffuser")),
-         export("attractap-led-diffuser.3mf", ["LED diffuser"], **FINE)],
         # mock display: lens and LCD module as one body, glass down
         [{"command": "solid.combine", "params": {"target": "Display lens (ref)", "tools": ["LCD module (ref)"], "operation": "join"}},
          {"command": "body.rename", "params": {"body": "Display lens (ref)", "name": "Mock display"}},

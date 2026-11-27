@@ -19,10 +19,11 @@ One reader needs five printed parts for the wall, six for the desk. The print fi
 
 | Printed part | File | Qty | Colour | Prints lying on |
 | --- | --- | --- | --- | --- |
-| Cap (front shell) | `attractap-cap.3mf`, or `attractap-cap-multicolor.3mf` with logo inlays | 1 | RAL 5021 | its front face |
+| Cap (front shell) | `attractap-cap.3mf` | 1 | RAL 5021 | its front face |
+| Faceplate (cover over the front) | `attractap-faceplate.3mf`, or `attractap-faceplate-logo.3mf` with the wordmark | 1 | RAL 5021, stripe and wordmark white | its front face |
+| Tap tile | `attractap-tile.3mf` | 1 | Black top and keyhole, plain white body | its top |
 | Dock (back plate) | `attractap-dock.3mf` | 1 | Marble white | its back |
 | Display frame | `attractap-display-frame.3mf` | 1 | Any | its PCB side |
-| LED diffuser | `attractap-led-diffuser.3mf` | 2 | Natural or plain white | its PCB side |
 | Stand (desk only) | `attractap-stand.3mf` | 1 | Marble white | its desk face |
 
 | Hardware | Qty | Where it goes |
@@ -32,6 +33,7 @@ One reader needs five printed parts for the wall, six for the desk. The print fi
 | M3 × 4 pan head screw | 4 | PCB to cap |
 | M3 × 8 countersunk screw, ideally Torx with pin | 2 | Lock screws, from below |
 | Double-sided tape, 0.3 mm thick | 3 strips | Display glass to frame |
+| Thin double-sided tape, at most 0.15 mm | about 4 strips | Faceplate to cap. Thicker tape leaves the glass sunk behind the faceplate |
 | Polyimide tape (Kapton), 25 mm wide | 30 mm, plus 80 mm | Back of the display, over the Ethernet jack's solder pins (Ethernet version); over the display's flex where it leaves the display |
 | Conductive gasket, fabric over foam, 5 × 5 mm, about 2 mm thick, self-adhesive | 2 to 4 | On the bare square ground pads on the PCB's display side, against the display's metal back. It ties the metal back to ground, which the reader needs to pass the static-discharge test |
 | Neodymium disc magnet, 10 mm across, 3 mm thick | 1 | Ring on the dock's inner face. The reader senses it and knows when it is taken off the dock |
@@ -46,7 +48,7 @@ The PCB screws are M3 × 4. Earlier parts lists said M3 × 6, but since the scre
 
 ## Prepare the printed parts
 
-Six inserts go into the cap, the magnet into the dock, then the two LED diffusers into the cap. Do all hot work before any electronics are on the bench.
+Six inserts go into the cap, the magnet into the dock, then the tap tile into the cap. Do all hot work before any electronics are on the bench.
 
 ![Cap lying face-down with four short inserts above the PCB bosses, two standard inserts in front of the bottom wall, and the two saddles for cable ties marked](../../../_media/hardware/touch-p4/manual/02-inserts.png)
 
@@ -54,18 +56,18 @@ The short inserts go straight down into the bosses. The two standard ones enter 
 
 1. Lay the cap face-down on a soft cloth, inside facing up.
 2. Heat the soldering iron to about 250 °C.
-3. Press one short insert into each of the four PCB bosses, flush with the top of the boss or 0.2 mm below. A proud insert lifts the PCB and loosens the display behind it. These holes end 1.5 mm behind the front face: take the iron away as soon as the insert is flush, or the front can mark.
+3. Press one short insert into each of the four PCB bosses, flush with the top of the boss or 0.2 mm below. A proud insert lifts the PCB and loosens the display behind it. These holes end 1.1 mm behind the cap's front: take the iron away as soon as the insert is flush, or the front can bulge and lift the faceplate.
 4. Stand the cap on its top edge, bottom wall up. Put a standard insert on the iron tip, pass it through one of the two round holes in the bottom wall and across the slot, and press it into the lock bar until it is flush. Repeat for the second hole.
 5. Check that nothing sticks out into the slot between bottom wall and lock bar. The dock's tongue has to slide in there.
 6. Let everything cool, then run an M3 screw through each insert once.
 7. Put a drop of superglue into the ring on the dock's inner face and press the magnet in, either side up. It must not stand above the ring.
-8. Drop the two LED diffusers into the cap from behind: the four pills into the four light windows, the side with the four funnels facing you. One row sits above the card target, one below. They stay loose until the PCB holds them.
+8. Push the tap tile into the cap from behind, black top first, through the square opening below the display window. Its flange stops against the inside of the front wall. The notch in the flange goes round the PCB boss beside it. The tile stays loose until the PCB holds it.
 
 ## Assemble the reader
 
 Everything drops into the face-down cap from behind, in this order: display on its frame, PCB, four screws. On the Ethernet version the PCB and the display each get one preparation step first.
 
-![Exploded stack: cap, LED diffusers, display, display frame, PCB and four screws](../../../_media/hardware/touch-p4/manual/03-reader-stack.png)
+![Exploded stack: cap, display, display frame, PCB and four screws](../../../_media/hardware/touch-p4/manual/03-reader-stack.png)
 
 Everything is shown lifted out of the cap in the order it goes in, lowest first.
 
@@ -80,6 +82,7 @@ Everything is shown lifted out of the cap in the order it goes in, lowest first.
 9. Plug the flex into its connector on the PCB and close the latch.
 10. Fasten the PCB with the four M3 × 4 screws. Hand-tight is enough; the inserts sit in plastic.
 11. Power the board over USB-C and check display, touch, LEDs and buzzer before the reader goes on the wall. USB-C, reset and boot are only reachable while the reader is off the dock.
+12. Turn the reader face-up. Stick thin double-sided tape onto the cap's front near the edges and between the display window and the tile, then lower the faceplate over the tile and the glass and press it down all round. Its edge lines up with the cap's sides.
 
 ## Mount the dock on a wall
 
@@ -210,6 +213,6 @@ Nothing below has been checked on real parts. Each item can change a step or a p
 - [ ] **Swing-on motion.** Collision-free in CAD at five angles between 7° and closed, after the dock's tongue was tapered on 19 Nov 2026. Docks sliced before that need re-slicing.
 - [ ] **Strain relief.** The tie saddles in the cap and the tie fins in the stand were added on 19 Nov 2026 and are checked in CAD only. On the first print, thread a tie and pull on the cable. The stand's cable notch was raised to 11 mm in the same change; before, it was too low for an Ethernet cable. Caps and stands sliced before that need re-slicing.
 - [ ] **Cable route into the wall.** Modelled on 19 Nov 2026 with a 5.5 mm Ethernet cable at 18 mm bend radius and a 3.5 mm power lead; nothing collides in CAD. Not tried with real cables. The route from a flush-mount box is not modelled.
-- [ ] **LED brightness** through marble white diffusers compared with natural ones.
+- [ ] **Faceplate and tap tile.** New on 27 Nov 2026 and checked in CAD only: how evenly the tile's rim lights up (the LEDs sit under the top and bottom edges only), whether the tile sits without play, and how well thin tape holds the faceplate. The figures do not show either part yet.
 - [ ] **Insert fit.** The printed holes are 4.0 mm for common M3 inserts. Check them against the inserts you buy.
 - [ ] **Outdoor use.** There are no seals; the buzzer holes and cable notches are open, and ABS+ ages in sunlight. Treat it as indoor only: a sealed variant would also need Wi-Fi limited to the channels allowed outdoors.
