@@ -12,8 +12,9 @@ both. Nothing has been printed or test-fitted yet: see [Not yet verified](#not-y
 ## How it works
 
 - **Cap**: the front shell. It carries the display and the board; its front is a plain 1.4 mm wall.
-- **Faceplate**: a 1 mm cover over the whole front, stuck onto the cap; the display's glass lies flush
-  with it. It is plain by default, with a white stripe from the tap tile down to the bottom edge. The
+- **Faceplate**: a 1 mm cover over the whole front, held on the cap by five magnets without glue or
+  tape; the display's glass lies flush with it. Five steel washers on its back sit over magnets hidden
+  in the cap's front wall, so faceplates can be swapped by hand (see [Faceplate interface](#faceplate-interface)). It is plain by default, with a white stripe from the tap tile down to the bottom edge. The
   logo is the faceplate's business: the printed one comes as a second file with the Attraccess wordmark
   inlaid, and other faceplates (aluminium, wood, a customer's logo) bring their own. Readers ship with
   the Attraccess wordmark unless a customer asks otherwise.
@@ -46,6 +47,54 @@ both. Nothing has been printed or test-fitted yet: see [Not yet verified](#not-y
   cable tie on a saddle inside the cap takes the pull off the jack.
 - Screws go into heat-set inserts. The reader comes off the wall with two screws, the board out of
   the cap with four more.
+
+## Faceplate interface
+
+What any faceplate needs to fit (printed, aluminium, wood or other). Positions are in mm from the
+centre of the display, seen from the front: X to the right, Y up. The logo or artwork is the
+faceplate's own business.
+
+| Feature | Size and position |
+| --- | --- |
+| Outline | 94.8 x 166.3 mm, corner radius 6 mm, centred at X 0, Y -26.1 (the cap's outline). A 0.4 mm chamfer on the front edge is optional |
+| Thickness | 1.0 mm. The display's glass lies 0.1 mm below the front of a 1 mm plate; a thicker plate leaves the glass sunk |
+| Screen window | 84.8 mm square, corner radius 1 mm, centred at X 0, Y 0 |
+| Tile opening | 45.2 mm square, corner radius 6.2 mm, centred at X 0, Y -67.85. The tap tile stands 1.8 mm proud of the plate through it |
+| Stripe slit | 2 mm wide (X -1 to 1), from the tile opening down through the bottom edge. Required on a metal plate (see below); a printed plate fills it with its white stripe |
+| Steel discs | Five, centred at (-28.3, 48.8), (-39.5, -60), (39.5, -60), (-39.5, -88) and (39.5, -88). From the plate's edges: the top one 19.1 mm from the left edge and 8.25 mm from the top edge, the four side ones 7.9 mm from the left or right edge and 49.25 or 21.25 mm from the bottom edge |
+| Disc size | At most 9.4 mm across (the cap's pockets are 9.6 mm wide and 0.7 mm deep). A disc may stand at most 0.6 mm proud of the plate's back, glue included; nothing else on the back may stand proud |
+| Pry notch | In the cap's bottom face, X 6 to 18, right behind the plate's bottom edge. Keep the plate's bottom edge straight and whole there |
+
+- **Discs.** They must be magnetic steel: zinc-plated or plain steel, not stainless (A2 and A4 stainless
+  hardly react to a magnet). The printed plate takes DIN 125 / ISO 7089 M4 washers (9 mm across, 0.8 mm
+  thick) in 9.4 mm recesses 0.4 mm deep, which leave 0.6 mm of plate in front of them. A plate without
+  recesses can take ISO 7092 M4 washers (8 mm, 0.5 mm) glued flat, or M4 washers in recesses at least
+  0.3 mm deep.
+- **Gluing the discs on.** Superglue gel or two-part epoxy. On a plate without recesses, drop the washers
+  into the cap's pockets (the magnets hold them), put a small drop of glue on each, press the plate on
+  lined up with the cap's edges and let it cure. Keep glue off the cap.
+- **Holding force.** The magnets are 10 x 3 mm neodymium discs (N42), the same as the dock's. Each sits
+  behind 0.4 mm of the cap's front wall, so a washer in a 0.4 mm recess is about 0.65 mm away from it.
+  At that gap one magnet would pull about 8 N on thick steel (the maker's 17.7 N at contact, scaled by a
+  disc-magnet model). A thin washer smaller than the magnet takes an estimated 40 to 60 % of that: about
+  3 to 5 N per magnet, 16 to 24 N for the plate. A printed plate weighs about 8 g, a 1 mm aluminium one
+  about 18 g, so the pull is over 80 times the weight. The washers in their pockets also stop the plate
+  from sliding. Lifted at the notch, the plate comes off one pair of magnets at a time, about 6 to 10 N.
+  The estimate is not measured.
+- **Metal plates.** Around the tile opening a metal plate is a closed ring right over the NFC loop. It
+  would act as a shorted turn and take the reader's field, which is why the board's own copper round the
+  loop is open in one place ([design notes](hardware/touch-p4/design-notes.md#nfc)). The stripe slit
+  opens that ring; leave it open or fill it with something that does not conduct. Metal over the Wi-Fi
+  antenna costs 1.5 to 1.9 dB at 2.4 GHz, so a metal plate needs a window in the strip above the screen
+  window from X -7.5 to its right edge ([antenna](hardware/touch-p4/design-notes.md#antenna)). The discs
+  stay clear of both: at least 17 mm from the NFC loop's copper and 30 mm from the antenna.
+- **Where the magnets sit.** They avoid the NFC loop (35 x 37 mm round the tile's centre), the Wi-Fi
+  antenna (top right behind the strip above the display), the buzzer (X 36.6, Y -2.85) and the hall switch
+  U703 (X 30.5, Y 10.95), which senses the dock's magnet. All five together give at most about 0.24 mT at
+  the switch (dipole estimate, every magnet the worst way round). The switch (DRV5032FA) operates at
+  1.5 to 4.8 mT and releases at 0.5 mT at the least, so the faceplate magnets can neither trip it nor keep
+  it on once the reader leaves the dock. The top right corner has no magnet: the antenna and a board screw
+  leave no room there.
 
 The [installation manual](hardware/touch-p4/installation-manual.md) ([PDF](_media/hardware/touch-p4/attractap-installation-manual-en.pdf ':ignore'))
 shows every step with figures: parts and hardware list, inserts, assembly, drilling template, cable
@@ -170,6 +219,12 @@ files for it, and use `rsvg-convert` for labels.
   - Backwards (towards the wall) nothing but the board itself supports that corner: the dock has its
     cable opening behind it. A card pressed on the tile bends it back elastically, by an estimated
     0.1 mm for 5 N on the tile's centre.
+- **Faceplate magnets.** Five magnets glued into bosses behind the cap's front wall, 0.4 mm of it in
+  front of them, and five washers on the faceplate. The magnets' backs clear the board's display side by
+  0.2 mm; a magnet glued proud of its boss presses on the board. Check the holding force and that the
+  plate lifts at the notch, and that the hall switch still reads "off" with the reader off the dock. The
+  bridge over each front pocket is the first layer above it (the cap prints face down): check that it
+  closes.
 - **Inserts close to the front face.** Only 2.9 mm lie between the board and the front wall. The
   insert holes of the four PCB bosses are 3.2 mm deep (`pcb_ins_depth`), reaching 0.3 mm into the
   cap's 1.4 mm front wall (2.4 mm before the faceplate took its outer 1 mm) and leaving 1.1 mm. Check on

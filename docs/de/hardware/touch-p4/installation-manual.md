@@ -33,10 +33,11 @@ Ein Leser braucht fünf gedruckte Teile für die Wand und sechs für den Tisch. 
 | M3 × 4 Linsenkopfschraube | 4 | Platine an Kappe |
 | M3 × 8 Senkkopfschraube, idealerweise Torx mit Stift | 2 | Sicherungsschrauben, von unten |
 | Doppelseitiges Klebeband, 0,3 mm dick | 3 Streifen | Displayglas an Rahmen |
-| Dünnes doppelseitiges Klebeband, höchstens 0,15 mm | etwa 4 Streifen | Frontplatte an Kappe. Dickeres Band lässt das Glas hinter der Frontplatte versinken |
 | Polyimidband (Kapton), 25 mm breit | 30 mm, plus 80 mm | Rückseite des Displays, über den Lötpins der Ethernet-Buchse (Ethernet-Version); über dem Flexkabel des Displays dort, wo es das Display verlässt |
 | Leitfähige Dichtung, Gewebe über Schaumstoff, 5 × 5 mm, etwa 2 mm dick, selbstklebend | 2 bis 4 | Auf den blanken quadratischen Masse-Pads auf der Displayseite der Platine, gegen die Metallrückseite des Displays. Sie legt die Metallrückseite auf Masse, was der Leser braucht, um den Test auf elektrostatische Entladung zu bestehen |
-| Neodym-Scheibenmagnet, 10 mm Durchmesser, 3 mm dick | 1 | Ring auf der Innenseite des Docks. Der Leser erfasst ihn und weiß so, wann er vom Dock genommen wird |
+| Neodym-Scheibenmagnet, 10 mm Durchmesser, 3 mm dick (N42 oder stärker) | 6 | Einer im Ring auf der Innenseite des Docks: Der Leser erfasst ihn und weiß so, wann er vom Dock genommen wird. Fünf hinter der Frontwand der Kappe: Sie halten die Frontplatte |
+| Unterlegscheibe DIN 125 / ISO 7089, M4 (9 mm Durchmesser, 0,8 mm dick), Stahl verzinkt, nicht rostfrei | 5 | Rückseite der Frontplatte, über den Magneten der Kappe. Edelstahlscheiben reagieren kaum auf einen Magneten |
+| Sekundenkleber-Gel oder Zweikomponenten-Epoxid | einige Tropfen | Magnete in Dock und Kappe, Scheiben auf die Frontplatte |
 | Senkkopf-Wandschraube, 4 mm Schaft, Kopf bis 8,6 mm, mit Dübeln | 3 bis 5 | Dock an Wand |
 | Kabelbinder, 2,5 mm breit, etwa 100 mm lang | 1 pro Kabel | Zugentlastung, nur für ein Kabel, das durch die untere Aussparung oder am Tischständer austritt |
 | M3-Einschmelzmutter, Standard (5,7 mm lang) | 4 | Ständer (nur Tisch) |
@@ -48,7 +49,7 @@ Die Platinenschrauben sind M3 × 4. Frühere Stücklisten nannten M3 × 6, aber 
 
 ## Die gedruckten Teile vorbereiten
 
-Sechs Einschmelzmuttern kommen in die Kappe, der Magnet ins Dock, dann die Tap-Kachel in die Kappe. Erledigen Sie alle Arbeiten mit Hitze, bevor Elektronik auf dem Tisch liegt.
+Sechs Einschmelzmuttern kommen in die Kappe, ein Magnet ins Dock und fünf in die Kappe, die Scheiben auf die Frontplatte, dann die Tap-Kachel in die Kappe. Erledigen Sie alle Arbeiten mit Hitze, bevor Elektronik auf dem Tisch liegt, und halten Sie die Magnete vom Lötkolben und den losen Einschmelzmuttern fern.
 
 ![Kappe mit der Vorderseite nach unten, vier kurze Einschmelzmuttern über den Platinen-Schraubdomen, zwei Standard-Einschmelzmuttern vor der unteren Wand und die beiden Sättel für Kabelbinder markiert](../../../_media/hardware/touch-p4/manual/02-inserts.png)
 
@@ -56,12 +57,14 @@ Die kurzen Einschmelzmuttern gehen direkt von oben in die Schraubdome. Die beide
 
 1. Legen Sie die Kappe mit der Vorderseite nach unten auf ein weiches Tuch, die Innenseite zeigt nach oben.
 2. Heizen Sie den Lötkolben auf etwa 250 °C auf.
-3. Drücken Sie in jeden der vier Platinen-Schraubdome eine kurze Einschmelzmutter, bündig mit der Oberseite des Schraubdoms oder 0,2 mm darunter. Eine überstehende Einschmelzmutter hebt die Platine an und lockert das Display dahinter. Diese Löcher enden 1,1 mm hinter der Front der Kappe: Nehmen Sie den Kolben weg, sobald die Einschmelzmutter bündig sitzt, sonst kann sich die Front wölben und die Frontplatte anheben.
+3. Drücken Sie in jeden der vier Platinen-Schraubdome eine kurze Einschmelzmutter, bündig mit der Oberseite des Schraubdoms oder 0,2 mm darunter. Eine überstehende Einschmelzmutter hebt die Platine an und lockert das Display dahinter. Diese Löcher enden 1,1 mm hinter der Front der Kappe: Nehmen Sie den Kolben weg, sobald die Einschmelzmutter bündig sitzt, sonst kann sich die Front wölben, und die Frontplatte liegt nicht mehr flach auf.
 4. Stellen Sie die Kappe auf ihre Oberkante, die untere Wand zeigt nach oben. Setzen Sie eine Standard-Einschmelzmutter auf die Lötkolbenspitze, führen Sie sie durch eines der beiden runden Löcher in der unteren Wand und über den Schlitz hinweg und drücken Sie sie in die Sicherungsleiste, bis sie bündig sitzt. Wiederholen Sie das für das zweite Loch.
 5. Prüfen Sie, dass nichts in den Schlitz zwischen unterer Wand und Sicherungsleiste hineinragt. Die Zunge des Docks muss dort hineingleiten.
 6. Lassen Sie alles abkühlen und drehen Sie dann einmal eine M3-Schraube durch jede Einschmelzmutter.
 7. Geben Sie einen Tropfen Sekundenkleber in den Ring auf der Innenseite des Docks und drücken Sie den Magneten hinein, mit beliebiger Seite nach oben. Er darf nicht über den Ring hinausstehen.
-8. Schieben Sie die Tap-Kachel von hinten in die Kappe, die schwarze Oberseite voran, durch die quadratische Öffnung unter dem Displayfenster. Drehen Sie sie so, dass die Kerbe in ihrem Flansch um den Platinen-Schraubdom neben der Öffnung geht; der Kanal in ihrer Rückseite zeigt dann zu Ihnen. Ihr Flansch schlägt innen an der Frontwand an. Die Kachel bleibt lose, bis die Platine sie hält.
+8. Legen Sie die Kappe wieder mit der Vorderseite nach unten und kleben Sie in jeden der fünf runden Dome auf der Innenseite ihrer Front einen Magneten: je zwei links und rechts der quadratischen Öffnung für die Kachel und einen in der Ecke neben dem Displayfenster (von vorn gesehen oben links). Geben Sie etwas Kleber auf die Innenwand des Doms, nicht auf seinen Boden, und drücken Sie den Magneten hinein, bis er an der Frontwand anschlägt, mit beliebiger Seite nach oben: Gegenüber Stahl spielt die Polung keine Rolle. Er muss bündig mit dem Dom abschließen, nicht darüber, denn die Platine liegt später 0,2 mm darüber. Halten Sie die Magnete auseinander, bis der Kleber fest ist; sie springen aufeinander.
+9. Legen Sie die Frontplatte mit der Vorderseite nach unten. Geben Sie in jede der fünf runden Vertiefungen auf ihrer Rückseite einen kleinen Tropfen Kleber, drücken Sie je eine Scheibe flach hinein und lassen Sie den Kleber aushärten.
+10. Schieben Sie die Tap-Kachel von hinten in die Kappe, die schwarze Oberseite voran, durch die quadratische Öffnung unter dem Displayfenster. Drehen Sie sie so, dass die Kerbe in ihrem Flansch um den Platinen-Schraubdom neben der Öffnung geht; der Kanal in ihrer Rückseite zeigt dann zu Ihnen. Ihr Flansch schlägt innen an der Frontwand an. Die Kachel bleibt lose, bis die Platine sie hält.
 
 ## Den Leser zusammenbauen
 
@@ -82,7 +85,7 @@ Alles ist in der Reihenfolge, in der es eingesetzt wird, aus der Kappe herausgeh
 9. Stecken Sie das Flexkabel in seinen Anschluss auf der Platine und schließen Sie den Verriegelungsbügel.
 10. Befestigen Sie die Platine mit den vier M3 × 4 Schrauben. Handfest genügt; die Einschmelzmuttern sitzen in Kunststoff. Die Platine liegt jetzt flach auf der Rückseite der Tap-Kachel, klemmt die Kachel ein und wird von ihr an der Ecke gehalten, die keine Schraube hat. Steht eine Ecke der Platine von ihrem Schraubdom ab, ist die Rückseite der Kachel zu dick: Schleifen Sie sie plan und versuchen Sie es erneut.
 11. Versorgen Sie die Platine über USB-C und prüfen Sie Display, Touch, LEDs und Buzzer, bevor der Leser an die Wand kommt. USB-C, Reset und Boot sind nur erreichbar, solange der Leser nicht am Dock hängt.
-12. Drehen Sie den Leser mit der Front nach oben. Kleben Sie dünnes doppelseitiges Klebeband auf die Front der Kappe nahe den Kanten und zwischen Displayfenster und Kachel, setzen Sie dann die Frontplatte über Kachel und Glas und drücken Sie sie rundum an. Ihre Kante schließt mit den Seiten der Kappe ab.
+12. Drehen Sie den Leser mit der Front nach oben und setzen Sie die Frontplatte über Kachel und Glas, die Scheiben nach unten. Jede Scheibe fällt in eine flache runde Tasche in der Front der Kappe, und die Magnete ziehen die Platte flach an; ihre Kante schließt mit den Seiten der Kappe ab. Kein Kleber, kein Klebeband. Zum Abnehmen setzen Sie einen Fingernagel oder eine Münze in die Kerbe in der Unterseite der Kappe, direkt hinter der Unterkante der Frontplatte, und heben die Platte an.
 
 ## Das Dock an einer Wand montieren
 
@@ -213,6 +216,7 @@ Nichts davon wurde an echten Teilen geprüft. Jeder Punkt kann einen Schritt ode
 - [ ] **Schwenkbewegung beim Einhängen.** In CAD kollisionsfrei bei fünf Winkeln zwischen 7° und geschlossen, nachdem die Zunge des Docks am 19. Nov. 2026 angeschrägt wurde. Docks, die vorher geslict wurden, müssen neu geslict werden.
 - [ ] **Zugentlastung.** Die Kabelbinder-Sättel in der Kappe und die Kabelbinder-Rippen im Ständer wurden am 19. Nov. 2026 hinzugefügt und sind nur in CAD geprüft. Fädeln Sie beim ersten Druck einen Kabelbinder ein und ziehen Sie am Kabel. Die Kabelaussparung des Ständers wurde in derselben Änderung auf 11 mm erhöht; vorher war sie für ein Ethernet-Kabel zu niedrig. Kappen und Ständer, die vorher geslict wurden, müssen neu geslict werden.
 - [ ] **Kabelweg in die Wand.** Am 19. Nov. 2026 modelliert, mit einem 5,5-mm-Ethernet-Kabel bei 18 mm Biegeradius und einer 3,5-mm-Stromleitung; in CAD kollidiert nichts. Mit echten Kabeln nicht erprobt. Der Weg aus einer Unterputzdose ist nicht modelliert.
-- [ ] **Frontplatte und Tap-Kachel.** Neu am 27. Nov. 2026 und nur im CAD geprüft; die Kachel wurde am selben Tag für den Ring aus 16 LEDs der Platine vergrößert. Wie gleichmäßig und hell der Rand der Kachel leuchtet, ob die Kachel die Ecke der Platine ohne Schraube ohne Spiel hält und wie gut dünnes Klebeband die Frontplatte hält. Die Abbildungen zeigen beide Teile noch nicht.
+- [ ] **Frontplatte und Tap-Kachel.** Neu am 27. Nov. 2026 und nur im CAD geprüft; die Kachel wurde am selben Tag für den Ring aus 16 LEDs der Platine vergrößert. Wie gleichmäßig und hell der Rand der Kachel leuchtet, und ob die Kachel die Ecke der Platine ohne Schraube ohne Spiel hält. Die Abbildungen zeigen beide Teile noch nicht.
+- [ ] **Magnete der Frontplatte.** Am 27. Nov. 2026 hinzugefügt, nur im CAD geprüft. Wie fest die fünf Magnete die Frontplatte halten (geschätzt 3 bis 5 N je Magnet), ob sie sich an der Kerbe mit einem Fingernagel abheben lässt und ob die Brücke über jeder Tasche in der Front der Kappe geschlossen druckt. Mit dem Leser abseits des Docks muss die Platine weiterhin „ab“ melden: Geschätzt fügen die Magnete der Frontplatte am Hall-Schalter höchstens 0,24 mT hinzu, und er schaltet frühestens unter 0,5 mT aus. Die Abbildungen zeigen die Magnete und die Kerbe noch nicht.
 - [ ] **Passung der Einschmelzmuttern.** Die gedruckten Löcher sind 4,0 mm für gängige M3-Einschmelzmuttern. Prüfen Sie sie gegen die Einschmelzmuttern, die Sie kaufen.
 - [ ] **Betrieb im Freien.** Es gibt keine Dichtungen; die Buzzerlöcher und Kabelaussparungen sind offen, und ABS+ altert im Sonnenlicht. Behandeln Sie es als nur für Innenräume: Eine abgedichtete Variante bräuchte außerdem ein auf die im Freien erlaubten Kanäle beschränktes WLAN.

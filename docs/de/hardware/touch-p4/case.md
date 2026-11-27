@@ -13,8 +13,10 @@ passt in beide. Noch nichts wurde gedruckt oder anprobiert: siehe [Noch nicht ge
 
 - **Kappe**: die vordere Schale. Sie trägt das Display und die Platine; ihre Front ist eine schlichte,
   1,4 mm dicke Wand.
-- **Frontplatte**: eine 1 mm dicke Abdeckung über die ganze Front, auf die Kappe geklebt; das Displayglas
-  liegt bündig mit ihr. Standardmäßig ist sie schlicht, mit einem weißen Streifen von der Tap-Kachel bis zur
+- **Frontplatte**: eine 1 mm dicke Abdeckung über die ganze Front, von fünf Magneten an der Kappe gehalten,
+  ohne Kleber oder Klebeband; das Displayglas liegt bündig mit ihr. Fünf Stahlscheiben auf ihrer Rückseite
+  liegen über Magneten, die in der Frontwand der Kappe verborgen sind, so lassen sich Frontplatten von Hand
+  tauschen (siehe [Frontplatten-Schnittstelle](#frontplatten-schnittstelle)). Standardmäßig ist sie schlicht, mit einem weißen Streifen von der Tap-Kachel bis zur
   Unterkante. Das Logo ist Sache der Frontplatte: Die gedruckte gibt es als zweite Datei mit eingelegtem
   Attraccess-Schriftzug, andere Frontplatten (Aluminium, Holz, das Logo eines Kunden) bringen ihr eigenes mit.
   Leser werden mit dem Attraccess-Schriftzug ausgeliefert, sofern ein Kunde nichts anderes wünscht.
@@ -48,6 +50,56 @@ passt in beide. Noch nichts wurde gedruckt oder anprobiert: siehe [Noch nicht ge
   unten, wo ein Kabelbinder auf einem Sattel in der Kappe den Zug von der Buchse nimmt.
 - Schrauben gehen in Einschmelzmuttern. Der Leser lässt sich mit zwei Schrauben von der Wand nehmen, die
   Platine mit vier weiteren aus der Kappe.
+
+## Frontplatten-Schnittstelle
+
+Was jede Frontplatte braucht, damit sie passt (gedruckt, Aluminium, Holz oder anderes). Positionen in mm
+von der Mitte des Displays, von vorn gesehen: X nach rechts, Y nach oben. Logo und Motiv sind Sache der
+Frontplatte.
+
+| Merkmal | Maß und Lage |
+| --- | --- |
+| Umriss | 94,8 x 166,3 mm, Eckradius 6 mm, Mitte bei X 0, Y -26,1 (der Umriss der Kappe). Eine Fase von 0,4 mm an der vorderen Kante ist freigestellt |
+| Dicke | 1,0 mm. Das Displayglas liegt 0,1 mm unter der Vorderseite einer 1 mm dicken Platte; bei einer dickeren Platte versinkt es |
+| Displayfenster | 84,8 mm im Quadrat, Eckradius 1 mm, Mitte bei X 0, Y 0 |
+| Öffnung für die Kachel | 45,2 mm im Quadrat, Eckradius 6,2 mm, Mitte bei X 0, Y -67,85. Die Tap-Kachel steht durch sie 1,8 mm über der Platte |
+| Schlitz für den Streifen | 2 mm breit (X -1 bis 1), von der Öffnung für die Kachel nach unten durch die Unterkante. Bei einer Metallplatte nötig (siehe unten); eine gedruckte Platte füllt ihn mit ihrem weißen Streifen |
+| Stahlscheiben | Fünf, mit der Mitte bei (-28,3, 48,8), (-39,5, -60), (39,5, -60), (-39,5, -88) und (39,5, -88). Von den Kanten der Platte: die obere 19,1 mm von der linken und 8,25 mm von der oberen Kante, die vier seitlichen 7,9 mm von der linken oder rechten Kante und 49,25 oder 21,25 mm von der Unterkante |
+| Größe der Scheiben | Höchstens 9,4 mm Durchmesser (die Taschen der Kappe sind 9,6 mm weit und 0,7 mm tief). Eine Scheibe darf höchstens 0,6 mm über die Rückseite der Platte stehen, Kleber eingeschlossen; sonst darf nichts über die Rückseite stehen |
+| Hebelkerbe | In der Unterseite der Kappe, X 6 bis 18, direkt hinter der Unterkante der Platte. Die Unterkante der Platte muss dort gerade und vollständig sein |
+
+- **Scheiben.** Sie müssen aus magnetischem Stahl sein: verzinkt oder blank, nicht rostfrei (Edelstahl A2
+  und A4 reagiert kaum auf einen Magneten). Die gedruckte Platte nimmt Unterlegscheiben DIN 125 / ISO 7089
+  M4 (9 mm Durchmesser, 0,8 mm dick) in Vertiefungen von 9,4 mm Durchmesser und 0,4 mm Tiefe auf; vor
+  ihnen bleiben 0,6 mm Platte. Eine Platte ohne Vertiefungen nimmt Scheiben ISO 7092 M4 (8 mm, 0,5 mm),
+  flach aufgeklebt, oder M4-Scheiben in mindestens 0,3 mm tiefen Vertiefungen.
+- **Scheiben aufkleben.** Sekundenkleber-Gel oder Zweikomponenten-Epoxid. Bei einer Platte ohne
+  Vertiefungen die Scheiben in die Taschen der Kappe legen (die Magnete halten sie), auf jede einen kleinen
+  Tropfen Kleber geben, die Platte bündig mit den Kanten der Kappe aufdrücken und aushärten lassen. Kein
+  Kleber auf die Kappe.
+- **Haltekraft.** Die Magnete sind Neodym-Scheiben 10 x 3 mm (N42), dieselben wie im Dock. Jeder sitzt hinter
+  0,4 mm der Frontwand der Kappe, eine Scheibe in einer 0,4 mm tiefen Vertiefung ist also etwa 0,65 mm von
+  ihm entfernt. Bei diesem Abstand zöge ein Magnet etwa 8 N an dickem Stahl (die 17,7 N des Herstellers bei
+  Kontakt, mit einem Modell des Scheibenmagneten umgerechnet). Eine dünne Scheibe, kleiner als der Magnet,
+  nimmt davon schätzungsweise 40 bis 60 %: etwa 3 bis 5 N pro Magnet, 16 bis 24 N für die Platte. Eine
+  gedruckte Platte wiegt etwa 8 g, eine aus 1 mm Aluminium etwa 18 g; der Zug ist also mehr als 80-mal ihr
+  Gewicht. Die Scheiben in ihren Taschen hindern die Platte außerdem am Verrutschen. An der Kerbe angehoben,
+  löst sich die Platte paarweise von den Magneten, mit etwa 6 bis 10 N. Die Schätzung ist nicht gemessen.
+- **Metallplatten.** Um die Öffnung für die Kachel ist eine Metallplatte ein geschlossener Ring direkt über
+  der NFC-Schleife. Er wirkte als Kurzschlusswindung und nähme dem Leser sein Feld; deshalb ist auch das
+  Kupfer der Platine um die Schleife an einer Stelle offen ([Designnotizen](hardware/touch-p4/design-notes.md#nfc)).
+  Der Schlitz für den Streifen öffnet diesen Ring; lassen Sie ihn offen oder füllen Sie ihn mit etwas, das
+  nicht leitet. Metall über der WLAN-Antenne kostet 1,5 bis 1,9 dB bei 2,4 GHz, eine Metallplatte braucht
+  deshalb ein Fenster im Streifen über dem Displayfenster, von X -7,5 bis zu ihrer rechten Kante
+  ([Antenne](hardware/touch-p4/design-notes.md#antenne)). Die Scheiben halten zu beidem Abstand: mindestens
+  17 mm zum Kupfer der NFC-Schleife und 30 mm zur Antenne.
+- **Wo die Magnete sitzen.** Sie meiden die NFC-Schleife (35 x 37 mm um die Mitte der Kachel), die
+  WLAN-Antenne (oben rechts hinter dem Streifen über dem Display), den Buzzer (X 36,6, Y -2,85) und den
+  Hall-Schalter U703 (X 30,5, Y 10,95), der den Magneten im Dock erkennt. Alle fünf zusammen ergeben am
+  Schalter höchstens etwa 0,24 mT (Dipol-Schätzung, jeder Magnet in der ungünstigsten Richtung). Der Schalter
+  (DRV5032FA) schaltet bei 1,5 bis 4,8 mT ein und frühestens unter 0,5 mT wieder aus; die Magnete der
+  Frontplatte können ihn also weder auslösen noch eingeschaltet halten, wenn der Leser das Dock verlässt.
+  Die obere rechte Ecke hat keinen Magneten: Antenne und eine Platinenschraube lassen dort keinen Platz.
 
 Die [Installationsanleitung](hardware/touch-p4/installation-manual.md) ([PDF](_media/hardware/touch-p4/attractap-installation-manual-de.pdf ':ignore'))
 zeigt jeden Schritt mit Abbildungen: Teile- und Hardwareliste, Einschmelzmuttern, Montage, Bohrschablone,
@@ -173,6 +225,12 @@ schreiben Step-Dateien dafür und nutzen `rsvg-convert` für Beschriftungen.
   - Nach hinten (zur Wand) stützt diese Ecke nur die Platine selbst: Das Dock hat dahinter seine Kabelöffnung.
     Eine auf die Kachel gedrückte Karte biegt sie elastisch zurück, geschätzt um 0,1 mm bei 5 N auf die Mitte
     der Kachel.
+- **Magnete der Frontplatte.** Fünf Magnete, in Domen hinter der Frontwand der Kappe eingeklebt, mit 0,4 mm
+  Wand vor ihnen, und fünf Scheiben auf der Frontplatte. Die Rückseiten der Magnete haben 0,2 mm Abstand zur
+  Displayseite der Platine; ein Magnet, der über seinen Dom steht, drückt auf die Platine. Prüfen Sie die
+  Haltekraft, ob sich die Platte an der Kerbe abheben lässt und ob der Hall-Schalter mit dem Leser abseits
+  des Docks weiterhin „ab“ meldet. Die Brücke über jeder vorderen Tasche ist die erste Schicht
+  über ihr (die Kappe wird mit der Front nach unten gedruckt): Prüfen Sie, dass sie sich schließt.
 - **Einschmelzmuttern nahe der Frontfläche.** Nur 2,9 mm liegen zwischen Platine und Frontwand. Die Löcher
   für die Einschmelzmuttern der vier Platinen-Schraubdome sind 3,2 mm tief (`pcb_ins_depth`), reichen also
   0,3 mm in die 1,4 mm dicke Frontwand der Kappe (2,4 mm, bevor die Frontplatte ihren äußeren Millimeter

@@ -33,10 +33,11 @@ One reader needs five printed parts for the wall, six for the desk. The print fi
 | M3 × 4 pan head screw | 4 | PCB to cap |
 | M3 × 8 countersunk screw, ideally Torx with pin | 2 | Lock screws, from below |
 | Double-sided tape, 0.3 mm thick | 3 strips | Display glass to frame |
-| Thin double-sided tape, at most 0.15 mm | about 4 strips | Faceplate to cap. Thicker tape leaves the glass sunk behind the faceplate |
 | Polyimide tape (Kapton), 25 mm wide | 30 mm, plus 80 mm | Back of the display, over the Ethernet jack's solder pins (Ethernet version); over the display's flex where it leaves the display |
 | Conductive gasket, fabric over foam, 5 × 5 mm, about 2 mm thick, self-adhesive | 2 to 4 | On the bare square ground pads on the PCB's display side, against the display's metal back. It ties the metal back to ground, which the reader needs to pass the static-discharge test |
-| Neodymium disc magnet, 10 mm across, 3 mm thick | 1 | Ring on the dock's inner face. The reader senses it and knows when it is taken off the dock |
+| Neodymium disc magnet, 10 mm across, 3 mm thick (N42 or stronger) | 6 | One in the ring on the dock's inner face: the reader senses it and knows when it is taken off the dock. Five behind the cap's front wall: they hold the faceplate |
+| Steel washer DIN 125 / ISO 7089, M4 (9 mm across, 0.8 mm thick), zinc-plated steel, not stainless | 5 | Back of the faceplate, over the cap's magnets. Stainless washers hardly react to a magnet |
+| Superglue gel or two-part epoxy | a few drops | Magnets into the dock and the cap, washers onto the faceplate |
 | Countersunk wall screw, 4 mm shank, head up to 8.6 mm, with plugs | 3 to 5 | Dock to wall |
 | Cable tie, 2.5 mm wide, about 100 mm long | 1 per cable | Strain relief, only for a cable that leaves through the bottom notch or on the desk stand |
 | M3 heat-set insert, standard (5.7 mm long) | 4 | Stand (desk only) |
@@ -48,7 +49,7 @@ The PCB screws are M3 × 4. Earlier parts lists said M3 × 6, but since the scre
 
 ## Prepare the printed parts
 
-Six inserts go into the cap, the magnet into the dock, then the tap tile into the cap. Do all hot work before any electronics are on the bench.
+Six inserts go into the cap, a magnet into the dock and five into the cap, the washers onto the faceplate, then the tap tile into the cap. Do all hot work before any electronics are on the bench, and keep the magnets away from the soldering iron and the loose inserts.
 
 ![Cap lying face-down with four short inserts above the PCB bosses, two standard inserts in front of the bottom wall, and the two saddles for cable ties marked](../../../_media/hardware/touch-p4/manual/02-inserts.png)
 
@@ -56,12 +57,14 @@ The short inserts go straight down into the bosses. The two standard ones enter 
 
 1. Lay the cap face-down on a soft cloth, inside facing up.
 2. Heat the soldering iron to about 250 °C.
-3. Press one short insert into each of the four PCB bosses, flush with the top of the boss or 0.2 mm below. A proud insert lifts the PCB and loosens the display behind it. These holes end 1.1 mm behind the cap's front: take the iron away as soon as the insert is flush, or the front can bulge and lift the faceplate.
+3. Press one short insert into each of the four PCB bosses, flush with the top of the boss or 0.2 mm below. A proud insert lifts the PCB and loosens the display behind it. These holes end 1.1 mm behind the cap's front: take the iron away as soon as the insert is flush, or the front can bulge and the faceplate no longer lies flat.
 4. Stand the cap on its top edge, bottom wall up. Put a standard insert on the iron tip, pass it through one of the two round holes in the bottom wall and across the slot, and press it into the lock bar until it is flush. Repeat for the second hole.
 5. Check that nothing sticks out into the slot between bottom wall and lock bar. The dock's tongue has to slide in there.
 6. Let everything cool, then run an M3 screw through each insert once.
 7. Put a drop of superglue into the ring on the dock's inner face and press the magnet in, either side up. It must not stand above the ring.
-8. Push the tap tile into the cap from behind, black top first, through the square opening below the display window. Turn it so the notch in its flange goes round the PCB boss beside the opening; the channel in its back then faces you. Its flange stops against the inside of the front wall. The tile stays loose until the PCB holds it.
+8. Lay the cap face-down again and glue one magnet into each of the five round bosses on the inside of its front: two on each side of the square tile opening and one in the corner beside the display window (seen from the front it is the top left one). Spread a little glue on the boss's inner wall, not on its bottom, and press the magnet in until it stops against the front wall, either side up: against steel the polarity does not matter. It must end flush with the boss, not above it, because the PCB will lie 0.2 mm above it. Keep the magnets apart until the glue has set; they jump onto each other.
+9. Lay the faceplate face-down. Put a small drop of glue into each of the five round recesses in its back, press a washer flat into each and let the glue cure.
+10. Push the tap tile into the cap from behind, black top first, through the square opening below the display window. Turn it so the notch in its flange goes round the PCB boss beside the opening; the channel in its back then faces you. Its flange stops against the inside of the front wall. The tile stays loose until the PCB holds it.
 
 ## Assemble the reader
 
@@ -82,7 +85,7 @@ Everything is shown lifted out of the cap in the order it goes in, lowest first.
 9. Plug the flex into its connector on the PCB and close the latch.
 10. Fasten the PCB with the four M3 × 4 screws. Hand-tight is enough; the inserts sit in plastic. The PCB now lies flat on the back of the tap tile, which clamps the tile and holds the corner of the PCB that has no screw. If a corner of the PCB stands off its boss, the tile's back is too thick: sand it flat and try again.
 11. Power the board over USB-C and check display, touch, LEDs and buzzer before the reader goes on the wall. USB-C, reset and boot are only reachable while the reader is off the dock.
-12. Turn the reader face-up. Stick thin double-sided tape onto the cap's front near the edges and between the display window and the tile, then lower the faceplate over the tile and the glass and press it down all round. Its edge lines up with the cap's sides.
+12. Turn the reader face-up and lower the faceplate over the tile and the glass, washers down. Each washer drops into a shallow round pocket in the cap's front and the magnets pull the plate flat; its edge lines up with the cap's sides. No glue or tape. To take the faceplate off, put a fingernail or a coin into the notch in the cap's bottom face, right behind the faceplate's bottom edge, and lift.
 
 ## Mount the dock on a wall
 
@@ -213,6 +216,7 @@ Nothing below has been checked on real parts. Each item can change a step or a p
 - [ ] **Swing-on motion.** Collision-free in CAD at five angles between 7° and closed, after the dock's tongue was tapered on 19 Nov 2026. Docks sliced before that need re-slicing.
 - [ ] **Strain relief.** The tie saddles in the cap and the tie fins in the stand were added on 19 Nov 2026 and are checked in CAD only. On the first print, thread a tie and pull on the cable. The stand's cable notch was raised to 11 mm in the same change; before, it was too low for an Ethernet cable. Caps and stands sliced before that need re-slicing.
 - [ ] **Cable route into the wall.** Modelled on 19 Nov 2026 with a 5.5 mm Ethernet cable at 18 mm bend radius and a 3.5 mm power lead; nothing collides in CAD. Not tried with real cables. The route from a flush-mount box is not modelled.
-- [ ] **Faceplate and tap tile.** New on 27 Nov 2026 and checked in CAD only; the tile was enlarged the same day for the board's ring of 16 LEDs. How evenly and brightly the tile's rim lights up, whether the tile holds the PCB's screwless corner without play, and how well thin tape holds the faceplate. The figures do not show either part yet.
+- [ ] **Faceplate and tap tile.** New on 27 Nov 2026 and checked in CAD only; the tile was enlarged the same day for the board's ring of 16 LEDs. How evenly and brightly the tile's rim lights up, and whether the tile holds the PCB's screwless corner without play. The figures do not show either part yet.
+- [ ] **Faceplate magnets.** Added on 27 Nov 2026, checked in CAD only. How firmly the five magnets hold the faceplate (estimated 3 to 5 N each), whether it lifts at the notch with a fingernail, and whether the bridge over each pocket in the cap's front prints closed. With the reader off the dock the board must still report "off": by estimate the faceplate magnets add at most 0.24 mT at the hall switch, which releases below 0.5 mT at the least. The figures do not show the magnets or the notch.
 - [ ] **Insert fit.** The printed holes are 4.0 mm for common M3 inserts. Check them against the inserts you buy.
 - [ ] **Outdoor use.** There are no seals; the buzzer holes and cable notches are open, and ABS+ ages in sunlight. Treat it as indoor only: a sealed variant would also need Wi-Fi limited to the channels allowed outdoors.
