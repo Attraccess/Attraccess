@@ -40,6 +40,12 @@ function observationTime(report: Extract<MeteringReport, { kind: 'reading' }>): 
   return observedAt;
 }
 
+export class MeteringTimeoutError extends MeteringOperationError {
+  constructor(seconds: number) {
+    super(`The metering flow did not reply within ${seconds}s`);
+  }
+}
+
 /** The consumption a reading adds since the meter's previous observation. */
 function readingDelta(
   meter: ResourceMeterRecord,

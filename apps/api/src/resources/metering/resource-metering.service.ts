@@ -16,7 +16,12 @@ import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event'
 
 import { LiveNotificationsService } from '../../billing/live-notifications/live-notifications.service';
 
-import { archivedMeterAccepts, MeteringOperationError, MeteringReadings } from './metering-readings';
+import {
+  archivedMeterAccepts,
+  MeteringOperationError,
+  MeteringReadings,
+  MeteringTimeoutError,
+} from './metering-readings';
 
 import { MeteringReport } from '../flows/node-executors/index';
 
@@ -40,17 +45,13 @@ import { MeteringSegments } from './metering-segments';
 
 import { handOverMeters } from './metering-handover';
 
+import { recordMeterUpdate } from './meter-audit';
+
 export type { MeterProblem } from './metering-definition';
 
 export type { FinalCollection } from './metering-settlement';
 
-export { MeteringOperationError } from './metering-readings';
-
-export class MeteringTimeoutError extends MeteringOperationError {
-  constructor(seconds: number) {
-    super(`The metering flow did not reply within ${seconds}s`);
-  }
-}
+export { MeteringOperationError, MeteringTimeoutError } from './metering-readings';
 
 @Injectable()
 export class ResourceMeteringService implements OnModuleInit {
@@ -278,17 +279,11 @@ export class ResourceMeteringService implements OnModuleInit {
     const before = await this.store.findMeter(resourceId, meterId);
     const updated = await this.catalog.setRate(resourceId, meterId, creditsPerUnit);
     if (before && initiatorId !== undefined && before.creditsPerUnit !== creditsPerUnit)
-      await this.audit.record({
-        domain: 'resource',
-        action: 'meter.updated',
-        actor: { id: initiatorId, authenticationMethod: 'session' },
-        subject: { type: 'resource', id: resourceId },
-        details: {
-          meterId,
-          meterName: before.name,
-          'before.creditsPerUnit': before.creditsPerUnit,
-          'after.creditsPerUnit': creditsPerUnit,
-        },
+      await recordMeterUpdate(this.audit, resourceId, initiatorId, {
+        meterId,
+        meterName: before.name,
+        'before.creditsPerUnit': before.creditsPerUnit,
+        'after.creditsPerUnit': creditsPerUnit,
       });
     return updated;
   }
@@ -298,17 +293,11 @@ export class ResourceMeteringService implements OnModuleInit {
     const before = await this.store.findMeter(resourceId, meterId);
     const updated = await this.catalog.setAllocation(resourceId, meterId, allocation);
     if (before && before.allocation !== allocation)
-      await this.audit.record({
-        domain: 'resource',
-        action: 'meter.updated',
-        actor: { id: initiatorId, authenticationMethod: 'session' },
-        subject: { type: 'resource', id: resourceId },
-        details: {
-          meterId,
-          meterName: before.name,
-          'before.allocation': before.allocation,
-          'after.allocation': allocation,
-        },
+      await recordMeterUpdate(this.audit, resourceId, initiatorId, {
+        meterId,
+        meterName: before.name,
+        'before.allocation': before.allocation,
+        'after.allocation': allocation,
       });
     return updated;
   }
