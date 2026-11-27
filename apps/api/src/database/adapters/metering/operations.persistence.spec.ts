@@ -274,5 +274,36 @@ describe('Flow-defined metering', () => {
       await operationsScope.metering.collectInterimReadings();
       expect(collect).toHaveBeenCalledTimes(1);
     });
+
+    it('starts one interim collection when two scheduler ticks overlap', async () => {
+      const session = await operationsScope.activeSession();
+      await operationsScope.source
+        .getRepository(ResourceMeteringSession)
+        .update(session.id, { createdAt: new Date(Date.now() - 3_600_000) });
+      await operationsScope.source
+        .getRepository(ResourceMeter)
+        .update(1, { latestObservedAt: new Date(Date.now() - 3_600_000) });
+      const collect = jest.fn(operationsScope.reading('0.7'));
+      operationsScope.onCollect = collect;
+      // Hold each tick at its first await after the interval check until the other tick gets there too.
+      const store = operationsScope.metering['store'];
+      const exists = store.existsLifecycleAttempt.bind(store);
+      let arrived = 0;
+      let release = () => undefined as void;
+      const together = new Promise<void>((resolve) => {
+        release = resolve;
+        setTimeout(resolve, 300);
+      });
+      jest.spyOn(store, 'existsLifecycleAttempt').mockImplementation(async (resourceId, context) => {
+        if (++arrived === 2) release();
+        await together;
+        return exists(resourceId, context);
+      });
+      await Promise.all([
+        operationsScope.metering.collectInterimReadings(),
+        operationsScope.metering.collectInterimReadings(),
+      ]);
+      expect(collect).toHaveBeenCalledTimes(1);
+    });
   });
 });
