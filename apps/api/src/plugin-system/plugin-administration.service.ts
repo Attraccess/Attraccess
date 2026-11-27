@@ -154,11 +154,10 @@ export class PluginAdministrationService {
   /** The check of the update offer, repeated right before an unattended install (see `automaticUpdateRefusal`). */
   private async assertAutomaticUpdateSource(packageName: string, version: string, before?: InstalledNpmPlugin) {
     if (!before) throw new NotFoundException('Plugin package is not installed');
-    const candidate = (await this.npmPluginService.installedVersionCandidates(packageName)).find(
-      (item) => item.version === version,
-    );
+    const versions = await this.npmPluginService.installedVersionCandidates(packageName);
+    const candidate = versions.find((item) => item.version === version);
     if (!candidate) throw new NotFoundException('Package version not found');
-    const refusal = automaticUpdateRefusal(candidate, before);
+    const refusal = automaticUpdateRefusal(candidate, before, versions);
     if (refusal) throw new BadRequestException(`${refusal}; install it manually`);
   }
 

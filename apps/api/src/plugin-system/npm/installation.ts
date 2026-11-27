@@ -353,7 +353,8 @@ export class NpmInstallation {
             (item) =>
               item.direction === 'newer' &&
               item.compatible &&
-              !automaticUpdateRefusal(item, current) &&
+              // While automatic updates are on, the offer is what they would install; while off, only an announcement.
+              (!policy.automaticUpdates || !automaticUpdateRefusal(item, current, candidates)) &&
               eligibleForPolicy(item, current, policy, requested?.version, channel === 'next'),
           )
           .sort((left, right) => semver.rcompare(left.version, right.version));

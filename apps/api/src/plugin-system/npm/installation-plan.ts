@@ -13,6 +13,7 @@ import {
   distIntegrity,
   matchesSpec,
   registryPublisher,
+  registryUploader,
   repositoryUrl,
   semverImpact,
   PluginInstallPlan,
@@ -55,15 +56,13 @@ export class NpmInstallationPlan {
     const metadata = (await this.catalog.packageMetadata(name, installed.registryId)) as {
       versions?: Record<string, unknown>;
       time?: Record<string, string>;
-      publisher?: unknown;
-      _npmUser?: unknown;
-      maintainers?: unknown;
     };
 
     return Object.entries(metadata.versions ?? {})
       .filter(([version]) => semver.valid(version))
       .map(([version, pkg]) => {
-        const publisher = registryPublisher(pkg) ?? registryPublisher(metadata) ?? installed.publisher;
+        // The npm user the registry recorded for this upload: a package cannot set it, unlike its own fields.
+        const publisher = registryUploader(pkg);
         try {
           const { manifest } = parseNpmPluginPackage(pkg, this.catalog.hostVersion());
           if (manifest.name !== name)

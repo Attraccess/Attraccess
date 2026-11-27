@@ -297,7 +297,7 @@ export type InstalledNpmPluginVersion = {
   homepage: string | null;
   semverImpact: 'major' | 'minor' | 'patch' | 'prerelease' | 'none';
   matchesRequestedSpec: boolean;
-  /** The npm user who published this version, or the installed version's publisher when the registry does not say. */
+  /** The npm user the registry recorded as this version's uploader (`_npmUser`), or null when it records none. */
   publisher: string | null;
 };
 
@@ -335,6 +335,12 @@ export function registryPublisher(value: unknown): string | null {
   if (publisher) return publisher;
   if (!Array.isArray(metadata.maintainers)) return null;
   return metadata.maintainers.map(publisherName).find((name): name is string => name !== null) ?? null;
+}
+
+/** The uploader the registry recorded for one version. Unlike `publisher` or `maintainers`, the package cannot set it. */
+export function registryUploader(versionMetadata: unknown): string | null {
+  if (!versionMetadata || typeof versionMetadata !== 'object') return null;
+  return publisherName((versionMetadata as { _npmUser?: unknown })._npmUser);
 }
 
 export function publisherName(value: unknown): string | null {
@@ -392,17 +398,22 @@ export function semverImpact(current: string, target: string): InstalledNpmPlugi
 }
 /**
  * Why the host must not install `candidate` on its own although the update policy allows it, or null. Nobody reviews
- * an automatic update, so it only comes over HTTPS (or from this machine) and from the installed version's publisher.
+ * an automatic update, so it only comes over HTTPS (or from this machine) and from the npm user who uploaded the
+ * installed version. `versions` are the registry's versions of the package, the installed one included: both uploaders
+ * come from the same registry response.
  */
 export function automaticUpdateRefusal(
   candidate: InstalledNpmPluginVersion,
   installed: InstalledNpmPlugin,
+  versions: readonly InstalledNpmPluginVersion[],
 ): string | null {
   const { protocol, hostname } = new URL(installed.registryUrl);
   if (protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(hostname))
     return `${installed.registryUrl} does not use HTTPS`;
-  if (installed.publisher && candidate.publisher && candidate.publisher !== installed.publisher)
-    return `${candidate.version} was published by ${candidate.publisher}, not ${installed.publisher}`;
+  const current = versions.find(({ version }) => version === installed.version);
+  if (!current) return `the registry no longer lists the installed version ${installed.version}`;
+  if (candidate.publisher !== current.publisher)
+    return `${candidate.version} was published by ${candidate.publisher ?? 'an unknown npm user'}, not ${current.publisher ?? 'an unknown npm user'}`;
   return null;
 }
 export function matchesSpec(
