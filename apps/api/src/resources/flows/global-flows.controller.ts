@@ -1,7 +1,7 @@
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { auditActorOf } from '../../audit/recorder/audit-event';
 import { Body, Controller, Delete, Get, Logger, Param, ParseIntPipe, Patch, Post, Put, Req, Sse } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
@@ -14,7 +14,6 @@ import {
   ResourceFlowLogsResponseDto,
   ResourceFlowResponseDto,
   ResourceFlowSaveDto,
-  StartFlowLogRecordingDto,
   UpdateGlobalFlowDto,
 } from './dto/index';
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
@@ -151,7 +150,12 @@ export class GlobalFlowsController {
   }
 
   @Get(':flowId/logs')
-  @ApiOperation({ summary: 'Get global flow logs', operationId: 'getGlobalFlowLogs' })
+  @ApiOperation({
+    summary: 'Get global flow logs',
+    description:
+      'Retrieve the logs collected by the currently running recording, oldest first. Recordings are kept alive by the flow editor through the keep-alive endpoint and expire, discarding their logs, 15 minutes after the last renewal. This endpoint neither starts nor extends a recording.',
+    operationId: 'getGlobalFlowLogs',
+  })
   @ApiParam({ name: 'flowId', type: 'integer' })
   @ApiResponse({ status: 200, type: ResourceFlowLogsResponseDto })
   async getLogs(@Param('flowId', ParseIntPipe) flowId: number): Promise<ResourceFlowLogsResponseDto> {
@@ -160,7 +164,12 @@ export class GlobalFlowsController {
   }
 
   @Get(':flowId/logs/recording')
-  @ApiOperation({ summary: 'Get global flow log recording status', operationId: 'getGlobalFlowLogRecordingStatus' })
+  @ApiOperation({
+    summary: 'Get global flow log recording status',
+    description:
+      'Retrieve whether a recording is active and when it started and expires. Recordings are kept alive by the flow editor through the keep-alive endpoint and expire 15 minutes after the last renewal. This endpoint neither starts nor extends a recording.',
+    operationId: 'getGlobalFlowLogRecordingStatus',
+  })
   @ApiParam({ name: 'flowId', type: 'integer' })
   @ApiResponse({ status: 200, type: FlowLogRecordingDto })
   async getRecording(@Param('flowId', ParseIntPipe) flowId: number): Promise<FlowLogRecordingDto> {
@@ -168,26 +177,18 @@ export class GlobalFlowsController {
     return this.flowLogs.getStatus(globalFlowLogKey(flowId));
   }
 
-  @Post(':flowId/logs/recording')
-  @ApiOperation({ summary: 'Start recording global flow logs', operationId: 'startGlobalFlowLogRecording' })
+  @Post(':flowId/logs/recording/keep-alive')
+  @ApiOperation({
+    summary: 'Keep global flow log recording alive',
+    description:
+      'Start recording logs for this global flow, or extend the running recording, to 15 minutes from now. The flow editor calls this about once a minute while someone is working in it. A renewal never shortens a recording and keeps its start time and collected logs. When no renewal arrives for 15 minutes the recording expires and all collected logs are discarded.',
+    operationId: 'keepGlobalFlowLogRecordingAlive',
+  })
   @ApiParam({ name: 'flowId', type: 'integer' })
-  @ApiBody({ type: StartFlowLogRecordingDto })
   @ApiResponse({ status: 201, type: FlowLogRecordingDto })
-  async startRecording(
-    @Param('flowId', ParseIntPipe) flowId: number,
-    @Body() body: StartFlowLogRecordingDto,
-  ): Promise<FlowLogRecordingDto> {
+  async keepRecordingAlive(@Param('flowId', ParseIntPipe) flowId: number): Promise<FlowLogRecordingDto> {
     await this.globalFlows.get(flowId);
-    return this.flowLogs.start(globalFlowLogKey(flowId), body.durationMinutes);
-  }
-
-  @Delete(':flowId/logs/recording')
-  @ApiOperation({ summary: 'Stop recording global flow logs', operationId: 'stopGlobalFlowLogRecording' })
-  @ApiParam({ name: 'flowId', type: 'integer' })
-  @ApiResponse({ status: 200, type: FlowLogRecordingDto })
-  async stopRecording(@Param('flowId', ParseIntPipe) flowId: number): Promise<FlowLogRecordingDto> {
-    await this.globalFlows.get(flowId);
-    return this.flowLogs.stop(globalFlowLogKey(flowId));
+    return this.flowLogs.keepAlive(globalFlowLogKey(flowId));
   }
 
   @Sse(':flowId/logs/live')

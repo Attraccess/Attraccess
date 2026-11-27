@@ -1,9 +1,8 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Subject } from 'rxjs';
 import {
-  DEFAULT_RECORDING_MINUTES,
   FlowLogRecordingDto,
-  MAX_RECORDING_MINUTES,
+  RECORDING_WINDOW_MINUTES,
   ResourceFlowLog,
   ResourceFlowLogType,
   ResourceFlowLogsResponseDto,
@@ -43,8 +42,9 @@ interface Recording {
 
 /**
  * Flow logs are a debugging aid, not an audit trail: they are collected only
- * while a user explicitly records a flow, held in memory, and thrown away when
- * the recording stops or expires. Nothing reaches the database — one chatty
+ * while someone works in the flow editor (the editor keeps the recording alive
+ * with `keepAlive`), held in memory, and thrown away when the recording
+ * expires {@link RECORDING_WINDOW_MINUTES} after the last renewal. Nothing reaches the database — one chatty
  * MQTT device used to write ~2M rows/day through the database.
  */
 @Injectable()
@@ -61,7 +61,7 @@ export class FlowLogRecorderService implements OnModuleInit, OnModuleDestroy {
       this.subjects.forEach((subject) => subject.next({ data: { keepalive: true } }));
       this.recordings.forEach((recording, key) => {
         if (recording.expiresAt.getTime() <= Date.now()) {
-          this.stop(key);
+          this.expire(key);
         }
       });
     }, SWEEP_INTERVAL_MS);
@@ -76,20 +76,21 @@ export class FlowLogRecorderService implements OnModuleInit, OnModuleDestroy {
     this.recordings.clear();
   }
 
-  public start(key: FlowLogKey, durationMinutes = DEFAULT_RECORDING_MINUTES): FlowLogRecordingDto {
-    const minutes = Math.min(Math.max(Math.floor(durationMinutes), 1), MAX_RECORDING_MINUTES);
-    const expiresAt = new Date(Date.now() + minutes * 60_000);
+  /**
+   * Starts a recording when none is active, otherwise only extends it. A renewal
+   * never shortens a recording and never touches its start time or collected logs.
+   */
+  public keepAlive(key: FlowLogKey): FlowLogRecordingDto {
+    const now = Date.now();
+    const windowEnd = new Date(now + RECORDING_WINDOW_MINUTES * 60_000);
+    const recording = this.activeRecording(key);
 
-    // Restarting drops whatever was collected before.
-    this.recordings.set(key, { startedAt: new Date(), expiresAt, logs: [] });
-    this.logger.log(`Recording flow logs for ${key} until ${expiresAt.toISOString()}`);
-
-    return this.getStatus(key);
-  }
-
-  public stop(key: FlowLogKey): FlowLogRecordingDto {
-    if (this.recordings.delete(key)) {
-      this.logger.log(`Stopped recording flow logs for ${key}, collected logs discarded`);
+    if (!recording) {
+      this.recordings.set(key, { startedAt: new Date(now), expiresAt: windowEnd, logs: [] });
+      this.logger.log(`Recording flow logs for ${key} until ${windowEnd.toISOString()}`);
+    } else if (windowEnd.getTime() > recording.expiresAt.getTime()) {
+      recording.expiresAt = windowEnd;
+      this.logger.verbose(`Extended flow log recording for ${key} until ${windowEnd.toISOString()}`);
     }
 
     return this.getStatus(key);
@@ -175,11 +176,17 @@ export class FlowLogRecorderService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (recording.expiresAt.getTime() <= Date.now()) {
-      this.stop(key);
+      this.expire(key);
       return undefined;
     }
 
     return recording;
+  }
+
+  private expire(key: FlowLogKey): void {
+    if (this.recordings.delete(key)) {
+      this.logger.log(`Flow log recording for ${key} expired, collected logs discarded`);
+    }
   }
 
   private serializePayload(payload?: () => unknown): string | undefined {

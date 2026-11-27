@@ -207,7 +207,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         await siblingCompletion;
       });
       const rejected = jest.fn();
-      scope.flowLogs.start(1);
+      scope.flowLogs.keepAlive(1);
       const completion = scope.service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {}).catch((error) => {
         rejected(error);
         return error;

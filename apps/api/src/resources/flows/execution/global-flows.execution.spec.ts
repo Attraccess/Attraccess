@@ -142,9 +142,9 @@ describe('global flows', () => {
       type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
     });
     wire(first, second, own);
-    scope.flowLogs.start('flow:5');
-    scope.flowLogs.start('flow:6');
-    scope.flowLogs.start(3);
+    scope.flowLogs.keepAlive('flow:5');
+    scope.flowLogs.keepAlive('flow:6');
+    scope.flowLogs.keepAlive(3);
 
     await scope.service.runFlow(3, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {});
 

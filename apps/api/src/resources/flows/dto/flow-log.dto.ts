@@ -1,6 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, Max, Min } from 'class-validator';
-import { Type } from 'class-transformer';
 
 export enum ResourceFlowLogType {
   FLOW_START = 'flow.start',
@@ -11,8 +9,8 @@ export enum ResourceFlowLogType {
 }
 
 /**
- * A single flow log line. Kept in memory only, for the duration of an
- * explicitly started recording — flow logs are never persisted.
+ * A single flow log line. Kept in memory only, while a recording is kept
+ * alive by the flow editor — flow logs are never persisted.
  */
 export class ResourceFlowLog {
   @ApiProperty({
@@ -81,7 +79,8 @@ export class FlowLogRecordingDto {
   startedAt!: Date | null;
 
   @ApiProperty({
-    description: 'When the recording stops automatically and all collected logs are discarded',
+    description:
+      'When the recording stops automatically and all collected logs are discarded, unless the flow editor renews it before',
     type: String,
     format: 'date-time',
     nullable: true,
@@ -97,20 +96,5 @@ export class ResourceFlowLogsResponseDto {
   logs!: ResourceFlowLog[];
 }
 
-export const DEFAULT_RECORDING_MINUTES = 15;
-export const MAX_RECORDING_MINUTES = 24 * 60;
-
-export class StartFlowLogRecordingDto {
-  @ApiProperty({
-    description: 'How long to record flow logs before stopping and discarding them',
-    default: DEFAULT_RECORDING_MINUTES,
-    minimum: 1,
-    maximum: MAX_RECORDING_MINUTES,
-    required: false,
-  })
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(MAX_RECORDING_MINUTES)
-  durationMinutes: number = DEFAULT_RECORDING_MINUTES;
-}
+/** A keep-alive extends a recording to this many minutes from now. */
+export const RECORDING_WINDOW_MINUTES = 15;
