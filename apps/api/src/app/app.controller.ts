@@ -1,7 +1,7 @@
 import { Controller, Get, Header, Post, StreamableFile } from '@nestjs/common';
 import { AppService } from './app.service';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -41,6 +41,7 @@ export class AppController {
   @ApiResponse({ status: 200, description: 'Host rebooted successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
   @ApiResponse({ status: 403, description: 'Forbidden - User does not have permission to reboot the host' })
+  @NotAnMcpTool('Host lifecycle: restarts the host')
   async rebootHost() {
     await this.appService.balenaRebootHost();
     return { message: 'Host rebooted successfully' };
@@ -52,6 +53,7 @@ export class AppController {
   @ApiResponse({ status: 200, description: 'Host shutdown successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
   @ApiResponse({ status: 403, description: 'Forbidden - User does not have permission to shutdown the host' })
+  @NotAnMcpTool('Host lifecycle: shuts the host down')
   async shutdownHost() {
     await this.appService.balenaShutdownHost();
     return { message: 'Host shutdown successfully' };

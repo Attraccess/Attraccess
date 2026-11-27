@@ -157,11 +157,17 @@ if [[ "$READER_PROFILE" == secure-lab ]]; then
   READER_ELF="${READER_ELF:-$WORK/reader.elf}"
 elif [[ -z "${READER_IMAGE:-}" ]]; then
   require_idf
+  built_plain_reader=1
   firmware="$ROOT/apps/attractap/firmware"
   build="$firmware/build/hil-$VARIANT"
+  # A plain lab image runs the "Secure this reader" conversion up to verify and refuses every burn (ATT-1208):
+  # -DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=ON. Its conversion client needs sdkconfig.conversion, which ESP-IDF
+  # applies only to a fresh sdkconfig: an older build directory's sdkconfig is dropped once.
+  grep -q '^CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED=y' "$build/sdkconfig" 2>/dev/null || rm -f "$build/sdkconfig"
   (cd "$firmware" && python3 tools/build_individual_ca_certs.py >/dev/null &&
     idf.py -B "$build" -DSDKCONFIG="$build/sdkconfig" -DATTRACTAP_VARIANT="$VARIANT" \
       -DATTRACTAP_LOG_LEVEL=DEBUG -DATTRACTAP_TEST_HOOKS=ON -DATTRACTAP_BEEPER_DEFAULT=OFF \
+      -DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=ON \
       -DATTRACTAP_CRASH_TRIGGER=ON -DATTRACTAP_VERSION_OVERRIDE= -DATTRACTAP_LAB_CA="$LAB_CA" ${READER_CMAKE_ARGS:-} \
       build >"$WORK/reader-build.log")
   (cd "$build" && esptool --chip esp32s3 merge-bin -o "$WORK/reader.bin" @flash_args >/dev/null)
@@ -170,7 +176,37 @@ elif [[ -z "${READER_IMAGE:-}" ]]; then
   # ELF and build id): the reader runs this build, and its coredumps carry this ELF's build id.
   cp "$build/attractap.elf" "$WORK/reader.elf"
   READER_ELF="${READER_ELF:-$WORK/reader.elf}"
-  build_ota_image "$build" -DATTRACTAP_CRASH_TRIGGER=ON
+  build_ota_image "$build" -DATTRACTAP_CRASH_TRIGGER=ON -DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=ON
+fi
+# "Secure this reader" on the plain place (test_secure_conversion.py, ATT-1208): the unsigned release secure
+# image of the variant, packaged like a release (secure_packaging.py), for the API to sign with the run's own
+# keys. The reader only streams it into its inactive slot and staging: its stop-before-burn build refuses the
+# burn, so this image never boots. Never on the secure-lab place, and only when run.sh built the stop-before-burn
+# reader itself (a supplied READER_IMAGE is not known to refuse burns). NO_CONVERSION_BUILD=1 skips it (tests skip).
+SECURE_IMAGE_DIR=
+SECURE_IMAGE_MANIFEST=
+if [[ "$READER_PROFILE" == plain && -n "${built_plain_reader:-}" && "${NO_CONVERSION_BUILD:-}" != 1 ]]; then
+  require_idf
+  secure_build="$ROOT/apps/attractap/firmware/build/hil-secure-$VARIANT"
+  (cd "$ROOT/apps/attractap/firmware" &&
+    idf.py -B "$secure_build" -DSDKCONFIG="$secure_build/sdkconfig" -DATTRACTAP_VARIANT="$VARIANT" \
+      -DATTRACTAP_TEST_HOOKS=OFF -DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=OFF -DATTRACTAP_CRASH_TRIGGER=OFF \
+      -DATTRACTAP_LAB_CA= -DATTRACTAP_SECURE_PROFILE=ON build >"$WORK/secure-build.log")
+  SECURE_IMAGE_DIR="$WORK/secure-images"
+  mkdir -p "$SECURE_IMAGE_DIR"
+  SECURE_IMAGE_MANIFEST="$WORK/secure-image.json"
+  (cd "$ROOT/apps/attractap/firmware" && python3 - "$secure_build" "$SECURE_IMAGE_DIR" "$VARIANT" "$SECURE_IMAGE_MANIFEST" <<'PY'
+import json, sys
+from secure_packaging import package_secure_images
+build, out, variant, manifest = sys.argv[1:]
+entry = package_secure_images(build, out, "hil", variant)
+if entry is None:
+    sys.exit("the secure build lacks the profile marker")
+open(manifest, "w").write(json.dumps(entry))
+PY
+  )
+  # The API skips its release-build gate only for readers built with stop-before-burn (secure-conversion.service.ts).
+  export ATTRACTAP_CONVERSION_LAB_STOP_BEFORE_BURN=true
 fi
 if [[ -n "$LAB_CA" ]]; then
   # A reader without the CA would only fail its handshakes; the update image must trust it too, or the
@@ -275,6 +311,7 @@ cd "$ARTIFACTS"
 GRPC_ENABLE_FORK_SUPPORT=0 PYTHONPATH="$HERE/../src:$HERE" LAB_PYTHON="$LAB_PYTHON" \
   READER_OTA_IMAGE="${READER_OTA_IMAGE:-}" READER_BASE_VERSION="$READER_BASE_VERSION" READER_OTA_VERSION="$READER_OTA_VERSION" \
   OTA_ASSETS_DIR="$ATTRACTAP_FIRMWARE_ASSETS_DIR" \
+  SECURE_IMAGE_DIR="$SECURE_IMAGE_DIR" SECURE_IMAGE_MANIFEST="$SECURE_IMAGE_MANIFEST" \
   READER_IMAGE="$READER_IMAGE" READER_VARIANT="$VARIANT" READER_PROFILE="$READER_PROFILE" EMULATOR_IMAGE="$EMULATOR_IMAGE" \
   API_URL="http://127.0.0.1:$API_PORT" DATABASE_URL="$DATABASE_URL" \
   API_HOST="${API_HOST:-}" API_PORT="$API_PORT" READER_API_PORT="$READER_API_PORT" \

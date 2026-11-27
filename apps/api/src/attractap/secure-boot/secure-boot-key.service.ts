@@ -18,6 +18,7 @@ import {
   type AttractapSecureBootKeyStore,
   type SecureBootReaderDigests,
 } from './secure-boot-key-store.port';
+import { SECURE_BOOT_KEY_CHANGE_GUARD, type SecureBootKeyChangeGuard } from './secure-boot-key-change-guard.port';
 
 export const MIN_PASSPHRASE_LENGTH = 12;
 /** OpenSSL reads PEM passphrases into a 1 KiB buffer; a longer one would produce a file nothing can open. */
@@ -67,6 +68,7 @@ export class SecureBootKeyService {
     @Inject(UNIT_OF_WORK) private readonly unitOfWork: UnitOfWork,
     private readonly encryption: EncryptionService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
+    @Inject(SECURE_BOOT_KEY_CHANGE_GUARD) private readonly changeGuard: SecureBootKeyChangeGuard,
   ) {}
 
   private async record(
@@ -146,7 +148,15 @@ export class SecureBootKeyService {
     return this.mutex.runExclusive(() => this.replaceKeys(actor));
   }
 
+  /** A running conversion burns the current digests and streams images signed with the current signing key. */
+  private async assertNoConversion(): Promise<void> {
+    if (await this.changeGuard.conversionActive()) {
+      throw new ConflictException('Keys cannot change while a reader is being secured');
+    }
+  }
+
   private async replaceKeys(actor: AuditActor): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
+    await this.assertNoConversion();
     if ((await this.keys.count()) > 0 && (await this.burnedReaderCount()) > 0) {
       throw new ConflictException('Keys cannot be regenerated while readers have digests burned with them');
     }
@@ -294,6 +304,7 @@ export class SecureBootKeyService {
     passphrase: string,
     actor: AuditActor,
   ): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
+    await this.assertNoConversion();
     const current = await this.latest('signing');
     if (!(await this.isRestoreAllowed(current))) {
       throw new ConflictException('Keys cannot be restored while readers are secured with the current signing key');
@@ -331,6 +342,21 @@ export class SecureBootKeyService {
       await this.record(actor, 'reader.secure_keys_restored', { ...fingerprints, source }, scope);
       return fingerprints;
     });
+  }
+
+  /**
+   * Just before a burn: the keys are still the ones the conversion was started with (KEY0 = signing, KEY1 = recovery)
+   * and the server can still open the signing key, so the reader can be updated after the burn.
+   */
+  async conversionKeysCurrent(digests: { digest0: string; digest1: string }): Promise<boolean> {
+    const [signing, recovery] = await Promise.all([this.latest('signing'), this.latest('recovery')]);
+    return (
+      !!signing &&
+      !!recovery &&
+      signing.digest.toLowerCase() === digests.digest0.toLowerCase() &&
+      recovery.digest.toLowerCase() === digests.digest1.toLowerCase() &&
+      this.holdsPrivateKey(signing)
+    );
   }
 
   /**

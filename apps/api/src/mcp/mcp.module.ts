@@ -8,6 +8,8 @@ import { McpBearerGuard } from './mcp-bearer.guard';
 import { McpConnectionController } from './mcp-connection.controller';
 import { McpController } from './mcp.controller';
 import { McpOAuthConsentController, McpOAuthController } from './mcp-oauth.controller';
+import { McpOAuthGrantsController } from './mcp-oauth-grants.controller';
+import { McpOAuthGrantsService } from './mcp-oauth-grants.service';
 import { McpOAuthService } from './mcp-oauth.service';
 import { McpPublicUrls } from './mcp-public-urls.service';
 import { McpRestGateway } from './mcp-rest-gateway';
@@ -22,8 +24,22 @@ import { McpToolRegistry } from './mcp-tool-registry';
     UsersAndAuthModule,
     NetworkRestrictionModule,
   ],
-  controllers: [McpController, McpOAuthController, McpOAuthConsentController, McpConnectionController],
-  providers: [McpToolRegistry, McpPublicUrls, McpOAuthService, McpBearerGuard, McpRateLimitGuard, McpRestGateway],
+  controllers: [
+    McpController,
+    McpOAuthController,
+    McpOAuthConsentController,
+    McpOAuthGrantsController,
+    McpConnectionController,
+  ],
+  providers: [
+    McpToolRegistry,
+    McpPublicUrls,
+    McpOAuthService,
+    McpOAuthGrantsService,
+    McpBearerGuard,
+    McpRateLimitGuard,
+    McpRestGateway,
+  ],
   exports: [McpToolRegistry],
 })
 export class McpModule {}

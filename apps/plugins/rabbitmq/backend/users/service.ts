@@ -1,5 +1,5 @@
 import type { MqttServerConnectionConfig, PluginContext } from '@attraccess/plugins-backend-sdk';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import {
   Body,
   Controller,
@@ -289,6 +289,7 @@ export class RabbitmqUsersController {
 
   @Auth(RABBITMQ_MANAGE_PERMISSION)
   @Put('users/:mqttServerId/:username')
+  @NotAnMcpTool('Credential flow: sets a broker user password')
   upsert(
     @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
     @Param('username') username: string,

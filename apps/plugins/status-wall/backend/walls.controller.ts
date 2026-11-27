@@ -1,4 +1,4 @@
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseIntPipe, Post, Put } from '@nestjs/common';
 import {
   ApiBody,
@@ -19,6 +19,7 @@ const WALL_ID = { name: 'id', type: Number } as const;
 /** Wall management. The public link of a wall is part of its answer, so managers can open it on any screen. */
 @ApiTags('Status walls')
 @Auth(STATUS_WALL_MANAGE_PERMISSION)
+@NotAnMcpTool('Secret management: every answer carries the public link token')
 @Controller('status-wall/walls')
 export class WallsController {
   constructor(@Inject(WallsService) private readonly walls: WallsService) {}

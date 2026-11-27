@@ -1,4 +1,4 @@
-import { Auth, PluginStorageUniqueViolation } from '@attraccess/plugins-backend-sdk';
+import { Auth, PluginStorageUniqueViolation, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import {
   BadGatewayException,
   BadRequestException,
@@ -124,6 +124,7 @@ export class ShellyController {
   }
 
   @Post('devices/:id/auth')
+  @NotAnMcpTool('Credential flow: sets the device password')
   async setAuth(@Param('id', ParseIntPipe) id: number, @Body() body: SetAuthBody): Promise<ShellyDevice> {
     const password = body?.password?.trim();
     if (!password) {
@@ -188,6 +189,7 @@ export class ShellyController {
   }
 
   @Post('devices/:id/firmware/update')
+  @NotAnMcpTool('Firmware lifecycle: updates device firmware')
   async startFirmwareUpdate(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: FirmwareUpdateBody,
@@ -246,6 +248,7 @@ export class ShellyController {
   }
 
   @Post('devices')
+  @NotAnMcpTool('Network probe: the server connects to a caller-chosen IP address')
   async add(@Body() body: AddDeviceBody): Promise<ShellyDevice> {
     if (body?.ipAddress !== undefined && typeof body.ipAddress !== 'string') {
       throw new BadRequestException('ipAddress must be a string');
@@ -289,6 +292,7 @@ export class ShellyController {
   }
 
   @Post('discovery')
+  @NotAnMcpTool('Network scan: the server probes every address of a caller-chosen range')
   async discover(@Body() body: DiscoverBody): Promise<DiscoveryResult> {
     const cidr = (body?.cidr ?? '').trim() || undefined;
     try {

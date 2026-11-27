@@ -1,7 +1,11 @@
 /**
- * OpenAPI-derived MCP tool definitions. Tools are generated in memory from the live OpenAPI document and
- * filtered by the reviewed manifest (`reviewed-manifest.json`); no generated source is committed.
+ * OpenAPI-derived MCP tool definitions. Tools are generated in memory from the live OpenAPI document by rule; there is
+ * no review list and no generated source is committed. This file holds the security rules (see `README.md`):
+ * an operation is a tool only if it declares `x-attraccess-auth` (set by `@Auth`, `@AuthAny`, `@SessionAuth`), is not
+ * session-only, is not marked `@NotAnMcpTool` (`x-mcp-exclude`) and passes every technical exclusion below.
  */
+import { AUTH_EXTENSION, MCP_EXCLUDE_EXTENSION } from '@attraccess/plugins-backend-sdk';
+
 export type OpenApiDocument = {
   paths?: Record<string, Record<string, OpenApiOperation | unknown>>;
   components?: { schemas?: Record<string, unknown> };
@@ -18,6 +22,8 @@ type OpenApiOperation = {
   responses?: Record<string, { content?: Record<string, unknown> }>;
   callbacks?: Record<string, unknown>;
   'x-mcp-streaming'?: boolean;
+  [MCP_EXCLUDE_EXTENSION]?: unknown;
+  [AUTH_EXTENSION]?: unknown;
 };
 
 export type McpTool = {
@@ -30,31 +36,16 @@ export type McpTool = {
   bodyProperties: string[];
   /** True when the whole request body is passed as the single `body` input instead of flattened properties. */
   wholeBody: boolean;
+  /** Permissions needed to see and call the tool (`x-attraccess-auth`); the REST guard still decides each call. */
+  auth: { all: string[]; any: string[] };
   inputSchema: { type: 'object'; properties: Record<string, unknown>; required: string[]; additionalProperties: false };
 };
 
-/** The reviewer's decision for one operation. `shape` pins the contract that was reviewed. */
-export type McpManifestEntry = { decision: 'allow' | 'deny'; reason: string; shape: string };
-
-export type ManifestProblemKind =
-  | 'unreviewed'
-  | 'stale'
-  | 'duplicate-operation-id'
-  | 'missing-operation-id'
-  | 'shape-drift'
-  | 'incompatible'
-  | 'invalid-entry'
-  | 'unsupported-operation';
-
-export type ManifestProblem = {
-  kind: ManifestProblemKind;
+export type SkippedOperation = {
   operationId?: string;
-  method?: string;
-  path?: string;
-  /** What the developer has to do, for example the exact entry to add. */
-  detail: string;
-  /** Present for `unreviewed` and `shape-drift`: the shape hash the manifest must carry after review. */
-  shape?: string;
+  method: string;
+  path: string;
+  reason: string;
 };
 
 export type DocumentOperation = { id: string; method: string; path: string; operation: OpenApiOperation };
@@ -63,12 +54,12 @@ const methods = new Set(['get', 'post', 'put', 'patch', 'delete']);
 const pathItemKeys = new Set(['parameters', 'servers', 'summary', 'description', '$ref']);
 const MAX_TOOL_NAME_LENGTH = 64;
 const jsonMediaType = (type: string) => type === 'application/json' || /^application\/[a-z0-9.+-]+\+json$/i.test(type);
-// Safeguard on top of the manifest: an operation whose id or path says it streams, uploads, restarts the host
-// or is a provider callback cannot be allowed by editing the manifest alone.
+// Technical exclusion: an operation whose id or path says it streams, uploads, restarts the host or is a provider
+// callback is never a tool, whatever its auth metadata says.
 const incompatibleOperation =
   /(?:callback|webhook|stream|\/live\b|Live$|subscribe|binary|download|upload|restart|reboot|shutdown|host.?lifecycle|auth\/sso\/(?:OIDC|SAML|logout|link|discovery))/;
 // These operations are known to return runtime streams/binary data even though Swagger omits or misstates their
-// response media types. A manifest edit alone must not make them ordinary text tools.
+// response media types. They must never become ordinary text tools.
 const knownNonToolOperations = new Set(['getLogo', 'getFrontendPluginFile', 'getReaderCrashReportCoredump']);
 
 type Schema = Record<string, unknown>;
@@ -163,86 +154,45 @@ function mergeExtendedBase(resolved: Schema, base: Schema, ownRequired: unknown)
   if (required.length) resolved.required = [...new Set(required)];
 }
 
-function referencedSchemaNames(value: unknown, schemas: Record<string, unknown>, found: Set<string>): void {
-  if (Array.isArray(value)) {
-    for (const item of value) referencedSchemaNames(item, schemas, found);
-    return;
-  }
-  if (!isSchema(value)) return;
-  for (const [key, child] of Object.entries(value)) {
-    if (key === '$ref' && typeof child === 'string' && child.startsWith('#/components/schemas/')) {
-      const name = child.slice('#/components/schemas/'.length);
-      if (!found.has(name)) {
-        found.add(name);
-        referencedSchemaNames(schemas[name], schemas, found);
-      }
-    } else referencedSchemaNames(child, schemas, found);
-  }
-}
+const operationLabel = (method: string, path: string) => `${method.toUpperCase()} ${path}`;
 
-/**
- * Stable digest of the operation contract that the reviewer approved: the operation, its path-level parameters
- * and only the component schemas it can reach. A change elsewhere in the API never invalidates it.
- */
-export function operationShape(
-  method: string,
-  path: string,
-  operation: OpenApiOperation,
-  sharedParameters: unknown = [],
-  schemas: Record<string, unknown> = {},
-): string {
-  const reachable = new Set<string>();
-  referencedSchemaNames([operation, sharedParameters], schemas, reachable);
-  const reachableSchemas = Object.fromEntries([...reachable].sort().map((name) => [name, schemas[name]]));
-  const canonical = JSON.stringify({
-    method: method.toUpperCase(),
-    path,
-    operation,
-    sharedParameters,
-    schemas: reachableSchemas,
-  });
-  // FNV-1a is used as a review drift marker, not as a security primitive.
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < canonical.length; i++) hash = Math.imul(hash ^ canonical.charCodeAt(i), 0x01000193) >>> 0;
-  return hash.toString(16).padStart(8, '0');
-}
-
-function collectOperations(document: OpenApiDocument, problems: ManifestProblem[]): DocumentOperation[] {
-  const operations: DocumentOperation[] = [];
+/** Operations with a valid, unique id. Everything else (also every operation sharing a duplicated id) is skipped. */
+function collectOperations(document: OpenApiDocument, skipped: SkippedOperation[]): DocumentOperation[] {
+  const candidates: DocumentOperation[] = [];
   for (const [path, pathItem] of Object.entries(document.paths ?? {})) {
     for (const [method, operation] of Object.entries(pathItem)) {
       const verb = method.toLowerCase();
       if (pathItemKeys.has(verb) || verb.startsWith('x-')) continue;
-      if (!methods.has(verb)) {
-        problems.push({
-          kind: 'unsupported-operation',
-          method: verb.toUpperCase(),
-          path,
-          detail: `Unsupported OpenAPI operation ${verb.toUpperCase()} ${path}`,
-        });
-        continue;
-      }
-      if (!isSchema(operation)) {
-        problems.push({
-          kind: 'unsupported-operation',
-          method: verb.toUpperCase(),
-          path,
-          detail: `Invalid OpenAPI operation ${verb.toUpperCase()} ${path}`,
-        });
+      const base = { method: verb.toUpperCase(), path };
+      if (!methods.has(verb) || !isSchema(operation)) {
+        skipped.push({ ...base, reason: `Unsupported OpenAPI operation ${operationLabel(verb, path)}` });
         continue;
       }
       const id = (operation as OpenApiOperation).operationId;
       if (!id || !/^[A-Za-z][A-Za-z0-9_]*$/.test(id) || id.length > MAX_TOOL_NAME_LENGTH) {
-        problems.push({
-          kind: 'missing-operation-id',
-          method: verb.toUpperCase(),
-          path,
-          detail: `Missing or invalid operationId for ${verb.toUpperCase()} ${path}: set an explicit @ApiOperation({ operationId }) of at most ${MAX_TOOL_NAME_LENGTH} letters, digits or underscores`,
+        skipped.push({
+          ...base,
+          operationId: id,
+          reason: `Missing or invalid operationId: set an explicit @ApiOperation({ operationId }) of at most ${MAX_TOOL_NAME_LENGTH} letters, digits or underscores`,
         });
         continue;
       }
-      operations.push({ id, method: verb.toUpperCase(), path, operation: operation as OpenApiOperation });
+      candidates.push({ id, method: base.method, path, operation: operation as OpenApiOperation });
     }
+  }
+  const counts = new Map<string, number>();
+  for (const { id } of candidates) counts.set(id, (counts.get(id) ?? 0) + 1);
+  const operations: DocumentOperation[] = [];
+  for (const entry of candidates) {
+    const count = counts.get(entry.id) ?? 0;
+    if (count > 1) {
+      skipped.push({
+        operationId: entry.id,
+        method: entry.method,
+        path: entry.path,
+        reason: `Duplicate operationId (${count} operations): give each operation a unique @ApiOperation({ operationId })`,
+      });
+    } else operations.push(entry);
   }
   return operations;
 }
@@ -250,16 +200,6 @@ function collectOperations(document: OpenApiDocument, problems: ManifestProblem[
 function sharedParametersOf(document: OpenApiDocument, path: string): OpenApiParameter[] {
   const shared = document.paths?.[path]?.parameters;
   return Array.isArray(shared) ? (shared as OpenApiParameter[]) : [];
-}
-
-function shapeOf(document: OpenApiDocument, entry: DocumentOperation): string {
-  return operationShape(
-    entry.method,
-    entry.path,
-    entry.operation,
-    document.paths?.[entry.path]?.parameters ?? [],
-    document.components?.schemas ?? {},
-  );
 }
 
 type ToolInputs = Pick<McpTool, 'pathParameters' | 'queryParameters' | 'bodyProperties' | 'wholeBody' | 'inputSchema'>;
@@ -272,7 +212,7 @@ function assertToolCompatible({ id, method, path, operation }: DocumentOperation
     operation.callbacks ||
     operation['x-mcp-streaming']
   ) {
-    throw new Error(`Incompatible endpoint ${method} ${path} cannot be allowed (${id})`);
+    throw new Error(`Incompatible endpoint ${method} ${path} (${id})`);
   }
 }
 
@@ -351,8 +291,26 @@ function buildInputs(document: OpenApiDocument, entry: DocumentOperation): ToolI
   };
 }
 
+const isStringList = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string');
+
+/**
+ * The requirement from `x-attraccess-auth`, or the reason the operation is not a tool. Malformed metadata fails closed:
+ * reading it as "no requirement" would show the tool to every caller.
+ */
+function authRequirement(operation: OpenApiOperation): { all: string[]; any: string[] } | string {
+  const extension = operation[AUTH_EXTENSION];
+  if (!isSchema(extension)) return 'No auth metadata (public or custom-guarded route)';
+  const { all = [], any = [], sessionOnly = false } = extension;
+  if (!isStringList(all) || !isStringList(any) || typeof sessionOnly !== 'boolean') {
+    return 'Malformed auth metadata';
+  }
+  if (sessionOnly) return 'Session-only route';
+  return { all: [...all], any: [...any] };
+}
+
 /** Builds the tool for one operation, or throws why the operation cannot be a tool. */
-function buildTool(document: OpenApiDocument, entry: DocumentOperation): McpTool {
+function buildTool(document: OpenApiDocument, entry: DocumentOperation, auth: McpTool['auth']): McpTool {
   const { id, method, path, operation } = entry;
   assertToolCompatible(entry);
   const inputs = buildInputs(document, entry);
@@ -366,97 +324,44 @@ function buildTool(document: OpenApiDocument, entry: DocumentOperation): McpTool
       .join('\n\n'),
     method,
     path,
+    auth,
     ...inputs,
   };
 }
 
-export type ManifestAnalysis = {
-  /** Every allowed operation that is individually valid. Safe to expose even when `problems` is not empty. */
+export type GeneratedMcpTools = {
   tools: McpTool[];
-  problems: ManifestProblem[];
-  operations: DocumentOperation[];
+  /** Every operation that is not a tool, with the reason. Not an error: most operations are deliberately skipped. */
+  skipped: SkippedOperation[];
 };
 
 /**
- * Compares the OpenAPI document with the manifest. It never throws: callers decide what a problem means (the drift
- * test fails on any problem; the running server only skips the affected operations).
+ * Derives the MCP tools from the OpenAPI document. Never throws: an operation that cannot be a tool is reported in
+ * `skipped`. Order of the checks: valid unique id, auth metadata, not session-only, not `x-mcp-exclude`, technical
+ * compatibility (streams, binary data, non-JSON bodies, unsupported schemas or parameters).
  */
-export function analyzeMcpManifest(
-  document: OpenApiDocument,
-  manifest: Record<string, McpManifestEntry>,
-): ManifestAnalysis {
-  const problems: ManifestProblem[] = [];
-  const operations = collectOperations(document, problems);
-  const counts = new Map<string, number>();
-  for (const { id } of operations) counts.set(id, (counts.get(id) ?? 0) + 1);
-  for (const [id, count] of counts) {
-    if (count > 1) {
-      problems.push({
-        kind: 'duplicate-operation-id',
-        operationId: id,
-        detail: `Duplicate operationId ${id} (${count} operations): give each operation a unique @ApiOperation({ operationId })`,
-      });
-    }
-  }
-  const ids = new Set(counts.keys());
-  for (const id of Object.keys(manifest)) {
-    if (!ids.has(id)) {
-      problems.push({
-        kind: 'stale',
-        operationId: id,
-        detail: `Manifest operation ${id} is absent from OpenAPI: remove "${id}" from reviewed-manifest.json`,
-      });
-    }
-  }
+export function generateMcpTools(document: OpenApiDocument): GeneratedMcpTools {
+  const skipped: SkippedOperation[] = [];
   const tools: McpTool[] = [];
-  for (const entry of operations) {
-    const { id, method, path } = entry;
+  for (const entry of collectOperations(document, skipped)) {
+    const { id, method, path, operation } = entry;
     const where = { operationId: id, method, path };
-    const review = Object.prototype.hasOwnProperty.call(manifest, id) ? manifest[id] : undefined;
-    const shape = shapeOf(document, entry);
-    if (!review) {
-      problems.push({
-        ...where,
-        kind: 'unreviewed',
-        shape,
-        detail: `Unreviewed OpenAPI operation ${id} (${method} ${path}): review it and add "${id}": { decision, reason, shape: "${shape}" } to reviewed-manifest.json`,
-      });
+    const auth = authRequirement(operation);
+    if (typeof auth === 'string') {
+      skipped.push({ ...where, reason: auth });
       continue;
     }
-    if (!review.reason?.trim()) {
-      problems.push({ ...where, kind: 'invalid-entry', detail: `Manifest operation ${id} has no review reason` });
+    const exclusion = operation[MCP_EXCLUDE_EXTENSION];
+    if (exclusion !== undefined) {
+      const reason = isSchema(exclusion) ? exclusion.reason : undefined;
+      skipped.push({ ...where, reason: `Marked @NotAnMcpTool${typeof reason === 'string' ? `: ${reason}` : ''}` });
       continue;
     }
-    if (review.decision !== 'allow' && review.decision !== 'deny') {
-      problems.push({ ...where, kind: 'invalid-entry', detail: `Invalid manifest decision for ${id}` });
-      continue;
-    }
-    if (review.shape !== shape) {
-      problems.push({
-        ...where,
-        kind: 'shape-drift',
-        shape,
-        detail: `Reviewed operation shape drift for ${id} (${method} ${path}): re-review it, then set its "shape" to "${shape}" (was "${review.shape}")`,
-      });
-      continue;
-    }
-    if (review.decision === 'deny') continue;
     try {
-      tools.push(buildTool(document, entry));
+      tools.push(buildTool(document, entry, auth));
     } catch (error) {
-      problems.push({
-        ...where,
-        kind: 'incompatible',
-        detail: `${(error as Error).message}. Change its manifest decision to "deny" with a specific reason`,
-      });
+      skipped.push({ ...where, reason: (error as Error).message });
     }
   }
-  return { tools, problems, operations };
-}
-
-/** Strict variant: throws on the first problem. */
-export function generateMcpTools(document: OpenApiDocument, manifest: Record<string, McpManifestEntry>): McpTool[] {
-  const { tools, problems } = analyzeMcpManifest(document, manifest);
-  if (problems.length) throw new Error(problems[0].detail);
-  return tools;
+  return { tools, skipped };
 }

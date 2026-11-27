@@ -8,6 +8,8 @@ import { AttractapFirmware } from '../../../dtos/firmware.dto';
 import { validateReaderUiCapabilities } from '../../../../resources/forms/reader-ui.validation';
 import { parseReportedBuild } from '../../../security/session-security-state';
 import { AttractapUiHandler } from '../ui/ui.handler';
+import { ConversionTransferService } from '../../../secure-conversion/conversion-transfer.service';
+import { SecuredReaderUpdates } from '../../../secure-conversion/secured-reader-updates';
 import { parseBleCapability } from '../ble/ble-wire';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
 
@@ -27,7 +29,23 @@ export class AttractapFirmwareHandler {
   @Inject(AttractapUiHandler)
   private uiHandler: AttractapUiHandler;
 
+  @Inject(ConversionTransferService)
+  private conversionTransfer: ConversionTransferService;
+
+  @Inject(SecuredReaderUpdates)
+  private securedUpdates: SecuredReaderUpdates;
+
   public async handleFirmwareChunkRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    // "Secure this reader" (ATT-1208) streams its signed images through the same request, marked `conversion`.
+    if (data.payload?.conversion !== undefined) {
+      if (!socket.sessionSecurity) return;
+      const chunk = await this.conversionTransfer.chunk(socket.sessionSecurity, data.payload).catch((error: Error) => {
+        this.logger.warn(`Conversion chunk failed: ${error.message}`);
+        return null;
+      });
+      if (chunk && chunk.length > 0) socket.sendBinaryData(chunk);
+      return;
+    }
     try {
       if (!socket.state.ota || !socket.state.ota.path || !socket.state.ota.size) {
         this.logger.error(`FIRMWARE_REQUEST_CHUNK received but no OTA context set for client ${socket.id}`);
@@ -102,6 +120,11 @@ export class AttractapFirmwareHandler {
     // The eFuse report on the control channel waits for the build: hand it over before the database writes,
     // so a slow write cannot run it into its wait limit.
     const build = parseReportedBuild(data.payload);
+    if (socket.sessionSecurity) {
+      socket.sessionSecurity.secureConversion = data.payload?.capabilities?.secureConversion === true;
+      socket.sessionSecurity.conversionStopBeforeBurn = data.payload?.capabilities?.conversionStopBeforeBurn === true;
+      socket.sessionSecurity.firmware = reportedFirmware(data.payload);
+    }
     socket.sessionSecurity?.setBuild(build);
     await this.attractapService.recordReaderBuild(socket.readerId, build);
     await this.attractapService.updateReaderFirmware(socket.readerId, this.withValidatedUi(data.payload));
@@ -110,7 +133,56 @@ export class AttractapFirmwareHandler {
       this.logger.warn(`Reader UI sync after firmware info failed: ${(error as Error).message}`);
     });
 
-    if (!(await this.isFirmwareLatest(data.payload))) await this.offerFirmwareUpdate(socket, data.payload);
+    if (await this.isFirmwareLatest(data.payload)) return;
+    // A reader on the secure profile only ever gets an image signed for its digests (never the plain image).
+    if (build.profile === 'secure') await this.offerSecuredUpdate(socket, data.payload, build.secureVersion);
+    else if (await this.conversionStaging(socket))
+      this.logger.log(`Reader ${socket.readerId} is being secured: no update`);
+    else await this.offerFirmwareUpdate(socket, data.payload);
+  }
+
+  /** A plain OTA would write the inactive app slot the reader's active conversion stages into. */
+  private async conversionStaging(socket: AuthenticatedWebSocket): Promise<boolean> {
+    if (socket.readerId === null) return false;
+    return await this.conversionTransfer.stagingInUse(socket.readerId);
+  }
+
+  /** Signed secure app for a secured reader; nothing when no held key matches its digests (shown in the UI). */
+  private async offerSecuredUpdate(
+    socket: AuthenticatedWebSocket,
+    current: AttractapFirmware,
+    reportedSecureVersion: number | null,
+  ): Promise<boolean> {
+    if (socket.readerId === null) return false;
+    const offer = await this.securedUpdates.prepare(
+      socket.readerId,
+      current.name,
+      current.variant,
+      reportedSecureVersion,
+    );
+    if (!offer) return false;
+    socket.state.ota = { path: offer.image.path, size: offer.image.size } as AuthenticatedWebSocket['state']['ota'];
+    await socket.sendMessage(
+      new AttractapEvent(AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED, {
+        available: {
+          name: current.name,
+          variant: current.variant,
+          version: offer.version,
+          totalSize: offer.image.size,
+        },
+      }),
+    );
+    this.metricsService.attractapFirmwareUpdatesTotal.inc({ reader_id: String(socket.readerId) });
+    return true;
+  }
+
+  /**
+   * Offers the latest image to an old reader on the update-only token connection (LegacyFirmwareUpdateService).
+   * False when there is none: unknown firmware or variant, already the latest, or the image is missing.
+   */
+  public async offerLegacyUpdate(socket: AuthenticatedWebSocket, current: AttractapFirmware): Promise<boolean> {
+    if (await this.isFirmwareLatest(current)) return false;
+    return this.offerFirmwareUpdate(socket, current);
   }
 
   /** Sends READER_FIRMWARE_UPDATE_REQUIRED; false when no update can be offered. */
@@ -181,4 +253,13 @@ export class AttractapFirmwareHandler {
 
     return String(firmwareDefinition.version) === String(firmware.version);
   }
+}
+
+/** Name, variant and version as the reader reported them; null when any is missing. */
+function reportedFirmware(payload: AttractapEvent['data']['payload']) {
+  const pick = (value: unknown) => (typeof value === 'string' && value.length > 0 ? value.slice(0, 64) : null);
+  const name = pick(payload?.name);
+  const variant = pick(payload?.variant);
+  const version = pick(payload?.version);
+  return name && variant && version ? { name, variant, version } : null;
 }

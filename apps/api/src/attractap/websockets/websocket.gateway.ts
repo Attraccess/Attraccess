@@ -41,6 +41,7 @@ import { ReaderSessionService } from '../security/reader-session.service';
 import { PAIRING_SUBPROTOCOL, SESSION_SUBPROTOCOL } from '../security/session-framing';
 import { readerWebSocketOptions } from './websocket-transport-options';
 import { WebsocketService } from './websocket.service';
+import { LegacyFirmwareUpdateService } from './legacy-firmware-update.service';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
@@ -49,7 +50,7 @@ import { randomBytes } from 'crypto';
 import type { IncomingMessage } from 'http';
 import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 
-/** Events of the removed token sign-in; a reader that still sends one is closed. */
+/** Events of the removed token sign-in; a session that sends one is closed (old readers use LegacyFirmwareUpdateService). */
 const TOKEN_SIGN_IN_EVENTS = new Set<string>(['READER_REGISTER', 'READER_AUTHENTICATE']);
 
 @WebSocketGateway({
@@ -130,6 +131,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(PairingService)
   protected pairingService: PairingService;
+
+  @Inject(LegacyFirmwareUpdateService)
+  protected legacyFirmwareUpdate: LegacyFirmwareUpdateService;
 
   @Inject(ReaderBleDriver)
   protected readerBleDriver: ReaderBleDriver;
@@ -416,9 +420,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
     if (client.protocol !== SESSION_SUBPROTOCOL) {
-      // The upgrade check refuses these already. A reader that offers no subprotocol is a token reader.
-      this.logger.warn('Closing a connection without the session subprotocol: token sign-in no longer supported');
-      client.close();
+      // No subprotocol: an old reader with token sign-in. It may only update its firmware, then it pairs.
+      const licensed = this.licenseService.verifyLicense({ modules: [LicenseModuleType.ATTRACTAP] });
+      this.legacyFirmwareUpdate.handleConnection(
+        client,
+        licensed.then(() => undefined),
+      );
       return;
     }
     // Taken over before the first await: early TLS bytes must not be missed and a stray text

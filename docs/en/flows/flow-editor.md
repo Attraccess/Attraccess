@@ -68,7 +68,7 @@ You can share flows between resources or back them up:
 
 ## Execution Logs
 
-Open **Flow logs**, choose a recording duration and click **Start recording** before triggering a flow. The logs show each node's input, output and failures. Logs are collected only while recording and remain visible until you leave or reload the page. See [Inspecting and Troubleshooting a Run](flows/payloads-variables-templates.md#inspecting-and-troubleshooting-a-run) for examples.
+Open **Flow logs**, choose a recording duration and click **Start recording** before triggering a flow. The logs show each node's input, output and failures. Logs are collected only while recording and remain visible until you leave or reload the page. To keep them, click **Download** before leaving the page and choose **NDJSON (.ndjson)** or **Plain text (.txt)**. The file contains only the entries the drawer currently holds, and their payloads can contain personal data, so check it before sharing. See [Inspecting and Troubleshooting a Run](flows/payloads-variables-templates.md#inspecting-and-troubleshooting-a-run) for examples.
 
 Node colors indicate their current state:
 

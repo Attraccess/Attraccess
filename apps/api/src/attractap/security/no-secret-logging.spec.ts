@@ -7,7 +7,7 @@ import { join, relative } from 'path';
  * modules, including calls that span several lines and values passed as extra arguments.
  */
 const SECRET =
-  /token|nonce|ticket|secret|password|privatekey|private_key|\bkey\b|keystring|\bcode\b|payload|plaintext|decrypted|pem\b|passphrase/i;
+  /token|nonce|ticket|secret|password|privatekey|private_key|\bkey\b|keystring|\bcode\b|payload|plaintext|decrypted|pem\b|passphrase|signature|\bnvs\b|staging|preflight|burnreport|chunk\b|\bdata\b/i;
 /** Extra arguments that are whole message objects carry payloads. */
 const WHOLE_MESSAGE = /^(data|message|event|eventdata|payload|body|frame|request|req)(\.data)?(\.payload)?$/i;
 
@@ -78,6 +78,8 @@ describe('secret hygiene in logs', () => {
     ...sources(join(ROOT, 'security')),
     ...sources(join(ROOT, 'websockets')),
     ...sources(join(ROOT, 'secure-boot')),
+    // "Secure this reader" (ATT-1208): reader reports, signed image bytes, digests the reader burns.
+    ...sources(join(ROOT, 'secure-conversion')),
     // Plugin BLE host: sessions, profiles and the reader driver carry device payloads.
     ...sources(join(ROOT, '..', 'plugin-system', 'ble')),
     join(ROOT, 'pairing.controller.ts'),
@@ -110,6 +112,30 @@ describe('secret hygiene in logs', () => {
       expect(
         logCalls("this.logger.warn('Refused a reader connection: token sign-in no longer supported');").flatMap(leaks),
       ).toEqual([]);
+    });
+  });
+
+  describe('the secure conversion', () => {
+    it.each([
+      'conversion-protocol.service.ts',
+      'conversion-transfer.service.ts',
+      'conversion-messages.ts',
+      'secure-conversion.service.ts',
+      'secured-reader-updates.ts',
+    ])('%s is scanned', (name) => {
+      expect(files.map((f) => relative(join(ROOT, 'secure-conversion'), f))).toContain(name);
+    });
+
+    it('catches a preflight report, image bytes or staging contents put into a log', () => {
+      for (const example of [
+        'this.logger.warn(`preflight ${JSON.stringify(report.preflight)}`);',
+        'this.logger.debug("chunk", data);',
+        'this.logger.debug(`staging ${staging.toString("hex")}`);',
+        'this.logger.log(`signature ${block.signature}`);',
+      ]) {
+        expect(logCalls(example).flatMap(leaks)).not.toEqual([]);
+      }
+      expect(logCalls('this.logger.warn(`Conversion chunk failed: ${error.message}`);').flatMap(leaks)).toEqual([]);
     });
   });
 

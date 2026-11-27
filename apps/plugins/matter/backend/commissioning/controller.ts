@@ -1,4 +1,4 @@
-import { Auth, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, type AuthenticatedRequest, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import {
   BadRequestException,
   Body,
@@ -53,6 +53,7 @@ export class MatterCommissioningController {
 
   @Auth(...MATTER_OPERATIONS.commissioningStart)
   @Post('commissioning/sessions')
+  @NotAnMcpTool('Credential flow: takes device setup codes')
   async start(@Body() body: unknown, @Req() request: AuthenticatedRequest) {
     const input = parse(startSchema, body);
     if (input.attestationOverride && !mayOverride(request)) {
@@ -103,6 +104,7 @@ export class MatterCommissioningController {
   @HttpCode(200)
   // The answer carries the sharing codes: no cache, proxy or browser may keep it.
   @Header('Cache-Control', 'no-store')
+  @NotAnMcpTool('Secret management: returns device sharing codes')
   async share(@Param('id') id: string, @Body() body: unknown, @Req() request: AuthenticatedRequest) {
     return this.sharing.open(parseId(id), parse(shareSchema, body ?? {}), principalOf(request));
   }

@@ -52,10 +52,10 @@ describe('network restriction for MCP tool calls (real application)', () => {
 
   it('keeps the settings to administrators and reveals no configuration in the status', async () => {
     expect(Object.keys(await status()).sort()).toEqual(['allowedFromHere', 'enabled', 'insideAllowedNetwork']);
-    // The caller has no system.settings.manage.
+    // The caller has no system.settings.manage, so these tools are not even offered.
     for (const name of ['getNetworkRestrictionSettings', 'getNetworkRestrictionRoleActions']) {
-      const result = resultOf((await t.rpc(token, 'tools/call', { name })).body);
-      expect(result.content[0].text).toMatch(/^HTTP 403/);
+      const { error } = (await t.rpc(token, 'tools/call', { name })).body;
+      expect(error).toMatchObject({ code: -32602, message: expect.stringContaining(`Unknown tool: ${name}`) });
     }
   });
 

@@ -142,6 +142,28 @@ describe('administration audit policy', () => {
     ).toBeNull();
   });
 
+  it.each(['all', 'selected', 'secured'])('accepts the card writer mode %s', (after) => {
+    expect(
+      projectAdministrationAuditEvent({
+        ...event,
+        action: 'settings.updated',
+        subjectType: 'setting',
+        details: { settingKey: 'attractap.cardWriterMode', before: 'all', after },
+      }),
+    ).not.toBeNull();
+  });
+
+  it('rejects an unknown card writer mode', () => {
+    expect(
+      projectAdministrationAuditEvent({
+        ...event,
+        action: 'settings.updated',
+        subjectType: 'setting',
+        details: { settingKey: 'attractap.cardWriterMode', before: 'all', after: 'secret-marker' },
+      }),
+    ).toBeNull();
+  });
+
   it.each(['en', 'de'])('accepts canonical %s language changes', (after) => {
     expect(
       projectAdministrationAuditEvent({

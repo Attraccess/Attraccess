@@ -209,6 +209,7 @@ All entries in one **Set Payload** node read the same incoming payload. An entry
 | **HTTP Request**, acknowledged     | Response body directly; `{"energy_wh":1500}` is read as `{{energy_wh}}`       |
 | **HTTP Request**, dispatch         | Original payload; no response body                                            |
 | **Wait for MQTT Message**, success | `{ "topic": "…", "payload": … }`; no previous fields or `serverId`            |
+| **MQTT Send Message**, reply topic | Incoming fields plus `response: { "topic": "…", "payload": … }`               |
 | **Add Billing Item**               | The item: `name`, `description`, `externalReference`, `unitPrice`, `quantity` |
 | **Lock PC / Unlock PC**            | Incoming fields, with `companion` replaced by `{ "delivered": true/false }`   |
 
@@ -266,7 +267,7 @@ With the example reading of `42`, the True branch sends `{"temperature":42,"limi
 
 ## Inspecting and Troubleshooting a Run
 
-Open **Flow logs**, choose a recording duration and click **Start recording** before triggering the flow. Inspect the node entries' `input` and `output` data to find the exact paths and see where fields change. Logs are collected while recording and remain in the page until you leave or reload.
+Open **Flow logs**, choose a recording duration and click **Start recording** before triggering the flow. Inspect the node entries' `input` and `output` data to find the exact paths and see where fields change. Logs are collected while recording and remain in the page until you leave or reload. Before that, **Download** saves them as NDJSON or plain text, for example for a bug report. The file can contain personal data from the payloads.
 
 | Symptom                                       | Check                                                                                                                   |
 | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |

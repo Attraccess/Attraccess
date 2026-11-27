@@ -9,6 +9,7 @@ import { projectAdministrationAuditEvent } from '../audit/policies/administratio
 import { CardWriterSettingsController } from './card-writer-settings.controller';
 import { AttractapService } from './attractap.service';
 import { CardWriterPolicyService, cardWriterSettingChanges } from './websockets/card-writer-policy.service';
+import { ATTRACTAP_READER_STORE } from './reader-store.port';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { ATTRACTAP_KEYS, ATTRACTAP_PARENT } from '../settings/constants';
 import { CardWriterSettingsDto } from './dtos/card-writer-settings.dto';
@@ -122,6 +123,7 @@ describe('CardWriterSettingsController', () => {
           },
           { provide: AttractapService, useValue: { getPairedReaders: jest.fn(async () => [{ id: 2 }, { id: 5 }]) } },
           { provide: AUDIT_RECORDER, useValue: { record } },
+          { provide: ATTRACTAP_READER_STORE, useValue: { findSecurity: jest.fn(async () => undefined) } },
           { provide: LicenseService, useValue: {} },
         ],
       }).compile();

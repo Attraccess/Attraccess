@@ -10,10 +10,4 @@ inline constexpr Entry formImagesCatalog[] = {
     // {0}: photos added so far, {1}: the most the form takes.
     {Message::FormImageCount, "{0} von {1} Fotos", "{0} of {1} photos"},
 };
-static_assert(sizeof(catalog) / sizeof(Entry) + sizeof(cardRelayCatalog) / sizeof(Entry) +
-                      sizeof(networkStatusCatalog) / sizeof(Entry) + sizeof(sessionUsersCatalog) / sizeof(Entry) +
-                      sizeof(btSetupCatalog) / sizeof(Entry) + sizeof(sessionDurationCatalog) / sizeof(Entry) +
-                      sizeof(formImagesCatalog) / sizeof(Entry) ==
-                  static_cast<size_t>(Message::Count),
-              "every firmware message needs a catalog entry, in enum order");
 } // namespace FirmwareI18n

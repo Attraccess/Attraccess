@@ -9,6 +9,7 @@
 #include "../../ble_proxy/ble_capability.hpp"
 #include "../diagnostics/reset-reason.hpp"
 #include "../security/build_profile.hpp"
+#include "../conversion/conversion_build.hpp"
 #ifdef ESP_PLATFORM
 #include "esp_system.h"
 #endif
@@ -16,6 +17,7 @@
 #include <functional>
 #include <limits>
 #include <string>
+#include "../conversion/conversion_link.hpp"
 
 
 void API::sendFirmwareInfo()
@@ -64,6 +66,11 @@ void API::sendFirmwareInfo()
     // This reader renders image form fields as a QR code for the phone (ATT-879). Readers without a display never get them.
     event["data"]["payload"]["capabilities"]["formImages"] = true;
 #endif
+    // "Secure this reader" (ATT-1208): plain builds of variants with a secure profile can run the conversion.
+    if (ConversionLink::advertised()) event["data"]["payload"]["capabilities"]["secureConversion"] = true;
+    // Lab/HIL builds: the server may skip its release-build gate only for a reader that cannot burn.
+    if (ConversionLink::advertised() && ConversionBuild::stopBeforeBurn())
+        event["data"]["payload"]["capabilities"]["conversionStopBeforeBurn"] = true;
     // Plugin BLE proxy, protocol v1 (ATT-1033). Builds without it send no `ble`: the API answers READER_UNSUPPORTED.
     char bleCaps[ble::CAPABILITY_SCRATCH];
     if (BleProxy::supported())

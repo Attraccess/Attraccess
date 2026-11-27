@@ -31,6 +31,9 @@ import nodeTranslationsDe from '../node/de.json';
 import nodeTranslationsEn from '../node/en.json';
 import { useFlowContext } from '../context/index';
 import { useCountdown } from './useCountdown';
+import { DownloadLogsMenu } from './DownloadLogsMenu';
+import { prettyPayload } from './prettyPayload';
+import { triggerNodeOfRun } from './triggerNodeOfRun';
 import { useFlowCanvasQuery, useFlowLogRecording, useFlowNodeSchemasQuery } from '../flowOwner';
 
 export interface Props {
@@ -49,21 +52,6 @@ export const DURATION_OPTIONS = [
   { minutes: 480, labelKey: 'duration.h8' },
   { minutes: 1440, labelKey: 'duration.h24' },
 ];
-
-// Payloads over the recorder's limit arrive truncated, so they are no longer valid JSON.
-export function prettyPayload(raw: string) {
-  try {
-    return JSON.stringify(JSON.parse(raw), null, 2);
-  } catch {
-    return raw;
-  }
-}
-
-// Logs are newest-first and a run's oldest entry is the synthetic flow.start, which has
-// no node — so the node that triggered the run is the oldest entry that does have one.
-export function triggerNodeOfRun<T extends { node?: ResourceFlowNodeDto }>(logsNewestFirst: T[]) {
-  return [...logsNewestFirst].reverse().find((log) => log.node)?.node;
-}
 
 export function LogViewer(props: Props) {
   const { isOpen, setOpen, open } = useOverlayState();
@@ -220,6 +208,8 @@ export function LogViewer(props: Props) {
                   </Button>
                 </>
               )}
+              {/* Keyed by the recording state: the row changes height then, and an open menu would cover its button. */}
+              <DownloadLogsMenu key={String(isRecording)} owner={owner} logs={logsOrdered} nodeTitle={nodeTitle} />
             </div>
 
             <ToggleButton

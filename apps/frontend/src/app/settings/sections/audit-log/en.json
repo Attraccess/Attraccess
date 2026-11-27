@@ -231,7 +231,12 @@
     "flow.deleted": "Global flow deleted",
     "flow.canvas_updated": "Global flow canvas updated",
     "flow_variable.set": "Flow variable set",
-    "flow_variable.deleted": "Flow variable deleted"
+    "flow_variable.deleted": "Flow variable deleted",
+    "attractap.reader.secure_conversion_started": "Securing a reader started",
+    "attractap.reader.secure_conversion_preflight": "Reader preflight checked",
+    "attractap.reader.secure_conversion_digests_burned": "Secure Boot keys burned into a reader",
+    "attractap.reader.secure_conversion_failed": "Securing a reader failed",
+    "attractap.reader.secure_conversion_interrupted": "Securing a reader interrupted"
   },
   "targets": {
     "resource": "Resource",
@@ -444,7 +449,14 @@
     "before.creditsPerUnit": "Rate per measured value before",
     "after.creditsPerUnit": "Rate per measured value after",
     "before.allocation": "Allocation before",
-    "after.allocation": "Allocation after"
+    "after.allocation": "Allocation after",
+    "conversionId": "Run ID",
+    "conversionState": "Step",
+    "targetVersion": "Target firmware version",
+    "digest0": "Signing key digest",
+    "digest1": "Recovery key digest",
+    "ok": "Passed",
+    "failedChecks": "Failed checks"
   },
   "fieldValues": {
     "allocation": {

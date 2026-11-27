@@ -474,14 +474,13 @@ describe('MCP OAuth (real application)', () => {
       expect(tokens.body.scope).toBe('users.roles.manage');
       // Granted subset: roles are readable, settings (not granted) are not.
       expect((await t.callTool(accessToken, 'listRoles')).body.result.isError).toBeUndefined();
-      const denied = (await t.callTool(accessToken, 'getSystemSettings')).body.result;
-      expect(denied.isError).toBe(true);
-      expect(denied.content[0].text).toMatch(/^HTTP 403 Forbidden/);
-      // Revoking the role in Attraccess removes the permission on the next call.
+      // Not granted: the tool is hidden, as if it did not exist.
+      const denied = (await t.callTool(accessToken, 'getSystemSettings')).body;
+      expect(denied.error).toMatchObject({ code: -32602, message: expect.stringContaining('Unknown tool') });
+      // Revoking the role in Attraccess removes the permission, and with it the tool, on the next call.
       await t.revokeRole(user.id, (user as never as { roleId: number }).roleId, ADMIN_PERMISSIONS);
-      const after = (await t.callTool(accessToken, 'listRoles')).body.result;
-      expect(after.isError).toBe(true);
-      expect(after.content[0].text).toMatch(/^HTTP 403 Forbidden/);
+      const after = (await t.callTool(accessToken, 'listRoles')).body;
+      expect(after.error).toMatchObject({ code: -32602, message: expect.stringContaining('Unknown tool') });
     });
 
     it('revokes grants together with a deleted or disabled user', async () => {
@@ -528,9 +527,9 @@ describe('MCP OAuth (real application)', () => {
       const before = await t.db.query(`SELECT COUNT(*) AS n FROM role`);
       const denied = (
         await t.callTool(tokens.body.access_token, 'createRole', { name: 'From MCP', permissionKeys: [] })
-      ).body.result;
-      expect(denied.isError).toBe(true);
-      expect(denied.content[0].text).toMatch(/^HTTP 403 Forbidden/);
+      ).body;
+      // createRole needs a permission the grant does not cover, so the tool is hidden.
+      expect(denied.error).toMatchObject({ code: -32602, message: expect.stringContaining('Unknown tool') });
       expect(await t.db.query(`SELECT COUNT(*) AS n FROM role`)).toEqual(before);
     });
 

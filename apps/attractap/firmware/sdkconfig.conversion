@@ -1,0 +1,8 @@
+# "Secure this reader" conversion client overlay (ATT-1208), layered after sdkconfig.defaults for plain builds of
+# variants with a secure profile build (CMakeLists.txt, ATTRACTAP_CONVERSION_CLIENT). Step 6 writes the signed
+# bootloader at 0x0 and erases the first sector of the running app, which ESP-IDF refuses by default. Only the
+# conversion code (src/api/conversion/conversion_steps.cpp) writes there, and only on the server's command after the
+# digests are burned. sdkconfig.secure turns this back off: a secure app never writes the bootloader region.
+CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED=y
+# CONFIG_SPI_FLASH_DANGEROUS_WRITE_ABORTS is not set
+# CONFIG_SPI_FLASH_DANGEROUS_WRITE_FAILS is not set

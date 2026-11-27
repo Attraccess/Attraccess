@@ -18,6 +18,9 @@ import { HandshakeLimiter } from './handshake-limiter';
 import { InstallationIdentityService } from './installation-identity.service';
 import { CREDENTIAL_CHANGED_EVENT, PairingService } from './pairing.service';
 import { ReaderControlService } from './reader-control.service';
+import { ConversionSessionRegistry } from '../secure-conversion/conversion-session-registry';
+import type { ConversionProtocolService } from '../secure-conversion/conversion-protocol.service';
+import { EmulatedConversionDevice } from './testing/emulated-conversion';
 import { ReaderSessionService } from './reader-session.service';
 import type { EfuseReportService } from './efuse-report.service';
 import { FrameType, SESSION_SUBPROTOCOL } from './session-framing';
@@ -40,6 +43,13 @@ describe('reader session through the real gateway', () => {
   const recordCertificate = jest.fn(async () => undefined);
   // The eFuse report check has its own specs; here only the wiring of the control channel counts.
   const efuse = { handle: jest.fn(async () => 'recorded') } as unknown as EfuseReportService;
+  // The conversion has its own specs (secure-conversion/*.spec.ts); here only the session wiring counts.
+  const conversionRegistry = new ConversionSessionRegistry();
+  const conversionProtocol = {
+    handle: jest.fn(async () => undefined),
+    onSessionClosed: jest.fn(async () => undefined),
+    onEfuseReportChecked: jest.fn(async () => undefined),
+  } as unknown as ConversionProtocolService;
   const issueReaderCertificate = jest.fn(async () => ({
     pem: 'RENEWED-CERT-PEM',
     serial: '0b',
@@ -93,7 +103,10 @@ describe('reader session through the real gateway', () => {
         provide: SessionMetrics,
         useValue: { activeSessions: { inc: jest.fn(), dec: jest.fn() }, handshakeFailures: { inc: jest.fn() } },
       },
-      { provide: ReaderControlService, useFactory: () => new ReaderControlService(efuse) },
+      {
+        provide: ReaderControlService,
+        useFactory: () => new ReaderControlService(efuse, conversionRegistry, conversionProtocol),
+      },
       ReaderSessionService,
     ];
     const module = await Test.createTestingModule({
@@ -344,7 +357,7 @@ describe('reader session through the real gateway', () => {
     expect(reader.frames.map((f) => json(f))).toEqual([{ t: 'session.rejected', reason: 'inactive-credential' }]);
   });
 
-  it('refuses unknown subprotocol versions and connections without a subprotocol (token readers) at upgrade', async () => {
+  it('refuses unknown subprotocol versions at upgrade', async () => {
     const statusOf = (socket: WebSocket) =>
       new Promise<number>((resolve) => {
         socket.on('unexpected-response', (_req, res) => resolve(res.statusCode ?? 0));
@@ -352,9 +365,44 @@ describe('reader session through the real gateway', () => {
         socket.on('error', () => undefined);
       });
     expect(await statusOf(new WebSocket(url, ['attractap-session.v2']))).toBe(400);
-    // A token reader offers no subprotocol: it gets no connection, so nothing is created for it.
-    expect(await statusOf(new WebSocket(url))).toBe(400);
     expect(SESSION_SUBPROTOCOL).toBe('attractap-session.v1');
+  });
+
+  it('lets an old reader with token sign-in in only to update its firmware', async () => {
+    // A token reader offers no subprotocol. It speaks the old JSON protocol in text frames.
+    const socket = new WebSocket(url);
+    const received: Array<{ event: string; data?: { type: string; payload: Record<string, unknown> } }> = [];
+    const next = () =>
+      new Promise<(typeof received)[number]>((resolve) => {
+        const check = () => {
+          const message = received.shift();
+          if (message) resolve(message);
+          else setTimeout(check, 10);
+        };
+        check();
+      });
+    socket.on('message', (data, isBinary) => {
+      if (!isBinary) received.push(JSON.parse(String(data)));
+    });
+    const sendEvent = (type: string, payload: unknown) =>
+      socket.send(JSON.stringify({ event: 'EVENT', data: { type, payload } }));
+
+    expect((await next()).data?.type).toBe('READER_REQUEST_AUTHENTICATION');
+    sendEvent('READER_AUTHENTICATE', { id: 3, token: 'tok-any' });
+    const authenticated = await next();
+    expect(authenticated.data?.type).toBe('READER_AUTHENTICATED');
+    expect(authenticated.data?.payload).toMatchObject({ name: 'Firmware update' });
+
+    // Nothing but the update: a tap or a heartbeat creates no reader and reaches no handler.
+    sendEvent('CARD_DETECTED', { uid: '04aabbccdd', detectionId: 1 });
+    socket.send(JSON.stringify({ event: 'HEARTBEAT' }));
+    expect((await next()).event).toBe('HEARTBEAT');
+    expect(received).toEqual([]);
+    expect(app.get(WebsocketService).sockets.size).toBe(0);
+
+    const closed = new Promise((resolve) => socket.on('close', resolve));
+    socket.close();
+    await closed;
   });
 
   describe('the reader control channel', () => {
@@ -372,6 +420,37 @@ describe('reader session through the real gateway', () => {
       ];
       expect(state).toMatchObject({ readerId: 24, fingerprint: identity.fingerprint });
       expect(body).toMatchObject({ mac: 'dc:b4:d9:21:71:c8' });
+    });
+
+    it('plays the reader side of a conversion over the session and registers it as online', async () => {
+      const { reader } = await connectPaired(26);
+      await reader.nextFrame((f) => f.type === FrameType.JSON);
+      expect(conversionRegistry.isOnline(26)).toBe(true);
+      const device = new EmulatedConversionDevice({ partitionTableSha256: 'e'.repeat(64) });
+      reader.playConversion(device);
+      await new Promise((r) => setTimeout(r, 200));
+      const [session, status] = (conversionProtocol.handle as jest.Mock).mock.calls.at(-1) as [
+        { state: { readerId: number } },
+        unknown,
+      ];
+      expect(session.state.readerId).toBe(26);
+      expect(status).toMatchObject({ t: 'conversion.status', id: null, stage: 'none' });
+
+      // A server command reaches the device through TLS, and its answer comes back the same way.
+      (conversionProtocol.handle as jest.Mock).mockClear();
+      expect(conversionRegistry.get(26)?.send({ t: 'conversion.preflight', id: 7 })).toBe(true);
+      await new Promise((r) => setTimeout(r, 200));
+      expect((conversionProtocol.handle as jest.Mock).mock.calls.at(-1)?.[1]).toMatchObject({
+        t: 'conversion.preflight-report',
+        id: 7,
+        mac: device.mac,
+      });
+
+      reader.close();
+      await reader.closed;
+      await new Promise((r) => setTimeout(r, 100));
+      expect(conversionRegistry.isOnline(26)).toBe(false);
+      expect(conversionProtocol.onSessionClosed).toHaveBeenCalledWith(26);
     });
 
     it.each([
