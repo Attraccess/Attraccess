@@ -300,6 +300,9 @@ enum class Message {
     FormImageScanHint, FormImageCount,
     SecureConversionTitle, SecureConversionTransfer, SecureConversionVerify, SecureConversionBurn,
     SecureConversionBootloader, SecureConversionDontUnplug, SecureConversionRestartHint,
+    ReportProblem, MaintenanceCheckTitle, MaintenanceCheckHint, MaintenanceMachineOk, MaintenanceNeeded,
+    MaintenanceReasonTitle, MaintenanceReasonPlaceholder, MaintenanceSend, SendingReport, MaintainersNotified,
+    ReportNotSent, ReportNotSentAfterStop,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };

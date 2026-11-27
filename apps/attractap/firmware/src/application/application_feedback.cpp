@@ -79,7 +79,11 @@ void Application::reportActionFailure(const API::ActionResult &result, uint32_t 
                          FirmwareI18n::Text::literal(result.blockBody) /* i18n-data: Plugin block reason body, localized by the plugin. */),
                      returnToList);
   } else {
-    this->showActionFailure(resourceId, result.error, FirmwareI18n::Text(), returnToList);
+    this->showActionFailure(resourceId, result.error,
+                            result.type == "CREATE_MAINTENANCE_REQUEST"
+                                ? FirmwareI18n::Text(FirmwareI18n::Message::ReportNotSent)
+                                : FirmwareI18n::Text(),
+                            returnToList);
   }
 }
 

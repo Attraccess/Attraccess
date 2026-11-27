@@ -199,8 +199,11 @@ public:
 #ifdef ATTRACTAP_UI_SELFTEST
     void testInject(const char *json, size_t len); // self-test build: processed by API::loop()
 #endif
-    // usageId 0 ends the card holder's own session; otherwise force-stops that session.
-    void stopResourceUsageSession(uint32_t resourceId, uint32_t usageId = 0);
+    // usageId 0 ends the card holder's own session; otherwise force-stops that session. A non-empty
+    // `maintenanceReason` ("Is the machine OK?") makes the server file a maintenance request once the session ended.
+    void stopResourceUsageSession(uint32_t resourceId, uint32_t usageId = 0, const char *maintenanceReason = nullptr);
+    // "Report a problem"
+    void createMaintenanceRequest(uint32_t resourceId, const char *reason);
     void requestFormFields(uint32_t resourceId, ResourceUsageFormActionType action, uint32_t formId, uint32_t offset, uint32_t limit);
     void submitFormPage(uint32_t resourceId, ResourceUsageFormActionType action, const FormPageSubmission &page);
     void cancelForm(uint32_t resourceId, ResourceUsageFormActionType action);

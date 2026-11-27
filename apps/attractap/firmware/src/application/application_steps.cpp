@@ -127,6 +127,7 @@ void Application::resetPendingAction()
   this->pendingActionIsTakeover = false;
   this->pendingActionEstimateMinutes = 0;
   this->pendingActionUsageId = 0;
+  this->pendingActionMaintenanceReason.clear();
 }
 
 void Application::clearPendingStartLocally()

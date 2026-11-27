@@ -33,6 +33,7 @@ void runJourney(ReaderWorkflow &workflow, bool timeKnown)
     workflow.testTransientRouting();
     workflow.testParallelSessions();
     workflow.testSessionDuration();
+    workflow.testMaintenance();
     workflow.testRefusedCardSuppression();
     if (!timeKnown) workflow.testWallClock();
 }

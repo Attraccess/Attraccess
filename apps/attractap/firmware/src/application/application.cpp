@@ -181,7 +181,8 @@ void Application::finishReaderAction(bool success) {
   this->leaveForms();
   this->actionCompletionMessage = success
       ? FirmwareI18n::Text(type == "START_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageStarted
-      : type == "STOP_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageEnded : FirmwareI18n::Message::ActionConfirmed)
+      : type == "STOP_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageEnded
+      : type == "CREATE_MAINTENANCE_REQUEST" ? FirmwareI18n::Message::MaintainersNotified : FirmwareI18n::Message::ActionConfirmed)
       : FirmwareI18n::Text();
   // Keep input blocked until fresh ownership/availability arrives, so a fast
   // second tap cannot act on the row's pre-action state.
@@ -215,7 +216,8 @@ void Application::beginSessionSummary(const API::ActionResult &result) {
   this->sessionSummaryDismissRequested = false;
   this->sessionSummaryTouchSequence = Display::touchPressSequence;
   this->state = APPLICATION_STATE_SESSION_SUMMARY;
-  Display::sessionSummaryScreen.setSummary(this->cardAuthenticationData.displayName, result.durationSeconds, result.billingTotal);
+  Display::sessionSummaryScreen.setSummary(this->cardAuthenticationData.displayName, result.durationSeconds, result.billingTotal,
+                                           result.maintenanceRequestFiled);
   Display::transitionToScreen(&Display::sessionSummaryScreen, [this] {
     if (!this->sessionSummaryActive) return;
     this->sessionSummaryShownAt = millis();

@@ -69,6 +69,10 @@ struct ResourceBrief
         // Per card: may end another person's session here (resources.update or the server's maintain rule).
         bool canEndOtherSessions = false;
         bool requiresSupervisor = false;
+        // Per card: may file a maintenance request ("Report a problem"), and whether ending the own session first
+        // asks "Is the machine OK?". False with an older server.
+        bool canRequestMaintenance = false;
+        bool askMaintenanceCheckOnEnd = false;
         char name[MAX_RESOURCE_NAME_LEN];
         std::string description;
         bool hasActiveUsage;
@@ -174,6 +178,8 @@ struct ActionResult {
         uint32_t durationSeconds = 0;
         bool hasOwnership = false;
         bool endedOwnSession = false;
+        // STOP with a maintenance request: 1 filed, 0 not filed, -1 none was sent (or an older server).
+        int8_t maintenanceRequestFiled = -1;
         // START_BLOCKED: the plugin's literal reason (already sanitized to Latin-1 for the display).
         std::string blockCode{};
         std::string blockTitle{};

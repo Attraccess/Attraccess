@@ -171,7 +171,7 @@ void DemoWebsocket::handleExtendSession(JsonObjectConst payload)
     respondResourceList();
 }
 
-void DemoWebsocket::handleStopSession(uint32_t resourceId, uint32_t usageId)
+void DemoWebsocket::handleStopSession(uint32_t resourceId, uint32_t usageId, bool maintenanceRequested)
 {
     int idx = sessionIndexForResource(resourceId);
     std::vector<DemoSession> *sessions = idx >= 0 ? &_sessions[idx] : nullptr;
@@ -214,6 +214,7 @@ void DemoWebsocket::handleStopSession(uint32_t resourceId, uint32_t usageId)
     payload["success"] = true;
     payload["requestId"] = _actionRequestId;
     payload["endedOwnSession"] = isOwnSession(*target);
+    if (maintenanceRequested) payload["maintenanceRequestFiled"] = true;
     const auto elapsed = time(nullptr) - target->startEpoch;
     payload["durationSeconds"] = elapsed > 0 ? elapsed : 0;
     sessions->erase(target);

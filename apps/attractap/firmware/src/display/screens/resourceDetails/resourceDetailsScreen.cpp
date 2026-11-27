@@ -61,6 +61,7 @@ void ResourceDetailsScreen::init()
    this->createDoorControls();
 
    this->createStatusPanels();
+   this->createReportProblemButton();
    this->createUiSlotContainer(UiSlotKind::Body);
 
    // Slots first, deferred: applyCachedState() then finds them current and does not build them a second time.
@@ -201,6 +202,7 @@ void ResourceDetailsScreen::destroy()
    this->unlockDoorButton = nullptr;
    this->unlatchDoorButton = nullptr;
    this->flowButtons.clear();
+   this->reportProblemButton = nullptr;
 }
 void ResourceDetailsScreen::applyCachedState()
 {
@@ -397,6 +399,7 @@ void ResourceDetailsScreen::updateOccupancy()
 void ResourceDetailsScreen::refreshAccessState()
 {
    this->updateOccupancy();
+   this->updateReportProblemButton();
    bool underMaintenance = this->resourceCacheValid && this->resourceCache.isUnderMaintenance;
    bool isUnhealthy = this->resourceCacheValid && !this->resourceCache.isHealthy;
 

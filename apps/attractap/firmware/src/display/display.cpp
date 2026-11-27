@@ -78,6 +78,8 @@ FirmwareUpdateScreen Display::firmwareUpdateScreen;
 SecureConversionScreen Display::secureConversionScreen;
 StatusScreen Display::statusScreen;
 ConfirmScreen Display::confirmScreen;
+MaintenanceCheckScreen Display::maintenanceCheckScreen;
+MaintenanceReasonScreen Display::maintenanceReasonScreen;
 NetworkStatusScreen Display::networkStatusScreen;
 TopUpScreen Display::topUpScreen;
 FormsScreen Display::formsScreen;

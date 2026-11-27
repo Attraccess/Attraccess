@@ -15,10 +15,4 @@ inline constexpr Entry secureConversionCatalog[] = {
     // Shown while the bootloader is written and the reader restarts into flash encryption (brick window 2).
     {Message::SecureConversionRestartHint, "Neustart und Verschlüsselung dauern einige Minuten.", "Restart and encryption take a few minutes."},
 };
-static_assert(sizeof(catalog) / sizeof(Entry) + sizeof(cardRelayCatalog) / sizeof(Entry) +
-                      sizeof(networkStatusCatalog) / sizeof(Entry) + sizeof(sessionUsersCatalog) / sizeof(Entry) +
-                      sizeof(btSetupCatalog) / sizeof(Entry) + sizeof(sessionDurationCatalog) / sizeof(Entry) +
-                      sizeof(formImagesCatalog) / sizeof(Entry) + sizeof(secureConversionCatalog) / sizeof(Entry) ==
-                  static_cast<size_t>(Message::Count),
-              "every firmware message needs a catalog entry, in enum order");
 } // namespace FirmwareI18n

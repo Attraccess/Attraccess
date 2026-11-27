@@ -46,6 +46,18 @@ bool durationStartPending = false;
 uint32_t extendUsageId = 0;
 #endif
 
+// "Is the machine OK?" and "Report a problem" (application_maintenance.cpp).
+#if defined(HAS_LVGL_DISPLAY)
+// The reason of the maintenance request the stop in progress carries, also on its resend after the end forms; empty:
+// the machine is OK or nothing was asked.
+std::string pendingActionMaintenanceReason;
+// Set while the answered check re-runs the stop it interrupted, so that stop does not ask again.
+bool maintenanceCheckAnswered = false;
+// The resource and chosen session the open maintenance screens belong to.
+uint32_t maintenanceResourceId = 0;
+uint32_t maintenanceStopUsageId = 0;
+#endif
+
 #if defined(HAS_LVGL_DISPLAY)
 bool hasPendingFormRequest = false;
 #endif

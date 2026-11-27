@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <cstdlib>
 #include "text.hpp"
+#include "../../shared/textEditor.hpp"
 
 void FormsScreen::updateFieldPreview(FormFieldWidget &widget)
 {
@@ -173,12 +174,8 @@ void FormsScreen::createFormsEditor(lv_obj_t *overlay)
 
 
    // Textarea fills all space between header and keyboard.
-   lv_obj_t *editorTa = lv_textarea_create(editor);
+   lv_obj_t *editorTa = TextEditor::createTextArea(editor);
    this->formsEditorTextarea = editorTa;
-   lv_obj_set_width(editorTa, lv_pct(100));
-   lv_obj_set_flex_grow(editorTa, 1);
-    DisplayTheme::field(editorTa);
-    lv_obj_set_style_text_font(editorTa, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Spacer keeps the keyboard pinned to the bottom when the textarea is
    // one-line (multiline textareas grow instead, see openFormsEditor).
@@ -190,11 +187,7 @@ void FormsScreen::createFormsEditor(lv_obj_t *overlay)
    lv_obj_set_width(editorSpacer, lv_pct(100));
    lv_obj_set_flex_grow(editorSpacer, 1);
 
-   this->formsEditorKeyboard = lv_keyboard_create(editor);
-   DisplayTheme::keyboard(this->formsEditorKeyboard);
-   lv_obj_set_width(this->formsEditorKeyboard, lv_pct(100));
-   lv_obj_set_height(this->formsEditorKeyboard, lv_pct(45));
-   lv_obj_add_event_cb(this->formsEditorKeyboard, &FormsScreen::onFormsEditorKeyboardEvent, LV_EVENT_ALL, this);
+   this->formsEditorKeyboard = TextEditor::createKeyboard(editor, &FormsScreen::onFormsEditorKeyboardEvent, this);
 
 }
 

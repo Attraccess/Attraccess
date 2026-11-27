@@ -158,6 +158,14 @@ private:
     // Whether the list still shows the session the extension screen extends, with a deadline.
     bool extendTargets(const API::ResourceBrief &resource) const;
     void handleExtend(uint32_t minutes, bool toMax);
+    // Maintenance requests, application_maintenance.cpp
+    bool asksMaintenanceCheck(uint32_t usageId) const;
+    void openMaintenanceCheck(uint32_t usageId);
+    void openProblemReport();
+    void openMaintenanceReason(const FirmwareI18n::Text &confirmLabel, std::function<void(const std::string &)> onConfirm);
+    void cancelMaintenanceInput();
+    void continueStopAfterCheck(const std::string &reason);
+    void sendProblemReport(const std::string &reason);
     // Forgets the start or stop in progress: its type, target, takeover flag, estimate and chosen session.
     void resetPendingAction();
     void finishCardAuthentication(bool success);

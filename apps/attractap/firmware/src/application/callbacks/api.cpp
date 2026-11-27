@@ -252,6 +252,10 @@ void Application::setupActionCallbacks()
         const std::string resourceName = self->resourceNameOf(resourceId);
         const bool returnToList = self->returnToListAfterAction;
         self->finishReaderAction(result.success);
+        if (result.success && result.maintenanceRequestFiled >= 0)
+          self->actionCompletionMessage = result.maintenanceRequestFiled
+                                              ? FirmwareI18n::Message::MaintainersNotified
+                                              : FirmwareI18n::Message::ReportNotSentAfterStop;
         if (result.success) {
           self->completedResourceName = resourceName;
           self->onActionResult(result.type);

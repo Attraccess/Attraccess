@@ -3,7 +3,11 @@
 
 class SessionSummaryScreen : public IScreen {
 public:
-    void setSummary(const std::string &name, uint32_t durationSeconds, const std::string &charge);
+    // `maintenanceRequestFiled`: 1 or 0 when the stop carried a maintenance request, -1 otherwise.
+    void setSummary(const std::string &name, uint32_t durationSeconds, const std::string &charge,
+                    int8_t maintenanceRequestFiled = -1);
+    // How long the summary stays on its own; longer when it also says what became of a maintenance request.
+    uint32_t displayDurationMs() const { return maintenance < 0 ? 3500 : 6000; }
     void clearSummary();
     void init() override;
     void destroy() override;
@@ -14,4 +18,5 @@ public:
 private:
     lv_obj_t *screen = nullptr;
     std::string name, duration, charge;
+    int8_t maintenance = -1;
 };

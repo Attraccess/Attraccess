@@ -29,6 +29,8 @@
 #include "screens/secureConversion/secureConversionScreen.hpp"
 #include "screens/status/statusScreen.hpp"
 #include "screens/confirm/confirmScreen.hpp"
+#include "screens/maintenance/maintenanceCheckScreen.hpp"
+#include "screens/maintenance/maintenanceReasonScreen.hpp"
 #include "screens/networkStatus/networkStatusScreen.hpp"
 #include "screens/topUp/topUpScreen.hpp"
 #include "screens/forms/formsScreen.hpp"
@@ -79,6 +81,8 @@ public:
     static SecureConversionScreen secureConversionScreen;
     static StatusScreen statusScreen;
     static ConfirmScreen confirmScreen;
+    static MaintenanceCheckScreen maintenanceCheckScreen;
+    static MaintenanceReasonScreen maintenanceReasonScreen;
     static NetworkStatusScreen networkStatusScreen;
     static TopUpScreen topUpScreen;
     static FormsScreen formsScreen;

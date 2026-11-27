@@ -372,6 +372,13 @@ void Application::handleResourceDetailsButtonClick(
     break;
   }
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_STOP_SESSION:
+    if (!this->maintenanceCheckAnswered) {
+      this->pendingActionMaintenanceReason.clear();
+      if (this->asksMaintenanceCheck(evt.usageId)) {
+        this->openMaintenanceCheck(evt.usageId);
+        break;
+      }
+    }
     this->pendingUiAction = "STOP_RESOURCE_USAGE_SESSION";
     this->showReaderActionProgress(FirmwareI18n::Message::EndingUsage);
     this->beginActionPause();
@@ -382,7 +389,8 @@ void Application::handleResourceDetailsButtonClick(
     this->pendingActionUsageId = evt.usageId;
     this->hasPendingFormRequest = false;
     this->formFlowSubmitted = false;
-    this->api.stopResourceUsageSession(this->selectedResourceId, evt.usageId);
+    this->api.stopResourceUsageSession(this->selectedResourceId, evt.usageId,
+                                       this->pendingActionMaintenanceReason.c_str());
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOCK_DOOR:
     this->pendingUiAction = "LOCK_DOOR";
@@ -412,6 +420,9 @@ void Application::handleResourceDetailsButtonClick(
     this->showReaderActionProgress(FirmwareI18n::Message::RunningAction);
     this->beginActionPause();
     this->api.triggerFlowButton(this->selectedResourceId, evt.flowButtonId);
+    break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_REPORT_PROBLEM:
+    this->openProblemReport();
     break;
   case ResourceDetailsScreen::BUTTON_CLICK_TYPE_LOGOUT:
     this->logoutReader();
