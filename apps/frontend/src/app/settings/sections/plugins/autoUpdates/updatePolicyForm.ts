@@ -38,13 +38,15 @@ export function updatePolicyFormErrors(form: UpdatePolicyForm): UpdatePolicyForm
   return errors;
 }
 
-/** The request body for a form without errors. */
-export function toUpdatePolicyBody(form: UpdatePolicyForm, stored: PluginUpdatePolicyDto) {
+/**
+ * The request body for a form without errors. It names only what the panel edits: the host keeps every other field, so
+ * a value changed through the API meanwhile (`prerelease`) is not put back.
+ */
+export function toUpdatePolicyBody(form: UpdatePolicyForm) {
   return {
     checksEnabled: form.checksEnabled,
     automaticUpdates: form.automaticUpdates,
     mode: form.mode,
-    prerelease: stored.prerelease,
     schedule: {
       weekdays: form.weekdays,
       startMinute: form.startMinute as number,

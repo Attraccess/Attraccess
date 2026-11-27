@@ -25,7 +25,7 @@ describe('UpdatesAvailableAlert', () => {
     [
       'the update check is off',
       { ...DEFAULT_UPDATE_POLICY, automaticUpdates: true, checksEnabled: false },
-      /nothing is installed on its own/,
+      /Update checks are off, so nothing is installed on its own/,
     ],
   ])('says what happens when %s', async (_label, policy, message) => {
     listAvailableUpdate();

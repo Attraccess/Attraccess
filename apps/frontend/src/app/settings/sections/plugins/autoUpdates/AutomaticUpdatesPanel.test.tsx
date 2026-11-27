@@ -82,7 +82,7 @@ describe('AutomaticUpdatesPanel', () => {
         checksEnabled: true,
         automaticUpdates: true,
         mode: 'minor',
-        prerelease: false,
+        // `prerelease` has no control here, so it is left out and keeps what the host has stored.
         schedule: { weekdays: [1, 3], startMinute: 180, durationMinutes: 120, timeZone: 'Europe/Berlin' },
       },
     });

@@ -40,7 +40,7 @@ export function AutomaticUpdatesForm({ policy }: Props) {
 
   const save = async () => {
     try {
-      const saved = await savePolicy({ body: toUpdatePolicyBody(form, policy) });
+      const saved = await savePolicy({ body: toUpdatePolicyBody(form) });
       queryClient.setQueryData(UsePluginControllerUpdatePolicyKeyFn(), saved);
       setDraft(null);
       toast.success({ title: t('autoUpdates.saved') });
@@ -83,9 +83,7 @@ export function AutomaticUpdatesForm({ policy }: Props) {
             data-cy="plugins-auto-updates-step"
           />
           <UpdateScheduleFields form={form} errors={errors} onChange={change} isDisabled={isPending} />
-          {isValid && form.checksEnabled ? (
-            <NextUpdateWindow schedule={toUpdatePolicyBody(form, policy).schedule} />
-          ) : null}
+          {isValid && form.checksEnabled ? <NextUpdateWindow schedule={toUpdatePolicyBody(form).schedule} /> : null}
         </>
       ) : (
         <p className="text-sm text-muted">{t('autoUpdates.offHint')}</p>

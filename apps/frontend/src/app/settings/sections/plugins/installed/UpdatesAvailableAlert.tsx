@@ -16,7 +16,11 @@ export function UpdatesAvailableAlert({ onReview }: Props) {
   const { data: policy } = usePluginControllerUpdatePolicy();
   const available = installed.filter((plugin) => plugin.updateCheck?.state === 'available');
   if (available.length === 0) return null;
-  const installsOnItsOwn = policy?.automaticUpdates && policy.checksEnabled;
+  const noteKey = !policy?.automaticUpdates
+    ? 'updatePolicy.manualOnly'
+    : policy.checksEnabled
+      ? 'updatePolicy.installsInWindow'
+      : 'updatePolicy.checksOff';
   return (
     <Alert status="warning" data-cy="plugins-list-updates-available">
       <AlertContent>
@@ -24,7 +28,7 @@ export function UpdatesAvailableAlert({ onReview }: Props) {
         <AlertDescription>
           {t('updatePolicy.availableDescription', { count: available.length })}
           {/* Says nothing about installing until the policy is known. */}
-          {policy ? ` ${t(installsOnItsOwn ? 'updatePolicy.installsInWindow' : 'updatePolicy.manualOnly')}` : null}
+          {policy ? ` ${t(noteKey)}` : null}
         </AlertDescription>
         <Button className="mt-2" variant="secondary" size="sm" onPress={() => onReview(available[0])}>
           {t('updatePolicy.reviewUpdates')}

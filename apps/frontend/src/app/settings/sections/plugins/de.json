@@ -138,7 +138,8 @@
       "many": "Für {{count}} installierte Marktplatz-Plugins gibt es Updates."
     },
     "installsInWindow": "Automatische Updates sind eingeschaltet: Attraccess installiert die Updates, die seine Schutzregeln erlauben, im nächsten Update-Zeitfenster und startet dann neu. Du kannst sie auch jetzt prüfen und installieren.",
-    "manualOnly": "Automatische Updates sind ausgeschaltet, es wird also nichts von selbst installiert. Prüfe die Updates, um sie zu installieren."
+    "manualOnly": "Automatische Updates sind ausgeschaltet, es wird also nichts von selbst installiert. Prüfe die Updates, um sie zu installieren.",
+    "checksOff": "Die Update-Suche ist ausgeschaltet, es wird also nichts von selbst installiert. Prüfe die Updates, um sie zu installieren."
   },
   "autoUpdates": {
     "title": "Automatische Updates",
@@ -262,7 +263,7 @@
     "hideOlderIncompatible": "Ältere inkompatible Versionen ausblenden",
     "details": "Release-Details",
     "update": "Aktualisieren",
-    "automaticUpdatesOff": "Automatische Updates sind für dieses Attraccess ausgeschaltet. Diese Einstellung installiert nichts, bis sie unter „Automatische Updates“ eingeschaltet werden."
+    "automaticUpdatesOff": "Automatische Updates sind auf dieser Instanz ausgeschaltet. Diese Einstellung installiert nichts, solange die automatischen Updates nicht eingeschaltet sind."
   },
   "dependencies": {
     "title": "Plugin-Abhängigkeiten",

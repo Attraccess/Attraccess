@@ -138,7 +138,8 @@
       "many": "{{count}} installed marketplace plugins have an update."
     },
     "installsInWindow": "Automatic updates are on: Attraccess installs the updates its safeguards allow in the next update window and then restarts. You can also review and install them now.",
-    "manualOnly": "Automatic updates are off, so nothing is installed on its own. Review the updates to install them."
+    "manualOnly": "Automatic updates are off, so nothing is installed on its own. Review the updates to install them.",
+    "checksOff": "Update checks are off, so nothing is installed on its own. Review the updates to install them."
   },
   "autoUpdates": {
     "title": "Automatic updates",
