@@ -6,7 +6,8 @@
   "preview": {
     "configuration": "Configuration",
     "loading": "Loading summary…",
-    "unavailable": "Preview unavailable"
+    "unavailable": "Preview unavailable",
+    "meterMissing": "Meter archived or deleted"
   },
   "editor": {
     "buttons": {

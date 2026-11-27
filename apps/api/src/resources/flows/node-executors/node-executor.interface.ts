@@ -3,6 +3,7 @@ import { FlowNodeRecord, ResourceType } from '@attraccess/application-models';
 
 export interface NodeProcessingResult {
   payload: object;
+  /** The handle to continue on; without one the flow continues on the default output (`DEFAULT_OUTPUT_HANDLE`). */
   outputHandle?: string;
 }
 

@@ -25,6 +25,10 @@ vi.mock('@attraccess/react-query-client', () => ({
   useCreateResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
   UseListResourceMetersKeyFn: () => ['meters'],
+  UseGetResourceMeteringStatusKeyFn: () => ['status'],
+  useArchiveResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useRestoreResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
@@ -48,14 +52,14 @@ describe('meter permissions', () => {
     expect(screen.getByText('Heartbeats')).toBeInTheDocument();
     expect(screen.getByText('110')).toBeInTheDocument();
     expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: en.rename })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Actions for/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: en.create })).not.toBeInTheDocument();
   });
 
   it('allows resource editors to create and rename meters without needing billing permission', () => {
     state.permissions.add('resources.update');
     render(<MetersCard resourceId={7} />);
-    expect(screen.getByRole('button', { name: en.rename })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Actions for Heartbeats' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: en.create })).toBeInTheDocument();
   });
 

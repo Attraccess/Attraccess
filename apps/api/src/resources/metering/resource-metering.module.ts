@@ -5,10 +5,11 @@ import { ResourceFlowsModule } from '../flows/resource-flows.module';
 import { ResourceTransactionsModule } from '../../database/resource-transactions.module';
 import { ResourceMeteringService } from './resource-metering.service';
 import { ResourceMeteringFlowsBridge } from './resource-metering-flows.bridge';
+import { MeterRemoval } from './meter-removal';
 
 @Module({
   imports: [ResourceTransactionsModule, MeteringPersistenceModule, ResourceFlowsModule, BillingModule],
-  providers: [ResourceMeteringService, ResourceMeteringFlowsBridge],
-  exports: [ResourceMeteringService],
+  providers: [ResourceMeteringService, MeterRemoval, ResourceMeteringFlowsBridge],
+  exports: [ResourceMeteringService, MeterRemoval],
 })
 export class ResourceMeteringModule {}

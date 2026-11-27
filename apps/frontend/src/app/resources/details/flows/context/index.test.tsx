@@ -17,6 +17,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   useGetGlobalFlowNodeSchemas: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 vi.mock('../liveLogs', () => ({ useLiveLogs: () => ({ liveLogs: [] }) }));
+vi.mock('../useFlowLogKeepAlive', () => ({ useFlowLogKeepAlive: () => ({ isPausedForInactivity: false }) }));
 vi.mock('../node/index', () => ({
   AttraccessNode: (props: { schema: { type: string }; validationErrors?: { message: string }[]; node: NodeProps }) => {
     state.rendered(props);

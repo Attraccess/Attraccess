@@ -38,6 +38,7 @@ import { toUsageLifecycleAttempt, toUsageSession } from './usage-session-mapping
 import { toResourceRecord } from '../resources/resource-mapping';
 import { findRelations } from '../find-options';
 import { RESOURCE_LOCK, lockResource } from '../resources/resource-locks';
+import { ACTIVE_METER } from '../metering/meter-rows';
 
 /** Relations of running sessions and of session details (exported for the mapping spec). */
 export const ACTIVE_RELATIONS = ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'];
@@ -279,7 +280,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
   }
 
   async findMeterRates(resourceId: number, context?: TransactionContext): Promise<UsageMeterRate[]> {
-    const meters = await this.managers.resolve(context).find(ResourceMeter, { where: { resourceId } });
+    const meters = await this.managers.resolve(context).find(ResourceMeter, { where: { resourceId, ...ACTIVE_METER } });
     return meters.map((meter) => ({
       meterId: meter.id,
       name: meter.name,

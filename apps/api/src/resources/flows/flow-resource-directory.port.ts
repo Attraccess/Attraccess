@@ -5,6 +5,6 @@ export const FLOW_RESOURCE_DIRECTORY = Symbol.for('attraccess.flows.resource-dir
 /** What the flow editor needs to know about resources. */
 export interface FlowResourceDirectory {
   find(resourceId: number): Promise<FlowResourceRecord | null>;
-  /** The ids of the meters that belong to the resource. */
+  /** The ids of the active (not archived) meters that belong to the resource. */
   meterIds(resourceId: number): Promise<number[]>;
 }

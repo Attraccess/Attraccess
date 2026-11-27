@@ -26,6 +26,7 @@ export const toMeter = (row: ResourceMeter): ResourceMeterRecord => ({
   lifetimeValue: row.lifetimeValue,
   counterValue: row.counterValue,
   latestObservedAt: row.latestObservedAt,
+  archivedAt: row.archivedAt,
 });
 
 export const toSession = (row: ResourceMeteringSession): ResourceMeteringSessionRecord => ({

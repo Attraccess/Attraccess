@@ -56,15 +56,35 @@ export interface MeteringBillRef {
 export interface MeteringStore {
   // ---- meters and their flow definition -----------------------------------------------------------
   findDefinitionFlow(resourceId: number, context?: TransactionContext): Promise<MeteringDefinitionFlow>;
-  listMeters(resourceId: number, context?: TransactionContext): Promise<ResourceMeterRecord[]>;
+  /** The active meters of a resource; with `includeArchived` the archived ones too. */
+  listMeters(
+    resourceId: number,
+    context?: TransactionContext,
+    options?: { includeArchived?: boolean },
+  ): Promise<ResourceMeterRecord[]>;
+  /** Every active meter of every resource. */
   listAllMeters(context?: TransactionContext): Promise<ResourceMeterRecord[]>;
   findMeter(resourceId: number, meterId: number, context?: TransactionContext): Promise<ResourceMeterRecord | null>;
   findMeterById(meterId: number, context?: TransactionContext): Promise<ResourceMeterRecord | null>;
   resourceExists(resourceId: number, context?: TransactionContext): Promise<boolean>;
-  /** Throws {@link MeterNameTakenError} for a name the resource already uses. */
+  /** Throws {@link MeterNameTakenError} for a name an active meter of the resource already uses. */
   createMeter(resourceId: number, name: string): Promise<ResourceMeterRecord>;
-  /** Throws {@link MeterNameTakenError} for a name the resource already uses. */
+  /** Throws {@link MeterNameTakenError} when an active meter would get a name another one already uses. */
   renameMeter(resourceId: number, meterId: number, name: string): Promise<void>;
+  /** Archives (a date) or restores (null). Restoring throws {@link MeterNameTakenError} on a name clash. */
+  setMeterArchivedAt(meterId: number, archivedAt: Date | null, context: TransactionContext): Promise<void>;
+  /**
+   * The meter, locked against every write including new rows that refer to it, so nothing can appear between the
+   * check for history and the deletion.
+   */
+  lockMeterForDeletion(
+    resourceId: number,
+    meterId: number,
+    context: TransactionContext,
+  ): Promise<ResourceMeterRecord | null>;
+  /** Whether any metering session, operation or segment refers to the meter. */
+  hasMeterRecords(meterId: number, context?: TransactionContext): Promise<boolean>;
+  deleteMeter(meterId: number, context: TransactionContext): Promise<void>;
   setMeterRate(meterId: number, creditsPerUnit: number): Promise<void>;
   setMeterAllocation(meterId: number, allocation: MeterAllocationKind): Promise<void>;
   /** Accepts a reading on the meter: only the fields that are given change. */
@@ -80,6 +100,10 @@ export interface MeteringStore {
   /** All published, running sessions of a machine, earliest first. */
   findRunningUsages(resourceId: number, context?: TransactionContext): Promise<MeteringUsageRecord[]>;
   findUsage(usageId: number, context?: TransactionContext): Promise<MeteringUsageRecord | null>;
+  /** Every usage of the resource that has not ended, including a start that is still in progress. */
+  findOpenUsages(resourceId: number, context?: TransactionContext): Promise<MeteringUsageRecord[]>;
+  /** Waits until no session start or stop of the resource is deciding, and holds them off until commit. */
+  lockUsageLifecycle(resourceId: number, context: TransactionContext): Promise<void>;
   findUsages(usageIds: number[], context?: TransactionContext): Promise<MeteringUsageRecord[]>;
   findBillableUsage(usageId: number, context?: TransactionContext): Promise<MeteringBillableUsage | null>;
   existsLifecycleAttempt(resourceId: number, context?: TransactionContext): Promise<boolean>;

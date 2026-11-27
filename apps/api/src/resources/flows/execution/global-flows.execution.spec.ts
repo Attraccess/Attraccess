@@ -109,7 +109,6 @@ describe('global flows', () => {
     });
     wire(trigger, error);
     scope.edgesBySourceAndHandle['g-trigger|output'] = [{ source: 'g-trigger', target: 'g-error' }];
-    scope.edgesBySourceAndHandle['g-trigger|'] = scope.edgesBySourceAndHandle['g-trigger|output'];
 
     await expect(scope.service.runFlow(3, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {})).rejects.toThrow(
       'global boom',
@@ -142,9 +141,9 @@ describe('global flows', () => {
       type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
     });
     wire(first, second, own);
-    scope.flowLogs.start('flow:5');
-    scope.flowLogs.start('flow:6');
-    scope.flowLogs.start(3);
+    scope.flowLogs.keepAlive('flow:5');
+    scope.flowLogs.keepAlive('flow:6');
+    scope.flowLogs.keepAlive(3);
 
     await scope.service.runFlow(3, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {});
 
@@ -249,7 +248,7 @@ describe('global flows', () => {
     await scope.service.runFlow(3, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {});
 
     expect(scope.resourceHealthService.reportHealth).not.toHaveBeenCalled();
-    expect(scope.flowStore.findOutgoingEdges).toHaveBeenCalledWith(trigger, undefined, undefined);
+    expect(scope.flowStore.findOutgoingEdges).toHaveBeenCalledWith(trigger, 'output', undefined);
   });
 
   it("lets a resource flow's Error node abort the run even when a global flow fails first with a plain error", async () => {

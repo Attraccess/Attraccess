@@ -3,6 +3,9 @@ import type { TransactionContext } from '../../database/transaction-context';
 
 export const FLOW_TRIGGER_STORE = Symbol.for('attraccess.flows.trigger-store');
 
+/** The handle a node continues on when its result names none; edges stored without a handle belong to it too. */
+export const DEFAULT_OUTPUT_HANDLE = 'output';
+
 /** A no-activity trigger node together with a machine that currently has an active session. */
 export interface InactivityTarget {
   node: FlowNodeRecord;
@@ -15,10 +18,13 @@ export interface InactivityTarget {
  * enabled global flows; nodes of disabled flows or of other scopes never match.
  */
 export interface FlowTriggerStore {
-  /** The edges leaving `node` on the canvas it belongs to; `outputHandle` undefined matches every handle. */
+  /**
+   * The edges leaving `node` on `outputHandle`, on the canvas it belongs to. For `'output'` this includes older edges
+   * stored without a handle (`sourceHandle` null), which are the node's default output.
+   */
   findOutgoingEdges(
     node: FlowNodeRecord,
-    outputHandle: string | undefined,
+    outputHandle: string,
     context?: TransactionContext,
   ): Promise<FlowEdgeRecord[]>;
 

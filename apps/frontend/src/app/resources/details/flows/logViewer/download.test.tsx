@@ -12,9 +12,9 @@ const state = vi.hoisted(() => ({
   live: [] as object[],
 }));
 
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('../context/index', () => ({
-  useFlowContext: () => ({ liveLogs: state.live, owner: state.owner }),
+  useFlowContext: () => ({ owner: state.owner }),
+  useFlowLogsContext: () => ({ liveLogs: state.live, isPausedForInactivity: false }),
 }));
 vi.mock('@attraccess/react-query-client', () => {
   const canvas = () => ({ data: { nodes: [{ id: 'trigger', type: 'input.button' }] } });
@@ -22,7 +22,6 @@ vi.mock('@attraccess/react-query-client', () => {
     data: { isRecording: state.isRecording, startedAt: state.isRecording ? '2026-09-01T11:00:00Z' : null },
   });
   const logs = () => ({ data: { logs: state.fetched } });
-  const mutation = () => ({ mutate: vi.fn() });
   const none = () => ({ data: undefined });
   return {
     useGetResourceFlow: canvas,
@@ -33,10 +32,6 @@ vi.mock('@attraccess/react-query-client', () => {
     useGetGlobalFlowLogRecordingStatus: status,
     useGetResourceFlowLogs: logs,
     useGetGlobalFlowLogs: logs,
-    useStartFlowLogRecording: mutation,
-    useStartGlobalFlowLogRecording: mutation,
-    useStopFlowLogRecording: mutation,
-    useStopGlobalFlowLogRecording: mutation,
   };
 });
 

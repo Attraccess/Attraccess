@@ -1,12 +1,13 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ResourceFlowLog } from '@attraccess/react-query-client';
-import { useLiveLogs } from './liveLogs';
+import { LIVE_LOG_FLUSH_MS, MAX_LIVE_LOGS, useLiveLogs } from './liveLogs';
 
 const state = vi.hoisted(() => ({
   messages: [] as Array<{ data: string }>,
   streamEnded: undefined as undefined | (() => void),
   liveUpdates: vi.fn(),
+  resourceUpdate: undefined as undefined | ((log: ResourceFlowLog) => void),
 }));
 
 vi.mock('fetch-event-stream', () => ({
@@ -21,8 +22,9 @@ vi.mock('fetch-event-stream', () => ({
 }));
 vi.mock('../../../../api', () => ({ getBaseUrl: () => 'http://api.test' }));
 vi.mock('../../../../utils/live-updates', () => ({
-  useLiveUpdates: (options: unknown) => {
+  useLiveUpdates: (options: { onUpdate: (log: ResourceFlowLog) => void }) => {
     state.liveUpdates(options);
+    state.resourceUpdate = options.onUpdate;
     return { abort: vi.fn(), owner: null };
   },
 }));
@@ -100,5 +102,72 @@ describe('useLiveLogs for a global flow', () => {
     expect(state.liveUpdates).toHaveBeenCalledWith(
       expect.objectContaining({ topic: 'flow-logs', resourceId: 3, enabled: true }),
     );
+  });
+});
+
+describe('useLiveLogs for a resource flow', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('hands every entry to the receiver at once but applies them to state in one batch', () => {
+    const onUpdate = vi.fn();
+    let renders = 0;
+    const { result } = renderHook(() => {
+      renders += 1;
+      return useLiveLogs({ owner: { kind: 'resource', resourceId: 3 }, onUpdate });
+    });
+    const rendersBefore = renders;
+
+    act(() => {
+      for (let id = 1; id <= 50; id += 1) state.resourceUpdate?.(log(id));
+    });
+    expect(onUpdate).toHaveBeenCalledTimes(50);
+    expect(result.current.liveLogs).toEqual([]);
+
+    act(() => vi.advanceTimersByTime(LIVE_LOG_FLUSH_MS));
+    expect(result.current.liveLogs).toHaveLength(50);
+    expect(renders - rendersBefore).toBe(1);
+  });
+
+  it('keeps only the newest 2000 entries', () => {
+    const { result } = renderHook(() => useLiveLogs({ owner: { kind: 'resource', resourceId: 3 }, onUpdate: vi.fn() }));
+
+    act(() => {
+      for (let id = 1; id <= 1200; id += 1) state.resourceUpdate?.(log(id));
+      vi.advanceTimersByTime(LIVE_LOG_FLUSH_MS);
+    });
+    act(() => {
+      for (let id = 1201; id <= 2500; id += 1) state.resourceUpdate?.(log(id));
+      vi.advanceTimersByTime(LIVE_LOG_FLUSH_MS);
+    });
+
+    expect(MAX_LIVE_LOGS).toBe(2000);
+    expect(result.current.liveLogs).toHaveLength(2000);
+    expect(result.current.liveLogs[0].id).toBe(501);
+    expect(result.current.liveLogs[1999].id).toBe(2500);
+  });
+
+  it('keeps only the newest 2000 entries of a single batch', () => {
+    const { result } = renderHook(() => useLiveLogs({ owner: { kind: 'resource', resourceId: 3 }, onUpdate: vi.fn() }));
+
+    act(() => {
+      for (let id = 1; id <= 2500; id += 1) state.resourceUpdate?.(log(id));
+      vi.advanceTimersByTime(LIVE_LOG_FLUSH_MS);
+    });
+
+    expect(result.current.liveLogs).toHaveLength(2000);
+    expect(result.current.liveLogs[0].id).toBe(501);
+    expect(result.current.liveLogs[1999].id).toBe(2500);
+  });
+
+  it('drops entries still waiting for their batch when the editor is left', () => {
+    const { unmount } = renderHook(() =>
+      useLiveLogs({ owner: { kind: 'resource', resourceId: 3 }, onUpdate: vi.fn() }),
+    );
+
+    act(() => state.resourceUpdate?.(log(1)));
+    unmount();
+
+    expect(() => vi.advanceTimersByTime(LIVE_LOG_FLUSH_MS)).not.toThrow();
   });
 });

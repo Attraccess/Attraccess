@@ -21,8 +21,22 @@ describe('ResourceMeteringController session visibility', () => {
       getLive: jest.fn(async () => ({ meters: [meter(session as never)] })),
     };
     const visibility = { activeSessionView: jest.fn(async () => view) };
-    return new ResourceMeteringController(metering as never, visibility as never);
+    return new ResourceMeteringController(metering as never, visibility as never, {} as never);
   };
+
+  it.each([
+    [true, ['resources.update'], true],
+    [true, ['resources.read', 'billing.manage'], false],
+    [undefined, ['resources.update'], false],
+    [false, ['resources.update'], false],
+  ])('lists archived meters for includeArchived=%s with %j: %s', async (query, permissions, included) => {
+    const listMeters = jest.fn(async () => []);
+    const controller = new ResourceMeteringController({ listMeters } as never, {} as never, {} as never);
+    await controller.list(1, { user: { id: 10, effectivePermissions: new Set(permissions) } } as never, query);
+    // Only people who may delete a meter learn whether it can be deleted.
+    const manage = permissions.includes('resources.update');
+    expect(listMeters).toHaveBeenCalledWith(1, { includeArchived: included, withDeletable: manage });
+  });
 
   it('hides the running session and the live counter from viewers without full access', async () => {
     const controller = controllerWith({ full: false, ownUsageId: null });

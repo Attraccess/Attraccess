@@ -16,7 +16,7 @@ import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event'
 
 import { LiveNotificationsService } from '../../billing/live-notifications/live-notifications.service';
 
-import { MeteringOperationError, MeteringReadings } from './metering-readings';
+import { archivedMeterAccepts, MeteringOperationError, MeteringReadings } from './metering-readings';
 
 import { MeteringReport } from '../flows/node-executors/index';
 
@@ -32,7 +32,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { type FinalCollection, type MeterFinal, MeteringSettlement } from './metering-settlement';
 
-import { MeteringCatalog } from './metering-catalog';
+import { ListMetersOptions, MeteringCatalog } from './metering-catalog';
 
 import { findActiveMeterSessions, getMeteringSessionLimit } from './meter-sessions';
 
@@ -130,6 +130,10 @@ export class ResourceMeteringService implements OnModuleInit {
     options: { trigger: ResourceFlowNodeType; timeoutSeconds: number; freshAfter?: Date },
   ): Promise<ResourceMeteringOperationRecord> {
     return this.enqueue(session.resourceId, async () => {
+      // The cron listed its meters earlier: a meter archived meanwhile gets no further request. This check is not
+      // locked, so an archive right after it still lets one request out; `complete()` then refuses its reply.
+      if (!archivedMeterAccepts(kind) && (await this.store.findMeterById(session.meterId))?.archivedAt)
+        throw new MeteringOperationError('METER_ARCHIVED');
       const requestedAt = new Date();
       // A flow addresses the person's own measuring point with the user the session belongs to.
       const userId = session.usageId === null ? null : await this.store.findUsageOwner(session.usageId);
@@ -315,8 +319,8 @@ export class ResourceMeteringService implements OnModuleInit {
     return this.catalog.createMeter(resourceId, name);
   }
 
-  listMeters(resourceId: number) {
-    return this.catalog.listMeters(resourceId);
+  listMeters(resourceId: number, options?: ListMetersOptions) {
+    return this.catalog.listMeters(resourceId, options);
   }
 
   waive(resourceId: number, sessionId: string, initiatorId: number): Promise<ResourceMeteringSessionRecord> {
