@@ -96,13 +96,17 @@ export function useFlowLogKeepAlive(owner: FlowOwner, timing: FlowLogKeepAliveTi
     const evaluate = () => {
       const { renewIntervalMs, idleWarningMs, idleTimeoutMs } = latest.current.timing;
       const now = Date.now();
+      // A wall clock that was set back makes these negative; treat that as fresh input and a due renewal,
+      // or an active page would stop renewing until the clock caught up again.
+      if (now < lastInputAt) lastInputAt = now;
+      const sinceRenewal = now - lastRenewalAt;
       const idle = now - lastInputAt;
       if (idle >= idleTimeoutMs) {
         enterPhase('timedOut');
       } else if (idle >= idleWarningMs) {
         enterPhase('warned');
       } else if (
-        now - lastRenewalAt >= renewIntervalMs - TICK_SLACK_MS &&
+        (sinceRenewal < 0 || sinceRenewal >= renewIntervalMs - TICK_SLACK_MS) &&
         // The final renewal at the warning mark follows within a tick; renewing now as well would send two.
         idleWarningMs - idle >= renewIntervalMs - TICK_SLACK_MS
       ) {

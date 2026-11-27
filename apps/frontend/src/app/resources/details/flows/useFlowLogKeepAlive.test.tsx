@@ -109,6 +109,38 @@ describe('renewals', () => {
     expect(toastsOfType('warning')).toHaveLength(1);
   });
 
+  it('keeps renewing an active page when the wall clock is set back', () => {
+    mount();
+    advance(5 * MINUTE);
+    act(() => {
+      vi.setSystemTime(Date.now() - 20 * MINUTE);
+    });
+    state.keepAlive.mockClear();
+
+    advance(MINUTE);
+    input();
+    advance(MINUTE);
+
+    expect(state.keepAlive).toHaveBeenCalled();
+  });
+
+  it('listens for input on the window, passive and in the capture phase', () => {
+    const listen = vi.spyOn(window, 'addEventListener');
+    mount();
+    for (const type of ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart']) {
+      expect(listen).toHaveBeenCalledWith(type, expect.any(Function), { passive: true, capture: true });
+    }
+    listen.mockRestore();
+  });
+
+  it('does not re-evaluate while the tab is hidden', () => {
+    mount();
+    const hidden = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    wakeAfter(31 * MINUTE);
+    expect(state.toast.showToast).not.toHaveBeenCalled();
+    hidden.mockRestore();
+  });
+
   it('never stops a recording and sends nothing on unmount', () => {
     const view = mount();
     view.unmount();
@@ -154,6 +186,17 @@ describe('idle toasts', () => {
     const renewals = state.keepAlive.mock.calls.length;
 
     input('keydown');
+
+    expect(state.toast.dismiss).toHaveBeenCalledTimes(1);
+    expect(state.keepAlive).toHaveBeenCalledTimes(renewals + 1);
+  });
+
+  it.each(['wheel', 'touchstart', 'focus'])('counts %s as input', (type) => {
+    mount();
+    advance(15 * MINUTE + 30 * SECOND);
+    const renewals = state.keepAlive.mock.calls.length;
+
+    input(type);
 
     expect(state.toast.dismiss).toHaveBeenCalledTimes(1);
     expect(state.keepAlive).toHaveBeenCalledTimes(renewals + 1);

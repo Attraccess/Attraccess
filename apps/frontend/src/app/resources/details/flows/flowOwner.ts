@@ -199,12 +199,14 @@ export function useKeepFlowLogRecordingAliveRequest(owner: FlowOwner): () => voi
   const queryClient = useQueryClient();
   const onSuccess = useCallback(
     (status: FlowLogRecordingDto) => {
-      queryClient.setQueryData(
+      const queryKey =
         owner.kind === 'resource'
           ? UseGetFlowLogRecordingStatusKeyFn({ path: { resourceId: owner.resourceId } })
-          : UseGetGlobalFlowLogRecordingStatusKeyFn({ path: { flowId: owner.flowId } }),
-        status,
-      );
+          : UseGetGlobalFlowLogRecordingStatusKeyFn({ path: { flowId: owner.flowId } });
+      // A status request still in flight (e.g. a refetch on window focus) was answered before this renewal
+      // and would overwrite the newer state.
+      void queryClient.cancelQueries({ queryKey });
+      queryClient.setQueryData(queryKey, status);
     },
     [owner, queryClient],
   );
