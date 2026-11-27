@@ -33,8 +33,8 @@ the pointer moves. Public code never references it (see `CONTRIBUTING.md`,
 
 ## Committing
 
-The Husky pre-commit hook runs `pnpm precommit`: the file-size and
-import-cycle checks on the staged files, and a lite typecheck
+The Husky pre-commit hook runs `pnpm precommit`: the file-size, case-collision
+and import-cycle checks on the staged files, and a lite typecheck
 (`scripts/typecheck-staged.mjs`). It runs CI's `tsc` commands, with incremental
 build info, for the projects that own staged TypeScript files. It skips code
 generation and dependent projects. Lint, tests, the CRAP score and the full
