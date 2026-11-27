@@ -14,7 +14,7 @@ export enum ResourceFlowLogType {
  */
 export class ResourceFlowLog {
   @ApiProperty({
-    description: 'Identifier of the log entry, unique per API process',
+    description: 'Identifier of the log entry, unique per API process and increasing, also across restarts',
     example: 42,
   })
   id!: number;

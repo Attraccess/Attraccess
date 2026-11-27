@@ -53,7 +53,9 @@ export class FlowLogRecorderService implements OnModuleInit, OnModuleDestroy {
   private readonly recordings = new Map<FlowLogKey, Recording>();
   private readonly subjects = new Map<FlowLogKey, Subject<ResourceFlowLogEvent>>();
   private sweepInterval?: NodeJS.Timeout;
-  private nextId = 1;
+  // Seeded from the clock so ids keep increasing across API restarts: an open editor keeps the entries it
+  // received before a restart, and the log viewer de-duplicates and orders entries by id.
+  private nextId = Date.now();
 
   onModuleInit() {
     // Doubles as SSE keep-alive and expiry sweep.

@@ -113,6 +113,34 @@ describe('FlowLogRecorderService', () => {
     expect(service.isRecording(1)).toBe(false);
   });
 
+  it('reading the status or the logs never extends an active recording', () => {
+    const start = Date.now();
+    jest.spyOn(Date, 'now').mockReturnValue(start);
+    service.keepAlive(1);
+
+    jest.spyOn(Date, 'now').mockReturnValue(start + 10 * 60_000);
+    service.getStatus(1);
+    service.getLogs(1);
+
+    expect(service.getStatus(1).expiresAt.getTime()).toBe(start + 15 * 60_000);
+  });
+
+  it('gives entries ids above those of an earlier API process', () => {
+    const earlier = new FlowLogRecorderService();
+    earlier.keepAlive(1);
+    earlier.record(entry());
+    const earlierId = earlier.getLogs(1).logs[0].id;
+    earlier.onModuleDestroy();
+
+    jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 1_000);
+    const restarted = new FlowLogRecorderService();
+    restarted.keepAlive(1);
+    restarted.record(entry());
+
+    expect(restarted.getLogs(1).logs[0].id).toBeGreaterThan(earlierId);
+    restarted.onModuleDestroy();
+  });
+
   it('publishes recorded logs to the resource stream', () => {
     const received: unknown[] = [];
     service.subjectFor(1).subscribe((event) => received.push(event));
