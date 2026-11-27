@@ -9,6 +9,7 @@ import {
   TimeField,
 } from '@heroui/react';
 import { Time } from '@internationalized/date';
+import { useState } from 'react';
 import { usePluginsTranslations } from '../usePluginsTranslations';
 import { TimeZoneField } from './TimeZoneField';
 import type { UpdatePolicyForm, UpdatePolicyFormErrors } from './updatePolicyForm';
@@ -26,6 +27,9 @@ interface Props {
 /** When automatic updates may install and restart: weekdays, start time, duration and time zone. */
 export function UpdateScheduleFields({ form, errors, onChange, isDisabled }: Props) {
   const { t } = usePluginsTranslations();
+  // The time field keeps its last complete value while a segment is empty, but goes on showing the gap. Remounting it
+  // when focus leaves makes it show the value that will be saved.
+  const [startFieldKey, setStartFieldKey] = useState(0);
   return (
     <div className="flex flex-col gap-4">
       <CheckboxGroup
@@ -51,6 +55,10 @@ export function UpdateScheduleFields({ form, errors, onChange, isDisabled }: Pro
       </CheckboxGroup>
       <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <TimeField
+          key={startFieldKey}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) setStartFieldKey((key) => key + 1);
+          }}
           value={form.startMinute === null ? null : new Time(Math.floor(form.startMinute / 60), form.startMinute % 60)}
           onChange={(time) => onChange({ startMinute: time ? time.hour * 60 + time.minute : null })}
           hourCycle={24}

@@ -16,6 +16,7 @@ import {
   toUpdatePolicyForm,
   type UpdatePolicyForm,
   updatePolicyFormErrors,
+  withCompleteSchedule,
 } from './updatePolicyForm';
 
 const STEPS = ['patch', 'minor', 'follow'] as const;
@@ -63,7 +64,13 @@ export function AutomaticUpdatesForm({ policy }: Props) {
       </LabeledSwitch>
       <LabeledSwitch
         isSelected={form.automaticUpdates}
-        onChange={(automaticUpdates) => change({ automaticUpdates })}
+        onChange={(automaticUpdates) =>
+          setDraft(
+            automaticUpdates
+              ? { ...form, automaticUpdates }
+              : withCompleteSchedule({ ...form, automaticUpdates }, toUpdatePolicyForm(policy)),
+          )
+        }
         isDisabled={isPending}
         data-cy="plugins-auto-updates-switch"
       >

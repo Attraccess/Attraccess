@@ -39,6 +39,15 @@ export function updatePolicyFormErrors(form: UpdatePolicyForm): UpdatePolicyForm
 }
 
 /**
+ * `form` with every incomplete or invalid schedule field taken from `fallback`. For switching automatic updates off:
+ * the schedule fields are hidden then, so one of them must not block saving unseen.
+ */
+export function withCompleteSchedule(form: UpdatePolicyForm, fallback: UpdatePolicyForm): UpdatePolicyForm {
+  const invalid = Object.keys(updatePolicyFormErrors(form)) as (keyof UpdatePolicyFormErrors)[];
+  return { ...form, ...Object.fromEntries(invalid.map((field) => [field, fallback[field]])) };
+}
+
+/**
  * The request body for a form without errors. It names only what the panel edits: the host keeps every other field, so
  * a value changed through the API meanwhile (`prerelease`) is not put back.
  */

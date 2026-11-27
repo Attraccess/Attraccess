@@ -122,6 +122,36 @@ describe('AutomaticUpdatesPanel', () => {
     expect(nextWindow()).toBeNull();
   });
 
+  // The schedule fields are hidden while the switch is off: an invalid one must not block switching off unseen.
+  it('can switch off after a schedule field was left invalid', async () => {
+    hoisted.updatePolicy = ENABLED_POLICY;
+    const user = await renderPanel();
+    const duration = screen.getByRole('textbox', { name: /Duration/ });
+    await user.clear(duration);
+    fireEvent.blur(duration);
+    await user.click(master());
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(hoisted.setUpdatePolicyMock).toHaveBeenCalledWith({
+      body: expect.objectContaining({ automaticUpdates: false, schedule: ENABLED_POLICY.schedule }),
+    });
+  });
+
+  // React Aria keeps the last complete time while a segment is empty; the field has to show what would be saved.
+  it('shows the time that will be saved when the start time is left half cleared', async () => {
+    hoisted.updatePolicy = ENABLED_POLICY;
+    const user = await renderPanel();
+    const [, minute] = screen.getAllByRole('spinbutton');
+    await user.click(minute);
+    await user.keyboard('{Backspace}{Backspace}{Backspace}');
+    await user.tab();
+    await user.tab();
+    await user.click(weekday('Sunday'));
+    const [shownHour, shownMinute] = screen.getAllByRole('spinbutton').map((segment) => Number(segment.textContent));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    const { schedule } = hoisted.setUpdatePolicyMock.mock.calls[0][0].body;
+    expect(shownHour * 60 + shownMinute).toBe(schedule.startMinute);
+  });
+
   it('says that nothing is installed while the update check is off', async () => {
     hoisted.updatePolicy = ENABLED_POLICY;
     const user = await renderPanel();
