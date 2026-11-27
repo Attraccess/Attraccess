@@ -56,7 +56,7 @@ Anyone who notices a problem can ask for maintenance. A request notifies the peo
 - **In the web app:** open the resource's detail page, click **Report a problem**, describe what is wrong (at least 3 characters) and send the request.
 - **On an Attractap Touch reader:** sign in with your card, open the resource and tap [Report a problem](attractap/using-the-reader.md#report-a-problem).
 
-### "Is the machine OK?" when a session ends
+### “Is the machine OK?” when a session ends
 
 Before you end **your own** session, Attraccess asks **Is the machine OK?**:
 
