@@ -5,7 +5,7 @@ import math
 
 import geometry as G
 from board import B_, IN2, dog
-from placement import LED_VIA, LED_VIA_OUT, led_frame, led_gap_index, led_refs
+from placement import LED_FILTER, LED_VIA, LED_VIA_OUT, led_frame, led_gap_index, led_refs
 
 
 def nfc_feeds(B):
@@ -39,8 +39,13 @@ def led_ring(B):
     """The LED ring: the data line from LED to LED, each LED's supply pad to its capacitor and a via, and the
     5 V rail on In2 that joins the vias. The rail runs round the ring outside the LEDs and stays open where the
     copper round the NFC loop is open (geometry.NFC_GAP): closed, it would be a shorted turn round the loop
-    (its capacitors join it to ground at 13.56 MHz). The data line does cross that gap: it ends in an LED's
-    input, which is no low impedance."""
+    (its capacitors join it to ground at 13.56 MHz). The data line does cross that gap, and with the copper
+    either side it still closes a turn: from the output of the LED before the gap (low impedance to that LED's
+    supply) to the input of the LED after it, whose input capacitance and clamp diodes lead to its ground. The
+    carrier induces about 2.9 V peak in that turn (mutual inductance 164 nH, 209 mA in the loop), enough to
+    toggle the input. So the line runs through the carrier filter there (placement.LED_FILTER): the resistor in
+    the gap, the capacitor from the next LED's input to the ground beside it. Also the second bulk capacitor of
+    +5V_LED, which joins the rail above the ring's top right corner."""
     n = len(G.LEDS)
     refs = led_refs()
     gap = led_gap_index()
@@ -68,6 +73,15 @@ def led_ring(B):
         c, s_ = round(math.cos(math.radians(rot))), round(math.sin(math.radians(rot)))
         dx, dy = nxt[0] - x0, nxt[1] - y0
         nx, ny = dx * c - dy * s_, dx * s_ + dy * c
+        if k == gap:                                # through the filter's resistor in the gap, then 45 degrees
+            r1, r2 = B.pad(LED_FILTER[0], '1'), B.pad(LED_FILTER[0], '2')
+            B.track([out, r1], net, w)
+            net = B.d.parts[LED_FILTER[0]].nets['2']
+            pts = [r2, f(nx - 1.7, 0.75), f(nx - 0.2, ny), nxt]       # the next LED on the same side (ny -0.75)
+            B.track(pts, net, w)
+            c1 = B.pad(LED_FILTER[1], '1')
+            B.track([nxt, c1], net, w)
+            continue
         if abs(ny + 0.75) < 0.01:                   # the next LED on the same side: past the capacitor's inner end
             pts = [out, f(5.6, 0.75), f(7.1, -0.75), nxt]
         else:                                       # round a corner
@@ -93,3 +107,16 @@ def led_ring(B):
         pts.append(v)
     for a, b in zip(pts, pts[1:]):                  # one segment each, so every junction is an end point
         B.track([a, b], '+5V_LED', 0.6, layer=IN2)
+
+
+def led_bulk(B):
+    """The second bulk capacitor of +5V_LED, left of the ring: its + pad across to a via on the In2 rail, which
+    runs down the ring's left side on the line of the LEDs' 5 V vias; its - pad to a ground via."""
+    p, m = B.pad('C726', '1'), B.pad('C726', '2')
+    rail_x = led_frame(len(G.LEDS) - 2)(*LED_VIA)[0]
+    via = (rail_x, p[1])
+    B.track([p, via], '+5V_LED', 0.6)
+    B.via(*via, '+5V_LED', size=0.8, drill=0.4)
+    g = (m[0] - 1.9, m[1])
+    B.track([m, g], 'GND', 0.6)
+    B.via(*g, 'GND', size=0.6, drill=0.3)

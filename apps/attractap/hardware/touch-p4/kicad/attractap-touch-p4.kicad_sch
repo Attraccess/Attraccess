@@ -2426,11 +2426,11 @@
 		(effects (font (size 1.4 1.4)) (justify left bottom))
 		(uuid "375f87db-0f20-5f8a-8a9c-e45fb6b28b81")
 	)
-	(text "A   2026-11-27   LED ring behind a current-limited switch (TPS2553, 232 to 306 mA)"
+	(text "A   2026-11-27   LED ring behind a current-limited switch (TPS2553, 255 to 334 mA)"
 		(exclude_from_sim no)
 		(at 15 75 0)
 		(effects (font (size 1.4 1.4)) (justify left bottom))
-		(uuid "b9d55bfd-56b4-5f08-80ab-798f87e5b2d7")
+		(uuid "a96b5b62-4ee2-5d33-8136-1a8b7ad5cd01")
 	)
 	(sheet_instances (path "/" (page "1")))
 	(embedded_fonts no)

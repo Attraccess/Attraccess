@@ -92,7 +92,8 @@ NOTES = {
         '16 reverse-mount LEDs in a ring, shining through the board. Data: D701 -> D708, D710 -> D717.',
         'Buzzer: drive BUZZER with a 2.7 kHz square wave (LEDC). Its coil is between pads 1 and 2;',
         'pads 3 and 4 only hold the part. R705 keeps the LED data line low while the MCU is in reset.',
-        'LED supply: U705 limits the ring to 232 to 306 mA (R ILIM 100 k); its enable is tied on.',
+        'LED supply: U705 limits the ring to 255 to 334 mA (R ILIM 91 k); its enable is tied on.',
+        'R709 / C727 keep the NFC carrier off D707\'s data input, where the data line crosses the gap round the loop.',
         'Tamper: U702 accelerometer on I2C0 at 0x19, events read over I2C (INT1 on TP814). U703 hall switch:',
         'DOCK_N (IO expander P6) is low while the magnet in the dock is in front of it.',
         'U704 proximity sensor on I2C0 at 0x60: infrared reflection from the dock plate 13.9 mm away, and ambient',
@@ -126,7 +127,7 @@ HISTORY = [
                    'with a 3.3 V converter of its own'),
     ('2026-11-27', 'Tap tile: 16 LEDs in a ring round the NFC loop, the loop on the case centre line, the PN532 '
                    'below the display, the fourth mounting hole left of the tile'),
-    ('2026-11-27', 'LED ring behind a current-limited switch (TPS2553, 232 to 306 mA)'),
+    ('2026-11-27', 'LED ring behind a current-limited switch (TPS2553, 255 to 334 mA)'),
 ]
 
 

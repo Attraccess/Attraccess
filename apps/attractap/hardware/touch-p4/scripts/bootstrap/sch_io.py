@@ -190,14 +190,15 @@ def expander(cv, P_, x, y):
 # ---- UI ----------------------------------------------------------------------------------------------
 def ui(cv, P_, top):
     leds(cv, P_, 30.48, top + 45.72)
-    led_supply(cv, P_, 414.02, top + 45.72)
+    led_supply(cv, P_, 421.64, top + 45.72)
     buzzer(cv, P_, 337.82, top + 165.1)
     tamper(cv, P_, 50.8, top + 170.18)
 
 
 def leds(cv, P_, x, y):
     """Level shifter and the LED chain in the order the data passes them: two rows of eight round the ring
-    (placement.led_refs: D701 to D708, then D710 to D717)."""
+    (placement.led_refs: D701 to D708, then D710 to D717), the carrier filter R709 / C727 before LED GAP_LED."""
+    from circuit_io import GAP_LED
     from placement import led_refs
     refs = led_refs()
     cv.begin('LED data level shifter and addressable LEDs')
@@ -215,19 +216,30 @@ def leds(cv, P_, x, y):
     pitch = 35.56
     x0 = yo[0] + 45.72
     per_row = 8
+    gap_row, gap_col = divmod(GAP_LED, per_row)
+    extra = 20.32                                   # room for the filter before LED GAP_LED
     for row in range(len(refs) // per_row):
         yy = yo[1] + 58.42 * row
         rail = yy - 25.4
+        wide = extra if row == gap_row else 0
         for k in range(per_row):
             i = per_row * row + k
             ref, cref = refs[i]
-            d = cv.put(P_[ref], x0 + pitch * k, yy, fields={'Reference': (4.6, 9.4), 'Value': (8.6, 11.1)})
+            xk = x0 + pitch * k + (wide if k >= gap_col else 0)
+            d = cv.put(P_[ref], xk, yy, fields={'Reference': (4.6, 9.4), 'Value': (8.6, 11.1)})
             vdd = d.pin('3')
             cv.wire(vdd, (vdd[0], rail))
             cv.hang(P_[cref], vdd[0] + 12.7, rail, note=True)
-            if k:
+            if k and i == GAP_LED:                 # the carrier filter at the gap round the NFC loop
+                a, b = cv.at('%s.4' % refs[i - 1][0]), cv.at('%s.2' % ref)
+                cv.inline(P_['R709'], a[0] + 12.7, a[1], fields='a')
+                cv.wire(a, 'R709.1')
+                xc = a[0] + 27.94
+                cv.hang(P_['C727'], xc, a[1], gap=0, fields='l')
+                cv.wire('R709.2', (xc, a[1]), b)
+            elif k:
                 cv.wire('%s.4' % refs[i - 1][0], '%s.2' % ref)
-        xe = x0 + pitch * (per_row - 1) + 17.78
+        xe = x0 + pitch * (per_row - 1) + 17.78 + wide
         cv.wire((x0, rail), (xe, rail))
         cv.label('+5V_LED', xe, rail, 'R')
     cv.wire('R701.2', '%s.2' % refs[0][0])
@@ -239,7 +251,7 @@ def leds(cv, P_, x, y):
 
 def led_supply(cv, P_, x, y):
     """Current-limited switch from +5V to the LED ring's +5V_LED: input capacitor above, enable tied to the
-    input on the left, the limit resistor and the bulk capacitor on the right."""
+    input on the left, the limit resistor and the two bulk capacitors on the right."""
     cv.begin('LED supply switch')
     u = cv.put(P_['U705'], x + 30.48, y + 10.16)
     vin, en, out, ilim = (u.pin(n) for n in ('1', '3', '6', '5'))
@@ -250,9 +262,10 @@ def led_supply(cv, P_, x, y):
     cv.wire(en, (vin[0] - P, en[1]), (vin[0] - P, vin[1]))
     cv.wire(ilim, (ilim[0] + 12.7, ilim[1]))
     cv.hang(P_['R708'], ilim[0] + 12.7, ilim[1], gap=0, fields='r')
-    cv.wire(out, (out[0] + 30.48, out[1]))
-    cv.hang(P_['C725'], out[0] + 25.4, out[1], gap=0, fields='r')
-    cv.label('+5V_LED', out[0] + 30.48, out[1], 'R')
+    cv.wire(out, (out[0] + 40.64, out[1]))
+    cv.hang(P_['C725'], out[0] + 22.86, out[1], gap=0, fields='l')
+    cv.hang(P_['C726'], out[0] + 33.02, out[1], gap=0, fields='r')
+    cv.label('+5V_LED', out[0] + 40.64, out[1], 'R')
 
 
 def buzzer(cv, P_, x, y):

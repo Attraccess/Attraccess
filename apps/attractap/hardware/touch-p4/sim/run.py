@@ -53,6 +53,8 @@ def nfc(board):
     # no closed copper round the loop, on any layer: every net alone, and the supply nets together
     for what, closes in shorted_turn.check(board):
         check(not closes, 'no closed copper round the loop: %s' % what)
+    for passes, what in shorted_turn.crossings(board):
+        check(passes, what)
     # no mounting hole (a metal screw and insert) in the gap of the copper round it
     gx1, gy1, gx2, gy2 = geometry.NFC_GAP
     r = geometry.MOUNT_KEEPOUT_R

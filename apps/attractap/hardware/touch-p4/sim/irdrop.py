@@ -118,9 +118,9 @@ def ipc2221(board, w_mm, layer, rise=20.0):
     return (0.048 if layer in ('F.Cu', 'B.Cu') else 0.024) * rise ** 0.44 * area ** 0.725
 
 
-# Every 5 V load at its supply-sizing figure at once (design notes, "Power budget"): 1.65 A on the
-# 5 V rail with the LED ring at its switch's highest current limit (0.31 A), more than the firmware ever draws.
-LED_SWITCH_MAX = 0.31
+# Every 5 V load at its supply-sizing figure at once (design notes, "Power budget"): 1.67 A on the
+# 5 V rail with the LED ring at its switch's highest current limit (0.33 A), more than the firmware ever draws.
+LED_SWITCH_MAX = 0.33
 RAIL_5V = {'U103.4': 1.00, 'L601.1': 0.13, 'FB501.1': 0.12, 'R702.1': 0.09, 'U705.1': LED_SWITCH_MAX}
 LED_RING = {'D%d.3' % (701 + k if k < 8 else 702 + k): LED_SWITCH_MAX / 16 for k in range(16)}
 CASES = [

@@ -27,6 +27,12 @@ def led_refs():
 # of the 5 V rail; for the LED before the gap in the copper round the loop, outside the ring instead
 LED_CAP, LED_VIA = (4.6, -0.6), (4.6, -2.6)
 LED_CAP_OUT, LED_VIA_OUT = (2.9, -2.45), (1.6, -2.6)
+# The data line's carrier filter where it crosses that gap (circuit_io.GAP_LED): its resistor and capacitor, and
+# the capacitor's place in the frame of the LED after the gap, beside that LED's data input (pin 2)
+LED_FILTER = ('R709', 'C727')
+LED_FILTER_C = (-2.775, -3.0)
+# The second bulk capacitor of +5V_LED, beside the ring's left side, its + pad level with the rail's via line
+LED_BULK_2 = (15.9, 113.3)
 
 
 def led_gap_index():
@@ -397,6 +403,9 @@ def place(B):
     put('C724', 40.4, 87.65, 180)
     put('R708', 46.4, 88.6, 0)
     put('C725', 52.6, 89.2, 0)     # 100 uF, + on the left towards the switch's output
+    # the second 100 uF in the free strip between the DC cut-away and the ring's left side (5.4 mm tall under the
+    # dock plate's 13.9), between two of the ring's 5 V vias, + down
+    put('C726', *LED_BULK_2, 90)
     put('C702', 3.0, 61.2, 0)      # 5 V rail at the buzzer
     # the ring (geometry.LEDS) in the data line's order, each capacitor in the gap after its LED, across the
     # ring, its 5 V pad outside; the LED before the gap in the copper round the loop has it outside the ring
@@ -407,6 +416,11 @@ def place(B):
             put(cref, *led_frame(k)(*LED_CAP_OUT), rot)
         else:
             put(cref, *led_frame(k)(*LED_CAP), (rot + 270) % 360)
+    # the carrier filter of the data line across the gap: the resistor in the gap, in line with the data output
+    # of the LED before it (pin 1 towards it), the capacitor beside the next LED's data input, pin 1 towards it
+    x, y, rot = G.LEDS[gap]
+    put(LED_FILTER[0], *led_frame(gap)(G.LED_PITCH / 2, 0.75), rot)
+    put(LED_FILTER[1], *led_frame(gap + 1)(*LED_FILTER_C), (rot + 90) % 360)
     put('BZ701', 6.4, 52.0, 180)
     put('R702', 13.2, 48.4, 0)
     put('D709', 13.6, 52.0, 90)    # flyback diode

@@ -56,7 +56,7 @@ from routes_mcu import (
     psram_ring,
     uart_escape,
 )
-from routes_ring import led_ring, nfc_feeds
+from routes_ring import led_bulk, led_ring, nfc_feeds
 from routes_sdio import sdio_bus
 from routes_wifi import wifi_buck_routes
 from routes_signal import usb_connector, usb_pair
@@ -105,6 +105,7 @@ def build():
     shield_route(B)
     nfc_feeds(B)
     led_ring(B)
+    led_bulk(B)
     dc_route(B)
     small_links(B)
     tamper_routes(B)
@@ -170,6 +171,8 @@ STALE_NETS |= {'NFC_' + n for n in ('TX1', 'TX2', 'F1', 'F2', 'M1', 'M2', 'ANT1'
 # switch beside it; the ring's supply became +5V_LED.
 STALE_NETS |= {'LED_DATA', 'LED_DATA_5V', 'LED_ILIM', '+5V_LED'}
 STALE_PARTS |= {'U701', 'C701', 'R701', 'R705', 'U705', 'C724', 'R708', 'C725', 'TP827', 'TP828'}
+# The data line's carrier filter at the gap round the NFC loop, the LED supply's second bulk capacitor
+STALE_PARTS |= {'R709', 'C727', 'C726'}
 STALE_AREAS = [(0.0, 89.5, G.NOTCH_X, G.BOARD_H), (11.5, 76.0, 33.0, 89.5), (33.0, 84.0, 56.0, 89.5)]
 
 

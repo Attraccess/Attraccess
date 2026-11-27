@@ -350,6 +350,19 @@ class GeometryTest(unittest.TestCase):
         for hx, hy in geometry.MOUNT_HOLES:
             self.assertFalse(x1 - r < hx < x2 + r and y1 - r < hy < y2 + r)
 
+    def test_led_data_filter_sits_at_the_led_after_the_gap(self):
+        # the data line crosses the gap between led_gap_index() and the next LED; that LED's input is the
+        # filtered one (circuit_io.GAP_LED), the filter's resistor stands in the gap, its capacitor outside it
+        import circuit_io
+        import placement
+        self.assertEqual(placement.led_gap_index() + 1, circuit_io.GAP_LED)
+        k = placement.led_gap_index()
+        x1, y1, x2, y2 = geometry.NFC_GAP
+        rx, ry = placement.led_frame(k)(geometry.LED_PITCH / 2, 0.75)
+        self.assertTrue(x1 < rx < x2 and y1 + 0.8 < ry < y2 - 0.8)
+        cx, cy = placement.led_frame(k + 1)(*placement.LED_FILTER_C)
+        self.assertFalse(x1 - 1 < cx < x2 + 1 and y1 - 1 < cy < y2 + 1)
+
     def test_mounting_hole_bosses_clear_the_tap_tile(self):
         # the case's boss round each hole keeps its distance from the tile's body (the LED ring plus a margin,
         # rounded corners of 5 to 6 mm: 5 mm is the worse case), and each hole has board round it

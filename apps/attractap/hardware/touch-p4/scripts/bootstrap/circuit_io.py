@@ -277,29 +277,42 @@ def ui(d):
     d.group('Addressable LEDs, second half of the ring')
     for i in range(8, N_LED):
         led(d, i)
-    # The LED ring's supply through a current-limited switch. Each LED drives 12 mA per colour, so the ring
-    # draws 192 mA in one colour and 0.58 A in full white. The switch holds the ring below 232 to 306 mA
-    # (R ILIM 100 k, TI's equations 1 to 3 in SLVS841G with the resistor's 1 %), above the 192 mA the
-    # firmware allows. Its enable is tied on: the MCU's two free pins (GPIO27, GPIO48) have no way out of
-    # its fan-out. Constant-current version, not the latch-off -1: a firmware fault dims the ring instead of
-    # switching it off for good. The electrolytic carries the PWM peaks: the LEDs' PWM periods can line up,
-    # and then mixed colours draw up to three times their average for a part of each period.
+    # The LED ring's supply through a current-limited switch. Each LED drives 12 mA per colour and idles at 1 mA,
+    # so the ring draws 208 mA in one colour and 0.59 A in full white. The switch holds the ring below 255 to
+    # 334 mA (R ILIM 91 k, TI's equations 1 to 3 in SLVS841G with the resistor's 1 %), 23 % above the 208 mA the
+    # firmware's 192 mA PWM limit plus the idle current come to. Its enable is tied on: the MCU's two free pins
+    # (GPIO27, GPIO48) have no way out of its fan-out. Constant-current version, not the latch-off -1: a firmware
+    # fault dims the ring instead of switching it off for good. Two electrolytics carry the PWM peaks: the LEDs'
+    # PWM periods can line up, and then mixed colours draw up to three times their average for a part of each
+    # period. The second halves their ESR and keeps the ring above the LED's 3.7 V on a 4.75 V rail.
     d.group('LED supply switch')
     d.add('U', 'TPS2553DBVR', 'attractap:TPS2553DBVR', 'attractap:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL', {
         '1': '+5V', '2': 'GND', '3': '+5V', '5': 'LED_ILIM', '6': '+5V_LED',
     }, nc=('4',), lcsc='C55266', mpn='TPS2553DBVR', desc='Current-limited switch for the LED supply')
     d.C('100n', '+5V', desc='LED switch input')
-    d.R('100k', 'LED_ILIM', 'GND', desc='LED switch current limit: 232 to 306 mA')
-    d.add('C', '100u/16V', 'Device:C_Polarized', 'Capacitor_SMD:CP_Elec_6.3x5.4', {'1': '+5V_LED', '2': 'GND'},
-          lcsc='C7469977', mpn='FVH016ADA101M0654', desc='LED supply: the PWM peaks above the switch limit')
+    d.R('91k', 'LED_ILIM', 'GND', desc='LED switch current limit: 255 to 334 mA')
+    for which in ('the PWM peaks above the switch limit', 'second, halves the ESR'):
+        d.add('C', '100u/16V', 'Device:C_Polarized', 'Capacitor_SMD:CP_Elec_6.3x5.4', {'1': '+5V_LED', '2': 'GND'},
+              lcsc='C7469977', mpn='FVH016ADA101M0654', desc='LED supply: ' + which)
+    # The data line crosses the gap in the copper round the NFC loop (geometry.NFC_GAP) between the LED before
+    # it and GAP_LED. With the ground and +5V_LED copper either side it closes a turn round the loop, and the
+    # carrier induced in that turn (about 2.9 V peak at 13.56 MHz) would reach GAP_LED's data input. A low-pass
+    # at that input: 2.2 k in the line (in the gap), 39 pF to the LED's ground. It leaves 0.4 V of the carrier,
+    # keeps the turn at 2.2 k (0.09 ohm reflected into the loop) and delays the data edges by 0.1 us at most.
+    d.group('LED data filter at the gap round the NFC loop')
+    d.R('2.2k', 'LED_D%d' % GAP_LED, 'LED_D%d_F' % GAP_LED, desc='LED data: NFC carrier filter')
+    d.C('39p', 'LED_D%d_F' % GAP_LED, desc='LED data: NFC carrier filter')
 
 
 N_LED = 16
+# The LED after the gap in the copper round the NFC loop (placement.led_gap_index() + 1): its data input sits
+# behind the carrier filter
+GAP_LED = 6
 
 
 def led(d, i):
     """LED i of the chain (from 0) and its capacitor."""
-    nets = {'1': 'GND', '2': 'LED_D%d' % i, '3': '+5V_LED'}
+    nets = {'1': 'GND', '2': 'LED_D%d' % i + ('_F' if i == GAP_LED else ''), '3': '+5V_LED'}
     if i + 1 < N_LED:
         nets['4'] = 'LED_D%d' % (i + 1)
     d.add('D', 'SK6812MINI-E', 'attractap:SK6812MINI-E',

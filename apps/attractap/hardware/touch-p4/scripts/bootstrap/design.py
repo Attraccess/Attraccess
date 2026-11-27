@@ -47,6 +47,7 @@ PASSIVES = {
     ('R', '6.19k', '0402'): ('C25914', UR, '0402WGF6191TCE', R0402),
     ('R', '10k', '0402'): ('C25744', UR, '0402WGF1002TCE', R0402),
     ('R', '51k', '0402'): ('C25794', UR, '0402WGF5102TCE', R0402),
+    ('R', '91k', '0402'): ('C4147', UR, '0402WGF9102TCE', R0402),
     ('R', '100k', '0402'): ('C25741', UR, '0402WGF1003TCE', R0402),
     # Espressif's checklist for chip revision v3.x: the two 499 k of the core converter's divider "must be
     # populated" (ESP32-P4 Hardware Design Guidelines v2.0)
