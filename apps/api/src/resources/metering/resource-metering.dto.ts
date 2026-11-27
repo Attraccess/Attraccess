@@ -82,7 +82,10 @@ export class ResourceMeterDto {
   sessions!: MeterSessionDto[];
   @ApiProperty({ type: String, format: 'date-time', nullable: true, description: 'Null while the meter is active' })
   archivedAt!: Date | null;
-  @ApiProperty({ description: 'The meter has no history and no running session captured it, so it can be deleted' })
+  @ApiProperty({
+    description:
+      'The meter has no history and no running session captured it, so it can be deleted. Always false for callers without `resources.update`',
+  })
   deletable!: boolean;
 }
 class MeterDefinitionDto {

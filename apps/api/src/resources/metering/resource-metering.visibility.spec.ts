@@ -33,7 +33,9 @@ describe('ResourceMeteringController session visibility', () => {
     const listMeters = jest.fn(async () => []);
     const controller = new ResourceMeteringController({ listMeters } as never, {} as never, {} as never);
     await controller.list(1, { user: { id: 10, effectivePermissions: new Set(permissions) } } as never, query);
-    expect(listMeters).toHaveBeenCalledWith(1, { includeArchived: included });
+    // Only people who may delete a meter learn whether it can be deleted.
+    const manage = permissions.includes('resources.update');
+    expect(listMeters).toHaveBeenCalledWith(1, { includeArchived: included, withDeletable: manage });
   });
 
   it('hides the running session and the live counter from viewers without full access', async () => {

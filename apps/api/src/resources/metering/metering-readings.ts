@@ -1,6 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
+  MeteringOperationKind,
   ResourceMeterRecord,
   ResourceMeteringOperationRecord,
   ResourceMeteringSessionRecord,
@@ -25,6 +26,11 @@ export const CLOCK_SKEW_MS = 5_000;
 export const INTERIM_MAX_AGE_MS = 5 * 60_000;
 
 export class MeteringOperationError extends Error {}
+
+/** Only the retry of an outstanding charge still reads an archived meter, as a final collection. */
+export function archivedMeterAccepts(kind: MeteringOperationKind): boolean {
+  return kind === 'final';
+}
 
 function observationTime(report: Extract<MeteringReport, { kind: 'reading' }>): Date {
   const now = new Date();
@@ -88,8 +94,7 @@ export class MeteringReadings {
       const session = operation.sessionId ? await this.store.findSession(operation.sessionId, scope) : null;
       if (operation.sessionId && !session) throw new Error(`The metering session ${operation.sessionId} is gone`);
       const meter = await requireMeter(this.store, operation.resourceId, operation.meterId, scope);
-      // Only the retry of an outstanding charge still reads an archived meter, as a final collection.
-      if (meter.archivedAt && operation.kind !== 'final') throw new MeteringOperationError('METER_ARCHIVED');
+      if (meter.archivedAt && !archivedMeterAccepts(operation.kind)) throw new MeteringOperationError('METER_ARCHIVED');
       if ((operation.kind === 'start') !== (report.kind === 'ready'))
         throw new MeteringOperationError('The reply does not answer this request');
       if (report.kind === 'ready') await this.completeStart(scope, operation, session, meter, report);

@@ -17,6 +17,7 @@ import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceMeteringSessionRecord } from '@attraccess/application-models';
 import { ResourceMeteringService } from './resource-metering.service';
 import { MeterRemoval } from './meter-removal';
+import { auditActorOf } from '../../audit/recorder/audit-event';
 import {
   MeterAllocationDto,
   MeterNameDto,
@@ -83,8 +84,10 @@ export class ResourceMeteringController {
     @Req() req: AuthenticatedRequest,
     @Query('includeArchived') includeArchived?: string,
   ): Promise<ResourceMeterDto[]> {
+    const manage = req.user.effectivePermissions?.has('resources.update') === true;
     const meters = await this.metering.listMeters(resourceId, {
-      includeArchived: includeArchived === 'true' && req.user.effectivePermissions.has('resources.update'),
+      includeArchived: includeArchived === 'true' && manage,
+      withDeletable: manage,
     });
     return this.withVisibleSession(meters, resourceId, req);
   }
@@ -122,7 +125,7 @@ export class ResourceMeteringController {
     @Param('meterId', ParseIntPipe) meterId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceMeterDto> {
-    return this.removal.archive(resourceId, meterId, req.user.id);
+    return this.removal.archive(resourceId, meterId, auditActorOf(req.user));
   }
 
   @Post('meters/:meterId/restore')
@@ -135,7 +138,7 @@ export class ResourceMeteringController {
     @Param('meterId', ParseIntPipe) meterId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceMeterDto> {
-    return this.removal.restore(resourceId, meterId, req.user.id);
+    return this.removal.restore(resourceId, meterId, auditActorOf(req.user));
   }
 
   @Delete('meters/:meterId')
@@ -148,7 +151,7 @@ export class ResourceMeteringController {
     @Param('meterId', ParseIntPipe) meterId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<void> {
-    return this.removal.delete(resourceId, meterId, req.user.id);
+    return this.removal.delete(resourceId, meterId, auditActorOf(req.user));
   }
 
   @Patch('meters/:meterId/rate')

@@ -28,6 +28,21 @@ describe('audit storage safe snapshot', () => {
     expect(projectResourceAuditEvent({ ...deletion, details: { password: 'raw-secret' } })).toBeNull();
   });
 
+  it.each(['meter.archived', 'meter.restored', 'meter.deleted'] as const)(
+    'keeps the meter and its name for %s and nothing else',
+    (action) => {
+      const event = {
+        action,
+        operationId: randomUUID(),
+        actorId: 42,
+        subjectId: 7,
+        details: { meterId: 3, meterName: 'Power' },
+      };
+      expect(projectResourceAuditEvent(event)).toEqual(event);
+      expect(projectResourceAuditEvent({ ...event, details: { ...event.details, secret: 'x' } })).toBeNull();
+    },
+  );
+
   it('allows the flow events with their reviewed fields and subject types only', () => {
     const base = { operationId: randomUUID(), actorId: 42, subjectId: 7 };
     const canvas = {

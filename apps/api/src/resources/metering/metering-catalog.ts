@@ -34,6 +34,26 @@ export function capturedBy(usages: MeteringUsageRecord[], meterId: number): bool
   return usages.some((usage) => usage.meterRates?.some((rate) => rate.meterId === meterId));
 }
 
+/**
+ * The delete rule: a meter may be deleted when it never recorded anything and no usage that has not ended captured
+ * it. Sessions, operations and segments go with a deleted meter, so any of them counts as history.
+ */
+export async function meterIsDeletable(
+  store: MeteringStore,
+  meter: ResourceMeterRecord,
+  openUsages: MeteringUsageRecord[],
+  context?: TransactionContext,
+): Promise<boolean> {
+  if (hasObservations(meter) || capturedBy(openUsages, meter.id)) return false;
+  return !(await store.hasMeterRecords(meter.id, context));
+}
+
+export interface ListMetersOptions {
+  includeArchived?: boolean;
+  /** Work out `deletable`; otherwise it is false. Only people who may delete a meter need it. */
+  withDeletable?: boolean;
+}
+
 /** Meter configuration and read-only views of definition and consumption state. */
 export class MeteringCatalog {
   constructor(private readonly store: MeteringStore) {}
@@ -75,15 +95,15 @@ export class MeteringCatalog {
     };
   }
 
-  /** Whether the meter never recorded anything and no running usage captured it, so it may be deleted. */
-  private async isDeletable(meter: ResourceMeterRecord, openUsages: MeteringUsageRecord[]): Promise<boolean> {
-    if (hasObservations(meter) || capturedBy(openUsages, meter.id)) return false;
-    return !(await this.store.hasMeterRecords(meter.id));
-  }
-
-  async listMeters(resourceId: number, options: { includeArchived?: boolean } = {}) {
-    const meters = await this.store.listMeters(resourceId, undefined, options);
-    const openUsages = meters.length ? await this.store.findOpenUsages(resourceId) : [];
+  async listMeters(resourceId: number, options: ListMetersOptions = {}) {
+    const meters = await this.store.listMeters(resourceId, undefined, { includeArchived: options.includeArchived });
+    // Loaded once, and only when a meter without readings needs the full check.
+    let openUsages: MeteringUsageRecord[] | undefined;
+    const deletable = async (meter: ResourceMeterRecord) => {
+      if (!options.withDeletable || hasObservations(meter)) return false;
+      openUsages ??= await this.store.findOpenUsages(resourceId);
+      return meterIsDeletable(this.store, meter, openUsages);
+    };
     const { byMeter } = await findActiveMeterSessions(
       this.store,
       resourceId,
@@ -152,7 +172,7 @@ export class MeteringCatalog {
         session: sessions[0] ?? null,
         sessions,
         archivedAt: meter.archivedAt,
-        deletable: await this.isDeletable(meter, openUsages),
+        deletable: await deletable(meter),
       });
     }
     return result;
@@ -193,9 +213,10 @@ export class MeteringCatalog {
     return this.getMeterDto(resourceId, meterId);
   }
 
-  /** One meter, active or archived. */
+  /** One meter, active or archived, for the people who may change it. */
   async getMeterDto(resourceId: number, meterId: number) {
-    const meter = (await this.listMeters(resourceId, { includeArchived: true })).find((m) => m.id === meterId);
+    const meters = await this.listMeters(resourceId, { includeArchived: true, withDeletable: true });
+    const meter = meters.find((m) => m.id === meterId);
     if (!meter) throw new BadRequestException('METER_NOT_FOUND');
     return meter;
   }

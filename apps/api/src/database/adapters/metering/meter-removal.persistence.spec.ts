@@ -1,6 +1,7 @@
 import {
   Resource,
   ResourceFlowEdge,
+  ResourceFlowNode,
   ResourceMeter,
   ResourceMeteringOperation,
   ResourceMeteringSegment,
@@ -18,6 +19,7 @@ import { closeMeteringFixture, createMeteringPersistence, resetTestFixture } fro
 jest.setTimeout(30_000);
 
 const ADMIN = 1;
+const ACTOR = { id: ADMIN, authenticationMethod: 'session' } as const;
 const increment = { kind: 'reading', mode: 'increment', value: '2' } as const;
 
 describe('Archiving, restoring and deleting meters', () => {
@@ -37,9 +39,11 @@ describe('Archiving, restoring and deleting meters', () => {
     jest.restoreAllMocks();
   });
 
-  const archive = () => removal.archive(1, 1, ADMIN);
-  const restore = () => removal.restore(1, 1, ADMIN);
-  const remove = () => removal.delete(1, 1, ADMIN);
+  const archive = () => removal.archive(1, 1, ACTOR);
+  const restore = () => removal.restore(1, 1, ACTOR);
+  const remove = () => removal.delete(1, 1, ACTOR);
+  /** What a manager sees: only they learn whether a meter can be deleted. */
+  const deletable = async () => (await scope.metering.listMeters(1, { withDeletable: true }))[0].deletable;
   const meterRow = () => scope.source.getRepository(ResourceMeter).findOneBy({ id: 1 });
   const start = () => scope.usage.startSession(1, scope.users[0], {} as never);
   const end = () => scope.usage.endSession(1, scope.users[0], {} as never);
@@ -156,7 +160,7 @@ describe('Archiving, restoring and deleting meters', () => {
         await expect(archive()).rejects.toThrow('METER_IN_USE');
         await expect(remove()).rejects.toThrow('METER_IN_USE');
         expect(await meterRow()).toMatchObject({ archivedAt: null });
-        expect((await scope.metering.listMeters(1))[0].deletable).toBe(false);
+        expect(await deletable()).toBe(false);
         expect(auditedActions()).toEqual([]);
       },
     );
@@ -173,6 +177,16 @@ describe('Archiving, restoring and deleting meters', () => {
         creditsPerUnit: 30,
       });
       await expect(archive()).rejects.toThrow('METER_IN_USE');
+      await expect(remove()).rejects.toThrow('METER_IN_USE');
+    });
+
+    it('is not initialized for a running usage that captured no terms', async () => {
+      await scope.seedMeter();
+      await archive();
+      const usage = await openUsage({ meterRates: null });
+      await scope.metering.initialize({ resourceId: 1, usageId: usage.id });
+      expect(scope.log.filter((entry) => entry.startsWith('meter:'))).toEqual([]);
+      expect(await counts()).toEqual({ sessions: 0, operations: 0, segments: 0 });
     });
 
     /** What a session start does: it takes the lifecycle lock, reads the meters and inserts the usage. */
@@ -206,15 +220,52 @@ describe('Archiving, restoring and deleting meters', () => {
       await refused;
     });
 
-    it('never leaves a started session with an archived meter when both happen at once', async () => {
+    /**
+     * Holds the next call of `method` open after it ran, until `release()`. The other action must start from the test
+     * body: started inside the held call, it would join that call's transaction.
+     */
+    function pauseAfter<T extends object>(target: T, method: keyof T & string) {
+      const original = target[method] as (...args: unknown[]) => Promise<unknown>;
+      let reached: () => void = () => undefined;
+      let release: () => void = () => undefined;
+      const hasRun = new Promise<void>((resolve) => (reached = resolve));
+      const proceed = new Promise<void>((resolve) => (release = resolve));
+      jest.spyOn(target, method as never).mockImplementationOnce(async function (this: unknown, ...args: unknown[]) {
+        const result = await original.apply(this, args);
+        reached();
+        await proceed;
+        return result;
+      } as never);
+      return { hasRun, release };
+    }
+    /** Long enough for the other action to reach the lock and wait there. */
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 300));
+
+    it('refuses an archive that comes while a start is capturing the meter', async () => {
       await scope.seedMeter();
-      const [started, archived] = await Promise.allSettled([start(), archive()]);
-      expect(started.status).toBe('fulfilled');
-      const usage = await scope.source.getRepository(ResourceUsage).findOneByOrFail({ resourceId: 1 });
-      const captures = (usage.meterRates ?? []).some((rate) => rate.meterId === 1);
-      expect(captures).toBe(archived.status === 'rejected');
-      expect((await meterRow())?.archivedAt === null).toBe(captures);
-      expect((await counts()).sessions).toBe(captures ? 1 : 0);
+      const paused = pauseAfter(TypeOrmUsageSessionStore.prototype, 'findMeterRates');
+      const starting = start();
+      await paused.hasRun;
+      const refused = expect(archive()).rejects.toThrow('METER_IN_USE');
+      await settle();
+      paused.release();
+      expect((await starting).meterRates).toEqual([expect.objectContaining({ meterId: 1 })]);
+      await refused;
+      expect(await meterRow()).toMatchObject({ archivedAt: null });
+    });
+
+    it('lets a start that comes while the meter is being archived run without it', async () => {
+      await scope.seedMeter();
+      const paused = pauseAfter(persistence.store, 'setMeterArchivedAt');
+      const archiving = archive();
+      await paused.hasRun;
+      const starting = start();
+      await settle();
+      paused.release();
+      await archiving;
+      expect((await starting).meterRates).toEqual([]);
+      expect((await meterRow())?.archivedAt).not.toBeNull();
+      expect((await counts()).sessions).toBe(0);
     });
 
     it('keeps a pending charge listed, and a retry bills it', async () => {
@@ -250,6 +301,9 @@ describe('Archiving, restoring and deleting meters', () => {
       await restore();
       expect((await scope.metering.listMeters(1)).map((meter) => meter.id)).toEqual([1]);
       expect(auditedActions()).toEqual(['meter.archived', 'meter.restored']);
+      expect(scope.audit.record).toHaveBeenLastCalledWith(
+        expect.objectContaining({ actor: ACTOR, details: { meterId: 1, meterName: 'Energy (kWh)' } }),
+      );
     });
 
     it('frees the name for a new meter and refuses to restore until one of the two is renamed', async () => {
@@ -257,6 +311,7 @@ describe('Archiving, restoring and deleting meters', () => {
       const replacement = await scope.metering.createMeter(1, 'Energy (kWh)');
       await expect(restore()).rejects.toThrow('METER_NAME_EXISTS');
       expect((await meterRow())?.archivedAt).not.toBeNull();
+      expect(auditedActions()).toEqual(['meter.archived']);
       await expect(scope.metering.createMeter(1, 'Energy (kWh)')).rejects.toThrow('METER_NAME_EXISTS');
 
       // An archived meter can be renamed, also to the name of an active one.
@@ -270,9 +325,34 @@ describe('Archiving, restoring and deleting meters', () => {
   describe('delete', () => {
     it.each(['active', 'archived'])('removes an %s meter without history and audits it', async (state) => {
       if (state === 'archived') await archive();
+      const asManager = await scope.metering.listMeters(1, { includeArchived: true, withDeletable: true });
+      expect(asManager[0].deletable).toBe(true);
+      // Only managers learn whether a meter can be deleted.
+      expect((await scope.metering.listMeters(1, { includeArchived: true }))[0].deletable).toBe(false);
       await remove();
       expect(await meterRow()).toBeNull();
-      expect(auditedActions().at(-1)).toBe('meter.deleted');
+      expect(scope.audit.record).toHaveBeenLastCalledWith({
+        domain: 'resource',
+        action: 'meter.deleted',
+        actor: ACTOR,
+        subject: { type: 'resource', id: 1 },
+        details: { meterId: 1, meterName: 'Energy (kWh)' },
+      });
+    });
+
+    it('removes a meter that flow nodes still select, and leaves the nodes', async () => {
+      await scope.seedMeter();
+      await remove();
+      expect(await meterRow()).toBeNull();
+      expect(await new TypeOrmFlowResourceDirectory(scope.source).meterIds(1)).toEqual([]);
+      expect(await scope.source.getRepository(ResourceFlowNode).countBy({ resourceId: 1 })).toBeGreaterThan(0);
+    });
+
+    it('records who deleted it through an API token', async () => {
+      await removal.delete(1, 1, { id: ADMIN, authenticationMethod: 'api-token', apiTokenId: 4 });
+      expect(scope.audit.record).toHaveBeenLastCalledWith(
+        expect.objectContaining({ actor: { id: ADMIN, authenticationMethod: 'api-token', apiTokenId: 4 } }),
+      );
     });
 
     it.each([
@@ -281,7 +361,7 @@ describe('Archiving, restoring and deleting meters', () => {
       ['latestObservedAt', { latestObservedAt: new Date() }],
     ])('keeps a meter with a recorded %s', async (_field, patch) => {
       await scope.source.getRepository(ResourceMeter).update(1, patch);
-      expect((await scope.metering.listMeters(1))[0].deletable).toBe(false);
+      expect(await deletable()).toBe(false);
       await expect(remove()).rejects.toThrow('METER_HAS_HISTORY');
       expect(await meterRow()).not.toBeNull();
     });
@@ -322,7 +402,7 @@ describe('Archiving, restoring and deleting meters', () => {
         });
       }
       const before = await counts();
-      expect((await scope.metering.listMeters(1))[0].deletable).toBe(false);
+      expect(await deletable()).toBe(false);
       await expect(remove()).rejects.toThrow('METER_HAS_HISTORY');
       expect(await meterRow()).not.toBeNull();
       expect(await counts()).toEqual(before);
@@ -333,7 +413,7 @@ describe('Archiving, restoring and deleting meters', () => {
   it('does not find the meter of another resource', async () => {
     await scope.source.getRepository(Resource).save({ id: 2, name: 'Saw', type: ResourceType.Machine });
     for (const action of ['archive', 'restore', 'delete'] as const)
-      await expect(removal[action](2, 1, ADMIN)).rejects.toThrow('METER_NOT_FOUND');
+      await expect(removal[action](2, 1, ACTOR)).rejects.toThrow('METER_NOT_FOUND');
     expect(await meterRow()).toMatchObject({ archivedAt: null });
   });
 });
