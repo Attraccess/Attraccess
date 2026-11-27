@@ -18,7 +18,9 @@ export const devOnlyPackages = [
 // Not a dependency of the API itself, but runtime packages (the mailer, mjml) bring their own copy.
 export const transitiveOnlyPackages = ['glob'];
 
-// The WAGO plugin spawns the OpenSSH tools; the monitoring-init compose service uses the shell tools.
+// The WAGO plugin spawns the OpenSSH tools (apps/plugins/wago/backend: runtime/managed/transport/ssh.ts,
+// commissioning/delivery/upload.ts). The rest: entrypoint.sh and the monitoring-init command of
+// coolify.docker-compose.yml and docker-compose.balena.yml with the monitoring/grafana/*.sh it runs.
 export const requiredCommands = [
   'ssh',
   'ssh-agent',
@@ -36,9 +38,32 @@ export const requiredCommands = [
   'sort',
   'mktemp',
   'mkdir',
+  'dirname',
+  'stat',
+  'id',
+  'chown',
 ];
 
 const requiredFiles = ['/etc/ssl/certs/ca-certificates.crt', '/usr/share/zoneinfo/Europe/Berlin'];
+
+// Leftovers the image used to ship: the swagger build (a second copy of the API assets), library builds,
+// and the Python-linked GDB variants, which cannot run without libpython.
+export function shippedLeftovers(distDirectory = '/app/dist', gdbDirectory = '/opt/esp-gdb') {
+  const found = ['apps/api-swagger', 'libs']
+    .map((entry) => path.join(distDirectory, entry))
+    .filter((entry) => fs.existsSync(entry));
+  for (const toolchain of fs.existsSync(gdbDirectory) ? fs.readdirSync(gdbDirectory) : []) {
+    const bin = path.join(gdbDirectory, toolchain, 'bin');
+    if (!fs.existsSync(bin)) continue;
+    found.push(
+      ...fs
+        .readdirSync(bin)
+        .filter((file) => /-gdb-3\./.test(file))
+        .map((file) => path.join(bin, file)),
+    );
+  }
+  return found;
+}
 
 /** Every package a bundle requires by name, without Node built-ins, relative paths and bundled libraries. */
 export function requiredPackages(source) {
@@ -103,9 +128,9 @@ function loadNativeAddons(apiDirectory) {
   apiRequire('sharp'); // loads libvips
   const Database = apiRequire('better-sqlite3');
   new Database(':memory:').close();
-  // A transitive dependency of the mailer: only pnpm's hoisted directory reaches it.
-  const hoisted = createRequire(path.join(apiDirectory, 'node_modules/.pnpm/node_modules/probe.js'));
-  hoisted('@css-inline/css-inline').inline('<p>probe</p>');
+  // A dependency of the mailer, so load the copy the mailer resolves.
+  const mailer = fs.realpathSync(apiRequire.resolve('@nestjs-modules/mailer'));
+  createRequire(mailer)('@css-inline/css-inline').inline('<p>probe</p>');
 }
 
 export function main(apiDirectory = '/app/dist/apps/api') {
@@ -120,12 +145,14 @@ export function main(apiDirectory = '/app/dist/apps/api') {
     'Files missing',
     requiredFiles.filter((file) => !fs.existsSync(file)),
   );
-  for (const [command, args] of [
-    [process.env.ESP_COREDUMP_CMD, ['--help']],
-    [process.env.ESP_COREDUMP_XTENSA_GDB, ['--version']],
-    [process.env.ESP_COREDUMP_RISCV_GDB, ['--version']],
+  assertNone('Removed build output or tools are back', shippedLeftovers());
+  for (const [variable, args] of [
+    ['ESP_COREDUMP_CMD', ['--help']],
+    ['ESP_COREDUMP_XTENSA_GDB', ['--version']],
+    ['ESP_COREDUMP_RISCV_GDB', ['--version']],
   ]) {
-    execFileSync(command, args, { stdio: ['ignore', 'ignore', 'inherit'] });
+    if (!process.env[variable]) throw new Error(`${variable} is not set`);
+    execFileSync(process.env[variable], args, { stdio: ['ignore', 'ignore', 'inherit'] });
   }
   process.stdout.write('Server image verified.\n');
 }

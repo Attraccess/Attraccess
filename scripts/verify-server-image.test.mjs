@@ -10,6 +10,7 @@ import {
   installedDevOnlyPackages,
   missingCommands,
   requiredPackages,
+  shippedLeftovers,
   transitiveOnlyPackages,
   unresolvablePackages,
 } from './verify-server-image.mjs';
@@ -72,6 +73,20 @@ test('requires commands to be executable on the search path', () => {
     'plain-file',
     'nowhere',
   ]);
+});
+
+test('finds removed build output and Python-linked GDB variants', () => {
+  write('dist/apps/api/main.js');
+  write('dist/apps/api-swagger/main.js');
+  write('gdb/xtensa-esp-elf-gdb/bin/xtensa-esp32-elf-gdb');
+  write('gdb/xtensa-esp-elf-gdb/bin/xtensa-esp-elf-gdb-no-python');
+  write('gdb/xtensa-esp-elf-gdb/bin/xtensa-esp-elf-gdb-3.13');
+  write('gdb/riscv32-esp-elf-gdb/share/gdb/x');
+  assert.deepEqual(shippedLeftovers(join(directory, 'dist'), join(directory, 'gdb')), [
+    join(directory, 'dist/apps/api-swagger'),
+    join(directory, 'gdb/xtensa-esp-elf-gdb/bin/xtensa-esp-elf-gdb-3.13'),
+  ]);
+  assert.deepEqual(shippedLeftovers(join(directory, 'nothing'), join(directory, 'nothing')), []);
 });
 
 // The image installs what Nx derives from these manifests. Nx drops root devDependencies from it, but adds a
