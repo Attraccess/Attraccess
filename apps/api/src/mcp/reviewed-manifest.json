@@ -1737,7 +1737,7 @@
   "PluginController_installedPackageVersions": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "c843e8c9"
+    "shape": "472d06af"
   },
   "PluginController_replaceInstalledPackage": {
     "decision": "deny",
