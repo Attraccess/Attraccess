@@ -10,6 +10,7 @@ import {
   ResourceUsageSessionTakenOverEvent,
 } from '../../../../resources/usage/events/resource-usage.events';
 import { lastSent, makeSocket } from './ui-test-helpers.test-fixture';
+import { ReaderRouter } from '../../reader-router';
 
 const TOUCH_UI = {
   schemaVersion: 1,
@@ -803,6 +804,55 @@ describe('UiSlotService', () => {
       t.service.onUsageStarted(new ResourceSessionStartedEvent(null as never));
       await jest.advanceTimersByTimeAsync(UI_INVALIDATE_DEBOUNCE_MS + 1);
       expect(call.mock.calls.length).toBe(before);
+    });
+  });
+
+  describe('settings changes with several API instances (ATT-1163)', () => {
+    /** The service on an instance whose router talks to a fake cluster bus. */
+    function clustered() {
+      const handlers = new Map<string, (payload: unknown, from: string) => void>();
+      const bus = {
+        broadcast: jest.fn(async () => undefined),
+        on: jest.fn((type: string, handler: (payload: unknown, from: string) => void) => handlers.set(type, handler)),
+        handle: jest.fn(),
+      };
+      const { service, sockets } = setup(() => []);
+      const router = new ReaderRouter({ sockets } as never, { enabled: true, bus } as never);
+      Object.assign(service, { router });
+      service.onModuleInit();
+      const sync = jest.spyOn(service, 'syncReader').mockImplementation(() => undefined);
+      return { service, bus, sync, receive: (payload: unknown) => handlers.get('ui-slot.sync')?.(payload, 'other') };
+    }
+
+    it('syncs the readers here and tells every other instance to sync theirs', () => {
+      const { service, bus, sync } = clustered();
+
+      service.syncReaderEverywhere(8);
+      service.syncReaderEverywhere(undefined);
+
+      expect(bus.broadcast.mock.calls).toEqual([
+        ['ui-slot.sync', 8],
+        ['ui-slot.sync', null],
+      ]);
+      expect(sync.mock.calls).toEqual([[8], [undefined]]);
+    });
+
+    it('syncs its own readers when another instance changed the settings', () => {
+      const { sync, receive } = clustered();
+
+      receive(8);
+      receive(null);
+
+      expect(sync.mock.calls).toEqual([[8], [undefined]]);
+    });
+
+    it('only syncs locally without a router', () => {
+      const { service } = setup(() => []);
+      const sync = jest.spyOn(service, 'syncReader').mockImplementation(() => undefined);
+
+      service.syncReaderEverywhere(8);
+
+      expect(sync).toHaveBeenCalledWith(8);
     });
   });
 });

@@ -255,7 +255,7 @@ describe('PairingService', () => {
     expect(JSON.stringify(pending)).not.toContain(code); // the list never shows a code
     expect(readers.size).toBe(0); // nothing is written before approval
 
-    const resolved = service.resolve(code.toLowerCase().replace(/^(...)/, '$1-'), actor);
+    const resolved = await service.resolve(code.toLowerCase().replace(/^(...)/, '$1-'), actor);
     expect(resolved.id).toBe(pending.id);
 
     const done = await service.approve(pending.id, { code, mode: 'new', name: 'Laser' }, actor);
@@ -344,12 +344,12 @@ describe('PairingService', () => {
 
     await internal.rotate(request);
     const second = await completeRound(client, publicKey);
-    expect(service.resolve(first, actor).id).toBe(pending.id); // previous round still valid
-    expect(service.resolve(second.code, actor).id).toBe(pending.id);
+    expect((await service.resolve(first, actor)).id).toBe(pending.id); // previous round still valid
+    expect((await service.resolve(second.code, actor)).id).toBe(pending.id);
 
     await internal.rotate(request);
-    expect(() => service.resolve(first, actor)).toThrow('PairingCodeNotFound'); // dropped after the next rotation
-    expect(service.resolve(second.code, actor).id).toBe(pending.id);
+    await expect(service.resolve(first, actor)).rejects.toThrow('PairingCodeNotFound'); // dropped after the next rotation
+    expect((await service.resolve(second.code, actor)).id).toBe(pending.id);
   });
 
   it('sends a new round every rotation with a fresh commitment', async () => {
@@ -384,7 +384,7 @@ describe('PairingService', () => {
       Buffer.from(relayed.reveal['serverNonce'] as string, 'base64'),
     );
     expect(readerSide.code).not.toBe(relayed.code);
-    expect(() => service.resolve(readerSide.code, actor)).toThrow('PairingCodeNotFound');
+    await expect(service.resolve(readerSide.code, actor)).rejects.toThrow('PairingCodeNotFound');
     // Approving the attacker's request with the code on the real reader is refused too.
     const attackerRequest = await pendingOf();
     await expect(service.approve(attackerRequest.id, { code: readerSide.code, mode: 'new' }, actor)).rejects.toThrow(
@@ -399,7 +399,8 @@ describe('PairingService', () => {
     await announce();
     const pending = service.list();
     expect(pending).toHaveLength(2);
-    const other = pending.find((p) => service.get(p.id) && p.id !== service.resolve(a.code, actor).id) as {
+    const aId = (await service.resolve(a.code, actor)).id;
+    const other = pending.find((p) => service.get(p.id) && p.id !== aId) as {
       id: string;
     };
     await expect(service.approve(other.id, { code: a.code, mode: 'new' }, actor)).rejects.toThrow(
@@ -416,7 +417,7 @@ describe('PairingService', () => {
     ];
     first.current.derived = second.current.derived; // forced collision
     const code = (second.current.derived as { code: string }).code;
-    for (let i = 0; i < 6; i++) expect(() => service.resolve(code, actor)).toThrow('PairingCodeAmbiguous');
+    for (let i = 0; i < 6; i++) await expect(service.resolve(code, actor)).rejects.toThrow('PairingCodeAmbiguous');
     const id = service.list()[0].id;
     await expect(service.approve(id, { code, mode: 'new' }, actor)).rejects.toThrow('PairingCodeAmbiguous');
   });
@@ -424,28 +425,28 @@ describe('PairingService', () => {
   it('answers 429 after 5 wrong codes in a minute for resolve and approve alike', async () => {
     const { code } = await announce();
     const pending = await pendingOf();
-    for (let i = 0; i < 3; i++) expect(() => service.resolve('AAAAAA', actor)).toThrow('PairingCodeNotFound');
+    for (let i = 0; i < 3; i++) await expect(service.resolve('AAAAAA', actor)).rejects.toThrow('PairingCodeNotFound');
     for (let i = 0; i < 2; i++) {
       await expect(service.approve(pending.id, { code: '222222', mode: 'new' }, actor)).rejects.toThrow(
         'PairingCodeNotFound',
       );
     }
-    expect(() => service.resolve('AAAAAA', actor)).toThrow(EnrollmentRateLimitedException);
+    await expect(service.resolve('AAAAAA', actor)).rejects.toThrow(EnrollmentRateLimitedException);
     await expect(service.approve(pending.id, { code, mode: 'new' }, actor)).rejects.toThrow(
       EnrollmentRateLimitedException,
     );
     expect(readers.size).toBe(0);
     // another approver is not affected
-    expect(service.resolve(code, { ...actor, userId: 2 }).id).toBe(pending.id);
+    expect((await service.resolve(code, { ...actor, userId: 2 })).id).toBe(pending.id);
   });
 
   it('does not reset the wrong-code count when an approval succeeds', async () => {
     const { code } = await announce();
     const pending = await pendingOf();
-    for (let i = 0; i < 4; i++) expect(() => service.resolve('AAAAAA', actor)).toThrow('PairingCodeNotFound');
+    for (let i = 0; i < 4; i++) await expect(service.resolve('AAAAAA', actor)).rejects.toThrow('PairingCodeNotFound');
     await service.approve(pending.id, { code, mode: 'new' }, actor);
-    expect(() => service.resolve('AAAAAA', actor)).toThrow('PairingCodeNotFound');
-    expect(() => service.resolve('AAAAAA', actor)).toThrow(EnrollmentRateLimitedException);
+    await expect(service.resolve('AAAAAA', actor)).rejects.toThrow('PairingCodeNotFound');
+    await expect(service.resolve('AAAAAA', actor)).rejects.toThrow(EnrollmentRateLimitedException);
   });
 
   it('approves a Lite reader by the previous round until the next rotation', async () => {

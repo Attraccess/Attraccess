@@ -86,7 +86,7 @@ export class ReaderUiAdminController {
   ): Promise<ResourceReaderUiSettingsDto> {
     await this.requireResource(resourceId);
     await this.settings.setResource(resourceId, dto, req.user);
-    this.slots.syncReader(undefined);
+    this.slots.syncReaderEverywhere(undefined);
     return this.settings.getResource(resourceId);
   }
 
@@ -110,7 +110,7 @@ export class ReaderUiAdminController {
   ): Promise<ReaderReaderUiSettingsDto> {
     await this.requireReader(readerId);
     await this.settings.setReader(readerId, dto.widgetsEnabled, req.user);
-    this.slots.syncReader(readerId);
+    this.slots.syncReaderEverywhere(readerId);
     return this.settings.getReader(readerId);
   }
 
@@ -123,7 +123,7 @@ export class ReaderUiAdminController {
   @ApiResponse({ status: 200, type: [ReaderUiContributionStatusDto] })
   async getContributions(@Param('readerId', ParseIntPipe) readerId: number): Promise<ReaderUiContributionStatusDto[]> {
     await this.requireReader(readerId);
-    return this.slots.contributionsOf(readerId);
+    return this.slots.contributionsAnywhere(readerId);
   }
 
   @Get('reader-ui/alerts')

@@ -81,7 +81,10 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
     ),
   };
   scope.audit = { record: jest.fn() };
-  scope.liveNotifications = { notifyTransactionUpdate: jest.fn().mockResolvedValue(undefined) };
+  scope.liveNotifications = {
+    notifyTransactionUpdate: jest.fn().mockResolvedValue(undefined),
+    notifyTransactionRemoved: jest.fn(),
+  };
   await scope.source.getRepository(ResourceMeter).save({ resourceId: 1, name: 'Energy (kWh)', creditsPerUnit: 30 });
   const { store, unitOfWork } = createMeteringPersistence(scope.source);
   scope.metering = new ResourceMeteringService(

@@ -9,6 +9,7 @@ import {
 import { SupervisionService } from './supervision.service';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
 import type { SupervisionUser } from './supervision.types';
+import type { SupervisionStore } from './supervision-store';
 import { ResourceIntroducerType, ResourceType } from '@attraccess/application-models';
 import { SessionDurationErrorCode } from '../usage/session-duration/session-duration.errors';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
@@ -19,9 +20,15 @@ describe('SupervisionService', () => {
   it('validates eagerly and emits a REQUESTED event to the selected supervisor', async () => {
     const { requestId } = await fixture.createRequest();
 
-    expect(fixture.resourceUsageService.validateSupervisedStart).toHaveBeenCalledWith(5, fixture.requester, 2, undefined, {
-      id: 5,
-    });
+    expect(fixture.resourceUsageService.validateSupervisedStart).toHaveBeenCalledWith(
+      5,
+      fixture.requester,
+      2,
+      undefined,
+      {
+        id: 5,
+      },
+    );
     expect(requestId).toBeDefined();
 
     const [supervisorId, event] = fixture.live.emitToSupervisor.mock.calls[0];
@@ -44,7 +51,7 @@ describe('SupervisionService', () => {
     await expect(fixture.service.requestSupervisedSession(5, fixture.requester, fixture.dto)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
-    expect(fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
+    expect(await fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
     expect(fixture.live.emitToSupervisor).not.toHaveBeenCalled();
   });
 
@@ -60,7 +67,7 @@ describe('SupervisionService', () => {
     });
     expect(approved).toBe(fixture.startedSession);
     await expect(pending).resolves.toBe(fixture.startedSession);
-    expect(fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
+    expect(await fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
     expect(fixture.live.emitToSupervisor.mock.calls.some((c) => c[1].type === SupervisionLiveEventType.RESOLVED)).toBe(
       true,
     );
@@ -76,7 +83,7 @@ describe('SupervisionService', () => {
   it('rejects the requester when the supervisor rejects the request', async () => {
     const { pending, requestId } = await fixture.createRequest();
 
-    const result = fixture.service.reject(requestId, fixture.supervisor, 'api-token', 9);
+    const result = await fixture.service.reject(requestId, fixture.supervisor, 'api-token', 9);
 
     expect(result).toEqual({ status: 'rejected', requestId });
     await expect(pending).rejects.toBeInstanceOf(ForbiddenException);
@@ -101,10 +108,10 @@ describe('SupervisionService', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    jest.advanceTimersByTime(SupervisionService.APPROVAL_TTL_MS);
+    await jest.advanceTimersByTimeAsync(SupervisionService.APPROVAL_TTL_MS);
 
     await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
-    expect(fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
+    expect(await fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
 
     const expiredEvent = fixture.live.emitToSupervisor.mock.calls.find(
       (c) => c[1].type === SupervisionLiveEventType.EXPIRED,
@@ -115,14 +122,19 @@ describe('SupervisionService', () => {
   it('reports the requester with the username and the display name', async () => {
     await fixture.createRequest();
 
-    expect(fixture.service.listPendingForSupervisor(2)[0]).toMatchObject({
+    expect((await fixture.service.listPendingForSupervisor(2))[0]).toMatchObject({
       requesterUsername: 'requester',
       requesterDisplayName: 'requester',
     });
   });
 
   it('refuses a missing or too long duration estimate at the request, not at the approval', async () => {
-    const machine = { id: 5, type: ResourceType.Machine, requireSessionDurationEstimate: true, maxSessionDurationMinutes: 60 };
+    const machine = {
+      id: 5,
+      type: ResourceType.Machine,
+      requireSessionDurationEstimate: true,
+      maxSessionDurationMinutes: 60,
+    };
     fixture.resourceUsageService.assertSupportsSupervision.mockResolvedValue(machine);
     const codeOf = (error: unknown) => (error as { getResponse(): { code: string } }).getResponse().code;
 
@@ -132,7 +144,7 @@ describe('SupervisionService', () => {
       .requestSupervisedSession(5, fixture.requester, { ...fixture.dto, estimatedDurationMinutes: 61 })
       .catch(codeOf);
     expect(tooLong).toBe(SessionDurationErrorCode.ESTIMATE_EXCEEDS_MAXIMUM);
-    expect(fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
+    expect(await fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
   });
 
   it('rejects approval from someone other than the requested supervisor', async () => {
@@ -142,15 +154,37 @@ describe('SupervisionService', () => {
     await expect(fixture.service.approve(requestId, stranger)).rejects.toBeInstanceOf(ForbiddenException);
     expect(fixture.resourceUsageService.startSession).not.toHaveBeenCalled();
     // the request remains pending for the real supervisor
-    expect(fixture.service.listPendingForSupervisor(2)).toHaveLength(1);
+    expect(await fixture.service.listPendingForSupervisor(2)).toHaveLength(1);
   });
 
   it('throws NotFound for an unknown or already-settled request', async () => {
     await expect(fixture.service.approve('does-not-exist', fixture.supervisor)).rejects.toBeInstanceOf(
       NotFoundException,
     );
-    expect(() => fixture.service.reject('does-not-exist', fixture.supervisor)).toThrow(NotFoundException);
+    await expect(fixture.service.reject('does-not-exist', fixture.supervisor)).rejects.toThrow(NotFoundException);
   });
+
+  // QA finding (ATT-1163): with several instances the deadline sweep runs every 500 ms, so a request could still be
+  // approved a few hundred milliseconds after its 30 s were up. A decision past the deadline expires the request.
+  it.each(['approve', 'reject'] as const)(
+    'expires instead of deciding when %s comes after the deadline, even before the expiry ran',
+    async (decision) => {
+      jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick'] });
+      const { pending, requestId } = await fixture.createRequest();
+      // The clock passes the deadline, but no timer fires: the expiry has not run yet.
+      jest.setSystemTime(Date.now() + SupervisionService.APPROVAL_TTL_MS);
+
+      await expect(fixture.service[decision](requestId, fixture.supervisor)).rejects.toBeInstanceOf(NotFoundException);
+
+      await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
+      expect(fixture.resourceUsageService.startSession).not.toHaveBeenCalled();
+      expect(fixture.live.emitToSupervisor).toHaveBeenCalledWith(
+        2,
+        expect.objectContaining({ type: SupervisionLiveEventType.EXPIRED, requestId }),
+      );
+      expect(await fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
+    },
+  );
 
   it('propagates a failed session start to both supervisor and requester', async () => {
     fixture.resourceUsageService.startSession.mockRejectedValueOnce(new Error('resource in use'));
@@ -164,16 +198,36 @@ describe('SupervisionService', () => {
     await fixture.createRequest();
     await fixture.createRequest();
 
-    expect(fixture.service.listPendingForSupervisor(2)).toHaveLength(2);
+    expect(await fixture.service.listPendingForSupervisor(2)).toHaveLength(2);
+  });
+
+  // Review finding (ATT-1163): storing takes a Valkey round trip, during which the requester may leave. EXPIRED went
+  // out with the abort; a REQUESTED after it opened a popup for a request that no longer exists.
+  it('sends no popup for a request the requester abandoned while it was being stored', async () => {
+    const controller = new AbortController();
+    const store = (fixture.service as unknown as { store: SupervisionStore }).store;
+    const create = store.create.bind(store);
+    jest.spyOn(store, 'create').mockImplementationOnce(async (request) => {
+      controller.abort();
+      await create(request);
+    });
+
+    const pending = fixture.service.requestSupervisedSession(5, fixture.requester, fixture.dto, controller.signal);
+
+    await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
+    await fixture.flush();
+    const sent = fixture.live.emitToSupervisor.mock.calls.map(([, event]) => event.type);
+    expect(sent).toEqual([SupervisionLiveEventType.EXPIRED]);
+    expect(await fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
   });
 
   describe('reader-originated requests (ATT-493)', () => {
     const eligibleSupervisorIds = [2, 3];
 
-    const createReaderRequest = (overrides?: { onResolved?: jest.Mock; onFailed?: jest.Mock }) => {
+    const createReaderRequest = async (overrides?: { onResolved?: jest.Mock; onFailed?: jest.Mock }) => {
       const onResolved = overrides?.onResolved ?? jest.fn();
       const onFailed = overrides?.onFailed ?? jest.fn();
-      const { requestId, expiresAt } = fixture.service.createReaderRequest({
+      const { requestId, expiresAt } = await fixture.service.createReaderRequest({
         resourceId: 5,
         requester: fixture.requester,
         dto: {},
@@ -183,20 +237,20 @@ describe('SupervisionService', () => {
       return { requestId, expiresAt, onResolved, onFailed };
     };
 
-    it('broadcasts a REQUESTED event to every eligible supervisor', () => {
-      const { requestId } = createReaderRequest();
+    it('broadcasts a REQUESTED event to every eligible supervisor', async () => {
+      const { requestId } = await createReaderRequest();
 
       const requestedTargets = fixture.live.emitToSupervisor.mock.calls
         .filter((c) => c[1].type === SupervisionLiveEventType.REQUESTED && c[1].requestId === requestId)
         .map((c) => c[0]);
       expect(requestedTargets.sort()).toEqual([2, 3]);
       // The pending request is visible to either supervisor (initial SSE state on reconnect).
-      expect(fixture.service.listPendingForSupervisor(2)).toHaveLength(1);
-      expect(fixture.service.listPendingForSupervisor(3)).toHaveLength(1);
+      expect(await fixture.service.listPendingForSupervisor(2)).toHaveLength(1);
+      expect(await fixture.service.listPendingForSupervisor(3)).toHaveLength(1);
     });
 
     it('lets any eligible supervisor approve: starts the session and notifies the reader + all popups', async () => {
-      const { requestId, onResolved } = createReaderRequest();
+      const { requestId, onResolved } = await createReaderRequest();
       const otherSupervisor = { id: 3, username: 'other' } as SupervisionUser;
 
       const session = await fixture.service.approve(requestId, otherSupervisor);
@@ -221,11 +275,11 @@ describe('SupervisionService', () => {
         .filter((c) => c[1].type === SupervisionLiveEventType.RESOLVED && c[1].requestId === requestId)
         .map((c) => c[0]);
       expect(resolvedTargets.sort()).toEqual([2, 3]);
-      expect(fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
+      expect(await fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
     });
 
     it('rejects approval from a non-introducer who did not receive the request', async () => {
-      const { requestId } = createReaderRequest();
+      const { requestId } = await createReaderRequest();
       const stranger = { id: 9, username: 'stranger' } as SupervisionUser;
       fixture.resourceUsageService.validateSupervisedStart.mockRejectedValueOnce(
         new ForbiddenException('not an introducer'),
@@ -236,7 +290,7 @@ describe('SupervisionService', () => {
     });
 
     it('allows an introducer granted after the request was broadcast to approve', async () => {
-      const { requestId, onResolved } = createReaderRequest();
+      const { requestId, onResolved } = await createReaderRequest();
       const newlyGrantedIntroducer = { id: 9, username: 'new-introducer' } as SupervisionUser;
 
       const session = await fixture.service.approve(requestId, newlyGrantedIntroducer);
@@ -260,10 +314,10 @@ describe('SupervisionService', () => {
       });
     });
 
-    it('settleByCard closes the web popups without starting a session again', () => {
-      const { requestId, onResolved, onFailed } = createReaderRequest();
+    it('settleByCard closes the web popups without starting a session again', async () => {
+      const { requestId, onResolved, onFailed } = await createReaderRequest();
 
-      fixture.service.settleByCard(requestId);
+      await fixture.service.settleByCard(requestId);
 
       expect(fixture.resourceUsageService.startSession).not.toHaveBeenCalled();
       expect(onResolved).not.toHaveBeenCalled();
@@ -273,13 +327,13 @@ describe('SupervisionService', () => {
         .map((c) => c[0]);
       expect(resolvedTargets.sort()).toEqual([2, 3]);
       // A subsequent web approval is a no-op (already settled).
-      expect(fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
+      expect(await fixture.service.listPendingForSupervisor(2)).toHaveLength(0);
     });
 
-    it('cancelReaderRequest expires the request and dismisses popups without failing callbacks', () => {
-      const { requestId, onFailed } = createReaderRequest();
+    it('cancelReaderRequest expires the request and dismisses popups without failing callbacks', async () => {
+      const { requestId, onFailed } = await createReaderRequest();
 
-      fixture.service.cancelReaderRequest(requestId);
+      await fixture.service.cancelReaderRequest(requestId);
 
       expect(onFailed).not.toHaveBeenCalled();
       const expiredTargets = fixture.live.emitToSupervisor.mock.calls
@@ -288,11 +342,11 @@ describe('SupervisionService', () => {
       expect(expiredTargets.sort()).toEqual([2, 3]);
     });
 
-    it('notifies the reader (onFailed) when the request expires after 30s', () => {
+    it('notifies the reader (onFailed) when the request expires after 30s', async () => {
       jest.useFakeTimers();
-      const { onFailed } = createReaderRequest();
+      const { onFailed } = await createReaderRequest();
 
-      jest.advanceTimersByTime(SupervisionService.APPROVAL_TTL_MS);
+      await jest.advanceTimersByTimeAsync(SupervisionService.APPROVAL_TTL_MS);
 
       expect(onFailed).toHaveBeenCalledWith(expect.any(RequestTimeoutException));
     });
@@ -356,7 +410,7 @@ describe('SupervisionService', () => {
     it('fails the waiting requester when the reader cancels, instead of hanging', async () => {
       const { pending, requestId } = await requestAtReader();
 
-      fixture.service.cancelReaderRequest(requestId);
+      await fixture.service.cancelReaderRequest(requestId);
 
       await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
     });
@@ -379,7 +433,7 @@ describe('SupervisionService', () => {
       controller.abort();
       finishArming?.();
       await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
-      expect(fixture.service.listPendingForSupervisor(fixture.supervisor.id)).toEqual([]);
+      expect(await fixture.service.listPendingForSupervisor(fixture.supervisor.id)).toEqual([]);
       expect(readerCallbacks.onFailed).toHaveBeenCalledTimes(1);
       expect(fixture.resourceUsageService.startSession).not.toHaveBeenCalled();
     });
@@ -389,7 +443,7 @@ describe('SupervisionService', () => {
       const pending = fixture.service.requestSupervisedSession(5, fixture.requester, readerDto, controller.signal);
       pending.catch(() => undefined);
       await fixture.flush();
-      const requestId = fixture.service.listPendingForSupervisor(2)[0].id;
+      const requestId = (await fixture.service.listPendingForSupervisor(2))[0].id;
       let finishAuthorization: () => void;
       fixture.resourceUsageService.validateSupervisedStart.mockImplementationOnce(
         () =>
@@ -398,6 +452,7 @@ describe('SupervisionService', () => {
           }),
       );
       const approval = fixture.service.approve(requestId, fixture.supervisor);
+      await fixture.flush();
       controller.abort();
       finishAuthorization();
       await expect(approval).rejects.toBeInstanceOf(NotFoundException);
@@ -405,7 +460,7 @@ describe('SupervisionService', () => {
       expect(fixture.resourceUsageService.startSession).not.toHaveBeenCalled();
       expect(readerCallbacks.onFailed).toHaveBeenCalledTimes(1);
       expect(readerCallbacks.onResolved).not.toHaveBeenCalled();
-      expect(fixture.service.listPendingForSupervisor(2)).toEqual([]);
+      expect(await fixture.service.listPendingForSupervisor(2)).toEqual([]);
       expect(
         fixture.live.emitToSupervisor.mock.calls.some((call) => call[1].type === SupervisionLiveEventType.RESOLVED),
       ).toBe(false);
@@ -416,7 +471,7 @@ describe('SupervisionService', () => {
       const pending = fixture.service.requestSupervisedSession(5, fixture.requester, readerDto, controller.signal);
       pending.catch(() => undefined);
       await fixture.flush();
-      const requestId = fixture.service.listPendingForSupervisor(2)[0].id;
+      const requestId = (await fixture.service.listPendingForSupervisor(2))[0].id;
       let finishPersistence: () => void;
       fixture.resourceUsageService.startSession.mockImplementationOnce(
         () =>
@@ -427,7 +482,7 @@ describe('SupervisionService', () => {
       const approval = fixture.service.approve(requestId, fixture.supervisor);
       await fixture.flush();
       expect(fixture.resourceUsageService.startSession).toHaveBeenCalledTimes(1);
-      expect(fixture.service.listPendingForSupervisor(2)).toEqual([]);
+      expect(await fixture.service.listPendingForSupervisor(2)).toEqual([]);
       controller.abort();
       await expect(fixture.service.approve(requestId, fixture.supervisor)).rejects.toBeInstanceOf(NotFoundException);
       finishPersistence();
@@ -449,7 +504,7 @@ describe('SupervisionService', () => {
       pending.catch(() => undefined);
       await fixture.flush();
 
-      jest.advanceTimersByTime(SupervisionService.APPROVAL_TTL_MS);
+      await jest.advanceTimersByTimeAsync(SupervisionService.APPROVAL_TTL_MS);
 
       await expect(pending).rejects.toBeInstanceOf(RequestTimeoutException);
       expect(readerCallbacks.onFailed).toHaveBeenCalled();
@@ -506,7 +561,7 @@ describe('SupervisionService', () => {
     it('fails the waiting requester when the reader starts a session of its own instead', async () => {
       const { pending, requestId } = await requestAtReader();
 
-      fixture.service.settleByCard(requestId);
+      await fixture.service.settleByCard(requestId);
 
       await expect(pending).rejects.toBeInstanceOf(ForbiddenException);
     });
@@ -544,7 +599,7 @@ describe('SupervisionService', () => {
       armer.arm.mockImplementationOnce(async ({ requestId }: { requestId: string }) => {
         capturedId = requestId;
         // Stands in for the reader disconnecting mid-arm.
-        fixture.service.cancelReaderRequest(requestId);
+        await fixture.service.cancelReaderRequest(requestId);
         return readerCallbacks;
       });
 

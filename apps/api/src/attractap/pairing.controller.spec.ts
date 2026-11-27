@@ -6,6 +6,7 @@ import request from 'supertest';
 import { LicenseGuard } from '../license/license.guard';
 import { EnrollmentRateLimitedException } from '../device-enrollment/enrollment-rate-limited.exception';
 import { AttractapPairingController } from './pairing.controller';
+import { ClusterPairingService } from './security/cluster-pairing.service';
 import { CredentialRegistryService } from './security/credential-registry.service';
 import { PairingService } from './security/pairing.service';
 
@@ -25,6 +26,7 @@ describe('AttractapPairingController authorization and throttling', () => {
       controllers: [AttractapPairingController],
       providers: [
         { provide: PairingService, useValue: pairing },
+        { provide: ClusterPairingService, useValue: pairing },
         { provide: CredentialRegistryService, useValue: { history: jest.fn() } },
       ],
     })
