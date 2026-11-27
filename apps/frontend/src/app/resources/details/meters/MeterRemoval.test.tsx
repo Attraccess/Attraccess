@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MetersCard } from './MetersCard';
+import { MeterSelector } from './MeterSelector';
 import en from './en.json';
 
 const state = vi.hoisted(() => ({
@@ -19,9 +20,15 @@ vi.mock('../../../../hooks/useAuth', () => ({
   useAuth: () => ({ hasPermission: (permission: string) => state.permissions.has(permission) }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useListResourceMeters: (options: unknown) => {
-    state.list(options);
-    return { data: state.meters };
+  // Like the server: archived meters only on request, and nothing for a disabled query.
+  useListResourceMeters: (
+    options: { query?: { includeArchived?: boolean } },
+    _key: unknown,
+    queryOptions?: { enabled?: boolean },
+  ) => {
+    state.list(options, queryOptions);
+    if (queryOptions?.enabled === false) return { data: undefined };
+    return { data: options.query?.includeArchived ? state.meters : state.meters.filter((m) => !m.archivedAt) };
   },
   useCreateResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateResourceMeter: () => ({ mutateAsync: state.rename, isPending: false }),
@@ -58,7 +65,9 @@ const meter = (id: number, name: string, extra: Record<string, unknown> = {}) =>
 });
 const archivedMeter = (extra: Record<string, unknown> = {}) =>
   meter(2, 'Old water', { archivedAt: '2026-11-01T10:00:00Z', ...extra });
-const button = (name: string) => screen.queryByRole('button', { name });
+/** A meter's buttons are named after the meter too ("Archive Energy"); "Archive" does not match "Archived meters". */
+const named = (label: string) => new RegExp(`^${label}\\b`);
+const button = (name: string) => screen.queryByRole('button', { name: named(name) });
 const archivedToggle = () => screen.queryByRole('button', { name: /Archived meters/ });
 
 describe('removing meters', () => {
@@ -76,7 +85,9 @@ describe('removing meters', () => {
     expect(button(en.archive)).not.toBeInTheDocument();
     expect(button(en.delete)).not.toBeInTheDocument();
     expect(archivedToggle()).not.toBeInTheDocument();
-    expect(state.list).toHaveBeenCalledWith({ path: { resourceId: 7 } });
+    expect(state.list).not.toHaveBeenCalledWith(expect.objectContaining({ query: { includeArchived: true } }), {
+      enabled: true,
+    });
   });
 
   it('hides the whole card from regular users when no meter is active', () => {
@@ -91,7 +102,19 @@ describe('removing meters', () => {
     expect(button(en.archive)).toBeInTheDocument();
     expect(button(en.delete)).not.toBeInTheDocument();
     expect(archivedToggle()).not.toBeInTheDocument();
-    expect(state.list).toHaveBeenCalledWith({ path: { resourceId: 7 }, query: { includeArchived: true } });
+    // Active meters are polled on the key the rest of the page shares; archived ones are loaded once.
+    expect(state.list).toHaveBeenCalledWith({ path: { resourceId: 7 } }, { refetchInterval: 10_000 });
+    expect(state.list).toHaveBeenCalledWith(
+      { path: { resourceId: 7 }, query: { includeArchived: true } },
+      { enabled: true },
+    );
+  });
+
+  it('names each action after its meter for screen readers', () => {
+    state.meters = [meter(1, 'Energy', { deletable: true })];
+    render(<MetersCard resourceId={7} />);
+    for (const name of ['Rename Energy', 'Archive Energy', 'Delete Energy'])
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
   });
 
   it.each([
@@ -100,12 +123,12 @@ describe('removing meters', () => {
   ] as const)('asks before it runs %s, then reloads the list', async (_action, label, title, mutation) => {
     state.meters = [meter(1, 'Energy', { deletable: true })];
     render(<MetersCard resourceId={7} />);
-    fireEvent.click(screen.getByRole('button', { name: label }));
+    fireEvent.click(screen.getByRole('button', { name: named(label) }));
     expect(mutation()).not.toHaveBeenCalled();
 
     const dialog = await screen.findByRole('alertdialog');
     expect(within(dialog).getByText(title)).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole('button', { name: label }));
+    fireEvent.click(within(dialog).getByRole('button', { name: named(label) }));
 
     await waitFor(() => expect(mutation()).toHaveBeenCalledWith({ path: { resourceId: 7, meterId: 1 } }));
     await waitFor(() => expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['meters'] }));
@@ -114,13 +137,14 @@ describe('removing meters', () => {
   it.each([
     ['METER_IN_USE', en.errorInUseDelete],
     ['METER_HAS_HISTORY', en.errorHasHistory],
+    ['METER_NOT_FOUND', en.errorNotFound],
     ['SOMETHING_ELSE', en.errorAction],
   ])('explains a %s refusal', async (code, message) => {
     state.meters = [meter(1, 'Energy', { deletable: true })];
     state.remove.mockRejectedValue(Object.assign(new Error('Conflict'), { body: { message: code } }));
     render(<MetersCard resourceId={7} />);
-    fireEvent.click(screen.getByRole('button', { name: en.delete }));
-    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: en.delete }));
+    fireEvent.click(screen.getByRole('button', { name: named(en.delete) }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: named(en.delete) }));
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
     expect(state.invalidate).toHaveBeenCalled();
@@ -129,8 +153,8 @@ describe('removing meters', () => {
   it('does not tell someone who is archiving a meter in use to archive it', async () => {
     state.archive.mockRejectedValue(Object.assign(new Error('Conflict'), { body: { message: 'METER_IN_USE' } }));
     render(<MetersCard resourceId={7} />);
-    fireEvent.click(screen.getByRole('button', { name: en.archive }));
-    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: en.archive }));
+    fireEvent.click(screen.getByRole('button', { name: named(en.archive) }));
+    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: named(en.archive) }));
     expect(await screen.findByRole('alert')).toHaveTextContent(en.errorInUse);
     expect(screen.getByRole('alert')).not.toHaveTextContent(/archive it/i);
   });
@@ -138,10 +162,10 @@ describe('removing meters', () => {
   it('leaves only the name editor in place while a meter is renamed', () => {
     state.meters = [meter(1, 'Energy', { deletable: true })];
     render(<MetersCard resourceId={7} />);
-    fireEvent.click(screen.getByRole('button', { name: en.rename }));
+    fireEvent.click(screen.getByRole('button', { name: named(en.rename) }));
     expect(button(en.archive)).not.toBeInTheDocument();
     expect(button(en.delete)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: en.cancel }));
+    fireEvent.click(screen.getByRole('button', { name: named(en.cancel) }));
     expect(button(en.archive)).toBeInTheDocument();
     expect(button(en.delete)).toBeInTheDocument();
   });
@@ -157,10 +181,10 @@ describe('removing meters', () => {
 
     expect(screen.getByRole('heading', { name: 'Old water' })).toBeInTheDocument();
     expect(screen.getByText('Archived: yesterday')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: en.rename })).toHaveLength(2);
-    expect(screen.getAllByRole('button', { name: en.archive })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: named(en.rename) })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: named(en.archive) })).toHaveLength(1);
     expect(button(en.delete)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: en.restore }));
+    fireEvent.click(screen.getByRole('button', { name: named(en.restore) }));
     await waitFor(() => expect(state.restore).toHaveBeenCalledWith({ path: { resourceId: 7, meterId: 2 } }));
   });
 
@@ -168,18 +192,25 @@ describe('removing meters', () => {
     state.meters = [archivedMeter({ deletable: true })];
     state.restore.mockRejectedValue(Object.assign(new Error('Conflict'), { body: { message: 'METER_NAME_EXISTS' } }));
     render(<MetersCard resourceId={7} />);
-    expect(screen.getByText(en.empty)).toBeInTheDocument();
+    expect(screen.getByText(en.emptyActive)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Archived meters/ }));
     expect(button(en.delete)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: en.restore }));
+    fireEvent.click(screen.getByRole('button', { name: named(en.restore) }));
     expect(await screen.findByRole('alert')).toHaveTextContent(en.errorNameExists);
 
     // Renaming settles the clash, so the message goes.
     state.rename.mockResolvedValue({ id: 2, name: 'Older water' });
-    fireEvent.click(screen.getByRole('button', { name: en.rename }));
+    fireEvent.click(screen.getByRole('button', { name: named(en.rename) }));
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Older water' } });
-    fireEvent.click(screen.getByRole('button', { name: en.save }));
+    fireEvent.click(screen.getByRole('button', { name: named(en.save) }));
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
     expect(state.rename).toHaveBeenCalledWith({ path: { resourceId: 7, meterId: 2 }, body: { name: 'Older water' } });
+  });
+
+  it('tells the flow editor that the chosen meter is archived or removed', () => {
+    const { rerender } = render(<MeterSelector resourceId={7} value={2} onChange={vi.fn()} />);
+    expect(screen.getByText(en.missing)).toBeInTheDocument();
+    rerender(<MeterSelector resourceId={7} value={1} onChange={vi.fn()} />);
+    expect(screen.queryByText(en.missing)).not.toBeInTheDocument();
   });
 });

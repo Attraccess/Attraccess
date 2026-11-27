@@ -17,11 +17,14 @@ export function MeterNameEditor({
   meter,
   onSaved,
   onEditingChange,
+  isDisabled,
 }: {
   resourceId: number;
   meter?: ResourceMeterDto;
   onSaved?: (meter: ResourceMeterDto) => void;
   onEditingChange?: (editing: boolean) => void;
+  /** Another action on the meter is running. */
+  isDisabled?: boolean;
 }) {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
@@ -60,6 +63,8 @@ export function MeterNameEditor({
       <Button
         size="sm"
         variant="secondary"
+        aria-label={meter ? t('renameLabel', { name: meter.name }) : undefined}
+        isDisabled={isDisabled}
         onPress={() => {
           setName(meter?.name ?? '');
           setError(false);

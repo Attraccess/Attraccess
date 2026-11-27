@@ -7,6 +7,7 @@ import { useAuth } from '../../../../hooks/useAuth';
 import { MeterNameEditor } from './MeterNameEditor';
 import { MeterActions } from './MeterActions';
 import { ArchivedMeters } from './ArchivedMeters';
+import { useArchivedMeters } from './useArchivedMeters';
 import { useMeterValueFormatter } from '../../../../hooks/useMeterValueFormatter';
 import en from './en.json';
 import de from './de.json';
@@ -18,16 +19,11 @@ export function MetersCard({ resourceId, className }: { resourceId: number; clas
   const { hasPermission } = useAuth();
   const manage = hasPermission('resources.update');
   const {
-    data = [],
+    data: meters = [],
     isLoading,
     isError,
-  } = useListResourceMeters(
-    // Only people who may edit the resource get archived meters.
-    { path: { resourceId }, ...(manage ? { query: { includeArchived: true } } : {}) },
-    undefined,
-    { refetchInterval: 10_000 },
-  );
-  const meters = data.filter((meter) => !meter.archivedAt);
+  } = useListResourceMeters({ path: { resourceId } }, undefined, { refetchInterval: 10_000 });
+  const hasArchived = useArchivedMeters(resourceId, manage).length > 0;
   if (!meters.length && !manage && !isLoading && !isError) return null;
   return (
     <FlatSection className={className} icon={<Gauge className="size-4" />} title={t('title')}>
@@ -35,7 +31,9 @@ export function MetersCard({ resourceId, className }: { resourceId: number; clas
         <p className="text-sm text-muted">{t('description')}</p>
         {isLoading && <Spinner size="sm" />}
         {isError && <p role="alert">{t('loadError')}</p>}
-        {!isLoading && !isError && !meters.length && <p className="text-sm">{t('empty')}</p>}
+        {!isLoading && !isError && !meters.length && (
+          <p className="text-sm">{t(hasArchived ? 'emptyActive' : 'empty')}</p>
+        )}
         {meters.map((meter) => (
           <div key={meter.id} className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -68,7 +66,7 @@ export function MetersCard({ resourceId, className }: { resourceId: number; clas
           </div>
         ))}
         {manage && <MeterNameEditor resourceId={resourceId} />}
-        {manage && <ArchivedMeters resourceId={resourceId} meters={data.filter((meter) => meter.archivedAt)} />}
+        {manage && <ArchivedMeters resourceId={resourceId} />}
       </div>
     </FlatSection>
   );

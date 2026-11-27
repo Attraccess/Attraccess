@@ -1,12 +1,14 @@
 import { Button, Disclosure } from '@heroui/react';
-import { ResourceMeterDto } from '@attraccess/react-query-client';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useMeterValueFormatter } from '../../../../hooks/useMeterValueFormatter';
 import { MeterActions } from './MeterActions';
+import { useArchivedMeters } from './useArchivedMeters';
 import en from './en.json';
 import de from './de.json';
 
-export function ArchivedMeters({ resourceId, meters }: { resourceId: number; meters: ResourceMeterDto[] }) {
+/** The collapsed list of archived meters, for people who may edit the resource. */
+export function ArchivedMeters({ resourceId }: { resourceId: number }) {
+  const meters = useArchivedMeters(resourceId);
   const formatDateTime = useDateTimeFormatter();
   const { t } = useTranslations({ en, de });
   const format = useMeterValueFormatter();
@@ -24,7 +26,7 @@ export function ArchivedMeters({ resourceId, meters }: { resourceId: number; met
           {meters.map((meter) => (
             <div key={meter.id} className="flex flex-wrap items-start justify-between gap-2">
               <div className="text-sm">
-                <h3 className="font-medium break-all">{meter.name}</h3>
+                <h4 className="font-medium break-all">{meter.name}</h4>
                 <p className="break-all">
                   {t('lifetime')}: {format(meter.lifetimeValue)}
                 </p>

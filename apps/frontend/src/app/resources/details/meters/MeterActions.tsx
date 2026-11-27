@@ -20,6 +20,7 @@ const ERROR_KEYS: Record<string, string> = {
   METER_IN_USE: 'errorInUse',
   METER_HAS_HISTORY: 'errorHasHistory',
   METER_NAME_EXISTS: 'errorNameExists',
+  METER_NOT_FOUND: 'errorNotFound',
 };
 
 /** Rename, archive or restore, and delete one meter, for users who may edit the resource. */
@@ -56,10 +57,19 @@ export function MeterActions({ resourceId, meter }: { resourceId: number; meter:
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex flex-wrap items-start justify-end gap-2">
+        {/* A new name settles a name clash, and an older message would no longer be true. */}
+        <MeterNameEditor
+          resourceId={resourceId}
+          meter={meter}
+          isDisabled={pending}
+          onSaved={() => setErrorKey(undefined)}
+          onEditingChange={setRenaming}
+        />
         {!renaming && meter.archivedAt && (
           <Button
             size="sm"
             variant="secondary"
+            aria-label={t('restoreLabel', { name: meter.name })}
             isDisabled={pending}
             isPending={restore.isPending}
             onPress={() => void run(() => restore.mutateAsync({ path }))}
@@ -67,18 +77,11 @@ export function MeterActions({ resourceId, meter }: { resourceId: number; meter:
             {t('restore')}
           </Button>
         )}
-        {/* A new name settles a name clash, and an older message would no longer be true. */}
-        <MeterNameEditor
-          resourceId={resourceId}
-          meter={meter}
-          onSaved={() => setErrorKey(undefined)}
-          onEditingChange={setRenaming}
-        />
         {!renaming && !meter.archivedAt && (
           <ConfirmableButton
             label={t('archive')}
             status="warning"
-            buttonProps={{ size: 'sm' }}
+            buttonProps={{ size: 'sm', 'aria-label': t('archiveLabel', { name: meter.name }) }}
             isDisabled={pending}
             confirm={{ title: t('archiveTitle', { name: meter.name }), message: t('archiveMessage') }}
             onConfirm={() => run(() => archive.mutateAsync({ path }))}
@@ -88,7 +91,7 @@ export function MeterActions({ resourceId, meter }: { resourceId: number; meter:
           <ConfirmableButton
             label={t('delete')}
             status="error"
-            buttonProps={{ size: 'sm' }}
+            buttonProps={{ size: 'sm', 'aria-label': t('deleteLabel', { name: meter.name }) }}
             isDisabled={pending}
             confirm={{ title: t('deleteTitle', { name: meter.name }), message: t('deleteMessage') }}
             onConfirm={() => run(() => remove.mutateAsync({ path }), { METER_IN_USE: 'errorInUseDelete' })}
