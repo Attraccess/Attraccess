@@ -9,7 +9,8 @@ import type {
   NewAttractapNfcCardPendingChange,
 } from '@attraccess/application-models';
 import { EntityManager, Repository } from 'typeorm';
-import type { AttractapCardStore } from '../../../attractap/card-store.port';
+import { type AttractapCardStore, CardAlreadyEnrolledError } from '../../../attractap/card-store.port';
+import { isUniqueViolation } from '../../persistence-errors';
 import { toCardOwner, toNfcCard, toPendingChange } from './attractap-mappers';
 
 /**
@@ -24,6 +25,18 @@ async function lockCardOwner(manager: EntityManager, userId: number): Promise<vo
     .where('user.id = :userId', { userId })
     .setLock('for_no_key_update')
     .getOne();
+}
+
+/** The unique index on `lower(uid)` (migration NfcCardUniqueUid1796500000000): one card record per UID. */
+export const NFC_CARD_UID_INDEX = 'UQ_nfc_card_uid_lower';
+
+/** True only when the unique index on the card UID rejected the write; other violations are not this one. */
+function isDuplicateUid(error: unknown): boolean {
+  if (!isUniqueViolation(error)) return false;
+  const constraint =
+    (error as { driverError?: { constraint?: unknown } }).driverError?.constraint ??
+    (error as { constraint?: unknown }).constraint;
+  return constraint === NFC_CARD_UID_INDEX;
 }
 
 @Injectable()
@@ -61,16 +74,23 @@ export class TypeOrmAttractapCardStore implements AttractapCardStore {
   }
 
   async create(owner: AttractapCardOwner, card: NewAttractapNfcCard, activate: boolean): Promise<AttractapNfcCard> {
-    const saved = await this.cards.manager.transaction(async (manager) => {
-      if (activate) {
-        await lockCardOwner(manager, owner.id);
-        await manager.update(NFCCard, { user: { id: owner.id } }, { isActive: false });
-      }
-      return await manager.save(NFCCard, { ...card, user: { id: owner.id }, isActive: activate });
-    });
+    let saved: NFCCard;
+    try {
+      saved = await this.cards.manager.transaction(async (manager) => {
+        if (activate) {
+          await lockCardOwner(manager, owner.id);
+          await manager.update(NFCCard, { user: { id: owner.id } }, { isActive: false });
+        }
+        return await manager.save(NFCCard, { ...card, user: { id: owner.id }, isActive: activate });
+      });
+    } catch (error) {
+      // Another enrollment recorded the UID first. The rollback kept the owner's other cards as they were.
+      if (isDuplicateUid(error)) throw new CardAlreadyEnrolledError();
+      throw error;
+    }
     // The owner the caller loaded is the user the notification of the new card is addressed to; it is
     // projected to the card owner fields so nothing else of the caller's user record leaves the store.
-    return { ...toNfcCard(saved as NFCCard), user: toCardOwner(owner) };
+    return { ...toNfcCard(saved), user: toCardOwner(owner) };
   }
 
   async activateExclusively(id: number): Promise<AttractapNfcCard> {

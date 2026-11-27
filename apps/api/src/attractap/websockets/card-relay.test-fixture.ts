@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EmulatedCard } from '../card-crypto/card-emulator.test-fixture';
 import { AttractapService } from '../attractap.service';
+import { CardAlreadyEnrolledError } from '../card-store.port';
 import { CardConversationService } from './card-conversation.service';
 import { CardOperationsService } from './card-operations.service';
 import { AttractapEventType, CardDetection } from './websocket.types';
@@ -86,6 +87,8 @@ export function createServices() {
     getNFCCardByID: jest.fn(async (id: number) => cards.find((card) => card.id === id)),
     createNFCCard: jest.fn(async (user: any, data: any, options: { activate?: boolean } = {}) => {
       const activate = options.activate ?? true;
+      // The unique index on lower(uid): the failed insert changes nothing.
+      if (cards.some((card) => card.uid.toLowerCase() === data.uid.toLowerCase())) throw new CardAlreadyEnrolledError();
       if (activate) for (const other of cards) if (other.user?.id === user.id) other.isActive = false;
       const card = { id: nextId++, type: 'aes', ...data, user, isActive: activate };
       cards.push(card);

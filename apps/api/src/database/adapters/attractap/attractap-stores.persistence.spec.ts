@@ -11,6 +11,7 @@ import { ResourceType } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 
+import { CardAlreadyEnrolledError } from '../../../attractap/card-store.port';
 import { TypeOrmAttractapCardStore } from './typeorm-card.store';
 import { TypeOrmAttractapCrashReportStore } from './typeorm-crash-report.store';
 import { TypeOrmAttractapInstallationStore } from './typeorm-installation.store';
@@ -156,6 +157,47 @@ describe('Attractap persistence adapters on PostgreSQL', () => {
       ]);
 
       expect((await cards.listForUser(user.id)).filter((card) => card.isActive)).toHaveLength(1);
+    });
+
+    it("refuses a second card of a UID in any letter case and leaves the owner's active card on", async () => {
+      const user = await source.getRepository(User).save({ username: 'dup', email: 'dup@example.test' });
+      const other = await source.getRepository(User).save({ username: 'dup2', email: 'dup2@example.test' });
+      const cards = store();
+      const active = await cards.create(user, { uid: '04dd0001', keyNo: 1, key: 'k' }, true);
+      await cards.create(other, { uid: '04ee0001', keyNo: 1, key: 'k' }, false);
+
+      await expect(cards.create(user, { uid: '04EE0001', keyNo: 2, key: 'k2' }, true)).rejects.toBeInstanceOf(
+        CardAlreadyEnrolledError,
+      );
+
+      // The failed transaction rolled back: the owner's card was not switched off, nothing was added.
+      expect((await cards.findById(active.id)).isActive).toBe(true);
+      expect((await cards.listForUser(user.id)).map((card) => card.uid)).toEqual(['04dd0001']);
+    });
+
+    it('records one card when two enrollments of the same UID overlap', async () => {
+      const user = await source.getRepository(User).save({ username: 'race2', email: 'race2@example.test' });
+      const cards = store();
+
+      const results = await Promise.allSettled(
+        ['04ff0001', '04FF0001', '04Ff0001'].map((uid) => cards.create(user, { uid, keyNo: 1, key: 'k' }, true)),
+      );
+
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      for (const result of results.filter((result) => result.status === 'rejected')) {
+        expect((result as PromiseRejectedResult).reason).toBeInstanceOf(CardAlreadyEnrolledError);
+      }
+      expect((await cards.listForUser(user.id)).filter((card) => card.isActive)).toHaveLength(1);
+    });
+
+    it('lets other failures of a card insert through unchanged', async () => {
+      const cards = store();
+      const ghost = { id: 999_999, username: 'ghost', email: 'ghost@example.test' } as User;
+
+      const failure = await cards.create(ghost, { uid: '04ab0001', keyNo: 1, key: 'k' }, false).catch((e) => e);
+
+      expect(failure).not.toBeInstanceOf(CardAlreadyEnrolledError);
+      expect(failure.driverError?.code).toBe('23503');
     });
 
     it('keeps pending key changes apart by kind and removes them by id or uid', async () => {

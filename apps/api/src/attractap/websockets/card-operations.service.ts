@@ -2,6 +2,7 @@ import type {
   AttractapCardOwner,
   AttractapNfcCard,
   AttractapNfcCardPendingChange,
+  NewAttractapNfcCard,
 } from '@attraccess/application-models';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
@@ -22,7 +23,7 @@ import {
 import { isRandomUid, normalizeCardUid } from '../card-uid';
 import { CardWriterPolicyService } from './card-writer-policy.service';
 import { AttractapService } from '../attractap.service';
-import { ATTRACTAP_CARD_STORE, type AttractapCardStore } from '../card-store.port';
+import { ATTRACTAP_CARD_STORE, type AttractapCardStore, CardAlreadyEnrolledError } from '../card-store.port';
 import { CardConversationFailure, CardConversationService, PluginCardExchange } from './card-conversation.service';
 import { AuthenticatedWebSocket, CardDetection } from './websocket.types';
 import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
@@ -243,7 +244,11 @@ export class CardOperationsService {
     };
   }
 
-  /** The card holds the key an earlier, interrupted enrollment was writing: record the card now. */
+  /**
+   * The card holds the key an earlier, interrupted enrollment was writing: record the card now. Null when it cannot
+   * be recorded, also when another check or enrollment recorded the UID at the same moment (that tap answers
+   * `CARD_NOT_FOUND`; the next one verifies against the recorded card).
+   */
   private async finishPendingEnroll(
     channel: CardChannel,
     kind: CardKind,
@@ -269,6 +274,11 @@ export class CardOperationsService {
     );
   }
 
+  /**
+   * Records the card the enrollment `pending` wrote its key to. Null when another record got the UID first (the
+   * unique index decides a race the lookup before cannot): this attempt's record is deleted, as the UID belongs to
+   * that card now, and nothing is audited. Its key stays in the card slot.
+   */
   private async recordEnrollment(
     user: AttractapCardOwner,
     uid: string,
@@ -278,15 +288,12 @@ export class CardOperationsService {
     auditPrincipal?: AuditPrincipal,
     activate = true,
     origin?: { pluginId: string },
-  ): Promise<AttractapNfcCard> {
-    const card = await this.attractapService.createNFCCard(
-      user,
-      { key: keyHex, keyNo: pending.keyNo, uid },
-      { activate },
-    );
-    // This UID now belongs to this card record: no other enrollment may be recovered onto it later
-    // (e.g. after a reset). Records for other UIDs stay; their key may be on another card.
+  ): Promise<AttractapNfcCard | null> {
+    const card = await this.createCard(user, { key: keyHex, keyNo: pending.keyNo, uid }, activate);
+    // This UID now belongs to a card record (this one, or the one that got it first): no other enrollment may be
+    // recovered onto it later (e.g. after a reset). Records for other UIDs stay; their key may be on another card.
     await this.cardStore.deletePendingById(pending.id);
+    if (!card) return null;
     await this.cardStore.deletePendingByUid(uid, 'enroll');
     await this.audit.record({
       domain: 'attractap',
@@ -333,7 +340,7 @@ export class CardOperationsService {
       for (const change of stale) {
         const key = this.pendingKey(change);
         if (key && change.userId === user.id && (await authenticate(channel, kind, change.keyNo, key))) {
-          await this.recordEnrollment(
+          const recorded = await this.recordEnrollment(
             user,
             uid,
             change,
@@ -341,7 +348,7 @@ export class CardOperationsService {
             'reader-enrollment',
             enrollment.auditPrincipal,
           );
-          return { ok: true };
+          return recorded ? { ok: true } : { ok: false, error: 'CARD_ALREADY_ENROLLED' };
         }
       }
       // This user's records were not for this card. Other users' records stay: their key may be on
@@ -381,8 +388,15 @@ export class CardOperationsService {
       );
       if (outcome === 'master-refused') return { ok: false, error: 'CARD_NOT_FACTORY' };
       if (outcome !== 'done' || !pending) return { ok: false, error: 'ENROLL_NOT_CONFIRMED' };
-      await this.recordEnrollment(user, uid, pending, keyHex, 'reader-enrollment', enrollment.auditPrincipal);
-      return { ok: true };
+      const recorded = await this.recordEnrollment(
+        user,
+        uid,
+        pending,
+        keyHex,
+        'reader-enrollment',
+        enrollment.auditPrincipal,
+      );
+      return recorded ? { ok: true } : { ok: false, error: 'CARD_ALREADY_ENROLLED' };
     });
     if (!result.ok) return { ok: false, error: conversationError(result.reason) };
     return result.value;
@@ -403,11 +417,8 @@ export class CardOperationsService {
     // card without AES showing the same UID is a copy. Its record must stay, so the secure card can still be recovered.
     if ((await this.cardStore.listPendingEnrolls(uid)).length) return { ok: false, error: 'CARD_ALREADY_ENROLLED' };
     const { auditPrincipal } = enrollment;
-    const card = await this.attractapService.createNFCCard(
-      user,
-      { uid, type: 'uid-only', keyNo: null, key: null },
-      { activate: true },
-    );
+    const card = await this.createCard(user, { uid, type: 'uid-only', keyNo: null, key: null }, true);
+    if (!card) return { ok: false, error: 'CARD_ALREADY_ENROLLED' };
     await this.audit.record({
       domain: 'attractap',
       action: 'attractap.card.linked',
@@ -420,6 +431,20 @@ export class CardOperationsService {
       details: { source: 'reader-enrollment', cardType: 'uid-only' },
     });
     return { ok: true };
+  }
+
+  /** Stores a new card record; null when another record holds the UID already (in any letter case). */
+  private async createCard(
+    user: AttractapCardOwner,
+    data: NewAttractapNfcCard,
+    activate: boolean,
+  ): Promise<AttractapNfcCard | null> {
+    try {
+      return await this.attractapService.createNFCCard(user, data, { activate });
+    } catch (error) {
+      if (error instanceof CardAlreadyEnrolledError) return null;
+      throw error;
+    }
   }
 
   /**
