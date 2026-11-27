@@ -58,7 +58,7 @@
     },
     "timedOut": {
       "title": "Flow-Logging für diese Seite pausiert",
-      "description": "Du warst inaktiv, deshalb hält diese Seite das Flow-Logging nicht mehr an. Es läuft nur weiter, wenn jemand anderes an diesem Flow arbeitet. Bewege die Maus oder drücke eine Taste, um fortzufahren."
+      "description": "Du warst inaktiv, deshalb hält diese Seite das Flow-Logging nicht mehr aufrecht. Es läuft nur weiter, wenn jemand anderes an diesem Flow arbeitet. Bewege die Maus oder drücke eine Taste, um fortzufahren."
     }
   }
 }
