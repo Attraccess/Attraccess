@@ -44,7 +44,7 @@ All destinations share the existing Nest 11 `LOG_LEVELS` filter. Explicitly list
 
 Configuration changes take effect after restarting the API. Buffered startup logs use the same routing. Graceful shutdown (SIGINT/SIGTERM) flushes pending writes and closes destinations; forced termination cannot guarantee a flush. A destination that fails during initialization or operation is disabled for the rest of the process, with one emergency stderr diagnostic. Healthy destinations continue; if all fail, the API continues without application log delivery. Correct the cause and restart to reopen the destination. Before routing can be configured, startup failures retain console diagnostics.
 
-In containers, give the API write access to the file path and mount its directory if logs must survive container replacement. Rotation, retention, remote drivers, per-driver levels and live reconfiguration are not included. Only API application/framework logs are routed: persisted audit records, opt-in flow recordings, frontend, firmware, companion and dev-launcher output retain their own behavior. Generated `storage/` and `log/` files are gitignored. Developers can [register another transport](developer/logging.md).
+In containers, give the API write access to the file path and mount its directory if logs must survive container replacement. Rotation, retention, remote drivers, per-driver levels and live reconfiguration are not included. Only API application/framework logs are routed: persisted audit records, flow log recordings, frontend, firmware, companion and dev-launcher output retain their own behavior. Generated `storage/` and `log/` files are gitignored. Developers can [register another transport](developer/logging.md).
 
 ## Database
 
