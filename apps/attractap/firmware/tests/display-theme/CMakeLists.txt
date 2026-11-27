@@ -73,6 +73,8 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsProjects.cpp"
     "${FIRMWARE_DIR}/src/display/screens/projectSelect/projectSelectScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/projectSelect/projectSelectSearch.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/projectSelect/projectSelectSwitch.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsProjectSwitch.cpp"
     "${FIRMWARE_DIR}/src/display/screens/duration/durationInputScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/extend/extendSessionScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/forms/navigation.cpp"
