@@ -22,12 +22,12 @@
   "rateHint": "0 disables billing. The rate is captured when a session starts.",
   "perValue": "{{name}} — per measured value",
   "archive": "Archive",
-  "archiveTitle": "Archive {{name}}?",
-  "archiveMessage": "The meter is hidden and is no longer measured or billed for new sessions. Its history and pending charges are kept. Flow nodes that use it are marked invalid and their reports fail until you choose another meter or restore this one. You can restore it later.",
+  "archiveTitle": "Archive meter {{name}}?",
+  "archiveMessage": "The meter moves to Archived meters and is no longer measured or billed for new sessions. Its history and pending charges are kept. Flow nodes that use it are marked invalid and their reports fail until you choose another meter or restore this one. You can restore it later.",
   "restore": "Restore",
   "delete": "Delete",
-  "deleteTitle": "Delete {{name}}?",
-  "deleteMessage": "This meter never recorded anything. It is removed for good. Flow nodes that use it become invalid until you choose another meter.",
+  "deleteTitle": "Delete meter {{name}}?",
+  "deleteMessage": "This meter has never recorded anything. Flow nodes that use it become invalid until you choose another meter. This cannot be undone.",
   "archivedTitle": "Archived meters ({{count}})",
   "archivedAt": "Archived: {{time}}",
   "errorInUse": "A running session uses this meter. Try again after the session has ended.",
@@ -37,5 +37,8 @@
   "errorAction": "Unable to change the meter. Try again.",
   "errorNotFound": "This meter no longer exists.",
   "emptyActive": "No active meters. Create one, or restore an archived meter.",
-  "missing": "The chosen meter was archived or removed. Choose another one."
+  "missing": "The chosen meter was archived or deleted. Choose another one.",
+  "archivedToast": "{{name}} archived",
+  "restoredToast": "{{name}} restored",
+  "deletedToast": "{{name}} deleted"
 }

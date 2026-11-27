@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MetersCard } from './MetersCard';
@@ -15,6 +15,9 @@ const state = vi.hoisted(() => ({
   restore: vi.fn(),
   remove: vi.fn(),
   rename: vi.fn(),
+  archivedError: false,
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
 }));
 
 vi.mock('../../../../hooks/useAuth', () => ({
@@ -29,7 +32,9 @@ vi.mock('@attraccess/react-query-client', () => ({
   ) => {
     state.list(options, queryOptions);
     if (queryOptions?.enabled === false) return { data: undefined };
-    return { data: options.query?.includeArchived ? state.meters : state.meters.filter((m) => !m.archivedAt) };
+    if (options.query?.includeArchived)
+      return state.archivedError ? { data: undefined, isError: true } : { data: state.meters };
+    return { data: state.meters.filter((m) => !m.archivedAt) };
   },
   useCreateResourceMeter: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateResourceMeter: () => ({ mutateAsync: state.rename, isPending: false }),
@@ -39,7 +44,12 @@ vi.mock('@attraccess/react-query-client', () => ({
   UseListResourceMetersKeyFn: () => ['meters'],
   UseGetResourceMeteringStatusKeyFn: () => ['status'],
 }));
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ invalidateQueries: state.invalidate, getQueryState: () => undefined }),
+}));
+vi.mock('../../../../components/toastProvider', () => ({
+  useToastMessage: () => ({ success: state.toastSuccess, error: state.toastError }),
+}));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   useTranslations: () => ({
@@ -89,6 +99,7 @@ describe('removing meters', () => {
     vi.clearAllMocks();
     state.permissions = new Set(['resources.update']);
     state.meters = [meter(1, 'Energy')];
+    state.archivedError = false;
     for (const mutation of [state.archive, state.restore, state.remove]) mutation.mockResolvedValue({});
   });
 
@@ -100,9 +111,8 @@ describe('removing meters', () => {
     expect(trigger('Energy')).not.toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     expect(archivedToggle()).not.toBeInTheDocument();
-    expect(state.list).not.toHaveBeenCalledWith(expect.objectContaining({ query: { includeArchived: true } }), {
-      enabled: true,
-    });
+    for (const [options, queryOptions] of state.list.mock.calls)
+      if (options.query?.includeArchived) expect(queryOptions.enabled).toBe(false);
   });
 
   it('hides the whole card from regular users when no meter is active', () => {
@@ -122,25 +132,69 @@ describe('removing meters', () => {
     expect(state.list).toHaveBeenCalledWith({ path: { resourceId: 7 } }, { refetchInterval: 10_000 });
     expect(state.list).toHaveBeenCalledWith(
       { path: { resourceId: 7 }, query: { includeArchived: true } },
-      { enabled: true },
+      { enabled: true, staleTime: Infinity },
     );
   });
 
   it.each([
-    ['archive', en.archive, 'Archive Energy?', () => state.archive],
-    ['delete', en.delete, 'Delete Energy?', () => state.remove],
-  ] as const)('asks before it runs %s, then reloads the list', async (_action, label, title, mutation) => {
-    state.meters = [meter(1, 'Energy', { deletable: true })];
+    ['archive', en.archive, 'Archive meter Energy?', 'button--primary', 'Energy archived', () => state.archive],
+    ['delete', en.delete, 'Delete meter Energy?', 'button--danger', 'Energy deleted', () => state.remove],
+  ] as const)(
+    'asks before it runs %s, then reloads the list and says so',
+    async (_action, label, title, confirmStyle, done, mutation) => {
+      state.meters = [meter(1, 'Energy', { deletable: true })];
+      render(<MetersCard resourceId={7} />);
+      await choose('Energy', label);
+
+      const dialog = await screen.findByRole('alertdialog');
+      expect(within(dialog).getByText(title)).toBeInTheDocument();
+      // Archiving is a warning, deleting an error with a destructive confirm button.
+      expect(within(dialog).getByRole('button', { name: label })).toHaveClass(confirmStyle);
+      expect(mutation()).not.toHaveBeenCalled();
+      await confirm(label);
+
+      await waitFor(() => expect(mutation()).toHaveBeenCalledWith({ path: { resourceId: 7, meterId: 1 } }));
+      await waitFor(() => expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['meters'] }));
+      expect(state.toastSuccess).toHaveBeenCalledWith({ title: done });
+    },
+  );
+
+  it('runs a menu entry chosen by keyboard, also while Enter is still held', async () => {
+    const user = userEvent.setup();
     render(<MetersCard resourceId={7} />);
-    await choose('Energy', label);
+    trigger('Energy')?.focus();
+    await user.keyboard('{Enter}');
+    await screen.findByRole('menu');
+    // Rename must run on the key press, not only on its release.
+    const item = screen.getByRole('menuitem', { name: en.rename });
+    act(() => item.focus());
+    fireEvent.keyDown(item, { key: 'Enter' });
+    expect(await screen.findByRole('textbox', { name: en.name })).toBeInTheDocument();
+  });
 
-    const dialog = await screen.findByRole('alertdialog');
-    expect(within(dialog).getByText(title)).toBeInTheDocument();
-    expect(mutation()).not.toHaveBeenCalled();
-    await confirm(label);
+  it('puts the focus on "Create meter" after the meter left the list', async () => {
+    state.archive.mockImplementation(async () => {
+      state.meters = [archivedMeter({ id: 1, name: 'Energy' })];
+    });
+    const { rerender } = render(<MetersCard resourceId={7} />);
+    await choose('Energy', en.archive);
+    await confirm(en.archive);
+    await waitFor(() => expect(state.toastSuccess).toHaveBeenCalled());
+    rerender(<MetersCard resourceId={7} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: en.create })).toHaveFocus());
+  });
 
-    await waitFor(() => expect(mutation()).toHaveBeenCalledWith({ path: { resourceId: 7, meterId: 1 } }));
-    await waitFor(() => expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['meters'] }));
+  it("puts the focus on a restored meter's menu", async () => {
+    state.meters = [archivedMeter()];
+    state.restore.mockImplementation(async () => {
+      state.meters = [meter(2, 'Old water')];
+    });
+    const { rerender } = render(<MetersCard resourceId={7} />);
+    await userEvent.click(screen.getByRole('button', { name: /Archived meters/ }));
+    await choose('Old water', en.restore);
+    await waitFor(() => expect(state.toastSuccess).toHaveBeenCalledWith({ title: 'Old water restored' }));
+    rerender(<MetersCard resourceId={7} />);
+    await waitFor(() => expect(trigger('Old water')).toHaveFocus());
   });
 
   it('runs nothing when a confirmation is cancelled', async () => {
@@ -155,7 +209,6 @@ describe('removing meters', () => {
   it.each([
     ['METER_IN_USE', en.errorInUseDelete],
     ['METER_HAS_HISTORY', en.errorHasHistory],
-    ['METER_NOT_FOUND', en.errorNotFound],
     ['SOMETHING_ELSE', en.errorAction],
   ])('explains a %s refusal', async (code, message) => {
     state.meters = [meter(1, 'Energy', { deletable: true })];
@@ -166,6 +219,42 @@ describe('removing meters', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
     expect(state.invalidate).toHaveBeenCalled();
+  });
+
+  it('reports a meter deleted elsewhere in a toast, since its row goes too', async () => {
+    state.meters = [meter(1, 'Energy', { deletable: true })];
+    state.remove.mockRejectedValue(refusal('METER_NOT_FOUND'));
+    render(<MetersCard resourceId={7} />);
+    await choose('Energy', en.delete);
+    await confirm(en.delete);
+    await waitFor(() => expect(state.toastError).toHaveBeenCalledWith({ title: en.errorNotFound }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('drops an in-use refusal once the meter can be deleted again', async () => {
+    state.meters = [meter(1, 'Energy', { deletable: true })];
+    state.remove.mockRejectedValue(refusal('METER_IN_USE'));
+    const { rerender } = render(<MetersCard resourceId={7} />);
+    await choose('Energy', en.delete);
+    await confirm(en.delete);
+    expect(await screen.findByRole('alert')).toHaveTextContent(en.errorInUseDelete);
+
+    // The session holds the meter; the message stays.
+    state.meters = [meter(1, 'Energy', { deletable: false })];
+    rerender(<MetersCard resourceId={7} />);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    // It ended.
+    state.meters = [meter(1, 'Energy', { deletable: true })];
+    rerender(<MetersCard resourceId={7} />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('says so when the archived meters cannot be loaded, instead of "no meters"', () => {
+    state.meters = [];
+    state.archivedError = true;
+    render(<MetersCard resourceId={7} />);
+    expect(screen.getByRole('alert')).toHaveTextContent(en.loadError);
+    expect(screen.queryByText(en.empty)).not.toBeInTheDocument();
   });
 
   it('does not tell someone who is archiving a meter in use to archive it', async () => {
@@ -237,6 +326,7 @@ describe('removing meters', () => {
 
     await userEvent.click(toggle);
 
+    expect(trigger('Old water')?.closest('[data-cy="archived-meters"]')).not.toBeNull();
     expect(screen.getByRole('heading', { name: 'Old water' })).toBeInTheDocument();
     expect(screen.getByText('Archived: yesterday')).toBeInTheDocument();
     expect(await openMenu('Old water')).toEqual([en.rename, en.restore]);
@@ -263,7 +353,7 @@ describe('removing meters', () => {
     expect(state.rename).toHaveBeenCalledWith({ path: { resourceId: 7, meterId: 2 }, body: { name: 'Older water' } });
   });
 
-  it('tells the flow editor that the chosen meter is archived or removed', () => {
+  it('tells the flow editor that the chosen meter is archived or deleted', () => {
     const { rerender } = render(<MeterSelector resourceId={7} value={2} onChange={vi.fn()} />);
     expect(screen.getByText(en.missing)).toBeInTheDocument();
     rerender(<MeterSelector resourceId={7} value={1} onChange={vi.fn()} />);

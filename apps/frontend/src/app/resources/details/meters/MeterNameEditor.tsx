@@ -39,7 +39,7 @@ export function MeterNameEditor({
       />
     );
   return (
-    <Button ref={button} size="sm" variant="secondary" onPress={() => setEditing(true)}>
+    <Button ref={button} size="sm" variant="secondary" data-cy="meter-create" onPress={() => setEditing(true)}>
       {t('create')}
     </Button>
   );

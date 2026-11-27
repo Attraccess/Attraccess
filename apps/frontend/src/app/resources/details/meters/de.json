@@ -22,12 +22,12 @@
   "rateHint": "0 deaktiviert die Abrechnung. Der Preis wird beim Sitzungsstart gespeichert.",
   "perValue": "{{name}} — pro Messwert",
   "archive": "Archivieren",
-  "archiveTitle": "{{name}} archivieren?",
-  "archiveMessage": "Der Zähler wird ausgeblendet und für neue Sitzungen weder gemessen noch abgerechnet. Verlauf und ausstehende Kosten bleiben erhalten. Flow-Knoten, die ihn verwenden, werden als ungültig markiert und ihre Meldungen schlagen fehl, bis du einen anderen Zähler auswählst oder diesen wiederherstellst. Du kannst ihn später wiederherstellen.",
+  "archiveTitle": "Zähler {{name}} archivieren?",
+  "archiveMessage": "Der Zähler kommt unter „Archivierte Zähler“ und wird für neue Sitzungen weder gemessen noch abgerechnet. Verlauf und ausstehende Kosten bleiben erhalten. Flow-Knoten, die ihn verwenden, werden als ungültig markiert und ihre Meldungen schlagen fehl, bis du einen anderen Zähler auswählst oder diesen wiederherstellst. Du kannst ihn später wiederherstellen.",
   "restore": "Wiederherstellen",
   "delete": "Löschen",
-  "deleteTitle": "{{name}} löschen?",
-  "deleteMessage": "Dieser Zähler hat noch nie etwas erfasst. Er wird endgültig entfernt. Flow-Knoten, die ihn verwenden, werden ungültig, bis du einen anderen Zähler auswählst.",
+  "deleteTitle": "Zähler {{name}} löschen?",
+  "deleteMessage": "Dieser Zähler hat noch nie etwas erfasst. Flow-Knoten, die ihn verwenden, werden ungültig, bis du einen anderen Zähler auswählst. Das kann nicht rückgängig gemacht werden.",
   "archivedTitle": "Archivierte Zähler ({{count}})",
   "archivedAt": "Archiviert: {{time}}",
   "errorInUse": "Eine laufende Sitzung verwendet diesen Zähler. Versuche es nach dem Ende der Sitzung erneut.",
@@ -37,5 +37,8 @@
   "errorAction": "Der Zähler konnte nicht geändert werden. Versuche es erneut.",
   "errorNotFound": "Diesen Zähler gibt es nicht mehr.",
   "emptyActive": "Keine aktiven Zähler. Erstelle einen Zähler oder stelle einen archivierten wieder her.",
-  "missing": "Der gewählte Zähler wurde archiviert oder entfernt. Wähle einen anderen aus."
+  "missing": "Der gewählte Zähler wurde archiviert oder gelöscht. Wähle einen anderen aus.",
+  "archivedToast": "{{name}} archiviert",
+  "restoredToast": "{{name}} wiederhergestellt",
+  "deletedToast": "{{name}} gelöscht"
 }

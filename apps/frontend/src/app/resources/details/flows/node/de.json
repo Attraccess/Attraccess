@@ -7,7 +7,7 @@
     "configuration": "Konfiguration",
     "loading": "Zusammenfassung wird geladen…",
     "unavailable": "Vorschau nicht verfügbar",
-    "meterMissing": "Zähler archiviert oder entfernt"
+    "meterMissing": "Zähler archiviert oder gelöscht"
   },
   "editor": {
     "buttons": {

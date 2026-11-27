@@ -7,7 +7,7 @@
     "configuration": "Configuration",
     "loading": "Loading summary…",
     "unavailable": "Preview unavailable",
-    "meterMissing": "Meter archived or removed"
+    "meterMissing": "Meter archived or deleted"
   },
   "editor": {
     "buttons": {
@@ -313,7 +313,9 @@
               "empty": "No variables watched.",
               "add": "Add watch",
               "items": {
-                "key": { "label": "Key" },
+                "key": {
+                  "label": "Key"
+                },
                 "scope": {
                   "label": "Scope",
                   "enum": {
@@ -365,16 +367,27 @@
         "waitForMessage": {
           "title": "Wait for MQTT message",
           "description": "Waits for the next MQTT message matching the topic filter; forwards {topic, payload}.",
-          "inputs": { "input": "Input" },
-          "outputs": { "output": "Output", "failure": "Failure" },
+          "inputs": {
+            "input": "Input"
+          },
+          "outputs": {
+            "output": "Output",
+            "failure": "Failure"
+          },
           "preview": {
             "topic": "Topic",
             "timeoutSeconds": "Timeout (s)"
           },
           "config": {
-            "serverId": { "label": "Server" },
-            "topic": { "label": "Topic (supports + and #)" },
-            "timeoutSeconds": { "label": "Timeout (seconds)" },
+            "serverId": {
+              "label": "Server"
+            },
+            "topic": {
+              "label": "Topic (supports + and #)"
+            },
+            "timeoutSeconds": {
+              "label": "Timeout (seconds)"
+            },
             "subscribeQos": {
               "label": "QoS (effective is min(publish, subscribe))",
               "enum": {
@@ -449,8 +462,12 @@
             "empty": "No entries configured.",
             "add": "Add entry",
             "items": {
-              "key": { "label": "Key (path)" },
-              "value": { "label": "Value template" }
+              "key": {
+                "label": "Key (path)"
+              },
+              "value": {
+                "label": "Value template"
+              }
             }
           }
         }
@@ -648,7 +665,9 @@
                 "2": "2 - Exactly once (two-phase handshake)"
               }
             },
-            "retain": { "label": "Retain message" },
+            "retain": {
+              "label": "Retain message"
+            },
             "completionBehavior": {
               "label": "Completion",
               "helpText": "Dispatch continues after MQTT accepts the publish call. Acknowledged waits for the broker publish callback.",
@@ -685,8 +704,12 @@
         "lock-pc": {
           "title": "Lock PC",
           "description": "Locks the screen on a registered companion device.",
-          "inputs": { "input": "Input" },
-          "outputs": { "output": "Output" },
+          "inputs": {
+            "input": "Input"
+          },
+          "outputs": {
+            "output": "Output"
+          },
           "config": {
             "deviceId": {
               "label": "Companion device",
@@ -697,8 +720,12 @@
         "unlock-pc": {
           "title": "Unlock PC",
           "description": "Unlocks the screen on a registered companion device.",
-          "inputs": { "input": "Input" },
-          "outputs": { "output": "Output" },
+          "inputs": {
+            "input": "Input"
+          },
+          "outputs": {
+            "output": "Output"
+          },
           "config": {
             "deviceId": {
               "label": "Companion device",
@@ -712,8 +739,13 @@
           "end-session": {
             "title": "End active session",
             "description": "Ends the triggering session, one user's session or all sessions of this machine, optionally with a note.",
-            "inputs": { "input": "Input" },
-            "outputs": { "output": "Output", "failure": "Failure" },
+            "inputs": {
+              "input": "Input"
+            },
+            "outputs": {
+              "output": "Output",
+              "failure": "Failure"
+            },
             "config": {
               "target": {
                 "label": "Which session",
@@ -728,7 +760,9 @@
                 "label": "User id (templates allowed)",
                 "helpText": "Only for \"The session of a user\". A user id, or a template that resolves to one, such as \\{{user.id}}."
               },
-              "notes": { "label": "Notes (templates allowed)" },
+              "notes": {
+                "label": "Notes (templates allowed)"
+              },
               "failureBehavior": {
                 "label": "On failure",
                 "helpText": "Fail flow logs the failure and stops the triggering operation. Continue through failure output logs the failure and sends the original input plus flowError {kind, message} through Failure. Log and continue logs the failure and sends the unchanged input through Output.",
@@ -776,7 +810,6 @@
             }
           }
         },
-
         "metering": {
           "ready": {
             "title": "Metering ready",
@@ -831,7 +864,10 @@
                 "helpText": "Choose a named meter on this resource."
               },
               "mode": {
-                "enum": { "total": "Cumulative total", "increment": "Increment" },
+                "enum": {
+                  "total": "Cumulative total",
+                  "increment": "Increment"
+                },
                 "label": "Reporting mode",
                 "helpText": "total: cumulative reading; increment: add this amount."
               }
@@ -846,14 +882,22 @@
           "operating": {
             "title": "Record operation started",
             "description": "Records that the resource began operating at the current server time.",
-            "inputs": { "input": "Input" },
-            "outputs": { "output": "Output" }
+            "inputs": {
+              "input": "Input"
+            },
+            "outputs": {
+              "output": "Output"
+            }
           },
           "idle": {
             "title": "Record operation stopped",
             "description": "Records that the resource stopped operating at the current server time.",
-            "inputs": { "input": "Input" },
-            "outputs": { "output": "Output" }
+            "inputs": {
+              "input": "Input"
+            },
+            "outputs": {
+              "output": "Output"
+            }
           },
           "track-activity": {
             "title": "Record activity",
@@ -870,29 +914,45 @@
           "heartbeat": {
             "title": "Send health heartbeat",
             "description": "Marks the resource healthy when this node fires. If no heartbeat arrives within the configured timeout the resource is automatically marked unhealthy.",
-            "inputs": { "input": "Input" },
-            "outputs": { "output": "Output" },
+            "inputs": {
+              "input": "Input"
+            },
+            "outputs": {
+              "output": "Output"
+            },
             "preview": {
               "identifier": "Identifier",
               "timeoutSeconds": "Timeout (s)"
             },
             "config": {
-              "identifier": { "label": "Identifier (optional)" },
-              "timeoutSeconds": { "label": "Timeout (seconds)" },
-              "unhealthyReason": { "label": "Reason on timeout (optional)" }
+              "identifier": {
+                "label": "Identifier (optional)"
+              },
+              "timeoutSeconds": {
+                "label": "Timeout (seconds)"
+              },
+              "unhealthyReason": {
+                "label": "Reason on timeout (optional)"
+              }
             }
           },
           "set": {
             "title": "Set health state",
             "description": "Sets the resource health state. Static config values can be overridden by payload fields (health.identifier, health.status, health.reason).",
-            "inputs": { "input": "Input" },
-            "outputs": { "output": "Output" },
+            "inputs": {
+              "input": "Input"
+            },
+            "outputs": {
+              "output": "Output"
+            },
             "preview": {
               "identifier": "Identifier",
               "status": "Status"
             },
             "config": {
-              "identifier": { "label": "Identifier (optional)" },
+              "identifier": {
+                "label": "Identifier (optional)"
+              },
               "status": {
                 "label": "Status",
                 "enum": {
@@ -900,7 +960,9 @@
                   "unhealthy": "Unhealthy"
                 }
               },
-              "reason": { "label": "Reason (optional, templates allowed)" }
+              "reason": {
+                "label": "Reason (optional, templates allowed)"
+              }
             }
           }
         }

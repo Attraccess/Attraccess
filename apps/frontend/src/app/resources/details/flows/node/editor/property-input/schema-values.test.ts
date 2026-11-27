@@ -4,7 +4,13 @@ import type { Property } from './index';
 
 describe('schema values', () => {
   it('rejects unresolved required fields even when they are not yet exposed as controls', () => {
-    expect(isValueValid({ type: 'object', properties: { controllerId: { type: 'number' } }, required: ['controllerId', 'channelId'] }, { controllerId: 1 }, true)).toBe(false);
+    expect(
+      isValueValid(
+        { type: 'object', properties: { controllerId: { type: 'number' } }, required: ['controllerId', 'channelId'] },
+        { controllerId: 1 },
+        true,
+      ),
+    ).toBe(false);
   });
 
   it('rejects invalid read-only numeric values and wrong primitive types', () => {
