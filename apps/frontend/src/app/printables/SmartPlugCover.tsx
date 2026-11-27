@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import scadSource from './smart-plug-cover.scad?raw';
 import { Select } from '../../components/select';
 import { DownloadControls } from './DownloadControls';
@@ -7,13 +7,11 @@ import { PlugCableFields } from './PlugCableFields';
 import { MillimetreField } from './MillimetreField';
 import { Preview } from './Preview';
 import { PreviewStage } from './PreviewStage';
-import { PrintTip } from './PrintTip';
 import { RenderErrorAlert } from './RenderErrorAlert';
 import { triggerDownload, type DownloadFormat } from './download';
 import { downloadPlug, plugFileSlug, plugScadSource } from './plugDownload';
 import { NO_OUTPUT_ERROR } from './errors';
 import {
-  DEFAULT_PLUG_CONFIG,
   DEVICE_EXTRA_DIAMETER_LIMITS,
   withCable,
   type PlugCable,
@@ -24,13 +22,18 @@ import { usePlugRender } from './usePlugRender';
 import de from './de.json';
 import en from './en.json';
 
+interface SmartPlugCoverProps {
+  /** Owned by the page, so switching tabs keeps the settings. */
+  config: PlugConfig;
+  onConfigChange: (update: (current: PlugConfig) => PlugConfig) => void;
+}
+
 /** Configurator for the two-part smart-plug security cover. */
-export function SmartPlugCover() {
+export function SmartPlugCover({ config, onConfigChange }: SmartPlugCoverProps) {
   const { t } = useTranslations({ de, en });
-  const [config, setConfig] = useState<PlugConfig>(DEFAULT_PLUG_CONFIG);
   const [format, setFormat] = useState<DownloadFormat>('3mf');
   const { status, result, error } = usePlugRender(config);
-  const update = (change: Partial<PlugConfig>) => setConfig((current) => ({ ...current, ...change }));
+  const update = (change: Partial<PlugConfig>) => onConfigChange((current) => ({ ...current, ...change }));
 
   const handleDownload = () => {
     if (format === 'scad') {
@@ -72,7 +75,7 @@ export function SmartPlugCover() {
           label={t('plugCable')}
           description={t('plugCableDescription')}
           value={config.cable}
-          onChange={(cable) => setConfig((current) => withCable(current, cable as PlugCable))}
+          onChange={(cable) => onConfigChange((current) => withCable(current, cable as PlugCable))}
           items={[
             { key: 'straight_schuko', label: t('cableStraightSchuko') },
             { key: 'straight_euro', label: t('cableStraightEuro') },
@@ -83,7 +86,7 @@ export function SmartPlugCover() {
         />
         <PlugCableFields config={config} onChange={update} />
 
-        <PrintTip>{t('plugPrintTip')}</PrintTip>
+        <StatusAlert status="accent">{t('plugPrintTip')}</StatusAlert>
       </div>
 
       <div className="flex w-full min-w-0 flex-1 flex-col gap-4">

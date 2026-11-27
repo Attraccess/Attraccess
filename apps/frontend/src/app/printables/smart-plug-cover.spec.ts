@@ -5,8 +5,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { parseBinaryStl, type Mesh } from './stl';
-import { boundingBox } from './testBoundingBox';
+import { parseBinaryStl, type Mesh, boundingBox } from './stl';
 import {
   DEFAULT_PLUG_CONFIG,
   MIN_HEIGHT_ABOVE_PLUG,
@@ -133,7 +132,9 @@ describe('smart-plug-cover.scad', () => {
     expect(boundingBox(cover).min[2]).toBeCloseTo(43, 2);
     expect(boundingBox(cover).max[2]).toBeCloseTo(60.8, 2);
     expect(width(cover)).toBeCloseTo(45.9, 2);
-    // Volume catches an inverted bore, a missing wordmark or blind seal passages despite matching bounds.
+    // Volume catches an inverted bore or a missing wordmark despite matching bounds (the seal
+    // passages have their own checks below). #1734's values; the wordmark rows now stay clear of
+    // the bottom face, which leaves about 110 mm³ more body.
     expect(Math.abs(volume(body) - 31_458.4)).toBeLessThan(150);
     expect(Math.abs(volume(cover) - 6_718.2)).toBeLessThan(100);
   }, 60_000);
@@ -145,6 +146,40 @@ describe('smart-plug-cover.scad', () => {
     // Same envelope, but the engraving removes material.
     expect(boundingBox(branded)).toEqual(boundingBox(plain as Mesh));
     expect(volume(plain as Mesh) - volume(branded)).toBeGreaterThan(200);
+  }, 60_000);
+
+  it.each([
+    ['the default straight cable', {}],
+    ['a tall angled cover', { cable: 'angled_schuko', heightAbovePlug: 22 }],
+    ['the shortest body', { device: 'shelly_legacy', cable: 'angled_schuko', heightAbovePlug: MIN_HEIGHT_ABOVE_PLUG }],
+  ] as const)(
+    'keeps every wordmark clear of the bottom face and the rim for %s',
+    async (_, config) => {
+      const body = await render('body', config);
+      const box = boundingBox(body);
+      // The recess floor is the only surface 1.4 mm inside the outer wall.
+      const floorRadius = (box.max[0] - box.min[0]) / 2 - 1.4;
+      const floor = vertices(body, (x, y) => Math.abs(Math.hypot(x, y) - floorRadius) < 0.02);
+      expect(floor.length).toBeGreaterThan(0);
+      const zs = floor.map(([, , z]) => z);
+      expect(Math.min(...zs)).toBeGreaterThan(box.min[2] + 0.5);
+      // Below the 1 mm rounded rim.
+      expect(Math.max(...zs)).toBeLessThan(box.max[2] - 1.5);
+    },
+    60_000,
+  );
+
+  it('cuts both seal passages out through the body wall', async () => {
+    const body = await render('body');
+    const outerRadius = width(body) / 2;
+    // Each passage leaves the outer wall as a 5 mm wide opening, on opposite sides.
+    for (const side of [1, -1]) {
+      const edges = vertices(
+        body,
+        (x, y) => side * x > 0 && Math.abs(Math.abs(y) - 2.5) < 1e-3 && Math.abs(Math.hypot(x, y) - outerRadius) < 0.05,
+      );
+      expect(edges.length).toBeGreaterThan(0);
+    }
   }, 60_000);
 
   it('cuts both 3 x 5 mm seal passages through the cover top', async () => {
@@ -237,6 +272,7 @@ describe('smart-plug-cover.scad', () => {
 
   it.each([
     ['a height below the cover skirt', { CABLE: '"angled_schuko"', HEIGHT_ABOVE_PLUG: 12 }],
+    ['a height just below the minimum', { CABLE: '"angled_schuko"', HEIGHT_ABOVE_PLUG: MIN_HEIGHT_ABOVE_PLUG - 0.1 }],
     ['a straight Euro opening above 12 mm', { CABLE: '"straight_euro"', CORD_OPEN_D: 13 }],
     ['a straight Schuko opening above 16 mm', { CORD_OPEN_D: 17 }],
     ['an unknown device', { DEVICE: '"other"' }],

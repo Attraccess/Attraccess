@@ -54,6 +54,19 @@ describe('buildThreeMf', () => {
     expect(xml.match(/<triangle /g)).toHaveLength(2);
   });
 
+  it('places a part through its build item when given an offset', () => {
+    const xml = model(
+      unzipSync(
+        buildThreeMf([
+          { name: 'Body', color: '#B4B4B4', mesh: triangle },
+          { name: 'Cover', color: '#FFFFFF', mesh: triangle, offset: [60, 0, -43] },
+        ]),
+      ),
+    );
+    expect(xml).toContain('<item objectid="2" />');
+    expect(xml).toContain('<item objectid="3" transform="1 0 0 0 1 0 0 0 1 60.0000 0.0000 -43.0000" />');
+  });
+
   it('escapes characters that would otherwise break the XML', () => {
     const xml = model(unzipSync(buildThreeMf([{ name: 'A & B <"quoted">', color: '#000000', mesh: triangle }])));
     expect(xml).toContain('name="A &amp; B &lt;&quot;quoted&quot;&gt;"');

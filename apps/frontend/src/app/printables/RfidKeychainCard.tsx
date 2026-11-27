@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { Description, Input, Label, TextField } from '@heroui/react';
-import { type TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StatusAlert, type TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import scadSource from './rfid-keychain-card.scad?raw';
 import { DownloadControls } from './DownloadControls';
 import { Preview } from './Preview';
 import { PreviewStage } from './PreviewStage';
-import { PrintTip } from './PrintTip';
 import { RenderErrorAlert } from './RenderErrorAlert';
 import { downloadCard, scadWithLabel, toFileSlug, triggerDownload } from './download';
 import { useCardRender } from './useCardRender';
@@ -20,16 +19,21 @@ import type { DownloadFormat } from './download';
  * produced no file at all (rather than an OpenSCAD assert() message, which is already
  * user-facing text). Map it to a translated string here; any other error string is OpenSCAD's
  * own assert() message, which comes out in English and is surfaced as-is (see
- * `renderErrorReason` in openscad.worker.ts).
+ * `renderErrorReason` in openscadRuntime.ts).
  */
 export function resolveErrorMessage(error: string | null, t: TFunction): string | null {
   if (error === null) return null;
   return error === NO_OUTPUT_ERROR ? t('errorNoOutput') : error;
 }
 
-export function RfidKeychainCard() {
+interface RfidKeychainCardProps {
+  /** Owned by the page, so switching tabs keeps the label. */
+  label: string;
+  onLabelChange: (label: string) => void;
+}
+
+export function RfidKeychainCard({ label, onLabelChange }: RfidKeychainCardProps) {
   const { t } = useTranslations({ de, en });
-  const [label, setLabel] = useState('Tobias J.');
   const [format, setFormat] = useState<DownloadFormat>('3mf');
 
   const { status, result, error } = useCardRender(label);
@@ -52,7 +56,7 @@ export function RfidKeychainCard() {
           <p className="text-sm text-muted">{t('cardDescription')}</p>
         </div>
 
-        <TextField value={label} onChange={setLabel}>
+        <TextField value={label} onChange={onLabelChange}>
           <Label>{t('labelField')}</Label>
           <Input placeholder={t('labelPlaceholder')} data-cy="printables-label-input" />
           <Description>{t('labelDescription')}</Description>
@@ -60,7 +64,7 @@ export function RfidKeychainCard() {
 
         {errorMessage !== null && <RenderErrorAlert title={t('errorTitle')} message={errorMessage} />}
 
-        <PrintTip>{t('printTip')}</PrintTip>
+        <StatusAlert status="accent">{t('printTip')}</StatusAlert>
       </div>
 
       {/* Preview, with the download controls beneath it at the bottom right. */}

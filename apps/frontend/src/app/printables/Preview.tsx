@@ -144,9 +144,10 @@ export function Preview({ body, accent, ariaLabel }: PreviewProps) {
 
   // Rebuilds the mesh pair whenever the STL data changes, and only then: the dependencies are the
   // two meshes, which keep their identity until a new render replaces them. The cleanup below
-  // disposes exactly the group this run created (captured by closure, not read back from a ref), so it fires both when
-  // swapping to a newer pair and on unmount — no pair is ever left undisposed, and because each
-  // run's cleanup only ever touches its own group, two runs can never dispose the same objects.
+  // disposes exactly the group this run created (captured by closure, not read back from a
+  // ref), so it fires both when swapping to a newer pair and on unmount — no pair is ever left
+  // undisposed, and because each run's cleanup only ever touches its own group, two runs can
+  // never dispose the same objects.
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;

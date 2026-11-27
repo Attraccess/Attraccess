@@ -4,6 +4,8 @@
  * a configuration means. The limits mirror the asserts in the .scad.
  */
 
+import type { ScadDefines } from './openscadRuntime';
+
 export type PlugDevice = 'nous_a1' | 'shelly_plus_gen3' | 'shelly_legacy';
 export type PlugCable = 'straight_schuko' | 'straight_euro' | 'angled_schuko' | 'angled_euro';
 
@@ -26,9 +28,8 @@ export const PLUG_CABLES: readonly PlugCable[] = ['straight_schuko', 'straight_e
 /** The STEP profile's heights; straight cables always use them. */
 export const DEFAULT_HEIGHT_ABOVE_PLUG = 17.8;
 export const DEFAULT_CABLE_CUTOUT_HEIGHT = 24.2;
-/** Fixed openings of the angled variants, from the STEP. */
+/** Fixed cover slot of the angled variants, from the STEP (the body's mouth is 34.17 mm). */
 export const ANGLED_COVER_SLOT = 30.9;
-export const ANGLED_BODY_MOUTH = 34.17;
 
 export const DEVICE_EXTRA_DIAMETER_LIMITS = { min: 0, max: 4, step: 0.5 } as const;
 /**
@@ -97,7 +98,7 @@ function round(value: number): number {
 }
 
 /** OpenSCAD `-D` values (already OpenSCAD literals) for every configurable .scad parameter. */
-export function toScadDefines(config: PlugConfig): Record<string, string | number> {
+export function toScadDefines(config: PlugConfig): ScadDefines {
   const effective = effectivePlugConfig(config);
   return {
     DEVICE: JSON.stringify(effective.device),

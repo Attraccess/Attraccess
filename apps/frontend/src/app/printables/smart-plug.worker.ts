@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import scadSource from './smart-plug-cover.scad?raw';
-import { createSerialQueue, errorResponse, renderScad } from './openscadRuntime';
+import { createSerialQueue, errorResponse, renderScad, yieldToMessages, type WorkerResponse } from './openscadRuntime';
 import { toScadDefines, type PlugConfig } from './smartPlugConfig';
 
 export interface PlugRenderRequest {
@@ -9,8 +9,7 @@ export interface PlugRenderRequest {
   config: PlugConfig;
 }
 
-export type PlugRenderResponse =
-  { id: number; ok: true; body: ArrayBuffer; cover: ArrayBuffer } | { id: number; ok: false; error: string };
+export type PlugRenderResponse = WorkerResponse<{ body: ArrayBuffer; cover: ArrayBuffer }>;
 
 /**
  * Renders the body, then the cover, unless a newer request has arrived in between: the cover
@@ -24,6 +23,7 @@ export async function renderPlug(
 ): Promise<{ body: ArrayBuffer; cover: ArrayBuffer } | null> {
   const defines = toScadDefines(config);
   const body = await render(scadSource, { ...defines, PART: '"body"' });
+  await yieldToMessages();
   if (!isCurrent()) return null;
   const cover = await render(scadSource, { ...defines, PART: '"cover"' });
   return { body, cover };
@@ -48,9 +48,7 @@ export function createPlugMessageHandler(
     });
 }
 
-// OpenSCAD is GPL-licensed and deliberately kept at arm's length: it is fetched as an
-// unbundled static asset and driven through argv + a virtual filesystem, exactly like the
-// CLI. See apps/frontend/public/openscad/NOTICE.md. Do not import it into the main bundle.
+// OpenSCAD stays at arm's length (GPL); see OPENSCAD_BASE in openscadRuntime.ts.
 const handle = createPlugMessageHandler((response, transfer = []) =>
   (self as unknown as Worker).postMessage(response, transfer),
 );

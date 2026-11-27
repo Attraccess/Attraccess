@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { RfidKeychainCard } from './RfidKeychainCard';
-import type { CardRender, RenderStatus } from './useCardRender';
+import type { CardRender } from './useCardRender';
+import type { RenderStatus } from './useWorkerRender';
 import { NO_OUTPUT_ERROR } from './errors';
+import { DEFAULT_CARD_LABEL } from './download';
 const state = vi.hoisted(() => ({
   status: 'rendering' as RenderStatus,
   result: null as CardRender | null,
@@ -43,8 +46,14 @@ beforeEach(() => {
   state.error = null;
 });
 afterEach(cleanup);
+
+/** Holds the label the way PrintablesPage does. */
+function Card() {
+  const [label, setLabel] = useState(DEFAULT_CARD_LABEL);
+  return <RfidKeychainCard label={label} onLabelChange={setLabel} />;
+}
 it('announces rendering and allows source downloads before a mesh exists', async () => {
-  render(<RfidKeychainCard />);
+  render(<Card />);
   // the rendering spinner is a status too (named "Loading"); the announcement is the unnamed live region
   expect(screen.getByRole('status', { name: '' })).toHaveTextContent('rendering');
   expect(screen.getByRole('button', { name: 'download' })).toBeDisabled();
@@ -62,7 +71,7 @@ it('announces rendering and allows source downloads before a mesh exists', async
 it('downloads a ready mesh in the selected format', async () => {
   state.status = 'ready';
   state.result = renderedCard;
-  render(<RfidKeychainCard />);
+  render(<Card />);
   expect(screen.getByText('Mesh preview')).toBeTruthy();
   expect(screen.getByRole('status')).toHaveTextContent('renderReady');
   fireEvent.click(screen.getByRole('button', { name: 'download' }));
@@ -78,7 +87,7 @@ it.each([NO_OUTPUT_ERROR, 'Model exceeds card dimensions'])(
     state.status = 'error';
     state.error = error;
     state.result = renderedCard;
-    render(<RfidKeychainCard />);
+    render(<Card />);
     expect(screen.getByRole('alert')).toHaveTextContent(error === NO_OUTPUT_ERROR ? 'errorNoOutput' : error);
     expect(screen.getByRole('button', { name: 'download' })).toBeDisabled();
   },

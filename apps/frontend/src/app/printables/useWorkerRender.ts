@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import type { WorkerResponse } from './openscadRuntime';
 
 export type RenderStatus = 'idle' | 'rendering' | 'ready' | 'error';
-
-/** What a printables worker posts back: the parts on success, OpenSCAD's reason on failure. */
-export type WorkerResponse<TParts> = ({ id: number; ok: true } & TParts) | { id: number; ok: false; error: string };
 
 const DEBOUNCE_MS = 500;
 
@@ -49,7 +47,16 @@ export function useWorkerRender<TParts, TResult>(
       // strictNullChecks off, a plain `if (event.data.ok)` fails to narrow away the other arm in
       // the `else` branch.
       if (event.data.ok === true) {
-        setResult(toResultRef.current(event.data as TParts));
+        let next: TResult;
+        try {
+          next = toResultRef.current(event.data as TParts);
+        } catch (parseError) {
+          // A malformed STL must not leave the spinner up forever.
+          setError(parseError instanceof Error ? parseError.message : String(parseError));
+          setStatus('error');
+          return;
+        }
+        setResult(next);
         setError(null);
         setStatus('ready');
       } else if (event.data.ok === false) {

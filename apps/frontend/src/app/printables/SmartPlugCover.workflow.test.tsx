@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { SmartPlugCover } from './SmartPlugCover';
@@ -47,13 +48,19 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+/** Holds the settings the way PrintablesPage does. */
+function Cover() {
+  const [config, setConfig] = useState<PlugConfig>(DEFAULT_PLUG_CONFIG);
+  return <SmartPlugCover config={config} onConfigChange={setConfig} />;
+}
+
 async function chooseCable(name: string) {
   fireEvent.click(screen.getByRole('button', { name: /plugCable/ }));
   fireEvent.click(await screen.findByRole('option', { name }));
 }
 
 it('renders the defaults and shows the opening field for a straight cable', () => {
-  render(<SmartPlugCover />);
+  render(<Cover />);
   expect(state.render).toHaveBeenLastCalledWith(DEFAULT_PLUG_CONFIG);
   expect(screen.getByRole('textbox', { name: 'cordOpeningDiameter' })).toHaveValue('12 mm');
   expect(screen.queryByRole('textbox', { name: 'heightAbovePlug' })).toBeNull();
@@ -61,7 +68,7 @@ it('renders the defaults and shows the opening field for a straight cable', () =
 });
 
 it('swaps the opening for the two heights on an angled cable and resets them on a straight one', async () => {
-  render(<SmartPlugCover />);
+  render(<Cover />);
   await chooseCable('cableAngledSchuko');
   expect(screen.queryByRole('textbox', { name: 'cordOpeningDiameter' })).toBeNull();
   const height = screen.getByRole('textbox', { name: 'heightAbovePlug' });
@@ -84,7 +91,7 @@ it('swaps the opening for the two heights on an angled cable and resets them on 
 });
 
 it('caps a straight Euro opening at 12 mm', async () => {
-  render(<SmartPlugCover />);
+  render(<Cover />);
   await chooseCable('cableStraightEuro');
   const opening = screen.getByRole('textbox', { name: 'cordOpeningDiameter' });
   fireEvent.change(opening, { target: { value: '15' } });
@@ -93,7 +100,7 @@ it('caps a straight Euro opening at 12 mm', async () => {
 });
 
 it('downloads the configured source before a mesh exists, and the mesh once ready', async () => {
-  const { rerender } = render(<SmartPlugCover />);
+  const { rerender } = render(<Cover />);
   fireEvent.click(screen.getByRole('button', { name: /format3mf/ }));
   fireEvent.click(await screen.findByRole('option', { name: 'formatScad' }));
   fireEvent.click(screen.getByRole('button', { name: 'download' }));
@@ -104,7 +111,7 @@ it('downloads the configured source before a mesh exists, and the mesh once read
 
   state.status = 'ready';
   state.result = rendered;
-  rerender(<SmartPlugCover />);
+  rerender(<Cover />);
   expect(screen.getByText('Mesh preview')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: /formatScad/ }));
   fireEvent.click(await screen.findByRole('option', { name: 'formatStl' }));
@@ -119,7 +126,18 @@ it.each([
   state.status = 'error';
   state.error = error;
   state.result = rendered;
-  render(<SmartPlugCover />);
+  render(<Cover />);
   expect(within(screen.getByRole('alert')).getByText(shown)).toBeTruthy();
   expect(screen.getByRole('button', { name: 'download' })).toBeDisabled();
+});
+
+it('offers only the source while a newer render replaces the shown model', async () => {
+  // The previous result is still on screen, but no longer matches the settings.
+  state.status = 'rendering';
+  state.result = rendered;
+  render(<Cover />);
+  expect(screen.getByRole('button', { name: 'download' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: /format3mf/ }));
+  fireEvent.click(await screen.findByRole('option', { name: 'formatScad' }));
+  expect(screen.getByRole('button', { name: 'download' })).toBeEnabled();
 });

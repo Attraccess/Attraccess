@@ -26,19 +26,17 @@ export type CreateOpenSCAD = (options: {
   ) => Record<string, never>;
 }) => Promise<OpenScadInstance>;
 
-export interface RenderRequest {
-  id: number;
-  label: string;
+let factoryPromise: Promise<CreateOpenSCAD> | null = null;
+
+let modulePromise: Promise<WebAssembly.Module> | null = null;
+
+let assetsPromise: Promise<{ font: Uint8Array; config: string }> | null = null;
+
+/** Caches `promise`, but forgets it again if it rejects, so one failed fetch is retried next time. */
+function retryable<T>(promise: Promise<T>, forget: () => void): Promise<T> {
+  promise.catch(forget);
+  return promise;
 }
-
-export type RenderResponse =
-  { id: number; ok: true; body: ArrayBuffer; letters: ArrayBuffer } | { id: number; ok: false; error: string };
-
-export let factoryPromise: Promise<CreateOpenSCAD> | null = null;
-
-export let modulePromise: Promise<WebAssembly.Module> | null = null;
-
-export let assetsPromise: Promise<{ font: Uint8Array; config: string }> | null = null;
 
 /**
  * The vendored build is unmodified, so it compiles the 11 MB wasm on every instance and
@@ -47,17 +45,24 @@ export let assetsPromise: Promise<{ font: Uint8Array; config: string }> | null =
  * cost to the first render without patching any GPL-licensed file.
  */
 export function load(): Promise<[CreateOpenSCAD, WebAssembly.Module, { font: Uint8Array; config: string }]> {
-  factoryPromise ??= import(/* @vite-ignore */ `${OPENSCAD_BASE}/openscad.wasm.js`).then(
-    (module) => module.default as CreateOpenSCAD,
+  factoryPromise ??= retryable(
+    import(/* @vite-ignore */ `${OPENSCAD_BASE}/openscad.wasm.js`).then((module) => module.default as CreateOpenSCAD),
+    () => (factoryPromise = null),
   );
-  // eslint-disable-next-line no-restricted-syntax -- The worker loads bundled WebAssembly directly.
-  modulePromise ??= WebAssembly.compileStreaming(fetch(`${OPENSCAD_BASE}/openscad.wasm`));
-  assetsPromise ??= Promise.all([
-    // eslint-disable-next-line no-restricted-syntax -- The worker loads bundled font assets directly.
-    fetch(`${OPENSCAD_BASE}/fonts/${FONT_FILE}`).then((r) => r.arrayBuffer()),
-    // eslint-disable-next-line no-restricted-syntax -- The worker loads bundled font assets directly.
-    fetch(`${OPENSCAD_BASE}/fonts/fonts.conf`).then((r) => r.text()),
-  ]).then(([font, config]) => ({ font: new Uint8Array(font), config }));
+  modulePromise ??= retryable(
+    // eslint-disable-next-line no-restricted-syntax -- The worker loads bundled WebAssembly directly.
+    WebAssembly.compileStreaming(fetch(`${OPENSCAD_BASE}/openscad.wasm`)),
+    () => (modulePromise = null),
+  );
+  assetsPromise ??= retryable(
+    Promise.all([
+      // eslint-disable-next-line no-restricted-syntax -- The worker loads bundled font assets directly.
+      fetch(`${OPENSCAD_BASE}/fonts/${FONT_FILE}`).then((r) => r.arrayBuffer()),
+      // eslint-disable-next-line no-restricted-syntax -- The worker loads bundled font assets directly.
+      fetch(`${OPENSCAD_BASE}/fonts/fonts.conf`).then((r) => r.text()),
+    ]).then(([font, config]) => ({ font: new Uint8Array(font), config })),
+    () => (assetsPromise = null),
+  );
 
   return Promise.all([factoryPromise, modulePromise, assetsPromise]);
 }
@@ -117,10 +122,21 @@ export function createSerialQueue(): (id: number, task: (isCurrent: () => boolea
     latestId = id;
     const isCurrent = () => id === latestId;
     tail = tail
+      // Let requests that arrived while the previous task blocked the thread land first.
+      .then(yieldToMessages)
       .then(() => (isCurrent() ? task(isCurrent) : undefined))
       // A rejection must not poison the chain for every later submission.
       .catch(() => undefined);
   };
+}
+
+/**
+ * Resolves after the worker has handled any messages already waiting. OpenSCAD's `callMain` runs
+ * synchronously, so a request posted during a render is only delivered once the thread is free;
+ * promise continuations alone never let it in. Await this before asking `isCurrent()`.
+ */
+export function yieldToMessages(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 /**
@@ -150,15 +166,22 @@ export async function renderScad(source: string, defines: ScadDefines): Promise<
   const errors: string[] = [];
   // Silence stdout: without an explicit `print`, Emscripten's default writes OpenSCAD's
   // normal ECHO/status chatter to the browser console.
-  const instance = await factory({
-    noInitialRun: true,
-    printErr: (t) => errors.push(t),
-    print: () => undefined,
-    instantiateWasm: (imports, done) => {
-      WebAssembly.instantiate(wasmModule, imports).then(done);
-      return {};
-    },
-  });
+  // The loader never settles if instantiation fails (e.g. out of memory), which would stall the
+  // render queue for good; race it against that failure instead.
+  let instantiateFailed!: (error: unknown) => void;
+  const failure = new Promise<never>((_, reject) => (instantiateFailed = reject));
+  const instance = await Promise.race([
+    factory({
+      noInitialRun: true,
+      printErr: (t) => errors.push(t),
+      print: () => undefined,
+      instantiateWasm: (imports, done) => {
+        WebAssembly.instantiate(wasmModule, imports).then(done, instantiateFailed);
+        return {};
+      },
+    }),
+    failure,
+  ]);
 
   instance.FS.mkdir('/fonts');
   instance.FS.writeFile('/fonts/fonts.conf', assets.config);
@@ -193,6 +216,9 @@ export async function renderScad(source: string, defines: ScadDefines): Promise<
   // Copy out of the wasm heap before the instance is collected.
   return new Uint8Array(data).buffer;
 }
+
+/** What a printables worker posts back: the parts on success, OpenSCAD's reason on failure. */
+export type WorkerResponse<TParts> = ({ id: number; ok: true } & TParts) | { id: number; ok: false; error: string };
 
 /** The worker's reply for a failed render. */
 export function errorResponse(id: number, error: unknown): { id: number; ok: false; error: string } {

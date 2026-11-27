@@ -86,7 +86,10 @@ SEAL_PASSAGE_NORMAL_H = SEAL_PASSAGE_H / sqrt(2);
 BRAND_SIZE = 3.2;
 BRAND_DEPTH = 1.4;
 BRAND_ROW_PITCH = 10;
-BRAND_VERTICAL_MARGIN = 7;
+// Half the wordmark's length (21.24 mm in Sansation at size 3.2, from textmetrics) plus 1 mm, so
+// the vertical text never runs into the bottom face or the rounded rim. A constant rather than
+// textmetrics() so the downloaded file opens in OpenSCAD without the experimental feature.
+BRAND_VERTICAL_MARGIN = 11.7;
 BRAND_REPEAT_ANGLE = 360 / 7;
 BRAND_ROW_SHIFT = 18;
 
@@ -143,15 +146,19 @@ module rounded_outer_body() {
 module brand_engraving() {
   // Vertical "Attraccess" wordmarks, seven per row, each row rotated against the one below.
   outer_r = BODY_OUTER_D / 2;
-  row_count = floor((BODY_H - BODY_BOTTOM_Z - 2 * BRAND_VERTICAL_MARGIN) / BRAND_ROW_PITCH) + 1;
+  first_z = BODY_BOTTOM_Z + BRAND_VERTICAL_MARGIN;
+  last_z = BODY_H - BODY_TOP_FILLET_R - BRAND_VERTICAL_MARGIN;
+  row_count = floor((last_z - first_z) / BRAND_ROW_PITCH) + 1;
+  // Centre the rows in the band so the spare height is split between top and bottom.
+  start_z = first_z + (last_z - first_z - (row_count - 1) * BRAND_ROW_PITCH) / 2;
   for (row = [0 : row_count - 1])
     for (repeat = [0 : 6])
       rotate([0, 0, repeat * BRAND_REPEAT_ANGLE + row * BRAND_ROW_SHIFT])
-        translate([0, -outer_r + BRAND_DEPTH, BODY_BOTTOM_Z + BRAND_VERTICAL_MARGIN + row * BRAND_ROW_PITCH])
+        translate([0, -outer_r + BRAND_DEPTH, start_z + row * BRAND_ROW_PITCH])
           rotate([90, 0, 0])
             linear_extrude(BRAND_DEPTH + 0.01)
               rotate([0, 0, 90])
-                text(BRAND, size = BRAND_SIZE, font = FONT, halign = "center", valign = "center");
+                text(BRAND, size = BRAND_SIZE, font = FONT, halign = "center", valign = "center", $fn = 16);
 }
 
 module body() {

@@ -1,8 +1,6 @@
 import { parseBinaryStl, type Mesh } from './stl';
 import { useWorkerRender, type RenderStatus } from './useWorkerRender';
 
-export type { RenderStatus };
-
 export interface CardRender {
   bodyStl: ArrayBuffer;
   lettersStl: ArrayBuffer;

@@ -17,7 +17,10 @@ describe('createSerialQueue', () => {
     return { task, release };
   }
 
-  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+  /** Lets pending timers run, including the queue's yield before each task. */
+  const flush = async () => {
+    for (let i = 0; i < 6; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+  };
 
   it('runs one task at a time instead of overlapping them', async () => {
     const log: string[] = [];
@@ -81,6 +84,22 @@ describe('createSerialQueue', () => {
     await flush();
 
     expect(seen).toEqual([true, false]);
+  });
+
+  it('lets requests that arrived while a task blocked the thread supersede the next one', async () => {
+    const log: string[] = [];
+    const submit = createSerialQueue();
+
+    submit(1, async () => {
+      // OpenSCAD blocks the worker, so messages posted meanwhile are delivered afterwards,
+      // as macrotasks: here, two newer requests.
+      setTimeout(() => submit(2, async () => void log.push('stale')));
+      setTimeout(() => submit(3, async () => void log.push('latest')));
+      log.push('first');
+    });
+    await flush();
+
+    expect(log).toEqual(['first', 'latest']);
   });
 
   it('keeps processing later tasks after one rejects', async () => {

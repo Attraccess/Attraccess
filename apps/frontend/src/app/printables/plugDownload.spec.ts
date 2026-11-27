@@ -1,7 +1,7 @@
 import { strFromU8, unzipSync } from 'fflate';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import plugSource from './smart-plug-cover.scad?raw';
-import { buildPlugFile, downloadPlug, plugFileSlug, plugScadSource } from './plugDownload';
+import { buildPlugFile, downloadPlug, plateOffsets, plugFileSlug, plugScadSource } from './plugDownload';
 import { DEFAULT_PLUG_CONFIG, type PlugConfig } from './smartPlugConfig';
 import type { PlugRender } from './usePlugRender';
 import * as download from './download';
@@ -64,6 +64,21 @@ describe('buildPlugFile', () => {
     expect(xml.match(/<object /g)).toHaveLength(2);
     expect(xml).toContain('<base name="Body"');
     expect(xml).toContain('<base name="Cover"');
+  });
+
+  it('stands body and cover side by side on the plate instead of nested', () => {
+    // The cover comes out of OpenSCAD inside the body's bore, raised off the plate.
+    const body = { positions: new Float32Array([-27, -27, -0.8, 27, 27, -0.8, 0, 0, 60.8]), triangleCount: 1 };
+    const cover = { positions: new Float32Array([-23, -23, 43, 23, 23, 43, 0, 0, 60.8]), triangleCount: 1 };
+    const [bodyOffset, coverOffset] = plateOffsets(body, cover);
+    expect(bodyOffset[0]).toBe(0);
+    expect(bodyOffset[2]).toBeCloseTo(0.8, 5);
+    expect(coverOffset[0]).toBeCloseTo(27 + 10 + 23, 5);
+    expect(coverOffset[2]).toBeCloseTo(-43, 5);
+
+    const xml = strFromU8(unzipSync(buildPlugFile({ ...render, body, cover }, '3mf'))['3D/3dmodel.model']);
+    expect(xml).toContain('<item objectid="2" transform="1 0 0 0 1 0 0 0 1 0.0000 0.0000 0.8000" />');
+    expect(xml).toContain('<item objectid="3" transform="1 0 0 0 1 0 0 0 1 60.0000 0.0000 -43.0000" />');
   });
 
   it('puts the two STLs into a ZIP', () => {

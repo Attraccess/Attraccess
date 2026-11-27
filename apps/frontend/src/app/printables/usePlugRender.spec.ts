@@ -2,7 +2,10 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_PLUG_CONFIG, type PlugConfig } from './smartPlugConfig';
 
-vi.mock('./stl', () => ({ parseBinaryStl: vi.fn(() => ({ positions: new Float32Array(), triangleCount: 0 })) }));
+const parseBinaryStl = vi.hoisted(() =>
+  vi.fn((buffer: ArrayBuffer) => ({ positions: new Float32Array(), triangleCount: buffer.byteLength })),
+);
+vi.mock('./stl', () => ({ parseBinaryStl }));
 
 /** Stands in for the real Worker so no wasm is loaded; just records what gets posted. */
 class FakeWorker {
@@ -95,5 +98,39 @@ describe('usePlugRender', () => {
       worker.onmessage?.({ data: { id: 2, ok: false, error: 'boom' } } as MessageEvent);
     });
     expect(result.current).toMatchObject({ status: 'error', error: 'boom' });
+  });
+
+  it('keeps body and cover apart in the result', () => {
+    const { result } = renderHook(() => usePlugRender(DEFAULT_PLUG_CONFIG));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    const body = new ArrayBuffer(1);
+    const cover = new ArrayBuffer(2);
+    act(() => {
+      FakeWorker.instances[0].onmessage?.({ data: { id: 1, ok: true, body, cover } } as MessageEvent);
+    });
+    expect(result.current.result).toMatchObject({
+      bodyStl: body,
+      coverStl: cover,
+      body: { triangleCount: 1 },
+      cover: { triangleCount: 2 },
+    });
+  });
+
+  it('reports an unreadable STL instead of rendering forever', () => {
+    parseBinaryStl.mockImplementationOnce(() => {
+      throw new Error('STL truncated');
+    });
+    const { result } = renderHook(() => usePlugRender(DEFAULT_PLUG_CONFIG));
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    act(() => {
+      FakeWorker.instances[0].onmessage?.({
+        data: { id: 1, ok: true, body: new ArrayBuffer(0), cover: new ArrayBuffer(0) },
+      } as MessageEvent);
+    });
+    expect(result.current).toMatchObject({ status: 'error', error: 'STL truncated', result: null });
   });
 });
