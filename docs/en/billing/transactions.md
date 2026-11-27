@@ -23,7 +23,7 @@ Each transaction contains the following information:
 
 For new usage sessions, completed duration charges retain the measured duration, rounded minutes and the rate saved at session start. Changing prices, billing factors or operating history later does not recalculate completed transactions.
 
-A session without any charge (no session price, no duration charge and no priced item) creates no transaction: its pending entry disappears when the session ends. A session whose charge a billing factor reduces to 0 credits still gets a transaction.
+A session without any charge (no Credits per Usage, no Credits per Minute or per Operating Minute, and no priced item) creates no transaction: its pending entry disappears when the session ends. A session whose charge a billing factor reduces to 0 credits still gets a transaction, and so does a session whose priced meter reading is still pending when it ends, because the later meter charge is booked against it. When upgrading to the version with this behaviour, existing 0-credit usage transactions without any priced item are removed once; transactions with a refund or correction are kept.
 
 For nonzero totals, the default email receipt shows separate session and operating-duration calculations and the saved billing factor. A zero-total transaction does not send a billing email. Customized email templates are preserved when the default receipt is upgraded; administrators can reset the template to its default to adopt the updated layout. Historical transactions are not rewritten.
 
