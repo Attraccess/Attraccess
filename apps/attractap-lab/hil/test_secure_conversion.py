@@ -29,9 +29,11 @@ from conftest import PROFILE, open_console, reboot_reader
 
 pytestmark = [
     pytest.mark.skipif(PROFILE != efuse.PLAIN, reason="the conversion runs on the plain lab reader only"),
-    # run.sh sets it for variants with a secure profile build; Touch V1 has none and is never converted.
+    # run.sh sets it for variants with a secure profile build; Touch V1 has none and is never converted. The reason
+    # names the variable, not the variant: run directly (without run.sh) it is unset for Touch V2 too.
     pytest.mark.skipif(os.environ.get("READER_SECURE_CONVERSION") != "1",
-                       reason=f"{os.environ.get('READER_VARIANT') or 'this variant'} has no secure profile to convert to"),
+                       reason=f"READER_SECURE_CONVERSION is not 1 for {os.environ.get('READER_VARIANT') or 'this variant'}: "
+                              "run.sh sets it only for a variant with a secure profile (Touch V1 has none)"),
 ]
 
 PASSPHRASE = "hil-recovery-passphrase"
