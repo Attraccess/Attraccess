@@ -204,9 +204,10 @@ SessionTls::Status SessionTls::feed(const uint8_t *data, size_t length,
         impl->inboundOffset = 0;
     }
     // Exceptions are off: a failed allocation would abort the reader. Without the heap for these bytes the session
-    // fails instead and the reader opens a new one (ATT-1315).
+    // fails instead and the reader opens a new one (ATT-1315). reserveFor checks the size the growth really
+    // allocates, not just `needed` (ATT-1394).
     const size_t needed = inbound.size() + length;
-    if (needed > inbound.capacity() && !heap_guard::fits(needed, heap_guard::CRITICAL_RESERVE_BYTES))
+    if (!heap_guard::reserveFor(inbound, needed, heap_guard::CRITICAL_RESERVE_BYTES))
     {
         fail(MBEDTLS_ERR_SSL_ALLOC_FAILED);
         return state;

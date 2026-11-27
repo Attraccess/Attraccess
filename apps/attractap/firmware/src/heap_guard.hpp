@@ -8,6 +8,7 @@
 //
 // Plain C++: host tests set the budget with heap_guard::setTestBudget().
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 
@@ -67,5 +68,33 @@ namespace heap_guard
         if (free - reserve - bytes >= PLENTY_FREE_BYTES) return true;
         const size_t largest = largestBlock();
         return largest >= reserve && largest - reserve >= bytes;
+    }
+
+    // Grows `v` so it takes `needed` elements without reallocating again (ATT-1394). A plain `insert` would grow to
+    // about double the current size, not to `needed`, so a check of `needed` bytes alone passes and the allocation
+    // still fails; with exceptions off that aborts the reader. Tries the usual doubling (capped at `limit`) first,
+    // then exactly `needed`. False, with `v` unchanged, when neither fits with `reserve` left over. The old buffer is
+    // still allocated while `fits` measures: during the copy both exist.
+    template <typename V>
+    bool reserveFor(V &v, size_t needed, size_t reserve = BULK_RESERVE_BYTES, size_t limit = SIZE_MAX)
+    {
+        const size_t capacity = v.capacity();
+        if (needed <= capacity) return true;
+        if (needed > v.max_size()) return false;
+        constexpr size_t elem = sizeof(typename V::value_type);
+        const auto bytesOf = [](size_t count) { return count > SIZE_MAX / elem ? SIZE_MAX : count * elem; };
+        const size_t doubled = capacity > SIZE_MAX / 2 ? SIZE_MAX : capacity * 2;
+        const size_t grown = std::min(std::max(needed, std::min(doubled, limit)), v.max_size());
+        if (grown > needed && fits(bytesOf(grown), reserve))
+        {
+            v.reserve(grown);
+            return true;
+        }
+        if (fits(bytesOf(needed), reserve))
+        {
+            v.reserve(needed);
+            return true;
+        }
+        return false;
     }
 }
