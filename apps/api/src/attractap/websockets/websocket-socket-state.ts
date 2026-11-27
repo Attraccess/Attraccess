@@ -342,6 +342,8 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       };
       /** When the enrollment was armed (ms since epoch); a card arriving much later is refused. */
       armedAt: number;
+      /** The cluster-wide reader screen claim taken for it (ATT-1163); released when the enrollment ends. */
+      screenClaim?: string;
     } | null;
     /** Armed by an admin: the next card tapped on this reader is reset if it is this one. No key material here. */
     resetNfcCardData: {
@@ -353,6 +355,8 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       };
       /** When the reset was armed (ms since epoch); a card arriving much later is refused. */
       armedAt: number;
+      /** The cluster-wide reader screen claim taken for it (ATT-1163); released when the reset ends. */
+      screenClaim?: string;
     } | null;
     // Two-card supervision flow (ATT-493). Present while the reader is waiting
     // for a supervisor to authorise a non-introduced user's session — either by

@@ -18,6 +18,7 @@ import { LicenseModuleType } from '../license/license.service';
 import { RequiresLicense } from '../license/require-license.decorator';
 import { ApprovePairingDto, PairingDto, ResolvePairingDto } from './dtos/pairing.dto';
 import { AttractapCredentialEventDto, toCredentialEventDto } from './dtos/credential-event.dto';
+import { ClusterPairingService } from './security/cluster-pairing.service';
 import { CredentialRegistryService } from './security/credential-registry.service';
 import { Actor, PairingService } from './security/pairing.service';
 
@@ -36,6 +37,8 @@ function actorOf(req: AuthenticatedRequest): Actor {
 export class AttractapPairingController {
   public constructor(
     @Inject(PairingService) private readonly pairing: PairingService,
+    // Waiting readers may be held by another API instance (ATT-1163).
+    @Inject(ClusterPairingService) private readonly pairings: ClusterPairingService,
     @Inject(CredentialRegistryService) private readonly registry: CredentialRegistryService,
   ) {}
 
@@ -43,8 +46,8 @@ export class AttractapPairingController {
   @Auth('resources.update')
   @ApiOperation({ summary: 'List readers waiting to pair; never includes codes', operationId: 'getPairings' })
   @ApiResponse({ status: 200, type: [PairingDto] })
-  public list(): PairingDto[] {
-    return this.pairing.list();
+  public async list(): Promise<PairingDto[]> {
+    return await this.pairings.list();
   }
 
   @Post('pairings/resolve')
@@ -55,16 +58,16 @@ export class AttractapPairingController {
   @ApiResponse({ status: 404, description: 'No waiting reader shows this code (counts toward the limit)' })
   @ApiResponse({ status: 409, description: 'Two readers show this code; wait for the next one' })
   @ApiResponse({ status: 429, description: 'Too many wrong codes' })
-  public resolve(@Body() body: ResolvePairingDto, @Req() req: AuthenticatedRequest): PairingDto {
-    return this.pairing.resolve(body.code, actorOf(req));
+  public async resolve(@Body() body: ResolvePairingDto, @Req() req: AuthenticatedRequest): Promise<PairingDto> {
+    return await this.pairings.resolve(body.code, actorOf(req));
   }
 
   @Get('pairings/:pairingId')
   @Auth('resources.update')
   @ApiOperation({ summary: 'Get one pairing; a Lite reader includes its current pattern', operationId: 'getPairing' })
   @ApiResponse({ status: 200, type: PairingDto })
-  public get(@Param('pairingId') pairingId: string): PairingDto {
-    return this.pairing.get(pairingId);
+  public async get(@Param('pairingId') pairingId: string): Promise<PairingDto> {
+    return await this.pairings.get(pairingId);
   }
 
   @Post('pairings/:pairingId/approve')
@@ -83,7 +86,7 @@ export class AttractapPairingController {
     @Body() body: ApprovePairingDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<PairingDto> {
-    return await this.pairing.approve(pairingId, body, actorOf(req));
+    return await this.pairings.approve(pairingId, body, actorOf(req));
   }
 
   @Delete('pairings/:pairingId')
@@ -91,7 +94,7 @@ export class AttractapPairingController {
   @HttpCode(204)
   @ApiOperation({ summary: 'Cancel a pairing', operationId: 'cancelPairing' })
   public async cancel(@Param('pairingId') pairingId: string, @Req() req: AuthenticatedRequest): Promise<void> {
-    await this.pairing.cancel(pairingId, actorOf(req));
+    await this.pairings.cancel(pairingId, actorOf(req));
   }
 
   @Post('readers/:readerId/revoke')

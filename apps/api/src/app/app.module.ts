@@ -24,6 +24,7 @@ import { EmailTemplateModule } from '../email-template/email-template.module';
 import { EmailLayoutModule } from '../email-layout/email-layout.module';
 import sessionConfig from '../config/session.config';
 import valkeyConfig from '../config/valkey.config';
+import { ClusterModule } from '../cluster/cluster.module';
 import { ValkeyModule } from '../valkey/valkey.module';
 import { LicenseModule } from '../license/license.module';
 import { LicenseService } from '../license/license.service';
@@ -51,6 +52,7 @@ const logger = new Logger('AppModule');
     }),
 
     ValkeyModule,
+    ClusterModule,
     EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
     UsersAndAuthModule,

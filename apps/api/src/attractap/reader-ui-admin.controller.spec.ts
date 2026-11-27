@@ -10,7 +10,7 @@ function setup() {
     setReader: jest.fn().mockResolvedValue(undefined),
   };
   const alerts = { listOpen: jest.fn().mockResolvedValue([{ id: 1 }]), clear: jest.fn(), findOpen: jest.fn() };
-  const slots = { syncReader: jest.fn(), contributionsOf: jest.fn().mockReturnValue([{ plugin: 'p' }]) };
+  const slots = { syncReaderEverywhere: jest.fn(), contributionsAnywhere: jest.fn().mockResolvedValue([{ plugin: 'p' }]) };
   const resources = { getResourceById: jest.fn().mockResolvedValue({ id: 3 }) };
   const readers = {
     findReaderById: jest.fn().mockResolvedValue({ id: 8, pairingState: 'paired' }),
@@ -35,7 +35,7 @@ describe('ReaderUiAdminController', () => {
     const dto = { noScreenPolicy: 'block' as const, plugins: [] };
     await controller.updateResourceSettings(3, dto, req);
     expect(settings.setResource).toHaveBeenCalledWith(3, dto, req.user);
-    expect(slots.syncReader).toHaveBeenCalledWith(undefined);
+    expect(slots.syncReaderEverywhere).toHaveBeenCalledWith(undefined);
     expect(await controller.getResourceSettings(3)).toEqual({ noScreenPolicy: null, plugins: [] });
   });
 
@@ -43,7 +43,7 @@ describe('ReaderUiAdminController', () => {
     const { controller, settings, slots, req } = setup();
     expect(await controller.updateReaderSettings(8, { widgetsEnabled: false }, req)).toEqual({ widgetsEnabled: false });
     expect(settings.setReader).toHaveBeenCalledWith(8, false, req.user);
-    expect(slots.syncReader).toHaveBeenCalledWith(8);
+    expect(slots.syncReaderEverywhere).toHaveBeenCalledWith(8);
   });
 
   it('answers 404 for settings of a resource or reader that does not exist', async () => {
@@ -69,7 +69,7 @@ describe('ReaderUiAdminController', () => {
     await expect(controller.getContributions(5)).rejects.toThrow(NotFoundException);
     await expect(controller.updateReaderSettings(5, { widgetsEnabled: false }, req)).rejects.toThrow(NotFoundException);
     expect(settings.setReader).not.toHaveBeenCalled();
-    expect(slots.syncReader).not.toHaveBeenCalled();
+    expect(slots.syncReaderEverywhere).not.toHaveBeenCalled();
   });
 
   it('lists contributions and open alerts', async () => {

@@ -1,5 +1,4 @@
 import type { UsageSession } from '@attraccess/application-models';
-import { StartUsageSessionDto } from '../usage/dtos/startUsageSession.dto';
 
 /** Who asks for or approves a supervised session. */
 export interface SupervisionUser {
@@ -7,40 +6,6 @@ export interface SupervisionUser {
   username: string;
   firstName?: string | null;
   lastName?: string | null;
-}
-
-export interface PendingSupervisionRequest {
-  id: string;
-  resourceId: number;
-  requester: SupervisionUser;
-  /**
-   * The single supervisor whose approval is required (web flow, ATT-487), or `null` for a
-   * reader-originated request (ATT-493) that any currently authorized introducer may approve — by
-   * tapping their card at the reader or approving the web popup.
-   */
-  supervisorUserId: number | null;
-  /** Supervisors the request was broadcast to (reader flow); used to fan out resolution/expiry events. */
-  eligibleSupervisorIds: number[];
-  dto: StartUsageSessionDto;
-  /**
-   * Whether the requester could be asked for the duration estimate (web, API, readers with
-   * capabilities.sessionDuration). Otherwise a missing estimate falls back to the machine's maximum or default.
-   */
-  canAskDuration: boolean;
-  createdAt: Date;
-  expiresAt: Date;
-  timeout: ReturnType<typeof setTimeout>;
-  resolve: (session: UsageSession) => void;
-  reject: (error: Error) => void;
-  settled: boolean;
-  removeAbortListener?: () => void;
-  /** Present for reader-originated requests (ATT-493); drives reader-websocket notifications. */
-  readerCallbacks?: ReaderSupervisionCallbacks;
-  /**
-   * The reader this request armed from the web (ATT-816). Set synchronously at registration, before
-   * arming, so the one-armed-reader-per-requester scan sees concurrent requests.
-   */
-  readerId?: number;
 }
 
 /**
@@ -71,4 +36,10 @@ export interface ReaderSupervisionArmer {
     requester: SupervisionUser;
     requestId: string;
   }): Promise<ReaderSupervisionCallbacks>;
+
+  /**
+   * Returns the reader to normal after its request ended without the callbacks `arm` returned, because the instance
+   * holding them is gone (ATT-1163). Never throws.
+   */
+  disarm?(params: { readerId: number; requestId: string; error: Error }): void;
 }

@@ -5,8 +5,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * resource only, so a new meter can reuse the name of an archived one. The two indexes on `meterId` serve the check
  * for a meter's history, which decides whether it may be deleted.
  */
-export class ResourceMeterArchive1796400000000 implements MigrationInterface {
-  name = 'ResourceMeterArchive1796400000000';
+export class ResourceMeterArchive1796400000002 implements MigrationInterface {
+  name = 'ResourceMeterArchive1796400000002';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`ALTER TABLE "resource_meter" ADD COLUMN IF NOT EXISTS "archivedAt" timestamptz`);

@@ -148,6 +148,27 @@ export function describeBillingLedgerConformance(fixture: PortBackendFixture): v
       expect(await balanceOf(member.userId)).toBe(75);
     }, 60_000);
 
+    it('discards the pending bill of a usage without any charge once, when two connections settle it at the same time', async () => {
+      const member = await db.seedMember('free');
+      const usageId = await db.seedFinishedUsage(member);
+      const free: BillableUsage = {
+        ...billable(member, usageId),
+        sessionDurationCreditsPerMinute: 0,
+        creditsPerUsage: 0,
+      };
+      await main.service.handleResourceUsageStart(member.resourceId, free, { id: member.userId });
+      expect(await db.countUsageTransactions(usageId)).toBe(1);
+
+      const outcomes = await Promise.all([
+        main.service.chargeForResourceUsage(free),
+        other.service.chargeForResourceUsage(free),
+      ]);
+
+      expect(outcomes).toEqual([undefined, undefined]);
+      expect(await db.countUsageTransactions(usageId)).toBe(0);
+      expect(await balanceOf(member.userId)).toBe(0);
+    }, 60_000);
+
     describe('independent accounts are not forced through an application-wide lock', () => {
       /** Holds a unit of work on `userId` open on the main connection until the returned release is called. */
       async function holdOpenUnit(userId: number) {

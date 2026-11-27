@@ -12,7 +12,9 @@ import { ResourceListVisibility1796300000000 } from './1796300000000-resource-li
 import { PermittedResourceIndexes1796300000001 } from './1796300000001-permitted-resource-indexes';
 import { NfcCardType1796300000002 } from './1796300000002-nfc-card-type';
 import { AttractapSecureConversion1796300000003 } from './1796300000003-attractap-secure-conversion';
-import { ResourceMeterArchive1796400000000 } from './1796400000000-resource-meter-archive';
+import { BillingTransactionReferenceIndexes1796400000000 } from './1796400000000-billing-transaction-reference-indexes';
+import { DiscardZeroUsageBills1796400000001 } from './1796400000001-discard-zero-usage-bills';
+import { ResourceMeterArchive1796400000002 } from './1796400000002-resource-meter-archive';
 
 /** The released PostgreSQL migration track, in order. Later schema changes are appended here as new migrations. */
 export const postgresMigrations = [
@@ -30,5 +32,7 @@ export const postgresMigrations = [
   PermittedResourceIndexes1796300000001,
   NfcCardType1796300000002,
   AttractapSecureConversion1796300000003,
-  ResourceMeterArchive1796400000000,
+  BillingTransactionReferenceIndexes1796400000000,
+  DiscardZeroUsageBills1796400000001,
+  ResourceMeterArchive1796400000002,
 ];

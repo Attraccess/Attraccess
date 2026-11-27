@@ -1,5 +1,6 @@
 import { OnEvent } from '@nestjs/event-emitter';
-import { Inject, Logger, UseInterceptors } from '@nestjs/common';
+import { remoteEvent } from './reader-event-relay';
+import { Inject, Logger, Optional, UseInterceptors } from '@nestjs/common';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -42,6 +43,7 @@ import { PAIRING_SUBPROTOCOL, SESSION_SUBPROTOCOL } from '../security/session-fr
 import { readerWebSocketOptions } from './websocket-transport-options';
 import { WebsocketService } from './websocket.service';
 import { LegacyFirmwareUpdateService } from './legacy-firmware-update.service';
+import { ReaderRouter } from './reader-router';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
@@ -141,6 +143,15 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   @Inject(ReaderSessionService)
   protected readerSessionService: ReaderSessionService;
 
+  @Optional()
+  @Inject(ReaderRouter)
+  protected readerRouter?: ReaderRouter;
+
+  /** Without Nest (unit tests) this instance is the whole cluster. */
+  protected get router(): ReaderRouter {
+    return (this.readerRouter ??= new ReaderRouter(this.websocketService));
+  }
+
   protected readonly connectedAt = new WeakMap<object, bigint>();
 
   protected clientResponseAwaiters: Array<{
@@ -201,10 +212,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     // Plugin BLE sessions and pending calls are bound to this connection's reader identity.
     this.readerBleDriver.socketClosed(socket);
     this.onReaderSessionEnded(socket, reason, readerId);
-    if (socket.state.supervisionFlow) this.supervisionHandler.cancelForSocket(socket);
+    if (socket.state.supervisionFlow) this.supervisionHandler.cancelForSocket(socket, readerId);
     if (socket.state.massIntroductionFlow) this.massIntroductionHandler.cancelForSocket(socket, readerId);
-    socket.state.enrollment = null;
-    socket.state.resetNfcCardData = null;
+    this.cardHandler.endCardFlows(socket, readerId);
   }
 
   public async sendResourceList(readerId: number) {
@@ -212,6 +222,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   @OnEvent('settings.default-language')
+  @OnEvent(remoteEvent('settings.default-language'))
   async updateReaderLanguage(language: 'en' | 'de') {
     this.websocketService.readerLanguage = language;
     const readers = Array.from(this.websocketService.sockets.values()).filter((socket) =>
@@ -248,6 +259,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   /** Revoked or re-paired credentials end live sessions immediately. */
   @OnEvent(CREDENTIAL_CHANGED_EVENT)
+  @OnEvent(remoteEvent(CREDENTIAL_CHANGED_EVENT))
   public async onCredentialChanged(readerId: number) {
     await this.disconnectReader(readerId);
   }
@@ -482,6 +494,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     await this.readerSessionService.accept(client as unknown as AuthenticatedWebSocket, session, (socket) => {
       this.websocketService.sockets.set(socket.id, socket);
       this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
+      // Other instances route this reader's work here from now on (ATT-1163).
+      if (socket.readerId) this.router.cluster.presence.socketConnected(socket.readerId, socket.id);
     });
   }
 
@@ -532,6 +546,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     cleanupSocketState(socket, { uiHandler: this.uiHandler, crashReportHandler: this.crashReportHandler });
     this.websocketService.sockets.delete(socket.id);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
+    if (readerId) this.router.cluster.presence.socketDisconnected(readerId, socket.id);
   }
 
   protected async clientWasActive(socket: AuthenticatedWebSocket) {

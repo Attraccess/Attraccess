@@ -1,11 +1,11 @@
 import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { postgresMigrations } from './index';
-import { ResourceMeterArchive1796400000000 } from './1796400000000-resource-meter-archive';
+import { ResourceMeterArchive1796400000002 } from './1796400000002-resource-meter-archive';
 
 jest.setTimeout(120_000);
 
-describe('ResourceMeterArchive1796400000000 (persistence)', () => {
+describe('ResourceMeterArchive1796400000002 (persistence)', () => {
   let source: DataSource;
 
   beforeEach(async () => {
@@ -17,7 +17,7 @@ describe('ResourceMeterArchive1796400000000 (persistence)', () => {
   const run = async (direction: 'up' | 'down') => {
     const runner = source.createQueryRunner();
     try {
-      await new ResourceMeterArchive1796400000000()[direction](runner);
+      await new ResourceMeterArchive1796400000002()[direction](runner);
     } finally {
       await runner.release();
     }
