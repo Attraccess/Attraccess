@@ -23,6 +23,7 @@ interface ResourceListServiceResourceListPayloadContext {
   usersService: ResourceListService['usersService'];
   readerTimeZone: ResourceListService['readerTimeZone'];
   rbacService: ResourceListService['rbacService'];
+  projectsService: ResourceListService['projectsService'];
   logger: ResourceListService['logger'];
 }
 /** What the reader's session list reads of a running usage session. */
@@ -30,6 +31,9 @@ interface ReaderSessionSource {
   id: number;
   userId: number;
   startTime: Date;
+  sessionStartTime?: Date | null;
+  projectId?: number | null;
+  project?: { name: string } | null;
   autoEndAt?: Date | null;
   maxAutoEndAt?: Date | null;
   /** Always loaded for the active sessions the reader lists. */
@@ -52,23 +56,29 @@ function readerAutoEnd(session: ReaderSessionSource, offsetMinutes: (at: Date) =
     autoEndInSeconds: seconds(session.autoEndAt),
     hasMaxSessionTime: session.maxAutoEndAt != null,
     extendLimitInSeconds: seconds(
-      extensionCap({ startTime: session.startTime, maxAutoEndAt: session.maxAutoEndAt ?? null }),
+      extensionCap({
+        startTime: session.startTime,
+        sessionStartTime: session.sessionStartTime,
+        maxAutoEndAt: session.maxAutoEndAt ?? null,
+      }),
     ),
   };
 }
 
 function toReaderSession(session: ReaderSessionSource, offsetMinutes: (at: Date) => number, now = new Date()) {
+  // After a project switch the reader keeps showing since when the machine has been in use.
+  const startedAt = session.sessionStartTime ?? session.startTime;
   return {
     id: session.id,
     user: {
       username: session.user.username,
       displayName: formatUserDisplayName(session.user),
     },
-    startTime: session.startTime.toISOString(),
+    startTime: startedAt.toISOString(),
     // Offset (minutes east of UTC) of the reader's time zone for this
     // specific instant, so the reader can render local wall-clock time without
     // a tz database. Computed per-timestamp, so it stays DST-correct.
-    startTimeUtcOffsetMinutes: offsetMinutes(session.startTime),
+    startTimeUtcOffsetMinutes: offsetMinutes(startedAt),
     ...(session.supervisorUser
       ? {
           supervisorUsername: session.supervisorUser.username,
@@ -92,6 +102,20 @@ function listedReaderSessions(
 ): ReaderSession[] {
   const ordered = own ? [own, ...sessions.filter((session) => session !== own)] : sessions;
   return ordered.slice(0, MAX_LISTED_READER_SESSIONS).map((session) => toReaderSession(session, offsetMinutes));
+}
+
+/**
+ * What a reader needs to offer a project switch of the card holder's own running session: the project it is booked
+ * to. Not offered to somebody who has neither that nor any project to switch to.
+ */
+async function projectSwitchOffer(
+  context: ResourceListServiceResourceListPayloadContext,
+  userId: number,
+  own: ReaderSessionSource,
+) {
+  const projectId = own.projectId ?? null;
+  if (projectId === null && !(await context.projectsService.getTotalCount(userId, { search: '' }))) return {};
+  return { canSwitchProject: true, ownProjectId: projectId, ownProjectName: own.project?.name ?? null };
 }
 
 /**
@@ -186,11 +210,12 @@ export async function sendResourceListToSockets(
   };
   // Share the expensive list queries, but never share one user's access with
   // another socket. Reuse the existing authorization cache/retraining rules.
+  // Keyed by the user and whether their reader can switch projects: only such a reader is offered the switch.
   const payloadsByUser = new Map<
-    number,
+    string,
     Promise<typeof resourceListPayload & { authenticatedUsername: string; authenticatedDisplayName: string }>
   >();
-  const forUser = async (userId: number) => {
+  const forUser = async (userId: number, offersProjectSwitch: boolean) => {
     const user = await context.usersService.findOne({ id: userId });
     if (!user) return { ...resourceListPayload, authenticatedUsername: '', authenticatedDisplayName: '' };
     const permissions = await context.rbacService.getEffectivePermissions(userId);
@@ -209,6 +234,9 @@ export async function sendResourceListToSockets(
         const canManageResource = permissions.has('resources.update');
         return {
           ...base,
+          ...(offersProjectSwitch && own && resource.type === ResourceType.Machine
+            ? await projectSwitchOffer(context, userId, own)
+            : {}),
           // At limit 1 this is today's single session; with several sessions the caller's own comes first.
           activeUsageSession: ownUsageSession ?? base.activeUsageSession,
           ownUsageSession,
@@ -242,8 +270,10 @@ export async function sendResourceListToSockets(
   await Promise.all(
     sockets.map(async (socket) => {
       const userId = socket.state.verifiedUserId;
-      if (userId != null && !payloadsByUser.has(userId)) payloadsByUser.set(userId, forUser(userId));
-      const payload = userId == null ? resourceListPayload : await payloadsByUser.get(userId);
+      const offersProjectSwitch = socket.state.projectSwitch === true;
+      const key = `${userId}:${offersProjectSwitch}`;
+      if (userId != null && !payloadsByUser.has(key)) payloadsByUser.set(key, forUser(userId, offersProjectSwitch));
+      const payload = userId == null ? resourceListPayload : await payloadsByUser.get(key);
       // A different card may have been presented while the queries were pending.
       if (socket.state.verifiedUserId !== userId) return;
       const resourceListResponse = new AttractapEvent(AttractapEventType.RESOURCE_LIST, payload);

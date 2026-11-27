@@ -2,6 +2,7 @@ import {
   BillingTransactionDetail,
   BillingTransactionRecord,
   BillingTransactionStatus,
+  ProjectSwitchCharging,
   ResourceBillingConfigurationRecord,
   UsageReceiptSource,
 } from '@attraccess/application-models';
@@ -12,6 +13,7 @@ import {
   BillingAuditFactory,
   BillingLedgerStore,
   BillingTransactionContext,
+  ContinuedUsagePart,
   NewBillingTransaction,
   SettleUsageChargeInput,
 } from '../ports/billing-ledger.port';
@@ -69,6 +71,13 @@ export class FakeBillingLedgerStore implements BillingLedgerStore {
   getBalance(userId: number, context?: BillingTransactionContext): Promise<number | null> {
     this.contexts.push(context);
     return Promise.resolve(this.balances.get(userId) ?? null);
+  }
+
+  /** Parts of switched sessions by the usage id a read starts at, newest first. */
+  continuedUsageParts = new Map<number, ContinuedUsagePart[]>();
+
+  findContinuedUsageParts(usageId: number): Promise<ContinuedUsagePart[]> {
+    return Promise.resolve(this.continuedUsageParts.get(usageId) ?? []);
   }
 
   findTransactionIdForUsage(usageId: number, userId: number): Promise<number | null> {
@@ -258,6 +267,7 @@ export class FakeBillingConfigurationStore implements BillingConfigurationStore 
       creditsPerUsage: 0,
       creditsPerMinute: 0,
       creditsPerOperatingMinute: 0,
+      projectSwitchCharging: ProjectSwitchCharging.CONTINUE,
       ...rates,
     };
     this.configurations.set(resourceId, record);

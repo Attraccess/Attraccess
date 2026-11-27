@@ -13,6 +13,8 @@ const READER_ACTION_OF_EVENT: Partial<Record<AttractapEventType, ReaderAction>> 
   [AttractapEventType.START_RESOURCE_USAGE_SESSION]: 'start',
   [AttractapEventType.STOP_RESOURCE_USAGE_SESSION]: 'stop',
   [AttractapEventType.EXTEND_RESOURCE_USAGE_SESSION]: 'stop',
+  // Moving a running session follows who may end it.
+  [AttractapEventType.SWITCH_SESSION_PROJECT]: 'stop',
   [AttractapEventType.LOCK_DOOR]: 'lock',
   [AttractapEventType.UNLOCK_DOOR]: 'unlock',
   [AttractapEventType.UNLATCH_DOOR]: 'unlatch',

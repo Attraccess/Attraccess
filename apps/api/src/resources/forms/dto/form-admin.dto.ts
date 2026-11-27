@@ -59,6 +59,9 @@ export class FormRequiredFlagsDto {
 
   @ApiProperty({ description: 'Required when ending a usage session' })
   isRequiredOnResourceUsageEnd!: boolean;
+
+  @ApiProperty({ description: 'Required when a running session switches its project' })
+  isRequiredOnResourceUsageProjectSwitch!: boolean;
 }
 
 const flagOverride = (description: string) =>
@@ -91,6 +94,18 @@ export class FormResourceOverrideDto {
   @ValidateIf((_, value) => value !== null)
   @IsBoolean()
   isRequiredOnResourceUsageEnd!: boolean | null;
+
+  @ApiProperty({
+    description: "Required when a running session switches its project; null inherits the form's default",
+    nullable: true,
+    required: false,
+    type: Boolean,
+  })
+  @rawValue()
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsBoolean()
+  isRequiredOnResourceUsageProjectSwitch?: boolean | null;
 }
 
 export class FormAppliedResourceDto {

@@ -1,3 +1,4 @@
+import type { ProjectSwitchCharging } from './project-switch-charging';
 import { BillingTransactionStatus } from './billing-transaction';
 
 /**
@@ -101,6 +102,7 @@ export interface ResourceBillingConfigurationRecord {
   creditsPerUsage: number;
   creditsPerMinute: number;
   creditsPerOperatingMinute: number;
+  projectSwitchCharging: ProjectSwitchCharging;
 }
 
 /** What a usage receipt mail is built from. */

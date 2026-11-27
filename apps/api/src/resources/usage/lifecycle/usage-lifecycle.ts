@@ -7,7 +7,7 @@ import type {
   UsageSessionWithParties,
 } from '@attraccess/application-models';
 
-import { ConflictException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -96,6 +96,18 @@ export interface ActiveSessionCounts {
   limit: number;
 }
 
+/**
+ * The tentative session of a project switch is the running session itself, under another project: cancelling it
+ * would run the stop flow of a machine that keeps running. A switch flow that fails refuses the switch instead.
+ */
+function assertCandidateMayBeCancelled(attempt: UsageLifecycleAttempt): void {
+  if (attempt.kind === 'project-switch') {
+    throw new FlowExecutionError(
+      'A project switch flow cannot end the session being switched; name a user or all sessions to end them after the switch',
+    );
+  }
+}
+
 /** Lifecycle attempts of starts, stops and takeovers: their drafts, flows, metering, recovery and abort. */
 @Injectable()
 export class UsageLifecycle {
@@ -134,6 +146,18 @@ export class UsageLifecycle {
   /** The final meter total of a session, `not-metered` without metering. */
   async collectFinal(usageId: number, at: Date): Promise<FinalCollection> {
     return (await this.metering?.collectFinal(usageId, at)) ?? { status: 'not-metered' };
+  }
+
+  /**
+   * Splits the metering of a running session between it and its continuation after a project switch; a billed meter
+   * that cannot be read refuses the switch.
+   */
+  async handOverMeters(usageId: number, successorUsageId: number, at: Date): Promise<FinalCollection> {
+    try {
+      return (await this.metering?.handOver(usageId, successorUsageId, at)) ?? { status: 'not-metered' };
+    } catch (error) {
+      throw new BadRequestException(`METER_SWITCH_FAILED: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   async initializeMeter(options: Parameters<ResourceMeteringService['initialize']>[0]): Promise<void> {
@@ -194,6 +218,7 @@ export class UsageLifecycle {
   async cancelLifecycleCandidate(attemptId: string, resourceId: number): Promise<void> {
     await this.transaction(async (scope) => {
       const attempt = await this.getLifecycleAttempt(scope, attemptId, resourceId);
+      assertCandidateMayBeCancelled(attempt);
       if (attempt.candidateUsageId === null) {
         throw new ConflictException('The usage lifecycle attempt has no candidate session');
       }
@@ -217,6 +242,7 @@ export class UsageLifecycle {
   ): Promise<void> {
     const { candidate, activeSessions } = await this.transaction(async (scope) => {
       const attempt = await this.getLifecycleAttempt(scope, attemptId, resourceId);
+      assertCandidateMayBeCancelled(attempt);
       if (attempt.candidateUsageId === null) {
         throw new ConflictException('The usage lifecycle attempt has no candidate session');
       }

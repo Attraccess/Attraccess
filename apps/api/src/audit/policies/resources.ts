@@ -21,6 +21,7 @@ export const RESOURCE_AUDIT_ACTIONS = [
   'usage_session.started',
   'usage_session.ended',
   'usage_session.extended',
+  'usage_session.project_switched',
   'energy_charge.waived',
   'meter_charge.waived',
   'meter.updated',
@@ -117,6 +118,7 @@ export const resourceDetailFields: Partial<Record<ResourceAuditAction, readonly 
   'usage_session.started': ['supervisorUserId', 'usageId', 'usageUserId', 'autoEndAt', 'estimatedDurationMinutes'],
   'usage_session.ended': ['usageId', 'usageUserId', 'triggeredByUserId', 'endReason'],
   'usage_session.extended': ['usageId', 'usageUserId', 'previousAutoEndAt', 'autoEndAt', 'extendedByMinutes'],
+  'usage_session.project_switched': ['usageId', 'newUsageId', 'usageUserId', 'previousProjectId', 'projectId'],
   'energy_charge.waived': ['usageId', 'waivedCredits'],
   'meter_charge.waived': ['meterId', 'usageId', 'waivedCredits'],
   'meter.updated': [

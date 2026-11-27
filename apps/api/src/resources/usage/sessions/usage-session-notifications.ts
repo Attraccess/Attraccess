@@ -33,6 +33,7 @@ import {
   ResourceSupervisedUsageEndedEvent,
   ResourceSupervisedUsageStartedEvent,
   ResourceUsageNoteAddedEvent,
+  ResourceUsageProjectSwitchedEvent,
   ResourceUsageSessionEndedEvent,
   ResourceUsageSessionTakenOverEvent,
 } from '../events/resource-usage.events';
@@ -201,6 +202,35 @@ export class UsageSessionNotifications {
           lastName: user.lastName,
         }),
       );
+    }
+  }
+
+  /**
+   * The charge of the part that ended and the live update of a project switch. Deliberately nothing a stop or a start
+   * announces: the session goes on.
+   */
+  async notifyProjectSwitched(
+    previous: UsageSession,
+    continuation: UsageSession,
+    switchTime: Date,
+    chargeTransactionId: number | undefined,
+  ): Promise<void> {
+    if (chargeTransactionId !== undefined) await this.billingService.notifyResourceUsageCharge(chargeTransactionId);
+    try {
+      this.eventEmitter.emit(
+        ResourceUsageProjectSwitchedEvent.EVENT_NAME,
+        new ResourceUsageProjectSwitchedEvent(
+          continuation.resourceId,
+          continuation.userId as number,
+          previous.id,
+          continuation.id,
+          previous.projectId,
+          continuation.projectId,
+          switchTime,
+        ),
+      );
+    } catch (error) {
+      this.logger.error('Failed to emit the project switched event after commit', (error as Error).stack);
     }
   }
 

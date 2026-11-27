@@ -47,6 +47,7 @@ import { AttractapProjectsHandler } from './handlers/projects/projects.handler';
 import { ResourceActionGuard } from './handlers/resource-action.guard';
 import { ResourceListService } from './handlers/resource-list/resource-list.service';
 import { AttractapSessionHandler } from './handlers/session/session.handler';
+import { AttractapProjectSwitchHandler } from './handlers/session/project-switch.handler';
 import { PairingService } from '../security/pairing.service';
 import { ReaderSessionService } from '../security/reader-session.service';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
@@ -182,6 +183,7 @@ export function gatewayProviders(
       },
     },
     AttractapSessionHandler,
+    AttractapProjectSwitchHandler,
     { provide: ResourceMeteringService, useValue: { getLive: jest.fn() } },
     { provide: ResourceOperatingAttributionService, useValue: { getForResource: jest.fn() } },
     AttractapBillingHandler,

@@ -56,6 +56,7 @@ const toFormRecord = (form: Form): FormRecord => ({
   isRequiredOnResourceUsageStart: form.isRequiredOnResourceUsageStart,
   isRequiredOnResourceUsageTakeOver: form.isRequiredOnResourceUsageTakeOver,
   isRequiredOnResourceUsageEnd: form.isRequiredOnResourceUsageEnd,
+  isRequiredOnResourceUsageProjectSwitch: form.isRequiredOnResourceUsageProjectSwitch,
   resourceId: form.resourceId,
   groupId: form.groupId,
   deletedAt: form.deletedAt,
@@ -70,6 +71,7 @@ const toOverrideRecord = (override: FormResourceOverride): FormResourceOverrideR
   isRequiredOnResourceUsageStart: override.isRequiredOnResourceUsageStart,
   isRequiredOnResourceUsageTakeOver: override.isRequiredOnResourceUsageTakeOver,
   isRequiredOnResourceUsageEnd: override.isRequiredOnResourceUsageEnd,
+  isRequiredOnResourceUsageProjectSwitch: override.isRequiredOnResourceUsageProjectSwitch,
   createdAt: override.createdAt,
   updatedAt: override.updatedAt,
 });
@@ -78,6 +80,7 @@ const REQUIRED_FLAG = {
   [ResourceFormAction.START]: 'isRequiredOnResourceUsageStart',
   [ResourceFormAction.TAKEOVER]: 'isRequiredOnResourceUsageTakeOver',
   [ResourceFormAction.END]: 'isRequiredOnResourceUsageEnd',
+  [ResourceFormAction.PROJECT_SWITCH]: 'isRequiredOnResourceUsageProjectSwitch',
 } as const satisfies Record<ResourceFormAction, keyof FormRequiredFlags>;
 
 const SCOPE_RANK: Record<FormScope, number> = { global: 0, group: 1, resource: 2 };
@@ -453,6 +456,7 @@ export class TypeOrmResourceFormStore implements ResourceFormStore {
       isRequiredOnResourceUsageStart: form.isRequiredOnResourceUsageStart,
       isRequiredOnResourceUsageTakeOver: form.isRequiredOnResourceUsageTakeOver,
       isRequiredOnResourceUsageEnd: form.isRequiredOnResourceUsageEnd,
+      isRequiredOnResourceUsageProjectSwitch: form.isRequiredOnResourceUsageProjectSwitch,
     };
   }
 

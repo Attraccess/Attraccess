@@ -219,6 +219,7 @@ export class BillingLedger {
       creditsPerUsage: configuration.creditsPerUsage,
       creditsPerMinute: configuration.creditsPerMinute,
       creditsPerOperatingMinute: configuration.creditsPerOperatingMinute,
+      projectSwitchCharging: data.projectSwitchCharging ?? configuration.projectSwitchCharging,
     };
 
     if (data.creditsPerMinute === null) {

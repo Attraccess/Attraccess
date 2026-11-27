@@ -72,5 +72,6 @@ export function toResourceBillingConfigurationValuesDto(
     creditsPerUsage: configuration.creditsPerUsage,
     creditsPerMinute: configuration.creditsPerMinute,
     creditsPerOperatingMinute: configuration.creditsPerOperatingMinute,
+    projectSwitchCharging: configuration.projectSwitchCharging,
   };
 }

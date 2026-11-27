@@ -54,6 +54,11 @@ export const buildScheduleEvaluationQuery = (
            AND u."lifecyclePending" = false
            AND u."endTime" IS NOT NULL
            AND u."endTime" >= b.baseline
+           -- A session whose project was switched is one use, counted when its last part ends.
+           AND NOT EXISTS (
+             SELECT 1 FROM "${usageTable}" next
+             WHERE next."previousUsageId" = u.id AND next."lifecyclePending" = false
+           )
           GROUP BY b."resourceId", b."scheduleId", b.baseline, b."hasActiveMaintenance"`;
 };
 

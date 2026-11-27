@@ -32,6 +32,7 @@ import { toUsageSessionResponse, type UsageSessionResponse } from '../dtos/usage
 import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 
 import { UpdateUsageSessionProjectDto } from '../dtos/updateUsageSessionProject.dto';
+import { SwitchUsageSessionProjectDto } from '../dtos/switchUsageSessionProject.dto';
 import { ResourceListVisible } from '../../visibility/resource-list-visible.interceptor';
 
 @ApiTags('Resources')
@@ -404,6 +405,42 @@ export class ResourceUsageController {
   ): Promise<UsageSessionResponse> {
     return toUsageSessionResponse(
       await this.resourceUsageService.updateSessionProject(resourceId, usageId, req.user, dto),
+    );
+  }
+
+  @Post('sessions/active/project')
+  @Auth()
+  @ApiOperation({
+    summary: 'Switch the project of a running session',
+    description:
+      "Moves your own running machine session to another of your projects, or to no project, without stopping the machine: the current usage record ends now and a continuation (linked through `previousUsageId`) starts at the same instant. Usage before the switch is booked to the old project, usage after it to the new one; how the continuation is charged follows the resource's billing setting `projectSwitchCharging`. Only flows and forms of the project-switch action take part. If a meter reading or a switch flow fails, nothing changes. Use `PUT sessions/{usageId}/project` for sessions that have ended.",
+    operationId: 'resourceUsageSwitchSessionProject',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'The continuation, now the running session.',
+    type: ResourceUsageResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad Request - the session already belongs to this project, a required form is missing, the balance does not cover a new session, or a meter could not be read',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  @ApiResponse({ status: 403, description: 'Forbidden - The running session belongs to somebody else' })
+  @ApiResponse({ status: 404, description: 'No such running session, or the project is not one of yours' })
+  @ApiResponse({ status: 409, description: 'Conflict - another change of the machine is in progress' })
+  async switchSessionProject(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Body() dto: SwitchUsageSessionProjectDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<UsageSessionResponse> {
+    // Booking further usage is starting a session as far as the network restriction is concerned.
+    await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.UsageStart, resourceId);
+    return toUsageSessionResponse(
+      await this.resourceUsageService.switchSessionProject(resourceId, req.user, dto, {
+        auditOrigin: auditActorOf(req.user),
+      }),
     );
   }
 

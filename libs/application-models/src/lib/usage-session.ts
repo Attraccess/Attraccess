@@ -1,4 +1,5 @@
 import type { BillingTransactionRecord } from './billing-ledger';
+import type { ProjectSwitchCharging } from './project-switch-charging';
 import { ResourceFormAction } from './form';
 import type { ProjectRecord } from './project-record';
 import type { FormFieldRecord, FormRecord } from './resource-form-records';
@@ -88,6 +89,12 @@ export interface UsageSession {
   /** Minutes between start and end, -1 while the session runs. Computed by the database. */
   usageInMinutes: number;
   projectId: number | null;
+  /** Set on a continuation: the part this one continues after a project switch. */
+  previousUsageId: number | null;
+  /** The charging mode in effect at the switch that created this continuation; null for every other session. */
+  projectSwitchCharging: ProjectSwitchCharging | null;
+  /** On a continuation, when the session it continues started; null otherwise. */
+  sessionStartTime: Date | null;
   /** A pending reservation is never visible: it is neither finalized nor counted in any duration. */
   isFinalized: boolean;
   lifecyclePending: boolean;
@@ -120,7 +127,7 @@ export type UsageSessionWithParties = UsageSession & {
   user: UsageSessionUserRecord | null;
 };
 
-export type UsageLifecycleKind = 'start' | 'end' | 'takeover';
+export type UsageLifecycleKind = 'start' | 'end' | 'takeover' | 'project-switch';
 
 export interface UsageFormAnswer {
   value: string;
@@ -155,9 +162,9 @@ export interface UsageLifecycleAttempt {
   id: string;
   resourceId: number;
   kind: UsageLifecycleKind;
-  /** The tentative session a start or takeover prepared. */
+  /** The tentative session a start, takeover or project switch prepared. */
   candidateUsageId: number | null;
-  /** The published session a stop or takeover is about to end. */
+  /** The published session a stop, takeover or project switch is about to end. */
   previousUsageId: number | null;
   transitionTime: Date;
   formSubmissions: UsageFormSubmissionDraft[];

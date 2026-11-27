@@ -16,6 +16,7 @@ import {
   BillingTransactionContext,
   NewBillingTransaction,
   SettleUsageChargeInput,
+  ContinuedUsagePart,
 } from '../../../billing/ports/billing-ledger.port';
 import { TransactionContextResolver } from '../transaction-context';
 import { toTransactionDetail, toTransactionRecord, toUsageReceipt } from './billing-mappers';
@@ -105,6 +106,25 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
       status: BillingTransactionStatus.Completed,
     });
     return Boolean(row);
+  }
+
+  async findContinuedUsageParts(usageId: number, context: BillingTransactionContext): Promise<ContinuedUsagePart[]> {
+    return this.contexts.manager(context).query(
+      `WITH RECURSIVE "chain" AS (
+         SELECT "previousUsageId", "startTime", "attributedOperatingDurationInMinutes", "projectSwitchCharging",
+                1 AS "depth"
+         FROM "resource_usage" WHERE "id" = $1
+         UNION ALL
+         SELECT "part"."previousUsageId", "part"."startTime", "part"."attributedOperatingDurationInMinutes",
+                "part"."projectSwitchCharging", "chain"."depth" + 1
+         FROM "resource_usage" "part"
+         JOIN "chain" ON "part"."id" = "chain"."previousUsageId"
+         WHERE "chain"."projectSwitchCharging" = 'continue'
+       )
+       SELECT "startTime", "attributedOperatingDurationInMinutes", "projectSwitchCharging"
+       FROM "chain" ORDER BY "depth"`,
+      [usageId],
+    );
   }
 
   async findUsageTransaction(

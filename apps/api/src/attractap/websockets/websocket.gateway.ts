@@ -28,6 +28,7 @@ import { AttractapFormsHandler } from './handlers/forms/forms.handler';
 import { AttractapProjectsHandler } from './handlers/projects/projects.handler';
 import { ResourceListService } from './handlers/resource-list/resource-list.service';
 import { AttractapSessionHandler } from './handlers/session/session.handler';
+import { AttractapProjectSwitchHandler } from './handlers/session/project-switch.handler';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
 import { CardConversationService, CardConversationFailure } from './card-conversation.service';
@@ -115,6 +116,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   @Inject(AttractapSessionHandler)
   protected sessionHandler: AttractapSessionHandler;
+
+  @Inject(AttractapProjectSwitchHandler)
+  protected projectSwitchHandler: AttractapProjectSwitchHandler;
 
   @Inject(AttractapBillingHandler)
   protected billingHandler: AttractapBillingHandler;

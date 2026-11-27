@@ -338,8 +338,15 @@ export class UsageSessionEnds {
   ): Promise<void> {
     const sessions = await this.findEndableSessions(resourceId, target, manager);
     if (sessions.length === 0) return;
+    // A session whose project is being switched runs on as its continuation: that is the one to end afterwards.
+    const attempt = await this.lifecycle.sessions.findAttempt(attemptId, resourceId);
+    const usageIds = sessions.map((session) =>
+      attempt?.kind === 'project-switch' && attempt.previousUsageId === session.id
+        ? (attempt.candidateUsageId as number)
+        : session.id,
+    );
     const ends = this.deferredSessionEnds.get(attemptId) ?? [];
-    ends.push({ usageIds: sessions.map((session) => session.id), notes, triggeredByUserId });
+    ends.push({ usageIds, notes, triggeredByUserId });
     this.deferredSessionEnds.set(attemptId, ends);
   }
 

@@ -33,6 +33,7 @@ export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
     getResourceBillingConfiguration: jest.Mock;
     validateResourceUsageStart: jest.Mock;
     handleResourceUsageStart: jest.Mock;
+    handleResourceUsageContinuation: jest.Mock;
     chargeForResourceUsage: jest.Mock;
     notifyResourceUsageCharge: jest.Mock;
   };

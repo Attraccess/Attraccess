@@ -72,14 +72,20 @@ export class TypeOrmMaintenanceEvaluationView implements MaintenanceEvaluationVi
   }
 
   async completedSessionCountSince(resourceId: number, since: Date): Promise<number> {
-    return this.manager
-      .getRepository(ResourceUsage)
-      .createQueryBuilder('usage')
-      .where('usage.resourceId = :resourceId', { resourceId })
-      .andWhere('usage.lifecyclePending = :lifecyclePending', { lifecyclePending: false })
-      .andWhere('usage.endTime IS NOT NULL')
-      .andWhere('usage.endTime >= :since', { since })
-      .getCount();
+    return (
+      this.manager
+        .getRepository(ResourceUsage)
+        .createQueryBuilder('usage')
+        .where('usage.resourceId = :resourceId', { resourceId })
+        .andWhere('usage.lifecyclePending = :lifecyclePending', { lifecyclePending: false })
+        .andWhere('usage.endTime IS NOT NULL')
+        .andWhere('usage.endTime >= :since', { since })
+        // A session whose project was switched is one use, counted when its last part ends.
+        .andWhere(
+          'NOT EXISTS (SELECT 1 FROM "resource_usage" "next" WHERE "next"."previousUsageId" = "usage"."id" AND "next"."lifecyclePending" = false)',
+        )
+        .getCount()
+    );
   }
 
   durationFingerprint(resourceId: number): Promise<string> {

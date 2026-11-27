@@ -21,6 +21,7 @@ import type {
 import { Injectable } from '@nestjs/common';
 import { EntityManager, In, IsNull, Not } from 'typeorm';
 import {
+  ContinuationDraft,
   DoorActionDraft,
   MachineCapacity,
   FormImageUnavailableError,
@@ -34,6 +35,7 @@ import { recoverOrphanedUsages } from '../../postgres/postgres-usage-recovery';
 import type { TransactionContext } from '../../transaction-context';
 import { EntityManagerResolver } from '../entity-manager-resolver';
 import { activeUsageWhere, countOccupiedSlots, findOccupyingUserIds } from './active-usage-queries';
+import { countCompletedSupervised, createContinuation, inheritDeadline } from './usage-continuations';
 import { toUsageLifecycleAttempt, toUsageSession } from './usage-session-mapping';
 import { toResourceRecord } from '../resources/resource-mapping';
 import { findRelations } from '../find-options';
@@ -117,17 +119,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
   }
 
   countCompletedSupervisedSessions(resourceIds: number[], userId: number): Promise<number> {
-    return this.managers
-      .resolve()
-      .getRepository(ResourceUsage)
-      .count({
-        where: {
-          resourceId: resourceIds.length === 1 ? resourceIds[0] : In(resourceIds),
-          userId,
-          supervisorUserId: Not(IsNull()),
-          endTime: Not(IsNull()),
-        },
-      });
+    return countCompletedSupervised(this.managers.resolve(), resourceIds, userId);
   }
 
   async findMachineCapacity(resourceId: number): Promise<MachineCapacity | null> {
@@ -419,6 +411,14 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     createdSession.billingFactor = createdSession.user.billingFactor;
     await manager.update(ResourceUsage, createdSession.id, { billingFactor: createdSession.billingFactor });
     return toSessionWithParties(createdSession);
+  }
+
+  createContinuationSession(draft: ContinuationDraft, context: TransactionContext): Promise<UsageSessionWithParties> {
+    return createContinuation(this.managers.resolve(context), draft);
+  }
+
+  inheritDeadline(previousUsageId: number, usageId: number, context: TransactionContext): Promise<void> {
+    return inheritDeadline(this.managers.resolve(context), previousUsageId, usageId);
   }
 
   async findPendingSession(usageId: number, context?: TransactionContext): Promise<UsageSessionWithParties | null> {

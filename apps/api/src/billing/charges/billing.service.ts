@@ -3,10 +3,11 @@ import {
   BillingTransactionPage,
   BillingTransactionRecord,
   BillingTransactionStatus,
+  ProjectSwitchCharging,
   ResourceBillingConfigurationRecord,
   ResourceFlowNodeType,
 } from '@attraccess/application-models';
-import { applyBillingFactor, toExactCredits } from '@attraccess/shared';
+import { toExactCredits } from '@attraccess/shared';
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { billingTransactionAuditEvent } from '../../audit/policies/billing';
@@ -33,6 +34,7 @@ import {
   NewBillingTransactionItem,
 } from '../ports/billing-ledger.port';
 import { BillablePriceSnapshot, BillableUsage } from './billable-usage';
+import { applyPartBillingFactor, roundsWithPreviousParts, usagePartCharges } from './project-switch-charges';
 
 @Injectable()
 export class BillingService {
@@ -89,11 +91,29 @@ export class BillingService {
     context?: BillingTransactionContext,
   ) {
     await this.validateResourceUsageStart(resourceId, usage, user, context);
+    await this.openUsageBill(usage.id, user.id, context);
+  }
 
+  /**
+   * The pending bill of the usage that continues a session after a project switch. Only a resource that charges the
+   * continuation like a new session checks the balance again.
+   */
+  public async handleResourceUsageContinuation(
+    resourceId: number,
+    usage: BillablePriceSnapshot & { id: number; projectSwitchCharging?: ProjectSwitchCharging | null },
+    user: { id: number },
+    context: BillingTransactionContext,
+  ) {
+    if (usage.projectSwitchCharging === ProjectSwitchCharging.NEW_SESSION)
+      await this.validateResourceUsageStart(resourceId, usage, user, context);
+    await this.openUsageBill(usage.id, user.id, context);
+  }
+
+  private async openUsageBill(usageId: number, userId: number, context?: BillingTransactionContext) {
     await this.ledgerStore.insertTransaction(
       {
-        userId: user.id,
-        resourceUsageId: usage.id,
+        userId,
+        resourceUsageId: usageId,
         amount: 0,
         status: BillingTransactionStatus.Pending,
       },
@@ -102,7 +122,7 @@ export class BillingService {
         audit: (transactionId) =>
           billingTransactionAuditEvent({
             transactionId,
-            userId: user.id,
+            userId,
             amount: 0,
             status: BillingTransactionStatus.Pending,
             source: 'resource-usage',
@@ -175,15 +195,28 @@ export class BillingService {
 
     const sessionDurationRate = usage.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute;
     const operatingDurationRate = usage.operatingDurationCreditsPerMinute ?? 0;
-    const sessionDurationMs = usage.endTime ? Math.max(0, usage.endTime.getTime() - usage.startTime.getTime()) : 0;
-    // Attribution originates from integer-millisecond intervals; remove only minute-storage float noise.
-    const operatingDurationMs = Math.round((usage.attributedOperatingDurationInMinutes ?? 0) * 60_000);
-    const roundedMinutes = Math.ceil(sessionDurationMs / 60_000);
-    const roundedOperatingMinutes = Math.ceil(operatingDurationMs / 60_000);
+    // A part of a switched session may share the fee per use and the minute rounding with the parts before it.
+    const part = usagePartCharges(
+      usage,
+      {
+        // Legacy sessions have no complete snapshot; preserve their existing configuration fallback.
+        creditsPerUsage: usage.creditsPerUsage ?? configuration.creditsPerUsage,
+        creditsPerMinute: sessionDurationRate,
+        creditsPerOperatingMinute: operatingDurationRate,
+      },
+      roundsWithPreviousParts(usage)
+        ? await this.ledgerStore.findContinuedUsageParts(usage.previousUsageId as number, context)
+        : [],
+    );
+    const {
+      durationMs: sessionDurationMs,
+      minutes: roundedMinutes,
+      operatingMs: operatingDurationMs,
+      operatingMinutes: roundedOperatingMinutes,
+      flatCredits: creditsForSession,
+    } = part;
     // Rounding a shared session's time up per person would create credit, so it is charged on exact shares.
     const sharedOperating = operatingShare?.shared ? operatingShare : null;
-    // Legacy sessions have no complete snapshot; preserve their existing configuration fallback.
-    const creditsForSession = usage.creditsPerUsage ?? configuration.creditsPerUsage;
     const existing = await this.ledgerStore.findUsageTransaction(usage.id, context);
     const components = [
       toExactCredits(sessionDurationRate) * toExactCredits(roundedMinutes),
@@ -208,7 +241,8 @@ export class BillingService {
     }
 
     const billingFactor = usage.billingFactor ?? usage.user.billingFactor;
-    const { amount: totalCredits, discount: billingFactorDiscountAmount } = applyBillingFactor(
+    const { amount: totalCredits, discount: billingFactorDiscountAmount } = applyPartBillingFactor(
+      part.priorCredits,
       grossCredits,
       billingFactor,
     );

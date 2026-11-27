@@ -65,6 +65,7 @@ export class TypeOrmBillingConfigurationStore implements BillingConfigurationSto
     row.creditsPerUsage = rates.creditsPerUsage;
     row.creditsPerMinute = rates.creditsPerMinute;
     row.creditsPerOperatingMinute = rates.creditsPerOperatingMinute;
+    row.projectSwitchCharging = rates.projectSwitchCharging;
     return toConfigurationRecord(await this.configurations.save(row));
   }
 

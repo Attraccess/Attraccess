@@ -45,12 +45,16 @@ export async function findActiveUsage(manager: EntityManager, resourceId: number
 }
 
 function occupiedSlotsQuery(manager: EntityManager, resourceId: number) {
-  return manager
-    .createQueryBuilder(ResourceUsage, 'usage')
-    .where('usage.resourceId = :resourceId', { resourceId })
-    .andWhere('usage.usageAction = :action', { action: ResourceUsageAction.Usage })
-    .andWhere('usage.endTime IS NULL')
-    .andWhere('(usage.isFinalized = true OR usage.lifecyclePending = true)');
+  return (
+    manager
+      .createQueryBuilder(ResourceUsage, 'usage')
+      .where('usage.resourceId = :resourceId', { resourceId })
+      .andWhere('usage.usageAction = :action', { action: ResourceUsageAction.Usage })
+      .andWhere('usage.endTime IS NULL')
+      .andWhere('(usage.isFinalized = true OR usage.lifecyclePending = true)')
+      // A pending project switch continues a session that already holds its slot.
+      .andWhere('(usage.lifecyclePending = false OR usage.previousUsageId IS NULL)')
+  );
 }
 
 /** Published sessions plus pending starts occupy a slot. Supervisors never take one. */

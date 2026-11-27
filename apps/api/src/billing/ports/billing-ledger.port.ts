@@ -3,6 +3,7 @@ import type {
   BillingTransactionDetail,
   BillingTransactionRecord,
   BillingTransactionStatus,
+  ProjectSwitchCharging,
   UsageReceiptSource,
 } from '@attraccess/application-models';
 import type { TransactionScope } from '../../database/unit-of-work';
@@ -47,6 +48,14 @@ export interface SettleUsageChargeInput {
   audit: BillingAuditFactory;
 }
 
+/** An earlier part of a session whose project was switched, as far as billing a later part reads it. */
+export interface ContinuedUsagePart {
+  startTime: Date;
+  attributedOperatingDurationInMinutes: number | null;
+  /** Null on the part the session started with. */
+  projectSwitchCharging: ProjectSwitchCharging | null;
+}
+
 /**
  * The billing ledger as the application needs it. Balances live on the user row and are changed by database
  * triggers when a completed transaction is written, so every write below changes the balance atomically with the
@@ -58,6 +67,12 @@ export interface BillingLedgerStore {
 
   /** The id of the user's own transaction for a usage, if any. */
   findTransactionIdForUsage(usageId: number, userId: number): Promise<number | null>;
+
+  /**
+   * The usage `usageId` and the parts before it, newest first, as far as they round their minutes together: the
+   * walk ends at the first part that is not charged in the `continue` mode.
+   */
+  findContinuedUsageParts(usageId: number, context: BillingTransactionContext): Promise<ContinuedUsagePart[]>;
 
   /** Newest first. */
   listTransactionsForUser(

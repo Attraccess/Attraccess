@@ -207,7 +207,7 @@ export class TypeOrmOperatingTimelineStore implements OperatingTimelineStore {
       .resolve(context)
       .getRepository(ResourceUsageLifecycleAttempt)
       .find({
-        where: { resourceId: In(resourceIds), kind: In(['end', 'takeover']) },
+        where: { resourceId: In(resourceIds), kind: In(['end', 'takeover', 'project-switch']) },
         select: { previousUsageId: true, transitionTime: true },
       });
     return new Map(

@@ -1,4 +1,4 @@
-import { ResourceUsageAction } from '@attraccess/application-models';
+import { ProjectSwitchCharging, ResourceUsageAction } from '@attraccess/application-models';
 import { ApiProperty, ApiSchema, getSchemaPath } from '@nestjs/swagger';
 
 /**
@@ -146,6 +146,35 @@ export class ResourceUsageResponseDto {
     type: Number,
   })
   projectId!: number | null;
+
+  @ApiProperty({
+    description:
+      'Set when this record continues a session after a project switch: the id of the part before it. A session whose project was switched is several consecutive records, one per project.',
+    example: 1203,
+    required: false,
+    nullable: true,
+    type: Number,
+  })
+  previousUsageId!: number | null;
+
+  @ApiProperty({
+    description:
+      'The charging mode in effect at the project switch that created this record; null for every other record',
+    required: false,
+    nullable: true,
+    enum: ProjectSwitchCharging,
+    enumName: 'ProjectSwitchCharging',
+  })
+  projectSwitchCharging!: ProjectSwitchCharging | null;
+
+  @ApiProperty({
+    description:
+      'On a record that continues a session after a project switch: when that session started. `startTime` is when this record started. Null otherwise.',
+    required: false,
+    nullable: true,
+    type: Date,
+  })
+  sessionStartTime!: Date | null;
 
   @ApiProperty({
     description: 'The project this usage session belongs to',

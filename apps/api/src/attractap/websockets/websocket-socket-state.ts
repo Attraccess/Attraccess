@@ -58,6 +58,8 @@ export enum AttractapEventType {
   READER_SESSION_ENDED = 'READER_SESSION_ENDED',
   START_RESOURCE_USAGE_SESSION = 'START_RESOURCE_USAGE_SESSION',
   STOP_RESOURCE_USAGE_SESSION = 'STOP_RESOURCE_USAGE_SESSION',
+  /** Reader → server (capabilities.projectSwitch): continue the card holder's session under another project. */
+  SWITCH_SESSION_PROJECT = 'SWITCH_SESSION_PROJECT',
   /** Reader → server (capabilities.sessionDuration): move the automatic end of the card holder's session later. */
   EXTEND_RESOURCE_USAGE_SESSION = 'EXTEND_RESOURCE_USAGE_SESSION',
   LOCK_DOOR = 'LOCK_DOOR',
@@ -312,6 +314,8 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
      * refused for the missing estimate: the machine's maximum or default estimate sets their deadline.
      */
     sessionDuration?: boolean;
+    /** The reader can switch the project of a running session (capabilities.projectSwitch): only it is offered to. */
+    projectSwitch?: boolean;
     /** False for the BLE Bridge (capabilities.nfc): it gets no resource list. Undefined until READER_FIRMWARE_INFO. */
     nfc?: boolean;
     /**

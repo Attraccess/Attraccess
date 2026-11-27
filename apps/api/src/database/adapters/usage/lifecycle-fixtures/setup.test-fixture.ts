@@ -43,9 +43,12 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
   // The billing stand-in writes through the unit of work the lifecycle hands it, like the real ledger adapter.
   const managerOf = (transaction: TransactionScope) => unitOfWorkFor(scope.source).handleOf(transaction);
   scope.billing = {
-    getResourceBillingConfiguration: jest
-      .fn()
-      .mockResolvedValue({ creditsPerUsage: 5, creditsPerMinute: 2, creditsPerOperatingMinute: 3 }),
+    getResourceBillingConfiguration: jest.fn().mockResolvedValue({
+      creditsPerUsage: 5,
+      creditsPerMinute: 2,
+      creditsPerOperatingMinute: 3,
+      projectSwitchCharging: 'continue',
+    }),
     validateResourceUsageStart: jest.fn().mockResolvedValue(undefined),
     handleResourceUsageStart: jest.fn(
       async (_resourceId: number, session: ResourceUsage, user: User, transaction: TransactionScope) =>
@@ -66,6 +69,15 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
       });
       return transaction;
     }),
+    handleResourceUsageContinuation: jest.fn(
+      async (_resourceId: number, session: ResourceUsage, user: User, transaction: TransactionScope) =>
+        managerOf(transaction).save(BillingTransaction, {
+          resourceUsageId: session.id,
+          userId: user.id,
+          amount: 0,
+          status: BillingTransactionStatus.Pending,
+        }),
+    ),
     notifyResourceUsageCharge: jest.fn().mockResolvedValue(undefined),
   };
   scope.maintenance = {
@@ -92,7 +104,9 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
     scope.billing as never,
     new ResourceOperatingAttributionService(createOperatingTimelineStore(scope.source)),
     scope.flow as never,
-    {} as never,
+    {
+      findOneById: jest.fn(async (_userId: number, projectId: number) => ({ id: projectId })),
+    } as never,
     {
       prepareRequiredSubmissions: jest.fn(async ({ resourceUsageId, userId, action }) => [
         {

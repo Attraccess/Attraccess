@@ -32,6 +32,10 @@ import { SessionEndTarget, UsageSessionEnds } from './usage-session-ends';
 
 import { UsageSessionRecords } from './usage-session-records';
 
+import { SwitchProjectOptions, UsageSessionProjectSwitch } from './usage-session-project-switch';
+
+import { SwitchUsageSessionProjectDto } from '../dtos/switchUsageSessionProject.dto';
+
 import { UsageSessionStartPreparation } from './usage-session-start-preparation';
 
 import { UsageSessionStarts } from './usage-session-starts';
@@ -61,6 +65,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     private readonly starts: UsageSessionStarts,
     private readonly ends: UsageSessionEnds,
     private readonly extensions: UsageSessionExtensions,
+    private readonly projectSwitch: UsageSessionProjectSwitch,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -195,6 +200,16 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     options: EndSessionOptions = {},
   ): Promise<UsageSession> {
     return this.ends.endSession(resourceId, user, dto, options);
+  }
+
+  /** Continues the caller's running session under another project, without stopping the machine. */
+  async switchSessionProject(
+    resourceId: number,
+    user: UsageSessionUser,
+    dto: SwitchUsageSessionProjectDto,
+    options: SwitchProjectOptions = {},
+  ): Promise<UsageSession> {
+    return this.projectSwitch.switchProject(resourceId, user, dto, options);
   }
 
   /** Moves the automatic end of a running session later; refused past its cap. */

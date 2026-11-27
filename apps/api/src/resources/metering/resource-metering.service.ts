@@ -38,6 +38,8 @@ import { findActiveMeterSessions, getMeteringSessionLimit } from './meter-sessio
 
 import { MeteringSegments } from './metering-segments';
 
+import { handOverMeters } from './metering-handover';
+
 export type { MeterProblem } from './metering-definition';
 
 export type { FinalCollection } from './metering-settlement';
@@ -462,6 +464,21 @@ export class ResourceMeteringService implements OnModuleInit {
   }
 
   // ---- lifecycle --------------------------------------------------------------------------------
+
+  /** Splits the metering of a running usage at a project switch; throws when a billed meter cannot be read. */
+  handOver(usageId: number, successorUsageId: number, at: Date): Promise<FinalCollection> {
+    return handOverMeters(
+      {
+        store: this.store,
+        segments: this.segments,
+        collectOwn: (session, freshAfter) => this.collectSessionFinal(session, freshAfter),
+        getDefinition: (resourceId, meterId) => this.getDefinition(resourceId, meterId),
+      },
+      usageId,
+      successorUsageId,
+      at,
+    );
+  }
 
   /**
    * Establishes the metering session for a (still tentative) usage. Throws when the meter is missing or

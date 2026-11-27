@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { ReaderRouter } from '../../reader-router';
+import { ProjectsService } from '../../../../projects/projects.service';
 import { ResourceFlowsService } from '../../../../resources/flows/resource-flows.service';
 import { ResourceHealthService } from '../../../../resources/health/resource-health.service';
 import { ResourceIntroducersService } from '../../../../resources/introducers/resourceIntroducers.service';
@@ -45,6 +46,9 @@ export class ResourceListService implements OnModuleInit {
 
   @Inject(RbacService)
   private rbacService: RbacService;
+
+  @Inject(ProjectsService)
+  private projectsService: ProjectsService;
 
   @Inject(ReaderTimeZoneService)
   private readerTimeZone: ReaderTimeZoneService;
@@ -197,6 +201,9 @@ export class ResourceListService implements OnModuleInit {
         },
         set rbacService(value: ResourceListService['rbacService']) {
           getContextOwner().rbacService = value;
+        },
+        get projectsService() {
+          return getContextOwner().projectsService;
         },
         logger: getContextOwner().logger,
       },

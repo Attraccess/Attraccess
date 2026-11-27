@@ -33,6 +33,7 @@ export function toResourceUsageExportRow(usage: ResourceUsage): ResourceUsageExp
     user: publicUser(usage.user),
     usageInMinutes: usage.usageInMinutes,
     projectId: usage.projectId,
+    previousUsageId: usage.previousUsageId,
     isFinalized: usage.isFinalized,
     lifecyclePending: usage.lifecyclePending,
     supervisorUserId: usage.supervisorUserId,

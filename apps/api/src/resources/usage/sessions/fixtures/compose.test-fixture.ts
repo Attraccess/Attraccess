@@ -7,6 +7,7 @@ import { SessionChangeTurns } from '../session-change-turns';
 import { UsageDoorActions } from '../usage-door-actions';
 import { UsageSessionEnds } from '../usage-session-ends';
 import { UsageSessionNotifications } from '../usage-session-notifications';
+import { UsageSessionProjectSwitch } from '../usage-session-project-switch';
 import { UsageSessionRecords } from '../usage-session-records';
 import { UsageSessionStartPreparation } from '../usage-session-start-preparation';
 import { UsageSessionStarts } from '../usage-session-starts';
@@ -123,7 +124,28 @@ export function composeResourceUsageService(
     deadlines,
     audit as never,
   );
-  return new ResourceUsageService(lifecycle, access, gate, records, doors, preparation, starts, ends, extensions);
+  const projectSwitch = new UsageSessionProjectSwitch(
+    lifecycle,
+    ends,
+    records,
+    billingService as never,
+    projectsService as never,
+    resourceFormsService as never,
+    audit as never,
+    notifications,
+  );
+  return new ResourceUsageService(
+    lifecycle,
+    access,
+    gate,
+    records,
+    doors,
+    preparation,
+    starts,
+    ends,
+    extensions,
+    projectSwitch,
+  );
 }
 
 /** The collaborators behind a ResourceUsageService, for tests that reach into the one owning some state. */
@@ -137,6 +159,7 @@ export function usageInternals(service: ResourceUsageService) {
     preparation: Reflect.get(service, 'preparation') as UsageSessionStartPreparation,
     starts: Reflect.get(service, 'starts') as UsageSessionStarts,
     extensions: Reflect.get(service, 'extensions') as UsageSessionExtensions,
+    projectSwitch: Reflect.get(service, 'projectSwitch') as UsageSessionProjectSwitch,
     ends,
     turns: Reflect.get(ends, 'turns') as SessionChangeTurns,
   };
@@ -157,5 +180,6 @@ export function forkUsageInstance(service: ResourceUsageService, setUp: (turns: 
   const preparation = fork(parts.preparation, { lifecycle });
   const starts = fork(parts.starts, { lifecycle, preparation, ends });
   const extensions = fork(parts.extensions, { lifecycle, ends });
-  return fork(service, { lifecycle, preparation, starts, ends, extensions });
+  const projectSwitch = fork(parts.projectSwitch, { lifecycle, ends });
+  return fork(service, { lifecycle, preparation, starts, ends, extensions, projectSwitch });
 }

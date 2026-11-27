@@ -393,6 +393,57 @@ export class MeteringSegments {
   }
 
   /**
+   * The owner of a session switches its project: one reading closes the segment `session` is in, and `successor`
+   * takes its place in the next one. A billed meter that cannot be read refuses the switch and leaves `session` as
+   * it was. A tracking-only meter lets both stay in the open segment until a later reading closes it.
+   */
+  async handOver(
+    session: ResourceMeteringSessionRecord,
+    successor: SessionValues,
+    definition: Definition,
+    freshAfter: Date,
+    sleep: (seconds: number) => Promise<void>,
+  ): Promise<MeterFinal> {
+    const meter = await this.requireMeter(session.meterId);
+    const running = await this.activeParticipants(undefined, session.resourceId, session.meterId, [successor.usageId]);
+    const others = running.filter((participant) => participant.session.usageId !== session.usageId);
+    const next = await this.store.createSession({ ...successor, accounting: 'segmented' });
+    const open = await this.ensureOpen(undefined, meter, running);
+    const { finalAttempts, finalRetryDelaySeconds } = definition.collect;
+    let reason = 'No attempt was made';
+    for (let attempt = 1; attempt <= finalAttempts; attempt++) {
+      try {
+        const operation = await this.hooks.runOperation(session, 'boundary', {
+          trigger: ResourceFlowNodeType.INPUT_METERING_COLLECT,
+          timeoutSeconds: definition.collect.timeoutSeconds,
+          freshAfter,
+        });
+        await this.close({
+          resourceId: session.resourceId,
+          meterId: session.meterId,
+          reading: this.readingOf(operation, await this.requireMeter(meter.id)),
+          next: this.inStartOrder([...this.nextParticipants(open, others), this.toParticipant(next)]),
+        });
+        return { status: 'ready', operationId: operation.id };
+      } catch (error) {
+        reason = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `Switch reading ${attempt}/${finalAttempts} of meter ${session.meterId} for usage ${session.usageId} failed: ${reason}`,
+        );
+        if (attempt < finalAttempts && finalRetryDelaySeconds > 0) await sleep(finalRetryDelaySeconds);
+      }
+    }
+    if (session.creditsPerUnit > 0) {
+      await this.store.deleteSession(next.id);
+    } else {
+      await this.store.updateSegment(open.id, {
+        participants: this.inStartOrder([...open.participants, this.toParticipant(next)]),
+      });
+    }
+    return { status: 'unavailable', reason };
+  }
+
+  /**
    * A stop that was cut off or taken back leaves its session running: it takes part in the open segment again.
    * Without any open segment, a new one starts at the meter's current counter.
    */

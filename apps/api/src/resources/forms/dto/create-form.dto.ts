@@ -76,6 +76,16 @@ export class BaseFormDto {
   @rawValue()
   @IsBoolean()
   isRequiredOnResourceUsageEnd!: boolean;
+
+  @ApiProperty({
+    description: 'Default: require when a running session switches its project (a resource can override it)',
+    default: false,
+    required: false,
+  })
+  @rawValue()
+  @IsOptional()
+  @IsBoolean()
+  isRequiredOnResourceUsageProjectSwitch?: boolean;
 }
 
 export class CreateFormDto extends BaseFormDto {

@@ -7,7 +7,7 @@ import type {
   UsageSessionResource,
   UsageSessionWithParties,
 } from '@attraccess/application-models';
-import type { SupervisionMode } from '@attraccess/application-models';
+import type { ProjectSwitchCharging, SupervisionMode } from '@attraccess/application-models';
 import type { ResourceUsageAction } from '@attraccess/application-models';
 import type { TransactionScope } from '../../database/unit-of-work';
 
@@ -30,6 +30,15 @@ export interface PendingSessionDraft {
   maxAutoEndAt?: Date | null;
   estimatedDurationMinutes?: number | null;
   autoEndWarnedOffsetMinutes?: number | null;
+}
+
+/** The part that continues a running session under another project. */
+export interface ContinuationDraft {
+  /** The part being switched away from; the continuation takes over its prices, billing factor and supervisor. */
+  previousUsageId: number;
+  startTime: Date;
+  projectId: number | null;
+  projectSwitchCharging: ProjectSwitchCharging;
 }
 
 /** A door action is stored as an already ended session record. */
@@ -136,6 +145,13 @@ export interface UsageSessionStore {
 
   /** Reserves a session for a start or takeover: pending, never visible, with the owner's billing factor. */
   createPendingSession(draft: PendingSessionDraft, context?: TransactionScope): Promise<UsageSessionWithParties>;
+  /** Reserves the continuation of a running session: pending, never visible, with everything the session froze. */
+  createContinuationSession(draft: ContinuationDraft, context: TransactionScope): Promise<UsageSessionWithParties>;
+  /**
+   * Hands the automatic end of the previous part to its continuation. Read when the switch commits, so an extension
+   * made while it ran is not lost; the previous part's row stays locked until then.
+   */
+  inheritDeadline(previousUsageId: number, usageId: number, context: TransactionScope): Promise<void>;
   /** The tentative session with relations, or null when it no longer exists. */
   findPendingSession(usageId: number, context?: TransactionScope): Promise<UsageSessionWithParties | null>;
   /** Removes a tentative session. Reports whether one was removed; a published session is never touched. */

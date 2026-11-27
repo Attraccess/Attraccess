@@ -28,6 +28,10 @@ const presentations: Record<ResourceFlowNodeType, NodePresentation> = {
   [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED]: { outputs: ['output'], resourceType: ResourceType.Machine },
   [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED]: { outputs: ['output'], resourceType: ResourceType.Machine },
   [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER]: { outputs: ['output'], resourceType: ResourceType.Machine },
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_SWITCHED]: {
+    outputs: ['output'],
+    resourceType: ResourceType.Machine,
+  },
   [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED]: { outputs: ['output'], resourceType: ResourceType.Door },
   [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED]: {
     outputs: ['output'],

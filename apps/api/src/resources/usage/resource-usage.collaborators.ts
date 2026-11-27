@@ -6,6 +6,7 @@ import { SessionChangeTurns } from './sessions/session-change-turns';
 import { UsageDoorActions } from './sessions/usage-door-actions';
 import { UsageSessionEnds } from './sessions/usage-session-ends';
 import { UsageSessionNotifications } from './sessions/usage-session-notifications';
+import { UsageSessionProjectSwitch } from './sessions/usage-session-project-switch';
 import { UsageSessionRecords } from './sessions/usage-session-records';
 import { UsageSessionStartPreparation } from './sessions/usage-session-start-preparation';
 import { UsageSessionStarts } from './sessions/usage-session-starts';
@@ -24,5 +25,6 @@ export const RESOURCE_USAGE_COLLABORATORS = [
   UsageSessionStartPreparation,
   UsageSessionEnds,
   UsageSessionStarts,
+  UsageSessionProjectSwitch,
   UsageSessionExtensions,
 ];

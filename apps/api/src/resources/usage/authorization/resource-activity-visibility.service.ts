@@ -126,6 +126,7 @@ export class ResourceActivityVisibilityService {
       resourceId: usage.resourceId,
       usageAction: usage.usageAction,
       startTime: usage.startTime,
+      sessionStartTime: usage.sessionStartTime,
       endTime: usage.endTime,
     } as UsageSession;
   }
