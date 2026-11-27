@@ -124,6 +124,21 @@ describe('renewals', () => {
     expect(state.keepAlive).toHaveBeenCalled();
   });
 
+  it('stays paused without input when the wall clock is set back on a timed-out page', () => {
+    const view = mount();
+    advance(31 * MINUTE);
+    act(() => {
+      vi.setSystemTime(Date.now() - 35 * MINUTE);
+    });
+    state.keepAlive.mockClear();
+
+    advance(20 * MINUTE);
+
+    expect(state.keepAlive).not.toHaveBeenCalled();
+    expect(view.result.current.isPausedForInactivity).toBe(true);
+    expect(toastsOfType('warning')).toHaveLength(1);
+  });
+
   it('listens for input on the window, passive and in the capture phase', () => {
     const listen = vi.spyOn(window, 'addEventListener');
     mount();
