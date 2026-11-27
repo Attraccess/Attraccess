@@ -1,17 +1,16 @@
 import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownPopover } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { ResourceFlowLog, ResourceFlowNodeDto } from '@attraccess/react-query-client';
 import { DownloadIcon } from 'lucide-react';
 import { triggerDownload } from '../../../../../utils/download';
 import { FlowOwner } from '../flowOwner';
-import { flowLogFileName, toNdjson, toPlainText } from './flowLogExport';
+import { ExportableLog, flowLogFileName, NodeTitle, toNdjson, toPlainText } from './flowLogExport';
 import de from './de.json';
 import en from './en.json';
 
 interface DownloadLogsMenuProps {
   owner: FlowOwner;
-  logs: (ResourceFlowLog & { node?: ResourceFlowNodeDto })[];
-  nodeTitle: (node?: ResourceFlowNodeDto) => string;
+  logs: ExportableLog[];
+  nodeTitle: NodeTitle;
 }
 
 export function DownloadLogsMenu({ owner, logs, nodeTitle }: Readonly<DownloadLogsMenuProps>) {

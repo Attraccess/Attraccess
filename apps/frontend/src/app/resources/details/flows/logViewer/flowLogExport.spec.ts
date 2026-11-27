@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ResourceFlowLog, ResourceFlowNodeDto } from '@attraccess/react-query-client';
 import { flowLogFileName, toNdjson, toPlainText } from './flowLogExport';
 
@@ -17,13 +17,13 @@ const log = (id: number, flowRunId: string, extra: Record<string, unknown> = {})
   }) as ResourceFlowLog & { node?: ResourceFlowNodeDto };
 
 const truncated = '{"a":"xx…[truncated]';
-// newest first, as the drawer holds them, with two interleaved runs
+// newest first, as the drawer holds them, with two interleaved runs whose ids sort against their start order
 const logs = [
   log(5, 'run-b', { nodeId: 'deleted' }),
-  log(4, 'run-a', { nodeId: 'action', node: node('action', 'http'), payload: truncated }),
+  log(4, 'run-z', { nodeId: 'action', node: node('action', 'http'), payload: truncated }),
   log(3, 'run-b', { type: 'flow.start' }),
-  log(2, 'run-a', { nodeId: 'trigger', node: node('trigger', 'timer'), payload: '{"ok":true,"list":[1]}' }),
-  log(1, 'run-a', { type: 'flow.start' }),
+  log(2, 'run-z', { nodeId: 'trigger', node: node('trigger', 'timer'), payload: '{"ok":true,"list":[1]}' }),
+  log(1, 'run-z', { type: 'flow.start' }),
 ];
 
 describe('toNdjson', () => {
@@ -34,7 +34,7 @@ describe('toNdjson', () => {
     .map((line) => JSON.parse(line));
 
   it('writes one line per entry, oldest first, with a final newline and no header', () => {
-    expect(output.endsWith('\n')).toBe(true);
+    expect(output).toMatch(/[^\n]\n$/);
     expect(output).not.toContain('\r');
     expect(entries.map((entry) => entry.id)).toEqual([1, 2, 3, 4, 5]);
     expect(logs.map((entry) => entry.id)).toEqual([5, 4, 3, 2, 1]);
@@ -44,7 +44,7 @@ describe('toNdjson', () => {
     expect(entries[1]).toEqual({
       id: 2,
       createdAt: '2026-09-01T12:00:02.000Z',
-      flowRunId: 'run-a',
+      flowRunId: 'run-z',
       type: 'node.processing.started',
       nodeId: 'trigger',
       resourceId: 7,
@@ -59,6 +59,11 @@ describe('toNdjson', () => {
   it('keeps an invalid payload as a string and omits a missing one', () => {
     expect(entries[3].payload).toBe(truncated);
     expect(entries[0]).not.toHaveProperty('payload');
+  });
+
+  it('writes createdAt in UTC', () => {
+    const [line] = toNdjson([log(1, 'run', { createdAt: '2026-09-01T14:00:00+02:00' })], nodeTitle).split('\n');
+    expect(JSON.parse(line).createdAt).toBe('2026-09-01T12:00:00.000Z');
   });
 
   it('turns absent ids into null', () => {
@@ -80,7 +85,7 @@ describe('toPlainText', () => {
         'Exported: 2026-09-02T08:00:00.000Z',
         'Entries: 5',
         '',
-        '=== Run run-a · Title of timer · 2026-09-01T12:00:01.000Z ===',
+        '=== Run run-z · Title of timer · 2026-09-01T12:00:01.000Z ===',
         '2026-09-01T12:00:01.000Z  flow.start  Flow',
         '2026-09-01T12:00:02.000Z  node.processing.started  Title of timer (trigger)',
         '    {',
@@ -108,6 +113,8 @@ describe('toPlainText', () => {
 });
 
 describe('flowLogFileName', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   // Built from local date parts, so the expectation holds in every time zone.
   const exportedAt = new Date(2026, 0, 2, 3, 4, 5);
 
@@ -117,6 +124,13 @@ describe('flowLogFileName', () => {
     );
     expect(flowLogFileName({ kind: 'global', flowId: 3 }, exportedAt, 'txt')).toBe(
       'flow-logs-flow-3-20260102-030405.txt',
+    );
+  });
+
+  it('uses local time, not UTC', () => {
+    vi.stubEnv('TZ', 'Pacific/Kiritimati');
+    expect(flowLogFileName({ kind: 'resource', resourceId: 7 }, new Date('2026-01-01T20:04:05Z'), 'txt')).toBe(
+      'flow-logs-resource-7-20260102-100405.txt',
     );
   });
 });

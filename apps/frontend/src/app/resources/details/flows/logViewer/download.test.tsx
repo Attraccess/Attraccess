@@ -42,7 +42,7 @@ vi.mock('@attraccess/react-query-client', () => {
 
 let blobs: Blob[];
 let fileNames: string[];
-const fetchSpy = vi.fn();
+let fetchSpy: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   state.owner = { kind: 'resource', resourceId: 7 };
@@ -51,12 +51,13 @@ beforeEach(() => {
   state.live = [];
   blobs = [];
   fileNames = [];
+  fetchSpy = vi.fn();
   vi.stubGlobal('fetch', fetchSpy);
-  URL.createObjectURL = vi.fn((blob: Blob) => {
-    blobs.push(blob);
+  vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+    blobs.push(blob as Blob);
     return 'blob:logs';
   });
-  URL.revokeObjectURL = vi.fn();
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
     fileNames.push(this.download);
   });
@@ -67,17 +68,19 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+const viewer = () => (
+  <MemoryRouter>
+    <LogViewer confettiEnabled={false} onConfettiEnabledChange={vi.fn()}>
+      {(open) => <button onClick={open}>View logs</button>}
+    </LogViewer>
+  </MemoryRouter>
+);
+
 async function open() {
   const user = userEvent.setup();
-  render(
-    <MemoryRouter>
-      <LogViewer confettiEnabled={false} onConfettiEnabledChange={vi.fn()}>
-        {(open) => <button onClick={open}>View logs</button>}
-      </LogViewer>
-    </MemoryRouter>,
-  );
+  const view = render(viewer());
   await user.click(screen.getByText('View logs'));
-  return user;
+  return { user, rerender: () => view.rerender(viewer()) };
 }
 
 const downloadButton = () => screen.findByRole('button', { name: 'Download' });
@@ -116,11 +119,12 @@ describe('flow log download', () => {
     state.isRecording = true;
     state.fetched = [entry(1), entry(2)];
     state.live = [entry(2), entry(3)];
-    const user = await open();
+    const { user } = await open();
     await user.click(await downloadButton());
     await user.click(await screen.findByRole('menuitem', { name: 'NDJSON (.ndjson)' }));
 
     expect(fileNames).toEqual([expect.stringMatching(/^flow-logs-resource-7-\d{8}-\d{6}\.ndjson$/)]);
+    expect(blobs[0].type).toBe('application/x-ndjson;charset=utf-8');
     const lines = (await readText(blobs[0])).trimEnd().split('\n');
     expect(lines.map((line) => JSON.parse(line).id)).toEqual([1, 2, 3]);
     expect(JSON.parse(lines[0])).toMatchObject({ nodeType: 'input.button', nodeTitle: 'Button' });
@@ -129,10 +133,53 @@ describe('flow log download', () => {
     expect(screen.getAllByRole('button', { name: 'Button -> node.processing.started' })).toHaveLength(3);
   });
 
+  it('saves the fetched entries after the recording was stopped', async () => {
+    state.isRecording = true;
+    state.fetched = [entry(1)];
+    const { user, rerender } = await open();
+    state.isRecording = false;
+    state.fetched = [];
+    rerender();
+    await user.click(await downloadButton());
+    await user.click(await screen.findByRole('menuitem', { name: 'NDJSON (.ndjson)' }));
+
+    const lines = (await readText(blobs[0])).trimEnd().split('\n');
+    expect(lines.map((line) => JSON.parse(line).id)).toEqual([1]);
+  });
+
+  it('closes an open menu when the recording state changes', async () => {
+    state.isRecording = true;
+    state.live = [entry(1)];
+    const { user, rerender } = await open();
+    await user.click(await downloadButton());
+    expect(await screen.findByRole('menu')).toBeInTheDocument();
+    state.isRecording = false;
+    rerender();
+
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    expect(await downloadButton()).toBeEnabled();
+  });
+
+  it('carries the data-cy hooks', async () => {
+    state.live = [entry(1)];
+    const { user } = await open();
+    const trigger = await downloadButton();
+    expect(trigger).toHaveAttribute('data-cy', 'flow-log-download');
+    await user.click(trigger);
+    expect(await screen.findByRole('menuitem', { name: 'NDJSON (.ndjson)' })).toHaveAttribute(
+      'data-cy',
+      'flow-log-download-ndjson',
+    );
+    expect(screen.getByRole('menuitem', { name: 'Plain text (.txt)' })).toHaveAttribute(
+      'data-cy',
+      'flow-log-download-text',
+    );
+  });
+
   // React Aria selects and closes the menu on keydown or drag release, so the item never sees a full press.
   it.each(['Enter', ' '])('saves the file while the selecting key (%j) is still held down', async (key) => {
     state.live = [entry(1)];
-    const user = await open();
+    const { user } = await open();
     await user.click(await downloadButton());
     (await screen.findByRole('menuitem', { name: 'NDJSON (.ndjson)' })).focus();
     await user.keyboard(`{${key}>}`);
@@ -144,7 +191,7 @@ describe('flow log download', () => {
 
   it('saves the file when the pointer is dragged from the button and released on an item', async () => {
     state.live = [entry(1)];
-    const user = await open();
+    const { user } = await open();
     const trigger = await downloadButton();
     await user.pointer({ keys: '[MouseLeft>]', target: trigger });
     const item = await screen.findByRole('menuitem', { name: 'Plain text (.txt)' });
@@ -156,7 +203,7 @@ describe('flow log download', () => {
   it('saves a global flow as plain text', async () => {
     state.owner = { kind: 'global', flowId: 3 };
     state.live = [entry(1)];
-    const user = await open();
+    const { user } = await open();
     await user.click(await downloadButton());
     await user.click(await screen.findByRole('menuitem', { name: 'Plain text (.txt)' }));
 

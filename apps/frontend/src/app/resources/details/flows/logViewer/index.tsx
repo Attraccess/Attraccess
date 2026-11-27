@@ -208,7 +208,8 @@ export function LogViewer(props: Props) {
                   </Button>
                 </>
               )}
-              <DownloadLogsMenu owner={owner} logs={logsOrdered} nodeTitle={nodeTitle} />
+              {/* Keyed by the recording state: the row changes height then, and an open menu would cover its button. */}
+              <DownloadLogsMenu key={String(isRecording)} owner={owner} logs={logsOrdered} nodeTitle={nodeTitle} />
             </div>
 
             <ToggleButton

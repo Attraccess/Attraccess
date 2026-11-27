@@ -3,8 +3,8 @@ import { FlowOwner } from '../flowOwner';
 import { prettyPayload } from './prettyPayload';
 import { triggerNodeOfRun } from './triggerNodeOfRun';
 
-type ExportableLog = ResourceFlowLog & { node?: ResourceFlowNodeDto };
-type NodeTitle = (node?: ResourceFlowNodeDto) => string;
+export type ExportableLog = ResourceFlowLog & { node?: ResourceFlowNodeDto };
+export type NodeTitle = (node?: ResourceFlowNodeDto) => string;
 
 const oldestFirst = <T extends ExportableLog>(logs: T[]) => [...logs].sort((a, b) => a.id - b.id);
 const isoTime = (value: ResourceFlowLog['createdAt']) => new Date(value).toISOString();
@@ -46,7 +46,12 @@ export function toPlainText(
 ): string {
   const runs = new Map<string, ExportableLog[]>();
   for (const log of oldestFirst(logs)) {
-    runs.set(log.flowRunId, [...(runs.get(log.flowRunId) ?? []), log]);
+    const run = runs.get(log.flowRunId);
+    if (run) {
+      run.push(log);
+    } else {
+      runs.set(log.flowRunId, [log]);
+    }
   }
 
   const header = [
