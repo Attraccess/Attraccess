@@ -1,4 +1,4 @@
-import { IsString } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class ChangePasswordDto {
@@ -14,5 +14,6 @@ export class ChangePasswordDto {
     example: '1234567890',
   })
   @IsString()
+  @IsNotEmpty()
   token: string;
 }
