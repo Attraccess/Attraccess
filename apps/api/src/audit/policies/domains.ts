@@ -33,6 +33,7 @@ export const CORE_SUBJECT_TYPES = [
   'plugin-package',
   'plugin-registry',
   'plugin-policy',
+  'plugin-system',
   'billing.transaction',
   'project',
   'project.invitation',

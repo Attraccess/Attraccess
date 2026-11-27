@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, it, vi } from 'vitest';
+import { expect, it } from 'vitest';
 // Register the shared API mocks before loading the component's feature modules.
 import { chooseRowAction, deferred, hoisted, makePlugin, pickRegistry, renderWithQuery } from './index.test.hoisted';
 import { PluginsSection } from './index';
@@ -111,95 +111,6 @@ describe('PluginsSection', () => {
     renderWithQuery(<PluginsSection />);
 
     expect(screen.getByRole('button', { name: `Actions for Max's Tools & Co` })).toBeInTheDocument();
-  });
-
-  it('checks marketplace plugins for updates and takes the admin to the in-place update flow', async () => {
-    hoisted.plugins = [makePlugin()];
-    const installed = {
-      name: 'Cool Plugin',
-      version: '1.2.3',
-      registryId: 'npm',
-      registryUrl: 'https://registry.npmjs.org',
-      classification: 'community',
-      classificationReason: 'Marketplace package',
-      requestedSpec: 'latest',
-      updateOverride: 'inherit',
-    };
-    const checked = {
-      ...installed,
-      updateCheck: {
-        checkedAt: '2026-09-21T12:00:00.000Z',
-        candidate: '1.2.4',
-        state: 'available',
-        error: null,
-      },
-    };
-    hoisted.apiMock.mockImplementation((url: string) => {
-      if (url.endsWith('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [installed] });
-      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
-      if (url.endsWith('/api/plugins/installed/Cool%20Plugin/versions'))
-        return Promise.resolve({
-          ok: true,
-          json: async () => [
-            { version: '1.2.3', direction: 'current', compatible: true },
-            { version: '1.2.4', direction: 'newer', compatible: true },
-          ],
-        });
-      return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
-    });
-    hoisted.checkAllInstalledPackagesMock.mockResolvedValue([checked]);
-    const user = userEvent.setup();
-    renderWithQuery(<PluginsSection />);
-
-    await user.click(await screen.findByRole('button', { name: 'Check all now' }));
-    expect(await screen.findByText('Plugin updates are available')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'One installed marketplace plugin has an update. Automatic updates are off, so nothing is installed on its own. Review the updates to install them.',
-      ),
-    ).toBeInTheDocument();
-    expect(hoisted.checkAllInstalledPackagesMock).toHaveBeenCalledOnce();
-
-    await user.click(screen.getByRole('button', { name: 'Review updates' }));
-    expect(await screen.findByRole('heading', { name: 'Manage Cool Plugin version' })).toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: '1.2.4 Newer' })).toBeInTheDocument();
-  });
-
-  it('reports failed package update checks', async () => {
-    hoisted.plugins = [makePlugin()];
-    const installed = {
-      name: 'Cool Plugin',
-      version: '1.2.3',
-      registryId: 'npm',
-      registryUrl: 'https://registry.npmjs.org',
-      classification: 'community',
-      classificationReason: 'Marketplace package',
-      requestedSpec: 'latest',
-      updateOverride: 'inherit',
-    };
-    hoisted.apiMock.mockImplementation((url: string) => {
-      if (url.endsWith('/api/plugins/installed')) return Promise.resolve({ ok: true, json: async () => [installed] });
-      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: true, json: async () => [] });
-      return Promise.resolve({ ok: true, json: async () => ({ results: [], errors: [] }) });
-    });
-    hoisted.checkAllInstalledPackagesMock.mockResolvedValue([
-      {
-        ...installed,
-        updateCheck: {
-          checkedAt: '2026-09-22T12:00:00.000Z',
-          candidate: null,
-          state: 'failed',
-          error: 'Registry unavailable',
-        },
-      },
-    ]);
-    const user = userEvent.setup();
-    renderWithQuery(<PluginsSection />);
-
-    await user.click(await screen.findByRole('button', { name: 'Check all now' }));
-
-    await waitFor(() => expect(hoisted.errorToast).toHaveBeenCalledWith({ title: 'Could not check plugin updates' }));
-    expect(hoisted.successToast).not.toHaveBeenCalled();
   });
 
   async function openMarketplace(user: ReturnType<typeof userEvent.setup>) {
@@ -340,7 +251,7 @@ describe('PluginsSection', () => {
     await user.click(screen.getByRole('checkbox'));
     expect(confirm).toBeEnabled();
     expect(
-      screen.getByText('Installing this plugin requires an application restart to activate it.'),
+      screen.getByText('The plugin takes effect after a restart. Use “Restart now” in the banner when you are ready.'),
     ).toBeInTheDocument();
   });
 
@@ -415,6 +326,12 @@ describe('PluginsSection', () => {
         body: { registryId: 'private', followHostChannel: true },
       }),
     );
+    await waitFor(() =>
+      expect(hoisted.successToast).toHaveBeenCalledWith({
+        title: 'Plugin installed. It takes effect after a restart; use “Restart now” in the banner.',
+      }),
+    );
+    expect(hoisted.reloadPage).not.toHaveBeenCalled();
   });
 
   it('keeps the install failure and compatibility remedy visible in the install confirmation modal', async () => {
@@ -859,6 +776,7 @@ describe('PluginsSection', () => {
     expect(hoisted.statusRefetchMock.mock.invocationCallOrder[0]).toBeLessThan(
       hoisted.retryMutateAsyncMock.mock.invocationCallOrder[0],
     );
+    await waitFor(() => expect(hoisted.reloadPage).toHaveBeenCalledOnce());
   });
 
   it('keeps the retry action pending while it waits for the restarted server', async () => {
@@ -948,16 +866,22 @@ describe('PluginsSection', () => {
     expect(hoisted.deleteMutateMock).toHaveBeenCalledWith({ path: { pluginId: 'plugin-1' } });
   });
 
-  it('shows a success toast after a successful delete', () => {
-    // The success handler also schedules a full page reload; fake timers keep that out of the test.
-    vi.useFakeTimers();
+  it('reloads the page once after a successful delete and shows the success toast after the reload', () => {
     hoisted.plugins = [makePlugin()];
-    renderWithQuery(<PluginsSection />);
+    const view = renderWithQuery(<PluginsSection />);
 
     hoisted.deleteOptions?.onSuccess?.();
 
+    // The removed plugin's frontend bundle is gone: the page reloads right away (the server does not restart).
+    expect(hoisted.reloadPage).toHaveBeenCalledOnce();
+    view.unmount();
+
+    // The reloaded page shows the toast the reload would have swallowed, once.
+    renderWithQuery(<PluginsSection />).unmount();
+    expect(hoisted.successToast).toHaveBeenCalledOnce();
     expect(hoisted.successToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Plugin removed' }));
-    vi.useRealTimers();
+    renderWithQuery(<PluginsSection />);
+    expect(hoisted.successToast).toHaveBeenCalledOnce();
   });
 
   it('shows an error toast when the delete fails', () => {

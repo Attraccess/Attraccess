@@ -27,6 +27,7 @@ import {
 import { pluginRemovalClosure } from '../runtime/dependencies';
 
 import { PluginService } from '../plugin.service';
+import { markPluginRestartRequired } from '../runtime/restart-required';
 
 import { parseNpmPluginPackage } from './contract-validation';
 
@@ -48,7 +49,7 @@ export class NpmPackageCatalog {
     return pluginRemovalClosure(name, this.state.listInstalled());
   }
 
-  async removeInstalled(name: string, deferRestart = false, approvedDependants: string[] = []): Promise<void> {
+  async removeInstalled(name: string, approvedDependants: string[] = []): Promise<void> {
     await this.state.mutateInstalls(async () => {
       const removing = this.removalPlan(name);
       const dependants = removing.filter((plugin) => plugin.name !== name).map((plugin) => plugin.name);
@@ -101,7 +102,7 @@ export class NpmPackageCatalog {
         }
       }
       // Keep plugin data and secrets, as in the existing npm removal lifecycle.
-      if (!deferRestart) new PluginService().requestRestart();
+      markPluginRestartRequired();
     });
   }
 

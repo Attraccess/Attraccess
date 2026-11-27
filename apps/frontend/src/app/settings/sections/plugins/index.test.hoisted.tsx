@@ -42,7 +42,10 @@ const hoisted = vi.hoisted(() => ({
   setUpdatePolicyMock: vi.fn(),
   pluginSystemStatus: { disabled: false, instanceId: 'original-instance' },
   deleteOptions: undefined as DeleteOptions | undefined,
+  reloadPage: vi.fn(),
 }));
+
+vi.mock('../../../../utils/reloadPage', () => ({ reloadPage: hoisted.reloadPage }));
 
 vi.mock('@attraccess/react-query-client', async () => {
   const { useQuery } = await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query');
@@ -56,6 +59,9 @@ vi.mock('@attraccess/react-query-client', async () => {
     registryId ? `${separator}registryId=${encodeURIComponent(registryId)}` : '';
   return {
     UsePluginControllerInstalledPackagesKeyFn: () => ['installed'],
+    usePluginControllerInstalledPackagesKey: 'installed',
+    useGetPluginsKey: 'GetPlugins',
+    useGetPluginSystemStatusKey: 'GetPluginSystemStatus',
     UsePluginControllerListRegistriesKeyFn: () => ['registries'],
     UsePluginControllerUpdatePolicyKeyFn: () => ['update-policy'],
     usePluginControllerUpdatePolicy: () =>
@@ -208,6 +214,9 @@ export function resetTestFixture() {
   hoisted.setUpdatePolicyMock.mockImplementation(async ({ body }: { body: unknown }) => body);
   hoisted.pluginSystemStatus = { disabled: false, instanceId: 'original-instance' };
   hoisted.deleteOptions = undefined;
+  hoisted.reloadPage.mockReset();
+  // A removal leaves a note for the reloaded page (removalNotice); it must not reach the next test.
+  sessionStorage.clear();
   hoisted.statusRefetchMock.mockResolvedValue({ data: hoisted.pluginSystemStatus });
   hoisted.retryMutateAsyncMock.mockResolvedValue({ ok: true });
   hoisted.checkAllInstalledPackagesMock.mockResolvedValue([]);

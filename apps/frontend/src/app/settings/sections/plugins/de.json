@@ -81,10 +81,10 @@
     "installTitle": "{{pluginName}} installieren?",
     "installDescription": "Prüfen Sie die Paketquelle und die angeforderten Berechtigungen vor der Installation.",
     "installApproval": "Ich bestätige diese Quelle und die angeforderten Berechtigungen.",
-    "restartWarning": "Die Installation dieses Plugins erfordert zur Aktivierung einen Neustart der Anwendung.",
+    "restartWarning": "Das Plugin wird nach einem Neustart wirksam. Nutzen Sie „Jetzt neu starten“ im Hinweisbanner, sobald es passt.",
     "cancel": "Abbrechen",
     "confirmInstall": "Plugin installieren",
-    "installSuccess": "Plugin installiert. Die App startet in wenigen Sekunden zur Aktivierung neu.",
+    "installSuccess": "Plugin installiert. Es wird nach einem Neustart wirksam; nutzen Sie „Jetzt neu starten“ im Hinweisbanner.",
     "installError": "Das Plugin wurde nicht installiert.",
     "installPermissionHelp": "Melden Sie sich mit einer Rolle an, die Plugins verwalten darf, und versuchen Sie es erneut.",
     "installRouteHelp": "Laden Sie Attraccess neu, um den aktuellen Client zu verwenden. Falls der Fehler bleibt, prüfen Sie, ob Frontend und API dieselbe Version haben.",
@@ -188,8 +188,8 @@
     "title": "Plugin entfernen?",
     "cancel": "Abbrechen",
     "delete": "Entfernen",
-    "messageRegistry": "Das Plugin {{pluginName}} entfernen? Sein Code und seine Laufzeitregistrierungen werden entfernt und die App wird neu geladen. Seine Daten und Geheimnisse bleiben erhalten; eine erneute Installation setzt mit ihnen fort.",
-    "messageUploaded": "Das Plugin {{pluginName}} entfernen? Sein Code, seine Laufzeitregistrierungen und alle gespeicherten Daten werden dauerhaft gelöscht, und die App wird neu geladen. Erstellen Sie vorher ein Backup, wenn Sie die Daten noch brauchen könnten.",
+    "messageRegistry": "Das Plugin {{pluginName}} entfernen? Sein Code wird entfernt, läuft aber bis zum Neustart von Attraccess weiter; die Seite wird jetzt neu geladen. Seine Daten und Geheimnisse bleiben erhalten; eine erneute Installation setzt mit ihnen fort.",
+    "messageUploaded": "Das Plugin {{pluginName}} entfernen? Sein Code und alle gespeicherten Daten werden dauerhaft gelöscht. Sein Code läuft bis zum Neustart von Attraccess weiter; die Seite wird jetzt neu geladen. Erstellen Sie vorher ein Backup, wenn Sie die Daten noch brauchen könnten.",
     "messageRefused": "Das abgelehnte Plugin {{pluginName}} entfernen? Seine Dateien werden entfernt, ohne seinen Code auszuführen, und die App wird neu geladen. Seine gespeicherten Daten bleiben in der Datenbank, bis eine kompatible Version sie übernimmt."
   },
   "error": {
@@ -209,21 +209,19 @@
   "success": {
     "replace": {
       "title": "Plugin-Version ersetzt",
-      "description": "Die App startet in wenigen Sekunden neu, um die ausgewählte Version zu aktivieren."
+      "description": "Die ausgewählte Version wird nach einem Neustart wirksam; nutzen Sie „Jetzt neu starten“ im Hinweisbanner."
     },
     "delete": {
       "title": "Plugin entfernt",
-      "description": "Die App lädt in wenigen Sekunden neu, um den Code des Plugins zu verwerfen."
+      "description": "Die Änderung wirkt nach dem Neustart von Attraccess; nutzen Sie „Jetzt neu starten“ im Hinweisbanner."
     }
   },
   "versionManagement": {
     "title": "Version von {{pluginName}} verwalten",
-    "current": "Aktuelle Version: {{version}}",
     "loading": "Verfügbare Versionen werden geladen...",
-    "selected": "Ausgewählte Version: {{version}}",
     "spec": "Gewünschte Version oder Kanal",
     "autoUpdate": "Automatische Update-Regel des Plugins",
-    "savePolicy": "Versionsregel speichern",
+    "savePolicy": "Update-Einstellungen speichern",
     "policySaved": "Plugin-Versionsregel gespeichert",
     "policyError": "Plugin-Versionsregel konnte nicht gespeichert werden",
     "overrides": {
@@ -236,19 +234,34 @@
     "published": "Veröffentlicht: {{date}}",
     "permissionApproval": "Ich genehmige diese neuen Berechtigungen: {{permissions}}",
     "permissionRemovals": "Entfernte Berechtigungen: {{permissions}}",
-    "majorApproval": "Ich genehmige dieses Major-Update und den Neustart/Ausfall.",
+    "majorApproval": "Ich genehmige dieses Major-Update. Es wird nach einem Neustart wirksam.",
     "deprecated": "Vom Herausgeber veraltet: {{notice}}",
     "integrity": "Integrität: {{integrity}}",
     "repository": "Release-Repository",
-    "downgradeWarning": "Ein Downgrade kann Plugin-Daten beeinträchtigen und erfordert einen Neustart der Anwendung.",
+    "downgradeWarning": "Ein Downgrade kann Plugin-Daten beeinträchtigen. Es wird nach einem Neustart wirksam.",
     "cancel": "Abbrechen",
-    "update": "Aktualisieren",
-    "downgrade": "Downgrade",
     "direction": {
       "current": "Aktuell",
       "newer": "Neuer",
       "older": "Älter"
     },
+    "currentHeading": "Aktuelle Version",
+    "requestedSpec": "Gewünscht: {{spec}}",
+    "availableHeading": "Verfügbare Versionen",
+    "noVersions": "Es sind keine anderen Versionen verfügbar.",
+    "detailsHeading": "Version {{version}}",
+    "settingsHeading": "Update-Einstellungen",
+    "settingsDescription": "Diese Regeln bestimmen, welche Versionen die Update-Prüfung anbietet und automatische Updates installieren dürfen. Beim Speichern wird nicht sofort etwas installiert.",
+    "specDescription": "Eine genaue Version, ein Bereich wie ^1.2.0 oder ein Kanal wie latest.",
+    "updateTo": "Auf {{version}} aktualisieren",
+    "downgradeTo": "Auf {{version}} zurückstufen",
+    "notCompatible": "Nicht kompatibel: {{reason}}",
+    "notCompatibleNoReason": "Nicht kompatibel mit dieser Attraccess-Version",
+    "installedNow": "Derzeit installiert",
+    "showOlderIncompatible": "{{count}} ältere inkompatible Versionen anzeigen",
+    "hideOlderIncompatible": "Ältere inkompatible Versionen ausblenden",
+    "details": "Release-Details",
+    "update": "Aktualisieren",
     "automaticUpdatesOff": "Automatische Updates sind für dieses Attraccess ausgeschaltet. Diese Einstellung installiert nichts, bis sie unter „Automatische Updates“ eingeschaltet werden."
   },
   "dependencies": {

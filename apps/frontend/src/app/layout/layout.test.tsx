@@ -50,6 +50,9 @@ vi.mock('../../components/DonationPrompt', () => ({ DonationPrompt: () => <div>D
 vi.mock('../../components/UpdateNotificationBanner', () => ({
   UpdateNotificationBanner: () => <div>Update banner</div>,
 }));
+vi.mock('../../components/PluginRestartBanner', () => ({
+  PluginRestartBanner: () => <div>Plugin restart banner</div>,
+}));
 vi.mock('../serverNotAvailable', () => ({ ServerNotAvailable: () => <div>Server status</div> }));
 vi.mock('../messaging/GlobalMessagingLive', () => ({
   GlobalMessagingLive: ({ enabled }: { enabled: boolean }) => <div>Messaging {String(enabled)}</div>,
@@ -98,6 +101,7 @@ it('renders unauthenticated content with server status and disables live subscri
 it('persists desktop collapse, adapts to viewport changes and closes the sidebar after navigation', () => {
   const view = open();
   expect(screen.getByText('Sidebar open expanded')).toBeTruthy();
+  expect(screen.getByText('Plugin restart banner')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Collapse' }));
   expect(screen.getByText('Sidebar open collapsed')).toBeTruthy();
   expect(localStorage.getItem('attraccess.sidebar-collapsed')).toBe('true');

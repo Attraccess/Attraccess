@@ -7,7 +7,7 @@
   "cancel": "Cancel",
   "success": {
     "title": "Success",
-    "description": "Plugin uploaded or updated successfully. Application will restart in 5 seconds."
+    "description": "Plugin uploaded. It takes effect after a restart; use “Restart now” in the banner."
   },
   "error": {
     "title": "Error",

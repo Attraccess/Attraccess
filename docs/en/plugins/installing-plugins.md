@@ -17,6 +17,29 @@ Updates and downgrades cannot break the dependency graph. If a required plugin i
 
 If a dependency fails to load, its dependants stay inactive. Open the failure details in **Settings → Plugins**, repair or retry the failed dependency, then restart.
 
+## Restart to apply changes
+
+Installing, updating, downgrading, uploading or removing a plugin saves the change to disk, but Attraccess keeps
+running. The change takes effect after the next restart, so you can install or update several plugins first and
+restart once.
+
+While changes are pending, plugin administrators (users with the `system.plugins.manage` permission) see a
+**Restart required** banner at the top of every page. It cannot be dismissed. Choose **Restart now** in the banner and
+confirm: Attraccess is unavailable for a moment, open sessions and reader connections reconnect on their own, and the
+page reloads when the server is back. The banner then disappears and the changed plugins are active.
+
+- Until the restart, an installed or updated plugin is on disk but not loaded. An updated plugin keeps running in its
+  old version, and its pages stay on that version too.
+- A removed plugin keeps running in the background until the restart, but it is no longer listed and can no longer
+  add readers or use Bluetooth. Removing a plugin reloads the page once, because its pages are gone.
+- Two actions still restart Attraccess at once: **Retry** on a plugin that failed to load, and a license key change
+  that changes which plugins may load (see [License missing](#license-missing)). Such a restart also applies pending
+  changes.
+- [Automatic updates](#automatic-updates), if a plugin manager turned them on, restart Attraccess themselves inside
+  their update window. That restart also applies pending changes.
+- With several API instances, each instance tracks its own pending changes, and **Restart now** restarts the instance
+  that answers the request.
+
 ## Release channels
 
 Official plugins are published to npm under these dist-tags:
@@ -40,9 +63,16 @@ The version you choose explicitly (**Manage version** or the API) always wins.
 
 A plugin installed on a nightly host from the marketplace, or through the API without a version, records `next` as its requested version. The host then offers newer `next` builds (or `latest`, if that is higher) as updates: from one nightly to the next, and from a nightly to the release. **It installs none of them on its own** until a plugin manager turns [automatic updates](#automatic-updates) on. Plugins that request `latest` are offered releases only. A release host never offers a nightly build through `next`.
 
+### The Manage version dialog
+
+The **Manage version** dialog shows the current version, the available versions (versions that cannot be installed
+say why; older ones of those are folded away behind **Show … older incompatible versions**), the changes and approvals of the version you select, and the package's **Update settings**. Saving the
+update settings only changes which versions update checks offer; it installs nothing. **Update to …** or
+**Downgrade to …** installs the selected version, which takes effect after a [restart](#restart-to-apply-changes).
+
 ### Switching a plugin to `next`
 
-A plugin that was installed as `latest` stays on `latest`, also on a nightly host. To switch it, open **Settings → Plugins**, open the installed plugin's actions menu (**⋯**), choose **Manage version**, enter `next` (or a specific nightly version) in the text field at the top (**Requested version or channel**) and click **Save version policy**. Then pick the version in the list below and click **Update**. **Update** alone does not save what you typed. You can also remove the plugin and install it again from the marketplace; its data is kept.
+A plugin that was installed as `latest` stays on `latest`, also on a nightly host. To switch it, open **Settings → Plugins**, open the installed plugin's actions menu (**⋯**), choose **Manage version**, enter `next` (or a specific nightly version) as **Requested version or channel** under **Update settings** and click **Save update settings**. Then select the version under **Available versions**, click **Update to …** and [restart](#restart-to-apply-changes). **Update to …** alone does not save what you typed. You can also remove the plugin and install it again from the marketplace; its data is kept.
 
 Once a plugin has had a release, the marketplace of a release host offers only released versions. npm sets `latest` automatically on a package's first publish, so a plugin first published by a nightly has a nightly `latest` until its first release. The release treats a nightly `latest` as never released and publishes the plugin.
 
@@ -69,10 +99,10 @@ To turn them off again, switch **Install updates automatically** off and save. W
 
 ### The update window
 
-- Attraccess **installs updates and restarts only inside the window**, on the chosen weekdays. After installing the updates that are due, it restarts once. The restart interrupts use for a short time, so choose a time when that is acceptable.
+- Attraccess **installs updates and restarts only inside the window**, on the chosen weekdays. After installing the updates that are due, it restarts once, without waiting for the [Restart required](#restart-to-apply-changes) banner; that restart also applies changes made by hand that still wait for one. The restart interrupts use for a short time, so choose a time when that is acceptable.
 - A window belongs to the weekday on which it starts and may run past midnight: a Monday window starting at 23:00 for two hours ends on Tuesday at 01:00.
 - The start is a clock time in the chosen time zone, so daylight saving changes do not move it. A start time that the clock skips on that night moves forward by the skipped hour; one that occurs twice opens the window the first time. The duration is elapsed time. The server's own time zone (`TZ`) does not matter.
-- Attraccess does not start an installation in the last two minutes of a window (in windows shorter than four minutes: in their second half). If an installation is still running when the window closes, or automatic updates are switched off in the meantime, Attraccess does not restart then: the restart follows in the next window, or when Attraccess is restarted for another reason.
+- Attraccess does not start an installation in the last two minutes of a window (in windows shorter than four minutes: in their second half). If an installation is still running when the window closes, or automatic updates are switched off in the meantime, Attraccess does not restart then. The **Restart required** banner stays until you choose **Restart now**, Attraccess restarts for another reason, or an update window opens while automatic updates are on.
 
 ### What is installed
 
@@ -113,7 +143,8 @@ Weekdays are numbered from 1 (Monday) to 7 (Sunday), and `startMinute` is the mi
 1. Open **Settings** in the sidebar and select the **Plugins** section
 2. Click the **Upload Plugin** button
 3. Select the plugin file from your computer
-4. The plugin is uploaded and appears in the plugin list
+4. The plugin is uploaded and appears in the plugin list. It becomes active after a
+   [restart](#restart-to-apply-changes).
 
 <!-- TODO: Screenshot of upload plugin dialog -->
 

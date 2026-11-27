@@ -5,6 +5,7 @@ import { ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { useState } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { usePluginDependencyPlan } from '../dependencies/usePluginDependencyPlan';
+import { useRefreshAfterPluginChange } from '../useRefreshAfterPluginChange';
 import { usePluginsTranslations } from '../usePluginsTranslations';
 import { describeInstallFailure } from './describeInstallFailure';
 import { InstallPlan } from './InstallPlan';
@@ -18,6 +19,7 @@ interface Props {
 export function InstallPluginModal({ plugin, onClose }: Props) {
   const { t } = usePluginsTranslations();
   const toast = useToastMessage();
+  const refreshAfterPluginChange = useRefreshAfterPluginChange();
   const { mutateAsync: installPluginPackage } = usePluginControllerInstallPackage();
   const [approvedPlanToken, setApprovedPlanToken] = useState<string | null>(null);
   const [isInstalling, setIsInstalling] = useState(false);
@@ -64,7 +66,7 @@ export function InstallPluginModal({ plugin, onClose }: Props) {
         },
       });
       toast.success({ title: t('marketplace.installSuccess') });
-      setTimeout(() => window.location.reload(), 5000);
+      void refreshAfterPluginChange();
       onClose();
       setApprovedPlanToken(null);
     } catch (error) {

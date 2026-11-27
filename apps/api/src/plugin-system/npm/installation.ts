@@ -30,6 +30,7 @@ import { createHash } from 'crypto';
 import { orderPluginDependencies } from '../runtime/dependencies';
 
 import { PluginService } from '../plugin.service';
+import { markPluginRestartRequired } from '../runtime/restart-required';
 
 import { existsSync } from 'fs';
 
@@ -158,7 +159,7 @@ export class NpmInstallation {
             migrationOutcome: 'pending-restart',
             restartRequested: 1,
           });
-        if (!audit?.context) new PluginService().requestRestart();
+        markPluginRestartRequired();
         return prepared.find(({ installed }) => installed.name === plan.root).installed;
       });
     } finally {
@@ -254,7 +255,7 @@ export class NpmInstallation {
             this.logger.error(`Failed to record quarantine cleanup failure for ${name}`, stateError);
           }
           if (audit) Object.assign(audit, { activationOutcome: 'quarantined', restartRequested: 1 });
-          if (!audit?.context) new PluginService().requestRestart();
+          markPluginRestartRequired();
           return quarantined;
         }
         try {
@@ -314,7 +315,7 @@ export class NpmInstallation {
             migrationOutcome: 'pending-restart',
             restartRequested: 1,
           });
-        if (!audit?.context) new PluginService().requestRestart();
+        markPluginRestartRequired();
         return installed;
       });
     } finally {

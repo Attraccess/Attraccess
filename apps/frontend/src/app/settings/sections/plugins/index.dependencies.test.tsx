@@ -178,6 +178,7 @@ describe('plugin dependency confirmations', () => {
       path: { packageName: core.name },
       body: { approvedDependants: [adapter.name, provider.name] },
     });
+    await waitFor(() => expect(hoisted.reloadPage).toHaveBeenCalledOnce());
   });
 });
 describe('plugin version management', () => {
@@ -268,34 +269,35 @@ describe('plugin version management', () => {
     await user.type(spec, '^2.0.0');
     await user.click(screen.getByRole('button', { name: /Plugin automatic update policy/ }));
     await user.click(screen.getByRole('option', { name: 'Patch only' }));
-    await user.click(screen.getByRole('button', { name: 'Save version policy' }));
+    await user.click(screen.getByRole('button', { name: 'Save update settings' }));
     await waitFor(() =>
       expect(hoisted.updateInstalledPackagePolicyMock).toHaveBeenCalledWith({
         path: { packageName: 'Cool Plugin' },
         body: { requestedSpec: '^2.0.0', updateOverride: 'patch' },
       }),
     );
-    expect(screen.getByText('3.0.0: Requires a newer host')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '3.0.0 Newer' })).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: '2.0.0 Newer' }));
+    expect(screen.getByText('Not compatible: Requires a newer host')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /^3\.0\.0 / })).toBeDisabled();
+    await user.click(screen.getByRole('radio', { name: /^2\.0\.0 / }));
     expect(screen.getByRole('link', { name: 'Release repository' })).toHaveAttribute('href', candidate.repository);
     expect(screen.getByText('Removed permissions: read:old')).toBeInTheDocument();
-    const update = screen.getByRole('button', { name: 'Update' });
+    const update = screen.getByRole('button', { name: 'Update to 2.0.0' });
     expect(update).toBeDisabled();
     await user.click(screen.getByRole('checkbox', { name: 'I approve these new permissions: write:users' }));
     expect(update).toBeDisabled();
     await user.click(screen.getByRole('switch', { name: /I approve this major version/ }));
     expect(update).toBeEnabled();
-    await user.click(screen.getByRole('button', { name: '1.0.0 Older' }));
+    await user.click(screen.getByRole('radio', { name: /^1\.0\.0 / }));
     expect(
-      screen.getByText('Downgrading can affect plugin data and requires an application restart.'),
+      screen.getByText('Downgrading can affect plugin data. It takes effect after a restart.'),
     ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '2.0.0 Newer' }));
+    expect(screen.getByRole('button', { name: 'Downgrade to 1.0.0' })).toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: /^2\.0\.0 / }));
     expect(screen.getByRole('checkbox')).not.toBeChecked();
     expect(screen.getByRole('switch', { name: /I approve/ })).not.toBeChecked();
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('switch', { name: /I approve/ }));
-    await user.click(screen.getByRole('button', { name: 'Update' }));
+    await user.click(screen.getByRole('button', { name: 'Update to 2.0.0' }));
     await waitFor(() =>
       expect(hoisted.replaceInstalledPackageMock).toHaveBeenCalledWith({
         path: { packageName: 'Cool Plugin', version: '2.0.0' },
@@ -305,6 +307,12 @@ describe('plugin version management', () => {
     await waitFor(() =>
       expect(screen.queryByRole('heading', { name: 'Manage Cool Plugin version' })).not.toBeInTheDocument(),
     );
+    // The new version waits for a restart: the dialog closes with a toast, the page stays.
+    expect(hoisted.successToast).toHaveBeenCalledWith({
+      title: 'Plugin version replaced',
+      description: expect.stringContaining('after a restart'),
+    });
+    expect(hoisted.reloadPage).not.toHaveBeenCalled();
   });
 
   it('keeps a saved version policy when the dialog opens again', async () => {
@@ -333,7 +341,7 @@ describe('plugin version management', () => {
     await user.type(spec, '^2.0.0');
     await user.click(screen.getByRole('button', { name: /Plugin automatic update policy/ }));
     await user.click(screen.getByRole('option', { name: 'Patch only' }));
-    await user.click(screen.getByRole('button', { name: 'Save version policy' }));
+    await user.click(screen.getByRole('button', { name: 'Save update settings' }));
     await waitFor(() => expect(hoisted.successToast).toHaveBeenCalledWith({ title: 'Plugin version policy saved' }));
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -385,10 +393,10 @@ describe('plugin version management', () => {
     const user = userEvent.setup();
     renderWithQuery(<PluginsSection />);
     await user.click(await openActions(user, 'Manage version'));
-    await user.click(await screen.findByRole('button', { name: '1.3.0 Newer' }));
+    await user.click(await screen.findByRole('radio', { name: /^1\.3\.0 / }));
 
     expect(screen.getByText('3D Printer Core · 1.0.0')).toBeInTheDocument();
-    const update = screen.getByRole('button', { name: 'Update' });
+    const update = screen.getByRole('button', { name: 'Update to 1.3.0' });
     expect(update).toBeDisabled();
     const approval = screen.getByRole('switch', { name: /I approve installing these dependencies/ });
     await user.click(approval);

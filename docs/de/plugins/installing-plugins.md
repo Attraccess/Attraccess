@@ -17,6 +17,30 @@ Updates und Downgrades dürfen keine Abhängigkeiten verletzen. Beim Entfernen e
 
 Wenn eine Abhängigkeit nicht geladen werden kann, bleiben ihre abhängigen Plugins inaktiv. Öffne die Fehlerdetails unter **Einstellungen → Plugins**, repariere die Abhängigkeit oder versuche sie erneut zu laden und starte neu.
 
+## Neustart zum Übernehmen von Änderungen
+
+Wenn Sie ein Plugin installieren, aktualisieren, zurückstufen, hochladen oder entfernen, speichert Attraccess die
+Änderung, läuft aber weiter. Die Änderung wird beim nächsten Neustart wirksam. So können Sie mehrere Plugins
+installieren oder aktualisieren und danach einmal neu starten.
+
+Solange Änderungen ausstehen, sehen Plugin-Administratoren (Benutzer mit der Berechtigung `system.plugins.manage`) oben
+auf jeder Seite den Hinweis **Neustart erforderlich**. Er lässt sich nicht ausblenden. Wählen Sie im Hinweis **Jetzt
+neu starten** und bestätigen Sie: Attraccess ist kurz nicht erreichbar, offene Sitzungen und Verbindungen von
+Lesegeräten verbinden sich selbst wieder, und die Seite lädt neu, sobald der Server wieder läuft. Danach verschwindet
+der Hinweis und die geänderten Plugins sind aktiv.
+
+- Bis zum Neustart liegt ein installiertes oder aktualisiertes Plugin auf dem Datenträger, ist aber nicht geladen. Ein
+  aktualisiertes Plugin läuft in seiner alten Version weiter, und auch seine Seiten bleiben bei dieser Version.
+- Ein entferntes Plugin läuft bis zum Neustart im Hintergrund weiter, wird aber nicht mehr aufgeführt und kann keine
+  Lesegeräte mehr anlegen und kein Bluetooth mehr nutzen. Nach dem Entfernen lädt die Seite einmal neu, weil die Seiten des Plugins fehlen.
+- Zwei Aktionen starten Attraccess weiterhin sofort neu: **Erneut versuchen** bei einem Plugin, das nicht geladen
+  werden konnte, und eine Änderung des Lizenzschlüssels, die ändert, welche Plugins geladen werden dürfen (siehe
+  [Lizenz fehlt](#lizenz-fehlt)). Ein solcher Neustart übernimmt auch ausstehende Änderungen.
+- [Automatische Updates](#automatische-updates) starten Attraccess selbst innerhalb ihres Update-Zeitfensters neu,
+  wenn ein Plugin-Verwalter sie eingeschaltet hat. Dieser Neustart übernimmt auch ausstehende Änderungen.
+- Bei mehreren API-Instanzen merkt sich jede Instanz ihre ausstehenden Änderungen selbst, und **Jetzt neu starten**
+  startet die Instanz neu, die die Anfrage beantwortet.
+
 ## Release-Kanäle
 
 Offizielle Plugins werden auf npm unter diesen Dist-Tags veröffentlicht:
@@ -40,9 +64,17 @@ Eine ausdrücklich gewählte Version (**Version verwalten** oder die API) hat im
 
 Ein Plugin, das auf einem Nightly-Host über den Marktplatz oder über die API ohne Versionsangabe installiert wird, merkt sich `next` als gewünschte Version. Der Host bietet dann neuere `next`-Builds (oder `latest`, falls höher) als Updates an: von Nightly zu Nightly und von einem Nightly zum Release. **Von selbst installiert er keinen davon**, bis ein Plugin-Verwalter die [automatischen Updates](#automatische-updates) einschaltet. Plugins, die `latest` wünschen, bekommen nur Releases angeboten. Ein Release-Host bietet über `next` nie einen Nightly-Build an.
 
+### Der Dialog Version verwalten
+
+Der Dialog **Version verwalten** zeigt die aktuelle Version, die verfügbaren Versionen (nicht installierbare Versionen
+nennen den Grund; ältere davon sind hinter **… ältere inkompatible Versionen anzeigen** eingeklappt), die Änderungen und Genehmigungen der ausgewählten Version und die **Update-Einstellungen** des
+Pakets. Das Speichern der Update-Einstellungen ändert nur, welche Versionen die Update-Prüfung anbietet; es installiert
+nichts. **Auf … aktualisieren** oder **Auf … zurückstufen** installiert die ausgewählte Version, die nach einem
+[Neustart](#neustart-zum-Übernehmen-von-Änderungen) wirksam wird.
+
 ### Ein Plugin auf `next` umstellen
 
-Ein Plugin, das als `latest` installiert wurde, bleibt auf `latest`, auch auf einem Nightly-Host. Zum Umstellen öffne **Einstellungen → Plugins**, öffne das Aktionsmenü (**⋯**) des installierten Plugins, wähle **Version verwalten**, trage `next` (oder eine bestimmte Nightly-Version) in das Textfeld oben ein (**Gewünschte Version oder Kanal**) und klicke auf **Versionsregel speichern**. Wähle dann die Version in der Liste darunter und klicke auf **Aktualisieren**. **Aktualisieren** allein speichert deine Eingabe nicht. Alternativ entfernst du das Plugin und installierst es erneut über den Marktplatz; seine Daten bleiben erhalten.
+Ein Plugin, das als `latest` installiert wurde, bleibt auf `latest`, auch auf einem Nightly-Host. Zum Umstellen öffne **Einstellungen → Plugins**, öffne das Aktionsmenü (**⋯**) des installierten Plugins, wähle **Version verwalten**, trage `next` (oder eine bestimmte Nightly-Version) unter **Update-Einstellungen** als **Gewünschte Version oder Kanal** ein und klicke auf **Update-Einstellungen speichern**. Wähle dann die Version unter **Verfügbare Versionen**, klicke auf **Auf … aktualisieren** und [starte neu](#neustart-zum-Übernehmen-von-Änderungen). **Auf … aktualisieren** allein speichert deine Eingabe nicht. Alternativ entfernst du das Plugin und installierst es erneut über den Marktplatz; seine Daten bleiben erhalten.
 
 Sobald ein Plugin einmal released wurde, bietet der Marktplatz eines Release-Hosts nur noch released Versionen an. npm setzt `latest` bei der ersten Veröffentlichung eines Pakets automatisch; ein Plugin, das zuerst von einem Nightly veröffentlicht wird, hat deshalb bis zu seinem ersten Release ein Nightly als `latest`. Das Release behandelt ein Nightly-`latest` als „noch nie released" und veröffentlicht das Plugin.
 
@@ -69,10 +101,10 @@ Zum Ausschalten schaltest du **Updates automatisch installieren** aus und speich
 
 ### Das Update-Zeitfenster
 
-- Attraccess **installiert Updates und startet nur innerhalb des Zeitfensters neu**, an den gewählten Wochentagen. Nach der Installation der fälligen Updates startet es einmal neu. Der Neustart unterbricht die Nutzung kurz, wähle also eine Zeit, in der das vertretbar ist.
+- Attraccess **installiert Updates und startet nur innerhalb des Zeitfensters neu**, an den gewählten Wochentagen. Nach der Installation der fälligen Updates startet es einmal neu, ohne auf den Hinweis [Neustart erforderlich](#neustart-zum-Übernehmen-von-Änderungen) zu warten; dieser Neustart übernimmt auch von Hand vorgenommene Änderungen, die noch ausstehen. Der Neustart unterbricht die Nutzung kurz, wähle also eine Zeit, in der das vertretbar ist.
 - Ein Zeitfenster gehört zu dem Wochentag, an dem es beginnt, und darf über Mitternacht reichen: Ein Montagsfenster ab 23:00 Uhr für zwei Stunden endet am Dienstag um 01:00 Uhr.
 - Der Start ist eine Uhrzeit in der gewählten Zeitzone, die Zeitumstellung verschiebt ihn also nicht. Eine Startzeit, die in dieser Nacht übersprungen wird, rückt um die übersprungene Stunde vor; eine, die zweimal vorkommt, öffnet das Fenster beim ersten Mal. Die Dauer ist tatsächlich verstrichene Zeit. Die Zeitzone des Servers (`TZ`) spielt keine Rolle.
-- In den letzten zwei Minuten eines Zeitfensters (bei Fenstern unter vier Minuten: in der zweiten Hälfte) beginnt Attraccess keine Installation. Läuft eine Installation noch, wenn das Fenster endet, oder werden die automatischen Updates währenddessen ausgeschaltet, startet Attraccess dann nicht neu: Der Neustart folgt im nächsten Zeitfenster oder wenn Attraccess aus einem anderen Grund neu startet.
+- In den letzten zwei Minuten eines Zeitfensters (bei Fenstern unter vier Minuten: in der zweiten Hälfte) beginnt Attraccess keine Installation. Läuft eine Installation noch, wenn das Fenster endet, oder werden die automatischen Updates währenddessen ausgeschaltet, startet Attraccess dann nicht neu. Der Hinweis **Neustart erforderlich** bleibt, bis du **Jetzt neu starten** wählst, Attraccess aus einem anderen Grund neu startet oder bei eingeschalteten automatischen Updates ein Update-Zeitfenster beginnt.
 
 ### Was installiert wird
 
@@ -113,7 +145,8 @@ Wochentage sind von 1 (Montag) bis 7 (Sonntag) nummeriert, `startMinute` ist die
 1. Oeffnen Sie **Einstellungen** in der Seitenleiste und waehlen Sie den Bereich **Plugins**
 2. Klicken Sie auf die Schaltflaeche **Plugin hochladen**
 3. Waehlen Sie die Plugin-Datei von Ihrem Computer aus
-4. Das Plugin wird hochgeladen und erscheint in der Plugin-Liste
+4. Das Plugin wird hochgeladen und erscheint in der Plugin-Liste. Es wird nach einem
+   [Neustart](#neustart-zum-Übernehmen-von-Änderungen) aktiv.
 
 <!-- TODO: Screenshot des Plugin-Upload-Dialogs -->
 

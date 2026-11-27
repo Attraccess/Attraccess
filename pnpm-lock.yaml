@@ -293,18 +293,12 @@ importers:
       '@nestjs/schedule':
         specifier: ^12.0.4
         version: 12.0.4(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)
-      '@nestjs/schematics':
-        specifier: 12.0.13
-        version: 12.0.13(prettier@3.10.1)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084))
       '@nestjs/serve-static':
         specifier: ^12.1.1
         version: 12.1.1(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)(express@5.3.0(supports-color@8.1.1))
       '@nestjs/swagger':
         specifier: ^12.1.2
         version: 12.1.2(patch_hash=1b25252fd3f58ea639e5b3d4f5ef4eb60a20c9ad40535cb328dd1a57b5d9e378)(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084))
-      '@nestjs/testing':
-        specifier: ^12.5.1
-        version: 12.5.1(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)(@nestjs/platform-express@12.5.1)
       '@nestjs/typeorm':
         specifier: ^12.0.3
         version: 12.0.3(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@1.1.3(babel-plugin-macros@3.1.0)(better-sqlite3@12.11.1)(ioredis@6.0.0(supports-color@8.1.1))(pg@8.23.1)(supports-color@8.1.1)(ts-node@10.9.2(@swc/core@1.16.22(@swc/helpers@0.5.24))(@types/node@26.6.6)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084))))
@@ -431,9 +425,6 @@ importers:
       fflate:
         specifier: ^0.8.3
         version: 0.8.3
-      glob:
-        specifier: ^14.0.6
-        version: 14.0.6
       grapesjs:
         specifier: ^0.23.9
         version: 0.23.9
@@ -443,9 +434,6 @@ importers:
       handlebars:
         specifier: ^4.7.10
         version: 4.7.10
-      identity-obj-proxy:
-        specifier: ^3.0.0
-        version: 3.0.0
       intl-pluralrules:
         specifier: ^2.0.1
         version: 2.0.1
@@ -575,9 +563,6 @@ importers:
       spark-md5:
         specifier: ^3.0.2
         version: 3.0.2
-      swagger-typescript-api:
-        specifier: ^13.14.0
-        version: 13.14.0(encoding@0.1.14)(magicast@0.5.5)(react@19.3.1)
       tailwind-merge:
         specifier: ^3.7.0
         version: 3.7.0
@@ -669,6 +654,12 @@ importers:
       '@eslint/compat':
         specifier: ^2.1.1
         version: 2.1.1(eslint@10.15.0(jiti@2.7.0)(supports-color@8.1.1))
+      '@nestjs/schematics':
+        specifier: 12.0.13
+        version: 12.0.13(prettier@3.10.1)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084))
+      '@nestjs/testing':
+        specifier: ^12.5.1
+        version: 12.5.1(@nestjs/common@12.5.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@12.5.1)(@nestjs/platform-express@12.5.1)
       '@nx/esbuild':
         specifier: 24.0.6
         version: 24.0.6(@babel/traverse@7.29.8(supports-color@8.1.1))(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@swc/core@1.16.22(@swc/helpers@0.5.24))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084)))(@swc/cli@0.8.2(@swc/core@1.16.22(@swc/helpers@0.5.24))(supports-color@8.1.1))(@swc/core@1.16.22(@swc/helpers@0.5.24))(esbuild@0.28.2)(nx@24.0.6(@swc-node/register@1.12.1(patch_hash=db85c72433985313803083663189cdafe497bccdceb91884a425cbfb2db1635f)(@swc/core@1.16.22(@swc/helpers@0.5.24))(@swc/types@0.1.28)(supports-color@8.1.1)(typescript@7.0.2(patch_hash=fce7f0c87c92a81d33e044239497e3c1c78d2bf2400d5511ab8711f7f94cc084)))(@swc/core@1.16.22(@swc/helpers@0.5.24)))(supports-color@8.1.1)(verdaccio@7.1.0(bare-buffer@3.7.2)(supports-color@8.1.1)(typanion@3.14.0))
@@ -897,12 +888,18 @@ importers:
       eslint-plugin-react-hooks:
         specifier: 7.1.1
         version: 7.1.1(eslint@10.15.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)
+      glob:
+        specifier: ^14.0.6
+        version: 14.0.6
       happy-dom:
         specifier: ^21.0.4
         version: 21.0.4
       husky:
         specifier: ^9.1.7
         version: 9.1.7
+      identity-obj-proxy:
+        specifier: ^3.0.0
+        version: 3.0.0
       ink:
         specifier: ^8.0.0
         version: 8.0.0(@types/react@19.3.0)(react@19.3.1)
@@ -954,6 +951,9 @@ importers:
       supertest:
         specifier: ^7.3.2
         version: 7.3.2(supports-color@8.1.1)
+      swagger-typescript-api:
+        specifier: ^13.14.0
+        version: 13.14.0(encoding@0.1.14)(magicast@0.5.5)(react@19.3.1)
       testcontainers:
         specifier: ^12.2.1
         version: 12.2.1(bare-buffer@3.7.2)(supports-color@8.1.1)

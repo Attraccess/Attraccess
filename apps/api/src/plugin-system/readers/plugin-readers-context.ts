@@ -8,6 +8,7 @@ import {
 } from '@attraccess/plugins-backend-sdk';
 import { Logger } from '@nestjs/common';
 import { printable } from '../../audit/policies/projection';
+import { isPluginRemoved, REMOVED_PLUGIN_MESSAGE } from '../runtime/removed-plugins';
 import type { PluginReaderChanges, PluginReadersService } from './plugin-readers.service';
 
 const logger = new Logger('PluginModule');
@@ -70,6 +71,7 @@ function changesOf(value: unknown): PluginReaderChanges {
 
 /** Plugin errors pass; a host failure (database, not yet bootstrapped) rejects with a generic error. */
 async function hostCall<T>(pluginId: string, call: string, work: () => Promise<T>): Promise<T> {
+  if (isPluginRemoved(pluginId)) throw new Error(`readers.${call}: ${REMOVED_PLUGIN_MESSAGE}`);
   try {
     return await work();
   } catch (error) {

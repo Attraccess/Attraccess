@@ -6,6 +6,7 @@ import {
 } from '@attraccess/plugins-backend-sdk';
 import type { LoggerService } from '@nestjs/common';
 import type { ModuleRef } from '@nestjs/core';
+import { isPluginRemoved, REMOVED_PLUGIN_MESSAGE } from '../runtime/removed-plugins';
 import { registerPluginBleProfile } from './plugin-ble-profile-registry';
 import { PluginBleService, type PluginBleCaller } from './plugin-ble.service';
 
@@ -22,6 +23,8 @@ export function createPluginBleContext(
   const caller: PluginBleCaller = { pluginId: plugin.id, logger: plugin.logger };
 
   const call = async <T>(operation: string, fn: (service: PluginBleService) => Promise<T>): Promise<T> => {
+    if (isPluginRemoved(plugin.id))
+      throw new PluginBleError('OPERATION_NOT_ALLOWED', REMOVED_PLUGIN_MESSAGE, { operation, detail: 'removed' });
     let service: PluginBleService;
     try {
       service = resolveService();

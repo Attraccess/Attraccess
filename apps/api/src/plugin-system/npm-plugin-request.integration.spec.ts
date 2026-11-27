@@ -28,12 +28,14 @@ describe('npm plugin request DTOs (HTTP integration)', () => {
     authenticationMethod: 'session',
     effectivePermissions: new Set(['system.plugins.manage']),
   };
+  // Mocked so a restart request never exits the test process.
+  const requestRestart = jest.fn();
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
       controllers: [PluginController],
       providers: [
-        { provide: PluginService, useValue: { requestRestart: jest.fn() } },
+        { provide: PluginService, useValue: { requestRestart } },
         { provide: NpmPluginService, useValue: npmPluginService },
         { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
         PluginAdministrationService,
@@ -70,6 +72,7 @@ describe('npm plugin request DTOs (HTTP integration)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    pluginManager.effectivePermissions = new Set(['system.plugins.manage']);
     npmPluginService.addRegistry.mockResolvedValue({ id: 'private', name: 'Private', url: 'https://registry.example' });
     npmPluginService.install.mockResolvedValue({ name: 'example', state: 'active' });
     npmPluginService.listInstalled.mockReturnValue([{ name: 'example', requestedSpec: '^1.0.0' }]);
@@ -214,5 +217,22 @@ describe('npm plugin request DTOs (HTTP integration)', () => {
       .expect(400);
 
     expect(npmPluginService.replaceInstalled).not.toHaveBeenCalled();
+  });
+
+  describe('POST /plugins/restart', () => {
+    it('refuses a user without system.plugins.manage and does not restart', async () => {
+      pluginManager.effectivePermissions = new Set(['system.plugins.read']);
+
+      await request(app.getHttpServer()).post('/api/plugins/restart').expect(403);
+
+      expect(requestRestart).not.toHaveBeenCalled();
+    });
+
+    it('restarts the API for a user with system.plugins.manage', async () => {
+      const response = await request(app.getHttpServer()).post('/api/plugins/restart').expect(201);
+
+      expect(response.body).toEqual({ ok: true });
+      expect(requestRestart).toHaveBeenCalledTimes(1);
+    });
   });
 });

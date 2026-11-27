@@ -12,6 +12,7 @@ import { PluginsTable } from './installed/PluginsTable';
 import { PluginToolbar } from './installed/PluginToolbar';
 import { RemovePluginModal } from './installed/RemovePluginModal';
 import { useInstalledNpmPlugins } from './installed/useInstalledNpmPlugins';
+import { useRemovalNotice } from './installed/useRemovalNotice';
 import { InstallPluginModal } from './marketplace/InstallPluginModal';
 import { MarketplaceBrowser } from './marketplace/MarketplaceBrowser';
 import { useMarketplaceBrowserState } from './marketplace/useMarketplaceBrowserState';
@@ -31,6 +32,7 @@ export function PluginsSection() {
   const { data: pluginSystemStatus } = useGetPluginSystemStatus();
   const { installed } = useInstalledNpmPlugins();
   const marketplace = useMarketplaceBrowserState();
+  useRemovalNotice();
   const [failedPlugin, setFailedPlugin] = useState<FailedPlugin | null>(null);
   const [pluginToDelete, setPluginToDelete] = useState<string | null>(null);
   const [pluginToInstall, setPluginToInstall] = useState<MarketplacePluginDto | null>(null);

@@ -21,7 +21,7 @@ describe('Manage version while automatic updates are off', () => {
   it('says nothing once they are on', async () => {
     hoisted.updatePolicy = { ...DEFAULT_UPDATE_POLICY, automaticUpdates: true };
     open();
-    await screen.findByRole('button', { name: 'Save version policy' });
+    await screen.findByRole('button', { name: 'Save update settings' });
     await waitFor(() => expect(screen.queryByText(HINT)).not.toBeInTheDocument());
   });
 });

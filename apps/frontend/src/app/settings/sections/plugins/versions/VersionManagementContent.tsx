@@ -1,24 +1,24 @@
 import { Button, LabeledSwitch } from '@attraccess/plugins-frontend-ui';
 import {
-  type InstalledNpmPluginDto,
   type InstalledPluginVersionDto,
   usePluginControllerInstalledPackageVersions,
   usePluginControllerReplaceInstalledPackage,
-  usePluginControllerUpdateInstalledPackagePolicy,
-  usePluginControllerUpdatePolicy,
 } from '@attraccess/react-query-client';
-import { Input, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
+import { ModalBody, ModalFooter, ModalHeader, ModalHeading, Separator } from '@heroui/react';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { Select } from '../../../../../components/select/index';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { dependencyError } from '../dependencies/dependencyError';
+import { installFailureReason } from '../marketplace/describeInstallFailure';
 import { DependencyPlanDetails } from '../dependencies/DependencyPlanDetails';
 import { usePluginDependencyPlan } from '../dependencies/usePluginDependencyPlan';
 import { useInstalledNpmPlugins } from '../installed/useInstalledNpmPlugins';
 import type { VersionPlugin } from '../types';
+import { useRefreshAfterPluginChange } from '../useRefreshAfterPluginChange';
 import { usePluginsTranslations } from '../usePluginsTranslations';
 import { VersionCandidates } from './VersionCandidates';
 import { VersionMetadata } from './VersionMetadata';
+import { VersionPolicySettings } from './VersionPolicySettings';
+import { VersionSection } from './VersionSection';
 
 interface Props {
   plugin: VersionPlugin;
@@ -28,20 +28,21 @@ interface Props {
   onCancel: () => void;
 }
 
-/** The dialog content; it mounts when the dialog opens, so every opening starts from a clean selection. */
+/**
+ * The dialog content, in sections: the current version, the versions to choose from, the selected version's changes
+ * and approvals, and apart from the update the package's update settings. It mounts when the dialog opens, so every
+ * opening starts from a clean selection.
+ */
 export function VersionManagementContent({ plugin, isReplacing, onReplacingChange, onClose, onCancel }: Props) {
   const { t } = usePluginsTranslations();
   const toast = useToastMessage();
-  const { installedByName, mergeInstalled } = useInstalledNpmPlugins();
+  const refreshAfterPluginChange = useRefreshAfterPluginChange();
+  const { installedByName } = useInstalledNpmPlugins();
   const installed = installedByName.get(plugin.name);
-  const { data: globalUpdatePolicy } = usePluginControllerUpdatePolicy();
+  // The installed package, which an update waiting for the restart already changed; the loaded plugin lags behind.
+  const currentVersion = installed?.version ?? plugin.version;
   const { mutateAsync: replaceInstalledPlugin } = usePluginControllerReplaceInstalledPackage();
-  const { mutateAsync: updateInstalledPluginPolicy } = usePluginControllerUpdateInstalledPackagePolicy();
 
-  const [requestedSpec, setRequestedSpec] = useState(installed?.requestedSpec ?? plugin.version);
-  const [updateOverride, setUpdateOverride] = useState<InstalledNpmPluginDto['updateOverride']>(
-    installed?.updateOverride ?? 'inherit',
-  );
   const [selectedVersion, setSelectedVersion] = useState<InstalledPluginVersionDto | null>(null);
   const [permissionApproved, setPermissionApproved] = useState(false);
   const [majorApproved, setMajorApproved] = useState(false);
@@ -76,6 +77,7 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
   );
   const dependencyChangesApproved = Boolean(versionPlan && approvedPlanToken === versionPlan.token);
   const installsDependencies = Boolean(versionPlan?.plugins.some((entry) => entry.action === 'install'));
+  const isDowngrade = selectedVersion?.direction === 'older';
 
   const selectVersion = (candidate: InstalledPluginVersionDto) => {
     setSelectedVersion(candidate);
@@ -100,63 +102,46 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
         title: t('success.replace.title'),
         description: t('success.replace.description'),
       });
-      setTimeout(() => window.location.reload(), 5000);
+      void refreshAfterPluginChange();
       onClose();
-    } catch {
-      toast.error({ title: t('error.replace.title'), description: t('error.replace.description') });
+    } catch (error) {
+      // The server's reason (e.g. a package it refuses) says more than a plain "try again".
+      toast.error({
+        title: t('error.replace.title'),
+        description: installFailureReason(error) ?? t('error.replace.description'),
+      });
     } finally {
       onReplacingChange(false);
-    }
-  };
-
-  const saveVersionPolicy = async () => {
-    try {
-      mergeInstalled([
-        await updateInstalledPluginPolicy({
-          path: { packageName: plugin.name },
-          body: { requestedSpec, updateOverride },
-        }),
-      ]);
-      toast.success({ title: t('versionManagement.policySaved') });
-    } catch {
-      toast.error({ title: t('versionManagement.policyError') });
     }
   };
 
   return (
     <>
       <ModalHeader>
-        <ModalHeading>{t('versionManagement.title', { pluginName: plugin.name })}</ModalHeading>
+        <ModalHeading className="break-words">{t('versionManagement.title', { pluginName: plugin.name })}</ModalHeading>
       </ModalHeader>
-      <ModalBody>
-        <p>{t('versionManagement.current', { version: plugin.version })}</p>
-        <div className="flex flex-col gap-2 rounded-medium border border-divider p-3">
-          <TextField value={requestedSpec} onChange={setRequestedSpec}>
-            <Input aria-label={t('versionManagement.spec')} placeholder="^1.2.0 or latest" />
-          </TextField>
-          <Select
-            value={updateOverride}
-            onChange={(value) => setUpdateOverride(value as InstalledNpmPluginDto['updateOverride'])}
-            items={['inherit', 'off', 'patch', 'minor', 'follow'].map((value) => ({
-              key: value,
-              label: t(`versionManagement.overrides.${value}`),
-            }))}
-            aria-label={t('versionManagement.autoUpdate')}
+      <ModalBody className="flex flex-col gap-5">
+        <VersionSection title={t('versionManagement.currentHeading')}>
+          <div className="flex flex-col gap-1">
+            <p className="break-all text-lg font-medium">{currentVersion}</p>
+            {installed?.requestedSpec ? (
+              <p className="break-all text-sm text-muted">
+                {t('versionManagement.requestedSpec', { spec: installed.requestedSpec })}
+              </p>
+            ) : null}
+          </div>
+        </VersionSection>
+        <VersionSection title={t('versionManagement.availableHeading')}>
+          {versionsQuery.isFetching ? <p role="status">{t('versionManagement.loading')}</p> : null}
+          <VersionCandidates
+            versions={versions}
+            isLoading={versionsQuery.isLoading}
+            selectedVersion={selectedVersion}
+            onSelect={selectVersion}
           />
-          {globalUpdatePolicy && !globalUpdatePolicy.automaticUpdates ? (
-            <p className="text-sm text-muted" data-cy="plugins-list-override-inactive-hint">
-              {t('versionManagement.automaticUpdatesOff')}
-            </p>
-          ) : null}
-          <Button variant="secondary" size="sm" onPress={() => void saveVersionPolicy()}>
-            {t('versionManagement.savePolicy')}
-          </Button>
-        </div>
-        {versionsQuery.isFetching ? <p>{t('versionManagement.loading')}</p> : null}
-        <VersionCandidates versions={versions} selectedVersion={selectedVersion} onSelect={selectVersion} />
+        </VersionSection>
         {selectedVersion ? (
-          <div className="flex flex-col gap-2 rounded-medium border border-divider p-3">
-            <p>{t('versionManagement.selected', { version: selectedVersion.version })}</p>
+          <VersionSection title={t('versionManagement.detailsHeading', { version: selectedVersion.version })}>
             {hasVersionDependencies ? (
               <DependencyPlanDetails
                 dependencies={selectedVersion.dependencies ?? []}
@@ -180,25 +165,19 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
               majorApproved={majorApproved}
               onMajorApprovedChange={setMajorApproved}
             />
-            {selectedVersion.direction === 'older' ? (
-              <p className="text-warning">{t('versionManagement.downgradeWarning')}</p>
-            ) : null}
-          </div>
+          </VersionSection>
         ) : null}
-        {versions
-          .filter((candidate) => !candidate.compatible)
-          .map((candidate) => (
-            <p key={candidate.version} className="text-danger text-sm">
-              {candidate.version}: {candidate.reason}
-            </p>
-          ))}
+        <Separator />
+        <VersionSection title={t('versionManagement.settingsHeading')}>
+          <VersionPolicySettings packageName={plugin.name} fallbackSpec={currentVersion} />
+        </VersionSection>
       </ModalBody>
-      <ModalFooter>
+      <ModalFooter className="flex-wrap">
         <Button variant="ghost" onPress={onCancel} isDisabled={isReplacing}>
           {t('versionManagement.cancel')}
         </Button>
         <Button
-          variant={selectedVersion?.direction === 'older' ? 'danger' : 'primary'}
+          variant={isDowngrade ? 'danger' : 'primary'}
           onPress={() => void replaceVersion()}
           isPending={isReplacing}
           isDisabled={
@@ -210,7 +189,11 @@ export function VersionManagementContent({ plugin, isReplacing, onReplacingChang
           }
           data-cy="plugins-list-replace-version-button"
         >
-          {selectedVersion?.direction === 'older' ? t('versionManagement.downgrade') : t('versionManagement.update')}
+          {selectedVersion
+            ? t(isDowngrade ? 'versionManagement.downgradeTo' : 'versionManagement.updateTo', {
+                version: selectedVersion.version,
+              })
+            : t('versionManagement.update')}
         </Button>
       </ModalFooter>
     </>
