@@ -348,6 +348,11 @@ describe('Archiving, restoring and deleting meters', () => {
       expect(await scope.source.getRepository(ResourceFlowNode).countBy({ resourceId: 1 })).toBeGreaterThan(0);
     });
 
+    it('is not worked out for a price change, which billing managers make', async () => {
+      expect((await scope.metering.setRate(1, 1, 5)).deletable).toBe(false);
+      expect((await scope.metering.listMeters(1, { withDeletable: true }))[0].deletable).toBe(true);
+    });
+
     it('records who deleted it through an API token', async () => {
       await removal.delete(1, 1, { id: ADMIN, authenticationMethod: 'api-token', apiTokenId: 4 });
       expect(scope.audit.record).toHaveBeenLastCalledWith(

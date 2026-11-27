@@ -204,18 +204,20 @@ export class MeteringCatalog {
   async setRate(resourceId: number, meterId: number, creditsPerUnit: number) {
     const meter = await requireMeter(this.store, resourceId, meterId);
     await this.store.setMeterRate(meter.id, creditsPerUnit);
-    return this.getMeterDto(resourceId, meterId);
+    // Billing managers may change prices without being allowed to delete the meter.
+    return this.getMeterDto(resourceId, meterId, false);
   }
 
   async setAllocation(resourceId: number, meterId: number, allocation: MeterAllocationKind) {
     const meter = await requireMeter(this.store, resourceId, meterId);
     await this.store.setMeterAllocation(meter.id, allocation);
-    return this.getMeterDto(resourceId, meterId);
+    // Billing managers may change prices without being allowed to delete the meter.
+    return this.getMeterDto(resourceId, meterId, false);
   }
 
-  /** One meter, active or archived, for the people who may change it. */
-  async getMeterDto(resourceId: number, meterId: number) {
-    const meters = await this.listMeters(resourceId, { includeArchived: true, withDeletable: true });
+  /** One meter, active or archived; `withDeletable` for people who may delete it. */
+  async getMeterDto(resourceId: number, meterId: number, withDeletable = true) {
+    const meters = await this.listMeters(resourceId, { includeArchived: true, withDeletable });
     const meter = meters.find((m) => m.id === meterId);
     if (!meter) throw new BadRequestException('METER_NOT_FOUND');
     return meter;
