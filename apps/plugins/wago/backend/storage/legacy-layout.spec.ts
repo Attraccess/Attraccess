@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { Client } from 'pg';
 import type { PluginStorageField, PluginStorageTable } from '@attraccess/plugins-backend-sdk';
 import { WAGO_LEGACY_MIGRATION_SQL } from './legacy-layout.fixture';
-import { WAGO_LEGACY_MIGRATIONS, wagoStorage, wagoTables } from './index';
+import { WAGO_LEGACY_MIGRATIONS, wagoBaselineTables, wagoStorage, wagoTables } from './index';
 
 jest.setTimeout(60_000);
 
@@ -110,7 +110,7 @@ describe('WAGO storage baseline against the 1.x migrations', () => {
     await legacy?.drop();
   });
 
-  const tables = Object.entries(wagoTables) as [string, PluginStorageTable][];
+  const tables = Object.entries(wagoBaselineTables) as [string, PluginStorageTable][];
 
   const columnsOfTable = async (table: string): Promise<ColumnInfo[]> =>
     (
@@ -207,7 +207,7 @@ describe('WAGO storage baseline against the 1.x migrations', () => {
     }));
     const declared = definition.foreignKeys.flatMap((key) =>
       key.fields.map((name, index) => {
-        const target = wagoTables[key.references as keyof typeof wagoTables];
+        const target = wagoBaselineTables[key.references as keyof typeof wagoBaselineTables];
         const targetField = key.referencedFields[index];
         return {
           from: columnOf(name, definition.fields[name]),
@@ -235,17 +235,42 @@ describe('WAGO storage definition', () => {
     expect(new Set(WAGO_LEGACY_MIGRATIONS).size).toBe(19);
   });
 
-  it('ships the declared layout as baseline version 1 and creates referenced tables first', () => {
-    expect(wagoStorage.migrations.map((migration) => migration.version)).toEqual([1]);
+  it('ships the released layout as baseline version 1 and creates referenced tables first', () => {
+    expect(wagoStorage.migrations.map((migration) => migration.version)).toEqual([1, 2, 3]);
     const created = (wagoStorage.migrations[0].steps ?? []).map((item) =>
       item.op === 'createTable' ? item.table : '',
     );
-    expect(created).toEqual(Object.keys(wagoTables));
+    expect(created).toEqual(Object.keys(wagoBaselineTables));
     for (const item of wagoStorage.migrations[0].steps ?? []) {
       if (item.op !== 'createTable') continue;
-      expect(item.definition).toBe(wagoTables[item.table as keyof typeof wagoTables]);
+      expect(item.definition).toBe(wagoBaselineTables[item.table as keyof typeof wagoBaselineTables]);
       for (const key of item.definition.foreignKeys)
         expect(created.indexOf(key.references)).toBeLessThan(created.indexOf(item.table));
     }
+  });
+
+  it('replaces both integer lease deadlines with timestamps in version 2', () => {
+    const steps = wagoStorage.migrations[1].steps ?? [];
+    expect(steps.map((item) => `${item.op} ${item.table}`)).toEqual([
+      'dropColumn deviceOperations',
+      'addColumn deviceOperations',
+      'dropColumn management',
+      'addColumn management',
+    ]);
+    for (const name of ['deviceOperations', 'management'] as const) {
+      expect(wagoBaselineTables[name].fields.leaseUntil.type).toBe('integer');
+      expect(wagoTables[name].fields.leaseUntil.type).toBe('timestamp');
+      expect(wagoTables[name].fields.leaseUntil.column).toBe('lease_until');
+    }
+  });
+
+  it('widens the controller sequence for epoch-millisecond announcements in version 3', () => {
+    const steps = wagoStorage.migrations[2].steps ?? [];
+    expect(steps.map((item) => `${item.op} ${item.table}`)).toEqual([
+      'dropColumn controllers',
+      'addColumn controllers',
+    ]);
+    expect(wagoBaselineTables.controllers.fields.lastSequence.type).toBe('integer');
+    expect(wagoTables.controllers.fields.lastSequence).toMatchObject({ type: 'decimal', precision: 15, scale: 0 });
   });
 });

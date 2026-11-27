@@ -159,7 +159,7 @@ export abstract class WagoRegistry extends WagoServiceState {
       protocolVersion: controller.protocolVersion,
       runtimeVersion: controller.runtimeVersion,
       capabilities: controller.capabilities,
-      lastSequence: controller.lastSequence,
+      lastSequence: Number(controller.lastSequence),
       lastHeartbeatAt: this.diagnostics.heartbeatAt(controller.id) ?? controller.lastHeartbeatAt,
       lastSeenAt: controller.lastSeenAt,
       compatibilityError: controller.compatibilityError,

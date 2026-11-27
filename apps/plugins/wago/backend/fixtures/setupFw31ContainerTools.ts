@@ -70,6 +70,10 @@ else if(a==='activation-status')console.log(running?'active':'inactive');else pr
 const fs=require('node:fs'),cp=require('node:child_process'),root=process.env.FIXTURE_ROOT,a=process.argv[2],f=process.env.FAULT;
 if(process.env.DOCKER_HOST!=='unix:///var/run/docker.sock'||process.env.DOCKER_CONTEXT)process.exit(99);
 if(!['install','activate'].includes(a))process.exit(99);
+// The real command starts dockerd/containerd, which keep every inherited descriptor: an inherited install.lock would
+// stay locked for as long as Docker runs.
+for(const fd of fs.readdirSync('/proc/self/fd')){let target='';try{target=fs.readlinkSync('/proc/self/fd/'+fd);}catch{}
+ if(target.endsWith('/install.lock')){fs.appendFileSync(root+'/vendor.log','config_docker '+a+' inherited install.lock\\n');process.exit(1);}}
 fs.appendFileSync(root+'/vendor.log','config_docker '+a+'\\n');
 if(f==='docker-'+a+'-failed')process.exit(1);
 if(a==='install'){if(fs.readFileSync(root+'/daemon','utf8')==='running')process.exit(1);process.exit(0);}

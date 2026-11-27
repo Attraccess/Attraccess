@@ -411,7 +411,7 @@ describe('WagoService connection monitoring', () => {
       ),
     );
 
-    expect(test.rows('controllers')[0]).toMatchObject({ lastSequence: 4, lastHeartbeatAt: expect.any(String) });
+    expect(test.rows('controllers')[0]).toMatchObject({ lastSequence: '4', lastHeartbeatAt: expect.any(String) });
   });
 
   it('does not overwrite newly committed broker or credential bindings with an in-flight old heartbeat', async () => {

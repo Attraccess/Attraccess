@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 
 import type { WagoStorage } from '../storage';
+import { leaseEnd } from '../runtime/device-operations';
 
 export async function networkStatus(storage: WagoStorage, controllerId: number) {
   const controller = await storage.controllers.get(controllerId);
@@ -25,7 +26,7 @@ export async function networkStatus(storage: WagoStorage, controllerId: number) 
           mqttServerId: row.mqttServerId,
           phase: row.phase,
           failure: row.failure,
-          running: row.phase !== 'completed' && !!lease?.owner && Number(lease.leaseUntil) > Date.now(),
+          running: row.phase !== 'completed' && !!lease?.owner && leaseEnd(lease.leaseUntil) > Date.now(),
         }
       : null,
   };

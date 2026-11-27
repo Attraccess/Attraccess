@@ -49,6 +49,7 @@ import { openWagoStorage, type WagoStorage } from '../storage';
 import { assertCommissioningBroker } from '../commissioning/delivery/preflight';
 
 import { networkStatus } from './status';
+import { leaseEnd } from '../runtime/device-operations';
 
 import { sharesCredentialDestination } from './credential-destination';
 
@@ -511,7 +512,7 @@ export class WagoNetworkChangeService implements OnModuleDestroy {
   /** Lease check that joins the given transaction. */
   protected async assertLeaseIn(scope: PluginTransactionScope, fingerprint: string, owner: string): Promise<void> {
     const row = await this.storage.deviceOperations.findOne({ where: { fingerprint, owner } }, { scope });
-    if (!row || Number(row.leaseUntil) <= Date.now()) throw new Error('Controller operation ownership lost');
+    if (!row || leaseEnd(row.leaseUntil) <= Date.now()) throw new Error('Controller operation ownership lost');
   }
 
   async status(controllerId: number) {

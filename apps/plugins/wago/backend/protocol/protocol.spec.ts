@@ -10,6 +10,7 @@ import {
   DISCOVERY_ROOT,
   discoveryTopic,
   heartbeatTopic,
+  MAX_SEQUENCE,
   parseAnnouncement,
   parseHeartbeat,
 } from './index';
@@ -23,6 +24,14 @@ describe('WAGO protocol', () => {
     capabilities: ['claim', 'heartbeat', 'configuration-v1'],
     sequence: 3,
   };
+
+  it('accepts the epoch-millisecond sequence a runtime announces and rejects sequences beyond 15 digits', () => {
+    const epoch = { ...valid, sequence: Date.UTC(2026, 10, 27) };
+    expect(parseAnnouncement(Buffer.from(JSON.stringify(epoch))).sequence).toBe(epoch.sequence);
+    expect(() => parseAnnouncement(Buffer.from(JSON.stringify({ ...valid, sequence: MAX_SEQUENCE + 1 })))).toThrow(
+      'at most 15 digits',
+    );
+  });
 
   it('accepts a complete announcement and preserves its protocol state', () => {
     expect(parseAnnouncement(Buffer.from(JSON.stringify(valid)))).toEqual(valid);

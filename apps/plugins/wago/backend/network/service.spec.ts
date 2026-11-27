@@ -222,7 +222,7 @@ describe('SSH MQTT/address changes with disconnected previous destinations', () 
         credentialEpoch: payload.credentialEpoch,
         enrollmentId: 42,
         name: 'Workshop',
-        lastSequence: 300,
+        lastSequence: '300',
       });
       expect(await test.tables.commissioningSessions.get(1)).toMatchObject({
         mqttServerId,

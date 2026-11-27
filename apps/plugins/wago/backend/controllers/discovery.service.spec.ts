@@ -66,11 +66,18 @@ describe('WagoService discovery', () => {
         fingerprint: 'fingerprint',
         runtimeVersion: '1.2.3',
         capabilities: '["claim"]',
-        lastSequence: 9,
+        lastSequence: '9',
       }),
     ]);
     expect(offered).toHaveBeenCalledWith(expect.objectContaining({ hardwareId: 'cc100-01', trustState: 'untrusted' }));
     expect(warnings()).toEqual([]);
+  });
+
+  it('stores the epoch-millisecond sequence a CC100 runtime announces', async () => {
+    const { test, discover } = await setup();
+    const sequence = Date.UTC(2026, 10, 27, 16, 50, 34);
+    await discover(announcement({ sequence }));
+    expect(test.rows('controllers')[0]).toMatchObject({ lastSequence: String(sequence) });
   });
 
   it('stores an announcement whose identity, fingerprint and versions exceed 255 characters', async () => {
@@ -103,17 +110,17 @@ describe('WagoService discovery', () => {
 
     await discover(announcement({ sequence: undefined, fingerprint: undefined }));
 
-    expect(test.rows('controllers')[0]).toMatchObject({ lastSequence: 0, fingerprint: null });
+    expect(test.rows('controllers')[0]).toMatchObject({ lastSequence: '0', fingerprint: null });
   });
 
   it('refreshes an untrusted controller and keeps its sequence when the announcement has none', async () => {
     const { test, discover } = await setup([controller()]);
 
     await discover(announcement({ sequence: undefined, runtimeVersion: '2.0.0' }));
-    expect(test.rows('controllers')[0]).toMatchObject({ runtimeVersion: '2.0.0', lastSequence: 4 });
+    expect(test.rows('controllers')[0]).toMatchObject({ runtimeVersion: '2.0.0', lastSequence: '4' });
 
     await discover(announcement({ sequence: 11 }));
-    expect(test.rows('controllers')[0]).toMatchObject({ lastSequence: 11 });
+    expect(test.rows('controllers')[0]).toMatchObject({ lastSequence: '11' });
   });
 
   it('never modifies a claimed controller', async () => {
@@ -202,7 +209,7 @@ describe('WagoService discovery', () => {
     await discover(announcement());
 
     expect(test.rows('controllers')).toHaveLength(1);
-    expect(test.rows('controllers')[0]).toMatchObject({ runtimeVersion: '1.2.3', lastSequence: 9 });
+    expect(test.rows('controllers')[0]).toMatchObject({ runtimeVersion: '1.2.3', lastSequence: '9' });
   });
 
   it('rethrows any other storage failure', async () => {

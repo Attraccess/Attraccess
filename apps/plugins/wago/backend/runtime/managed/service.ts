@@ -490,7 +490,7 @@ export class WagoManagedRuntimeService
         // still held when the metadata is written cannot be taken over in between.
         const saved = await this.context.persistence.transaction(async (scope) => {
           const held = await this.storage.deviceOperations.count(
-            { fingerprint, owner, leaseUntil: { gt: now } },
+            { fingerprint, owner, leaseUntil: { gt: new Date(now) } },
             { scope },
           );
           if (held !== 1) return 0;

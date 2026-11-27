@@ -42,7 +42,7 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
     if (
       !controller ||
       controller.trustState !== 'claimed' ||
-      (!canonical && heartbeat.sequence !== undefined && heartbeat.sequence < controller.lastSequence)
+      (!canonical && heartbeat.sequence !== undefined && heartbeat.sequence < Number(controller.lastSequence))
     )
       return;
     const now = new Date().toISOString();
@@ -120,7 +120,8 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
     controller.runtimeVersion = heartbeat.runtimeVersion;
     controller.capabilities = JSON.stringify(heartbeat.capabilities);
     if (!canonical) {
-      controller.lastSequence = this.diagnostics.read(controller.id).legacyHeartbeatSequence ?? controller.lastSequence;
+      const legacySequence = this.diagnostics.read(controller.id).legacyHeartbeatSequence;
+      if (legacySequence !== undefined && legacySequence !== null) controller.lastSequence = String(legacySequence);
       controller.lastHeartbeatAt = now;
     } else {
       controller.lastHeartbeatAt = heartbeatAt ?? controller.lastHeartbeatAt;
@@ -215,7 +216,7 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
       updatedAt: now,
     };
     if (existing) {
-      const lastSequence = announcement.sequence ?? existing.lastSequence;
+      const lastSequence = announcement.sequence === undefined ? existing.lastSequence : String(announcement.sequence);
       // Compare-and-set on the untrusted state: a claim that won the race keeps its trusted identity.
       const updated = await this.controllers.update(
         { id: existing.id, trustState: 'untrusted' },
@@ -229,7 +230,7 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
         hardwareId: announcement.hardwareId,
         trustState: 'untrusted',
         name: null,
-        lastSequence: announcement.sequence ?? 0,
+        lastSequence: String(announcement.sequence ?? 0),
         lastHeartbeatAt: null,
         createdAt: now,
       });

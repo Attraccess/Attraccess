@@ -72,16 +72,18 @@ ${codesysDisabled()}
 sync || fail 'Controller persistence flush failed'
 ${codesysDisabled()}
 # Vendor install is a supported activation preparation using present binaries.
+# Both vendor commands can start dockerd/containerd, which would inherit the install.lock descriptor (9) and hold
+# the controller lock for as long as Docker runs, so every later transaction fails as busy. Close it for them.
 printf 'WAGO_PROGRESS=preparation-docker\\n'
 if [ "$provision" = install-vendor-runtime ]; then
   boot_medium=$(timeout -k 5 10 "$root/etc/config-tools/get_filesystem_data" active-partition-medium) || fail 'Cannot verify Docker boot medium'
   case "$boot_medium" in ''|sd-card) fail 'Unsupported Docker boot medium' ;; esac
-  timeout -k 5 45 "$root/etc/config-tools/config_docker" install >/dev/null 2>&1 || fail 'docker-install-failed'
+  timeout -k 5 45 "$root/etc/config-tools/config_docker" install >/dev/null 2>&1 9>&- || fail 'docker-install-failed'
 fi
 if ! docker info >/dev/null 2>&1 || { test ! -e "$root/etc/rc.d/S99_docker" && test ! -L "$root/etc/rc.d/S99_docker"; }; then
   boot_medium=$(timeout -k 5 10 "$root/etc/config-tools/get_filesystem_data" active-partition-medium) || fail 'Cannot verify Docker boot medium'
   case "$boot_medium" in ''|sd-card) fail 'Unsupported Docker boot medium' ;; esac
-  timeout -k 5 45 "$root/etc/config-tools/config_docker" activate >/dev/null 2>&1 || fail 'docker-activation-failed'
+  timeout -k 5 45 "$root/etc/config-tools/config_docker" activate >/dev/null 2>&1 9>&- || fail 'docker-activation-failed'
 fi
 test -e "$root/etc/rc.d/S99_docker" && test -x "$root/etc/rc.d/S99_docker" || fail 'docker-boot-not-enabled'
 test "$(readlink -f "$root/etc/rc.d/S99_docker")" = "$root/etc/init.d/dockerd" || fail 'docker-boot-unverified'

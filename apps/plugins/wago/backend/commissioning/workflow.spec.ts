@@ -607,7 +607,6 @@ describe('commissioning workflows with in-memory storage and mocked device trans
   it('allows session deletion after read-only management inspection without requiring impossible rollback', async () => {
     await storage.tables.management.insert({
       controllerId: 9,
-      leaseUntil: 0,
       metadataJson: JSON.stringify({
         target: {
           controllerId: 9,
@@ -637,7 +636,6 @@ describe('commissioning workflows with in-memory storage and mocked device trans
     );
     await storage.tables.management.insert({
       controllerId: 9,
-      leaseUntil: 0,
       metadataJson: JSON.stringify({
         target: {
           controllerId: 9,

@@ -133,7 +133,7 @@ export async function resetTestFixture(scope: NetworkChangeFixture) {
     protocolVersion: '1.0.0',
     runtimeVersion: '0.1.0',
     capabilities: '[]',
-    lastSequence: 300,
+    lastSequence: '300',
     lastSeenAt: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
