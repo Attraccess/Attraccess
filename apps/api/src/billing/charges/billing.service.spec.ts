@@ -571,6 +571,27 @@ describe('BillingService', () => {
         expect(transaction).toMatchObject({ id: bill.id, status: BillingTransactionStatus.Completed });
         expect(transaction?.amount).toBeCloseTo(0);
         expect(f.ledgerStore.transactions).toHaveLength(1);
+        expect(f.liveNotifications.notifyTransactionRemoved).not.toHaveBeenCalled();
+      });
+
+      it('discards the bill of a session that took no time, although it has per-minute rates', async () => {
+        await pendingBill();
+        const startTime = new Date('2026-09-20T09:05:00Z');
+
+        await expect(
+          f.service.chargeForResourceUsage(
+            billableUsage({
+              startTime,
+              endTime: startTime,
+              attributedOperatingDurationInMinutes: 0,
+              sessionDurationCreditsPerMinute: 3,
+              operatingDurationCreditsPerMinute: 7,
+            }),
+            fakeTransactionScope(),
+          ),
+        ).resolves.toBeUndefined();
+
+        expect(f.ledgerStore.transactions).toHaveLength(0);
       });
     });
   });

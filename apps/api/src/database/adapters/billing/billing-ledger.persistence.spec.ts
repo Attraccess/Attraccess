@@ -12,6 +12,8 @@ import { billingTransactionAuditEvent } from '../../../audit/policies/billing';
 import { toBillingTransactionDto } from '../../../billing/dto/billing-dto.mapper';
 import { BillableUsage } from '../../../billing/charges/billable-usage';
 import { BillingConnection, createBillingDatabase } from './billing-persistence.test-fixture';
+import { TypeOrmMeteringStore } from '../metering/typeorm-metering.store';
+import { EntityManagerResolver } from '../entity-manager-resolver';
 
 type Database = Awaited<ReturnType<typeof createBillingDatabase>>;
 
@@ -292,7 +294,11 @@ describe('TypeOrmBillingLedgerStore on real PostgreSQL', () => {
       return { user, resource, usage, pending };
     };
 
-    const pendingMeter = async (usage: { id: number; resourceId: number }, creditsPerUnit: number) => {
+    const pendingMeter = async (
+      usage: { id: number; resourceId: number },
+      creditsPerUnit: number,
+      status = ResourceMeteringSessionStatus.Pending,
+    ) => {
       const meter = await db.primary
         .getRepository(ResourceMeter)
         .save({ resourceId: usage.resourceId, name: 'Energy', creditsPerUnit });
@@ -300,7 +306,7 @@ describe('TypeOrmBillingLedgerStore on real PostgreSQL', () => {
         id: `meter-of-${usage.id}`,
         resourceId: usage.resourceId,
         usageId: usage.id,
-        status: ResourceMeteringSessionStatus.Pending,
+        status,
         meterId: meter.id,
         meterName: meter.name,
         creditsPerUnit,
@@ -348,6 +354,21 @@ describe('TypeOrmBillingLedgerStore on real PostgreSQL', () => {
 
       expect(charge).toMatchObject({ id: pending.id, status: BillingTransactionStatus.Completed });
       expect(charge?.amount).toBeCloseTo(0);
+      // The late correction books against the completed bill of the usage.
+      const metering = new TypeOrmMeteringStore(new EntityManagerResolver(main.unitOfWork, main.source));
+      await expect(metering.requireBillOfUsage(usage.id, true)).resolves.toEqual({
+        id: pending.id,
+        userId: pending.userId,
+      });
+    });
+
+    it('discards the bill when the priced meter reading is already settled', async () => {
+      const { usage } = await startFree('settled-meter');
+      await pendingMeter(usage, 30, ResourceMeteringSessionStatus.Settled);
+
+      await expect(main.service.chargeForResourceUsage(billable(usage, free))).resolves.toBeUndefined();
+
+      expect(await db.primary.getRepository(BillingTransaction).countBy({ resourceUsageId: usage.id })).toBe(0);
     });
 
     it('discards the bill when the pending meter reading has no price', async () => {
