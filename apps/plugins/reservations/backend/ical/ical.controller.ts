@@ -64,7 +64,7 @@ export class IcalFeedsController {
   })
   @ApiBody({ type: CreateIcalFeedBody })
   @ApiCreatedResponse({ type: IcalFeedSecretDto })
-  @ApiReservationErrors({ badRequest: true, conflict: ['FEED_LIMIT'] })
+  @ApiReservationErrors({ badRequest: true, notFound: true, conflict: ['FEED_LIMIT'] })
   create(
     @Body(validated(CreateIcalFeedBody)) body: CreateIcalFeedBody,
     @Req() request: AuthenticatedRequest,

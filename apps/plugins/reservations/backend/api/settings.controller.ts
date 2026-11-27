@@ -1,4 +1,4 @@
-import { Auth, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, type AuthenticatedRequest, ResourceVisible } from '@attraccess/plugins-backend-sdk';
 import { Body, Controller, Get, Inject, Param, ParseIntPipe, Put, Req } from '@nestjs/common';
 import { ApiBody, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { AccessService } from '../reservations/access.service';
@@ -34,6 +34,7 @@ export class ReservationSettingsController {
   ) {}
 
   @Get('resources/:resourceId/manager-access')
+  @ResourceVisible()
   @ApiOperation({ summary: 'Whether the caller manages the resource (may edit its reservation settings)' })
   @ApiParam(RESOURCE_ID)
   @ApiOkResponse({ type: ManagerAccessDto })
@@ -48,6 +49,7 @@ export class ReservationSettingsController {
   }
 
   @Get('resources/:resourceId/settings')
+  @ResourceVisible()
   @ApiOperation({ summary: 'Reservation settings of a resource (managers only)' })
   @ApiParam(RESOURCE_ID)
   @ApiOkResponse({ type: ResourceSettingsDto })
@@ -60,6 +62,7 @@ export class ReservationSettingsController {
   }
 
   @Get('resources/:resourceId/settings/future-bookings-count')
+  @ResourceVisible()
   @ApiOperation({ summary: 'Number of future pending/confirmed bookings that disabling reservations would affect' })
   @ApiParam(RESOURCE_ID)
   @ApiOkResponse({ type: FutureBookingsCountDto })
@@ -72,6 +75,7 @@ export class ReservationSettingsController {
   }
 
   @Put('resources/:resourceId/settings')
+  @ResourceVisible()
   @ApiOperation({
     summary: 'Update the reservation settings of a resource (managers only)',
     description:

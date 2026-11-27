@@ -59,7 +59,7 @@ describe('IcalService', () => {
     for (const id of [1, 2, 3]) await h.enable(id);
     await h.settings.warmUp();
     const visibility = {
-      filterVisible: async (_userId: number, ids: number[]) => ids.filter((id) => !hidden.has(id)),
+      filterVisible: async (_subject: unknown, ids: number[]) => ids.filter((id) => !hidden.has(id)),
       resourceIdsOfGroups: async (groupIds: number[]) => groupIds.flatMap((id) => groups.get(id) ?? []),
       isActiveAccount: async (userId: number) => !inactive.has(userId),
       resourceIdsRequiringSupervision: async (ids: number[]) => ids.filter((id) => supervisionRequired.has(id)),
@@ -77,6 +77,68 @@ describe('IcalService', () => {
     );
   });
   afterEach(() => h.close());
+
+  describe('machine list visibility (ATT-1407)', () => {
+    const at10 = (day: string) => ({
+      startTime: new Date(`2026-06-${day}T10:00:00Z`),
+      endTime: new Date(`2026-06-${day}T11:00:00Z`),
+    });
+    const feedOf = (patch: Partial<IcalSelectionDto>) =>
+      ical.create(principal(10), { name: 'f', selection: selection(patch) });
+    const refused = expect.objectContaining({
+      status: 404,
+      response: expect.objectContaining({ code: 'RESOURCE_NOT_FOUND', message: 'Resource not found' }),
+    });
+
+    it('keeps only the owner’s own bookings of a machine that became hidden', async () => {
+      const feed = await feedOf({ resourceIds: [1, 2] });
+      await insert({ resourceId: 1, userId: 10, ...at10('03') });
+      await insert({ resourceId: 1, userId: 11, ...at10('04') });
+      await insert({ resourceId: 2, userId: 11, ...at10('02') });
+      expect((await render(feed.token)).events).toHaveLength(3);
+
+      hidden.add(1);
+      const calendar = await render(feed.token);
+      expect(events(calendar)).toEqual(['Resource 1 – user10', 'Resource 2 – Reserved']);
+    });
+
+    it('does the same for a feed of only the owner’s bookings', async () => {
+      const feed = await feedOf({ ownOnly: true });
+      await insert({ resourceId: 1, userId: 10, ...at10('03') });
+      await insert({ resourceId: 1, userId: 11, ...at10('04') });
+      hidden.add(1);
+      expect(events(await render(feed.token))).toEqual(['Resource 1 – user10']);
+    });
+
+    it('leaves a deleted machine out, own bookings included', async () => {
+      const feed = await feedOf({ ownOnly: true });
+      await insert({ resourceId: 1, userId: 10, ...at10('03') });
+      hidden.add(1);
+      h.deleteResource(1);
+      jest.spyOn(h.directory, 'getResourceNames').mockResolvedValue(new Map());
+      expect((await render(feed.token)).events).toEqual([]);
+    });
+
+    it('refuses to create or re-select a feed with a hidden machine', async () => {
+      hidden.add(2);
+      await expect(feedOf({ resourceIds: [1, 2] })).rejects.toEqual(refused);
+      const feed = await feedOf({ resourceIds: [1] });
+      await expect(
+        ical.update(principal(10), feed.feed.id, { selection: selection({ resourceIds: [1, 2] }) }),
+      ).rejects.toEqual(refused);
+      expect((await ical.list(10))[0].selection.resourceIds).toEqual([1]);
+    });
+
+    it('refuses a stored machine that became hidden, but not one that was deleted', async () => {
+      const feed = await feedOf({ resourceIds: [1, 2] });
+      const same = { selection: selection({ resourceIds: [1, 2] }) };
+      hidden.add(2);
+      await expect(ical.update(principal(10), feed.feed.id, same)).rejects.toEqual(refused);
+
+      jest.spyOn(h.directory, 'getResourceNames').mockResolvedValue(new Map());
+      await expect(ical.update(principal(10), feed.feed.id, same)).resolves.toMatchObject({ id: feed.feed.id });
+    });
+  });
 
   describe('feed management', () => {
     it('returns the secret only once and stores just its sha256', async () => {

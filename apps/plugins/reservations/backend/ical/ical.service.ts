@@ -1,4 +1,5 @@
 import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { ReservationActor } from '../reservations/actor';
 import { Inject, Injectable } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import { Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK } from '../constants';
@@ -14,6 +15,7 @@ import { GlobalSettingsService } from '../settings/global-settings.service';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
 import { tablesOf } from '../storage';
 import type { IcalFeedRow } from '../storage/ical-feed-table';
+import type { ReservationRow } from '../storage/reservation-table';
 import { IcalEvent, buildCalendar } from './ical-format';
 import type { IcalFeedDto, IcalFeedSecretDto, IcalSelectionDto } from './ical.dto';
 import { VisibilityService } from './visibility.service';
@@ -117,11 +119,26 @@ export class IcalService {
     return feeds.map((feed) => this.toDto(feed));
   }
 
+  /**
+   * Selecting a machine the caller may not see answers like selecting an unknown one. `stored` are the feed's current
+   * resource ids: a deleted machine among them stays accepted, so the feed can still be edited.
+   */
+  private async assertSelectable(actor: ReservationActor, resourceIds: number[], stored: number[] = []) {
+    const visible = new Set(await this.visibility.filterVisible(actor, resourceIds));
+    const refused = resourceIds.filter((id) => !visible.has(id));
+    if (refused.length === 0) return;
+    const existing = await this.directory.getResourceNames(refused.filter((id) => stored.includes(id)));
+    if (refused.some((id) => !stored.includes(id) || existing.has(id))) {
+      throw new ReservationError('RESOURCE_NOT_FOUND', 'Resource not found');
+    }
+  }
+
   async create(
-    actor: PluginAuditPrincipal,
+    actor: ReservationActor,
     input: { name: string; selection: IcalSelectionDto },
   ): Promise<IcalFeedSecretDto> {
     const selection = assertSelection(input.selection);
+    await this.assertSelectable(actor, selection.resourceIds);
     const count = await this.feeds.count({ userId: actor.userId, revokedAt: null });
     if (count >= MAX_FEEDS_PER_USER) {
       throw new ReservationError('FEED_LIMIT', `You can have at most ${MAX_FEEDS_PER_USER} calendar feeds`);
@@ -142,14 +159,18 @@ export class IcalService {
   }
 
   async update(
-    actor: PluginAuditPrincipal,
+    actor: ReservationActor,
     id: number,
     input: { name?: string; selection?: IcalSelectionDto },
   ): Promise<IcalFeedDto> {
     const feed = await this.load(actor.userId, id);
     const changes: Partial<IcalFeedRow> = {};
     if (input.name !== undefined) changes.name = input.name.trim();
-    if (input.selection !== undefined) changes.selection = JSON.stringify(assertSelection(input.selection));
+    if (input.selection !== undefined) {
+      const selection = assertSelection(input.selection);
+      await this.assertSelectable(actor, selection.resourceIds, parseSelection(feed.selection).resourceIds);
+      changes.selection = JSON.stringify(selection);
+    }
     return this.toDto(await this.patch(feed, changes));
   }
 
@@ -236,6 +257,37 @@ export class IcalService {
     return introduced;
   }
 
+  /**
+   * The bookings the feed shows. The owner's visibility is evaluated now: on a machine hidden from them only their
+   * own bookings stay, as core keeps a user's own session.
+   */
+  private async calendarRows(feed: IcalFeedRow, selection: IcalSelectionDto, now: Date): Promise<ReservationRow[]> {
+    const candidates = await this.candidateResourceIds(feed, selection);
+    const visible = new Set(await this.visibility.filterVisible(feed.userId, candidates));
+    const find = (resourceIds: number[], holderId: number | undefined) => {
+      const maxAdvance = Math.max(0, ...resourceIds.map((id) => this.settings.getCachedSettings(id).maxAdvanceDays));
+      return this.store.findForCalendar(
+        resourceIds,
+        new Date(now.getTime() - PAST_DAYS * DAY_MS),
+        new Date(now.getTime() + maxAdvance * DAY_MS),
+        holderId,
+      );
+    };
+    const [shown, own] = await Promise.all([
+      find([...visible], selection.ownOnly ? feed.userId : undefined),
+      find(
+        candidates.filter((id) => !visible.has(id)),
+        feed.userId,
+      ),
+    ]);
+    if (own.length === 0) return shown;
+    // A deleted machine is not a hidden one: its bookings stay out of the feed.
+    const existing = await this.directory.getResourceNames(own.map((r) => r.resourceId));
+    return [...shown, ...own.filter((r) => existing.has(r.resourceId))].sort(
+      (a, b) => a.startTime.getTime() - b.startTime.getTime(),
+    );
+  }
+
   async render(feed: IcalFeedRow, now: Date): Promise<string> {
     const selection = parseSelection(feed.selection);
     const [timeZone, languages] = await Promise.all([
@@ -243,17 +295,7 @@ export class IcalService {
       this.hostInfo.languagesOf([feed.userId]),
     ]);
     const lang = languages.get(feed.userId) ?? 'en';
-    const resourceIds = await this.visibility.filterVisible(
-      feed.userId,
-      await this.candidateResourceIds(feed, selection),
-    );
-    const maxAdvance = Math.max(0, ...resourceIds.map((id) => this.settings.getCachedSettings(id).maxAdvanceDays));
-    const rows = await this.store.findForCalendar(
-      resourceIds,
-      new Date(now.getTime() - PAST_DAYS * DAY_MS),
-      new Date(now.getTime() + maxAdvance * DAY_MS),
-      selection.ownOnly ? feed.userId : undefined,
-    );
+    const rows = await this.calendarRows(feed, selection, now);
     const inRange = rows.filter(
       (r) =>
         r.startTime.getTime() <= now.getTime() + this.settings.getCachedSettings(r.resourceId).maxAdvanceDays * DAY_MS,

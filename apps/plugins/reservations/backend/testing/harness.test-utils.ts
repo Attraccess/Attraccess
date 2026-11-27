@@ -10,7 +10,7 @@ import { reservationsStorage, tablesOf } from '../storage';
 import type { ReservationRow, ReservationWhere } from '../storage/reservation-table';
 import { AccessService } from '../reservations/access.service';
 import type { ReservationActor } from '../reservations/actor';
-import type { VisibilityService } from '../ical/visibility.service';
+import { VisibilityService } from '../ical/visibility.service';
 import type { DirectoryService } from '../reservations/directory.service';
 import type { ReservationNotifier } from '../reservations/notifier';
 import { ReservationQueryService } from '../reservations/reservation-query.service';
@@ -44,7 +44,8 @@ interface AccessState {
   maintained: Map<number, number[]>; // extra maintained ids (besides makeManager)
   attribution: Map<number, Set<number>>; // userId -> resourceIds whose users' names they may see
   limits: Map<number, number>; // effective session limit per resource (default 1)
-  hidden: Set<number>; // resourceIds only in hidden groups (invisible to everyone in these tests)
+  hidden: Set<number>; // resourceIds the host hides from everyone
+  hiddenFrom: Map<number, Set<number>>; // userId -> resourceIds the host hides from this user only
 }
 
 /**
@@ -88,6 +89,7 @@ export async function createHarness(options: { share?: { memory: InMemoryPluginS
     attribution: new Map(),
     limits: new Map(),
     hidden: new Set(),
+    hiddenFrom: new Map(),
   };
   const dispatch = jest.fn(async (_request: unknown) => undefined);
   const invalidateStartBlocked = jest.fn((_scope: { resourceId: number }) => undefined);
@@ -114,6 +116,10 @@ export async function createHarness(options: { share?: { memory: InMemoryPluginS
     return new Set([...own].filter((permission) => scope.has(permission)));
   };
 
+  // The host's machine visibility: unknown and deleted resources are never visible, hidden ones as scripted.
+  const sees = (subject: PluginAccessPrincipal, id: number) =>
+    knownResources.has(id) && !state.hidden.has(id) && !state.hiddenFrom.get(idOf(subject))?.has(id);
+
   const context = {
     audit,
     logger: console,
@@ -133,6 +139,9 @@ export async function createHarness(options: { share?: { memory: InMemoryPluginS
       };
     },
     resourceAccess: {
+      filterVisible: async (subject: PluginAccessPrincipal, ids: number[]) =>
+        [...new Set(ids)].filter((id) => sees(subject, id)),
+      canSee: async (subject: PluginAccessPrincipal, id: number) => sees(subject, id),
       // Core's rule for the current user's name; scripted per user and resource. Like core, a request scope without
       // resources.read (or update / access.manage) sees nobody's name.
       canSeeUsageAttribution: async (subject: PluginAccessPrincipal, resourceId: number) =>
@@ -176,13 +185,11 @@ export async function createHarness(options: { share?: { memory: InMemoryPluginS
     getUserNames: async (ids: number[]) => new Map(ids.map((id) => [id, `user${id}`])),
   } as unknown as DirectoryService;
 
-  const visibility = {
-    filterVisible: async (_userId: number, ids: number[]) =>
-      [...new Set(ids)].filter((id) => knownResources.has(id) && !state.hidden.has(id)),
+  const visibility = Object.assign(new VisibilityService(context), {
     resourceIdsOfGroups: async () => [],
     isActiveAccount: async () => true,
     resourceIdsRequiringSupervision: async () => [],
-  } as unknown as VisibilityService;
+  });
 
   const clock = () => now;
   const store = new ReservationStore(context);
@@ -267,6 +274,10 @@ export async function createHarness(options: { share?: { memory: InMemoryPluginS
     },
     makeManager(userId: number, resourceId: number) {
       state.maintainers.set(userId, new Set([...(state.maintainers.get(userId) ?? []), resourceId]));
+    },
+    /** The machine is hidden from this user (machine list visibility); others still see it. */
+    hideFrom(userId: number, resourceId: number) {
+      state.hiddenFrom.set(userId, new Set([...(state.hiddenFrom.get(userId) ?? []), resourceId]));
     },
     /** Lets the user see who uses the resource (core's usage attribution rule). */
     allowAttribution(userId: number, resourceId: number) {

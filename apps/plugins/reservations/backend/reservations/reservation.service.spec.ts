@@ -48,9 +48,9 @@ describe('ReservationService', () => {
     it('answers resources hidden from the user (hidden groups) like unknown ones', async () => {
       await h.enable(1);
       h.state.hidden.add(1);
-      const visible = jest.spyOn(h.visibility, 'filterVisible');
+      const visible = jest.spyOn(h.visibility, 'canSee');
       expect(await codeOf(book())).toBe('RESOURCE_NOT_FOUND');
-      expect(visible).toHaveBeenCalledWith(alice, [1]);
+      expect(visible).toHaveBeenCalledWith(alice, 1);
       expect(await h.tables.reservations.count()).toBe(0);
       h.state.hidden.delete(1);
       expect((await book()).status).toBe('confirmed');
