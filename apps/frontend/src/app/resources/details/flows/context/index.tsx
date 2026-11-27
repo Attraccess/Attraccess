@@ -64,8 +64,9 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
   const removeNode = useCallback(
     (nodeId: string) => {
       setNodes((nodes) => nodes.filter((node) => node.id !== nodeId));
+      setEdges((edges) => edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
     },
-    [setNodes],
+    [setNodes, setEdges],
   );
 
   const setValidationErrors = useCallback((errors: ReadonlyArray<NodeValidationError & { nodeId: string }>) => {

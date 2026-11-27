@@ -4,6 +4,8 @@
   "loading": "Loading flow…",
   "loadError": "Failed to load flow. Please try again.",
   "actions": {
+    "save": "Save",
+    "layout": "Arrange nodes",
     "export": "Export",
     "import": "Import",
     "addNode": "Add node",
