@@ -147,6 +147,19 @@ describe('useLiveLogs for a resource flow', () => {
     expect(result.current.liveLogs[1999].id).toBe(2500);
   });
 
+  it('keeps only the newest 2000 entries of a single batch', () => {
+    const { result } = renderHook(() => useLiveLogs({ owner: { kind: 'resource', resourceId: 3 }, onUpdate: vi.fn() }));
+
+    act(() => {
+      for (let id = 1; id <= 2500; id += 1) state.resourceUpdate?.(log(id));
+      vi.advanceTimersByTime(LIVE_LOG_FLUSH_MS);
+    });
+
+    expect(result.current.liveLogs).toHaveLength(2000);
+    expect(result.current.liveLogs[0].id).toBe(501);
+    expect(result.current.liveLogs[1999].id).toBe(2500);
+  });
+
   it('drops entries still waiting for their batch when the editor is left', () => {
     const { unmount } = renderHook(() =>
       useLiveLogs({ owner: { kind: 'resource', resourceId: 3 }, onUpdate: vi.fn() }),

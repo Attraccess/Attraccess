@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { useState } from 'react';
 import { LogViewer } from './index';
+import { useFlowLogsContext } from '../context/index';
 type Log = { id: number; flowRunId: string; nodeId?: string; type: string; createdAt: string; payload?: string };
 const state = vi.hoisted(() => ({
   recording: undefined as undefined | { isRecording: boolean; startedAt: string | null; expiresAt: string | null },
@@ -19,7 +20,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 vi.mock('../context/index', () => ({
   useFlowContext: () => ({ owner: { kind: 'resource', resourceId: 7 } }),
-  useFlowLogsContext: () => ({ liveLogs: state.live, isPausedForInactivity: state.paused }),
+  useFlowLogsContext: vi.fn(() => ({ liveLogs: state.live, isPausedForInactivity: state.paused })),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useGetGlobalFlowCanvas: () => ({ data: undefined }),
@@ -209,4 +210,13 @@ it('keeps previous recordings and deduplicates logs when recording starts again 
   );
   expect(screen.getAllByRole('button', { name: 'nodes.timer.title -> FIRST' })).toHaveLength(1);
   expect(screen.getAllByRole('button', { name: 'nodes.http.title -> SECOND' })).toHaveLength(1);
+});
+
+it('does not read the live entries while the drawer is closed', () => {
+  render(
+    <MemoryRouter>
+      <Viewer />
+    </MemoryRouter>,
+  );
+  expect(useFlowLogsContext).not.toHaveBeenCalled();
 });

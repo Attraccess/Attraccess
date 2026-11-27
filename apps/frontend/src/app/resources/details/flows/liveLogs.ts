@@ -68,7 +68,7 @@ export function useLiveLogs(props: Props) {
   const { owner, onUpdate } = props;
   const ownerKey = flowOwnerKey(owner);
   const [state, setState] = useState<LiveLogState | null>(null);
-  const pending = useRef<{ ownerKey: string; owner: object | null; logs: ResourceFlowLog[] } | null>(null);
+  const pending = useRef<LiveLogState | null>(null);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const flush = () => {
