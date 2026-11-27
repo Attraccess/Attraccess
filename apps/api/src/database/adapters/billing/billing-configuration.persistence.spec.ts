@@ -91,7 +91,7 @@ describe('billing configuration and credential stores on real PostgreSQL', () =>
       expect(await main.configuration.findResourceConfiguration(resource.id)).toBeNull();
     });
 
-    it('detects a priced meter only above zero', async () => {
+    it('detects a priced active meter only above zero', async () => {
       const { resource } = await db.seed(db.primary, 'cfg-meter');
       expect(await main.configuration.hasPricedMeter(resource.id)).toBe(false);
 
@@ -101,6 +101,10 @@ describe('billing configuration and credential stores on real PostgreSQL', () =>
 
       await meters.update(free.id, { creditsPerUnit: 3 });
       expect(await main.configuration.hasPricedMeter(resource.id)).toBe(true);
+
+      // An archived meter is no longer billed.
+      await meters.update(free.id, { archivedAt: new Date() });
+      expect(await main.configuration.hasPricedMeter(resource.id)).toBe(false);
     });
   });
 

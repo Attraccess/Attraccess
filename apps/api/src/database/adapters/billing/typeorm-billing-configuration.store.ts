@@ -2,7 +2,7 @@ import type { ResourceBillingConfigurationRecord } from '@attraccess/application
 import { ResourceBillingConfiguration, ResourceMeter, Setting } from '@attraccess/database-entities';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { IsNull, MoreThan, Repository } from 'typeorm';
 import { BillingConfigurationStore, ResourceRates } from '../../../billing/ports/billing-configuration.port';
 import type { BillingTransactionContext } from '../../../billing/ports/billing-ledger.port';
 import { TransactionContextResolver } from '../transaction-context';
@@ -70,7 +70,7 @@ export class TypeOrmBillingConfigurationStore implements BillingConfigurationSto
   async hasPricedMeter(resourceId: number, context?: BillingTransactionContext): Promise<boolean> {
     const count = await this.contexts
       .manager(context)
-      .count(ResourceMeter, { where: { resourceId, creditsPerUnit: MoreThan(0) } });
+      .count(ResourceMeter, { where: { resourceId, creditsPerUnit: MoreThan(0), archivedAt: IsNull() } });
     return count > 0;
   }
 }
