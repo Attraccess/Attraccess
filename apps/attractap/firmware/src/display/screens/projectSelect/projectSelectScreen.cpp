@@ -55,7 +55,8 @@ void ProjectSelectScreen::buildProjectsView()
    this->projectsPaginationLabel = ReaderHeader::createPageIndicator(header);
    lv_obj_t *title = nullptr;
    ReaderHeader::createFlowTitle(panel, &title, &this->resourceNameLabel);
-   FirmwareI18n::setLabel(title, FirmwareI18n::Message::SelectProject);
+   this->titleLabel = title;
+   FirmwareI18n::setLabel(title, this->switching ? FirmwareI18n::Message::ChangeProject : FirmwareI18n::Message::SelectProject);
    FirmwareI18n::setDynamicLabel(this->resourceNameLabel, this->resourceName.c_str()) /* i18n-data: Server-supplied resource name; preserve exact contents. */;
    lv_obj_set_style_margin_bottom(this->resourceNameLabel, 8, LV_PART_MAIN);
 
@@ -226,6 +227,9 @@ void ProjectSelectScreen::rebuildProjectsList()
       return;
    }
 
+   // On the first, unfiltered page: ending the project assignment is not a search result.
+   if (this->switching && this->projectsCurrentPage <= 1 && this->projectsSearchQuery.empty()) this->createNoProjectButton();
+
    if (this->projectsCache.count == 0)
    {
       lv_obj_t *emptyLabel = lv_label_create(this->projectsListContainer);
@@ -256,6 +260,7 @@ void ProjectSelectScreen::rebuildProjectsList()
       {
          DisplayTheme::button(btn);
       }
+      if (this->switching && project.id == this->currentProjectId) lv_obj_add_state(btn, LV_STATE_DISABLED);
 
       ProjectButtonEventData *evt = new ProjectButtonEventData{this, i};
       lv_obj_add_event_cb(btn, &ProjectSelectScreen::onProjectListItemClick, LV_EVENT_CLICKED, evt);
@@ -399,6 +404,7 @@ void ProjectSelectScreen::destroy()
    }
    this->screen = nullptr;
    this->projectsListContainer = nullptr;
+   this->titleLabel = nullptr;
    this->projectsPaginationLabel = nullptr;
    this->resourceNameLabel = nullptr;
    this->projectsPrevButton = nullptr;

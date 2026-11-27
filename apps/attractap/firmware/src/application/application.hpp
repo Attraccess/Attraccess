@@ -151,6 +151,13 @@ private:
     void leaveTopUp();
     void leaveForms();
     void openProjects();
+    // Project switch of the card holder's running session (ATT-1421), application_project_switch.cpp.
+    void openProjectSwitch();
+    void handleProjectPicked(uint32_t projectId, const std::string &projectName);
+    void cancelProjectPicker();
+    void startProjectSwitch(uint32_t resourceId, uint32_t usageId, uint32_t projectId);
+    // The form action of the pending start, takeover, stop or project switch.
+    API::ResourceUsageFormActionType pendingFormAction() const;
     // Duration estimate and extension (ATT-43)
     bool needsDurationEstimate(uint32_t resourceId, uint32_t &maxMinutes) const;
     void openDurationInput(uint32_t maxMinutes);

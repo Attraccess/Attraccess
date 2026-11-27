@@ -63,6 +63,8 @@ void API::sendFirmwareInfo()
 #ifdef HAS_LVGL_DISPLAY
     // Duration input and extend controls (ATT-43): the touch readers. Others start with the server's fallback deadline.
     if (traits.hasNfc) event["data"]["payload"]["capabilities"]["sessionDuration"] = true;
+    // "Change project" on the running session (ATT-1421): the touch readers.
+    if (traits.hasNfc) event["data"]["payload"]["capabilities"]["projectSwitch"] = true;
     // This reader renders image form fields as a QR code for the phone (ATT-879). Readers without a display never get them.
     event["data"]["payload"]["capabilities"]["formImages"] = true;
 #endif

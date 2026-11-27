@@ -91,6 +91,7 @@ bool Application::requestProjectsPage(uint32_t page, const std::string &search) 
 
 void Application::clearProjectSelection() {
   this->clearSelectedProject();
+  this->projectSwitchUsageId = 0;
   lv_lock();
   Display::projectSelectScreen.resetProjectsSearch();
   lv_unlock();
@@ -422,6 +423,9 @@ void Application::handleResourceDetailsButtonClick(
     this->returnToListAfterAction = false;
     this->clearSelectedProject();
     break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_SWITCH_PROJECT:
+    this->openProjectSwitch();
+    break;
   }
 }
 
@@ -572,6 +576,8 @@ void Application::handleExtend(uint32_t minutes, bool toMax) {
 }
 
 void Application::openProjects() {
+  this->projectSwitchUsageId = 0;
+  Display::projectSelectScreen.setSwitchTarget(false);
   Display::projectSelectScreen.setSelectedProject(this->selectedProjectId);
   Display::projectSelectScreen.setResourceName(this->resourceNameOf(this->selectedResourceId));
   Display::projectSelectScreen.begin();

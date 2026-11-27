@@ -90,6 +90,21 @@ void API::extendResourceUsageSession(uint32_t resourceId, uint32_t usageId, uint
     this->sendResourceAction("EXTEND_RESOURCE_USAGE_SESSION", payload);
 }
 
+void API::switchSessionProject(uint32_t resourceId, uint32_t usageId, uint32_t projectId)
+{
+    this->logger.info("Switching the project of the running session");
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["resourceId"] = resourceId;
+    if (usageId != 0) payload["usageId"] = usageId;
+    // Null books the rest of the session to no project.
+    if (projectId != 0) payload["projectId"] = projectId;
+    else payload["projectId"] = nullptr;
+    CardSessionIdBuf cardSession;
+    if (copyCardSessionId(cardSession)) payload["cardSessionId"] = cardSession;
+    this->sendResourceAction("SWITCH_SESSION_PROJECT", payload);
+}
+
 void API::stopResourceUsageSession(uint32_t resourceId, uint32_t usageId)
 {
     this->logger.info("Stopping resource usage session");
@@ -346,6 +361,10 @@ void API::onResourceList(JsonObject data)
             dst.autoEndUtcOffsetMinutes = aus["autoEndUtcOffsetMinutes"].is<int>() ? (int16_t)aus["autoEndUtcOffsetMinutes"].as<int>() : 0;
         }
         dst.ownUsageId = dst.hasOwnUsage ? own["id"].as<uint32_t>() : 0;
+        dst.canSwitchProject = dst.type == 0 && dst.hasOwnUsage && (resource["canSwitchProject"] | false);
+        dst.ownProjectId = dst.canSwitchProject ? (resource["ownProjectId"] | 0u) : 0u;
+        const char *ownProjectName = dst.canSwitchProject ? resource["ownProjectName"].as<const char *>() : nullptr;
+        dst.ownProjectName = ownProjectName ? ownProjectName : "";
         dst.activeSessions.clear();
         for (JsonObject session : resource["activeUsageSessions"].as<JsonArray>())
         {

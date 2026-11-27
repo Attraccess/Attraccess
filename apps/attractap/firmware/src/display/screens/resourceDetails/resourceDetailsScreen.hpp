@@ -136,6 +136,11 @@ private:
     void createAutoEnd();
     void updateAutoEnd();
     void updateOccupancy();
+    // The project of the card holder's own running session, with "Change project" (resourceDetailsProjectSwitch.cpp).
+    lv_obj_t *sessionProjectLabel = nullptr;
+    lv_obj_t *switchProjectButton = nullptr;
+    void createProjectSwitch();
+    void updateProjectSwitch();
     lv_obj_t *doorControls = nullptr;
 
     lv_obj_t *flowButtonsContainer = nullptr;

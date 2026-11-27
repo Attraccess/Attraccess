@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include "../state/language.hpp"
-#include "messages.catalog.secure-conversion.hpp"
+#include "messages.catalog.project-switch.hpp"
 
 // Firmware-owned text is identified independently of its displayed wording.
 namespace FirmwareI18n {
@@ -22,6 +22,7 @@ inline const char *messageText(Message id, const std::string &locale) {
     constexpr size_t btSetupEnd = sessionUsersEnd + sizeof(btSetupCatalog) / sizeof(btSetupCatalog[0]);
     constexpr size_t sessionDurationEnd = btSetupEnd + sizeof(sessionDurationCatalog) / sizeof(sessionDurationCatalog[0]);
     constexpr size_t formImagesEnd = sessionDurationEnd + sizeof(formImagesCatalog) / sizeof(formImagesCatalog[0]);
+    constexpr size_t secureConversionEnd = formImagesEnd + sizeof(secureConversionCatalog) / sizeof(secureConversionCatalog[0]);
     const auto &entry = index < mainEntries        ? catalog[index]
                         : index < cardRelayEnd     ? cardRelayCatalog[index - mainEntries]
                         : index < networkStatusEnd ? networkStatusCatalog[index - cardRelayEnd]
@@ -29,7 +30,8 @@ inline const char *messageText(Message id, const std::string &locale) {
                         : index < btSetupEnd       ? btSetupCatalog[index - sessionUsersEnd]
                         : index < sessionDurationEnd ? sessionDurationCatalog[index - btSetupEnd]
                         : index < formImagesEnd    ? formImagesCatalog[index - sessionDurationEnd]
-                                                   : secureConversionCatalog[index - formImagesEnd];
+                                                   : index < secureConversionEnd ? secureConversionCatalog[index - formImagesEnd]
+                                                   : projectSwitchCatalog[index - secureConversionEnd];
     return Language::text(entry.en, entry.de, locale);
 }
 
@@ -125,6 +127,7 @@ inline Text knownReaderError(const std::string &code) {
     if (code == "SESSION_EXTENSION_NOT_POSSIBLE" || code == "SESSION_EXTENSION_INVALID") return Message::ErrorExtensionNotPossible;
     if (code == "SESSION_DURATION_ESTIMATE_EXCEEDS_MAXIMUM") return Message::ErrorEstimateExceedsMaximum;
     if (code == "SESSION_DURATION_ESTIMATE_REQUIRED") return Message::ErrorEstimateRequired;
+    if (code == "METER_SWITCH_FAILED") return Message::ErrorMeterSwitchFailed;
     if (code == "ENROLLMENT_EXPIRED" || code == "RESET_EXPIRED") return Message::ErrorCardOperationExpired;
     return Text();
 }

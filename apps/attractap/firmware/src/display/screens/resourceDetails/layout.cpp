@@ -257,6 +257,7 @@ void ResourceDetailsScreen::createSessionControls()
    lv_obj_add_flag(this->otherSessionsContainer, LV_OBJ_FLAG_HIDDEN);
 
    this->createAutoEnd();
+   this->createProjectSwitch();
 }
 
 void ResourceDetailsScreen::createSessionDetails()

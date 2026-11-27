@@ -186,6 +186,8 @@ public:
                                    const char *stepId = nullptr, const char *choice = nullptr,
                                    uint32_t estimatedDurationMinutes = 0);
     // Moves the automatic end of the card holder's own session (usageId 0) later: by a step in minutes, or `toMax`.
+    // Continues the card holder's running session under another project; 0 means no project.
+    void switchSessionProject(uint32_t resourceId, uint32_t usageId, uint32_t projectId);
     void extendResourceUsageSession(uint32_t resourceId, uint32_t usageId, uint32_t extendByMinutes, bool toMax);
 
     // Reader UI (ATT-1187)

@@ -271,6 +271,10 @@ void FormsScreen::updateFormTitle()
       {
          pageTitle = FirmwareI18n::Message::PleaseCompleteBeforeTakingOver;
       }
+      else if (this->formsMeta->action == API::ResourceUsageFormActionType::PROJECT_SWITCH)
+      {
+         pageTitle = FirmwareI18n::Message::PleaseCompleteBeforeSwitchingProject;
+      }
 
 
       if (this->formsMeta->resourceName.length() > 0)

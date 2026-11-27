@@ -10,15 +10,7 @@ void Application::handleFormsRequest(
     const API::ResourceUsageFormRequest &request) {
   // Duplicates and retries must not reset or reopen a form; the request for a
   // re-sent action is the next batch of forms (see form_request_gate.hpp).
-  API::ResourceUsageFormActionType expectedAction =
-      API::ResourceUsageFormActionType::UNKNOWN;
-  if (this->pendingActionType == PENDING_ACTION_START_SESSION) {
-    expectedAction = this->pendingActionIsTakeover
-                         ? API::ResourceUsageFormActionType::TAKEOVER
-                         : API::ResourceUsageFormActionType::START;
-  } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
-    expectedAction = API::ResourceUsageFormActionType::END;
-  }
+  const API::ResourceUsageFormActionType expectedAction = this->pendingFormAction();
   const FormRequestGate::State gate{
       this->api.isCurrentResourceAction(request.requestId),
       this->pendingActionType != PENDING_ACTION_NONE,
@@ -115,7 +107,7 @@ void Application::pollFormImageCount() {
 
 void Application::onActionResult(const std::string &eventType) {
   if (eventType == "START_RESOURCE_USAGE_SESSION" ||
-      eventType == "STOP_RESOURCE_USAGE_SESSION") {
+      eventType == "STOP_RESOURCE_USAGE_SESSION" || eventType == "SWITCH_SESSION_PROJECT") {
     this->pendingActionType = PENDING_ACTION_NONE;
     this->hasPendingFormRequest = false;
     this->hasPendingServerFormFlow = false;
@@ -399,6 +391,8 @@ void Application::finishFormFlow() {
                                         this->pendingActionEstimateMinutes);
   } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
     this->api.stopResourceUsageSession(this->pendingActionResourceId, this->pendingActionUsageId);
+  } else if (this->pendingActionType == PENDING_ACTION_SWITCH_PROJECT) {
+    this->api.switchSessionProject(this->pendingActionResourceId, this->pendingActionUsageId, this->pendingActionProjectId);
   } else {
     this->handleFormsCancel();
   }
@@ -412,15 +406,7 @@ void Application::handleFormsCancel() {
     // A form request may still be waiting for the LVGL callback. Cancel against
     // the action identity now so its server-side draft cannot survive locally
     // clearing the pending action.
-    API::ResourceUsageFormActionType action =
-        API::ResourceUsageFormActionType::UNKNOWN;
-    if (this->pendingActionType == PENDING_ACTION_START_SESSION) {
-      action = this->pendingActionIsTakeover
-                   ? API::ResourceUsageFormActionType::TAKEOVER
-                   : API::ResourceUsageFormActionType::START;
-    } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
-      action = API::ResourceUsageFormActionType::END;
-    }
+    const API::ResourceUsageFormActionType action = this->pendingFormAction();
     if (action != API::ResourceUsageFormActionType::UNKNOWN) {
       this->api.cancelForm(this->pendingActionResourceId, action);
     }

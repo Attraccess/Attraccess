@@ -37,12 +37,14 @@ int main(int argc, char **argv)
     JsonDocument startReply;
     JsonDocument stopReply;
     JsonDocument extendReply;
+    JsonDocument switchReply;
     transport.setMessageCallbackRaw([&](const char *message, size_t length) {
         assert(deserializeJson(received, message, length) == DeserializationError::Ok);
         if (received["data"]["type"] == "RESOURCE_LIST") resourceList.set(received);
         if (received["data"]["type"] == "START_RESOURCE_USAGE_SESSION") startReply.set(received);
         if (received["data"]["type"] == "STOP_RESOURCE_USAGE_SESSION") stopReply.set(received);
         if (received["data"]["type"] == "EXTEND_RESOURCE_USAGE_SESSION") extendReply.set(received);
+        if (received["data"]["type"] == "SWITCH_SESSION_PROJECT") switchReply.set(received);
         if (received["data"]["type"] == "READER_AUTHENTICATED") {
             authenticated.set(received);
             State::setDefaultLanguage(received["data"]["payload"]["language"].as<std::string>());
@@ -180,6 +182,28 @@ int main(int argc, char **argv)
     startPrinter(); // already has one
     assert(startError() == "AlreadyHasActiveSessionError");
     assert(printer()["activeSessionCount"] == 1);
+    // ATT-1421: the running session moves to another project and back to none, as a new usage record.
+    const auto switchProject = [&](uint32_t usageId, const char *projectId) {
+        switchReply.clear();
+        exchange((R"({"data":{"type":"SWITCH_SESSION_PROJECT","payload":{"resourceId":2,"requestId":9,"usageId":)" +
+                  std::to_string(usageId) + ",\"projectId\":" + projectId + "}}}").c_str());
+    };
+    assert(printer()["canSwitchProject"] == true && printer()["ownProjectId"] == 0 && printer()["ownProjectName"].isNull());
+    const auto unbookedId = printer()["ownUsageSession"]["id"].as<uint32_t>();
+    const std::string startedAt = printer()["ownUsageSession"]["startTime"].as<std::string>();
+    switchProject(unbookedId, "1");
+    assert(switchReply["data"]["payload"]["success"] == true && switchReply["data"]["payload"]["requestId"] == 9);
+    assert(!switchReply["data"]["payload"]["projectName"].isNull());
+    assert(printer()["ownProjectId"] == 1 && printer()["ownProjectName"] == switchReply["data"]["payload"]["projectName"]);
+    assert(printer()["ownUsageSession"]["id"].as<uint32_t>() != unbookedId);
+    assert(printer()["ownUsageSession"]["startTime"].as<std::string>() == startedAt);
+    switchProject(unbookedId, "2"); // the replaced record is no longer running
+    assert(switchReply["data"]["payload"]["error"] == "No active session found");
+    switchProject(printer()["ownUsageSession"]["id"].as<uint32_t>(), "1"); // already booked there
+    assert(!switchReply["data"]["payload"]["error"].isNull() && printer()["ownProjectId"] == 1);
+    switchProject(printer()["ownUsageSession"]["id"].as<uint32_t>(), "null");
+    assert(switchReply["data"]["payload"]["success"] == true && switchReply["data"]["payload"]["projectName"].isNull());
+    assert(printer()["ownProjectId"] == 0 && printer()["activeSessionCount"] == 1);
     const auto annId = printer()["ownUsageSession"]["id"].as<uint32_t>();
     tap("B2B2B2B2"); startPrinter();
     assert(printer()["activeSessionCount"] == 2 && printer()["canStart"] == false);

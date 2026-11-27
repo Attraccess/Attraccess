@@ -56,7 +56,6 @@ void DemoWebsocket::handleStartSession(JsonObjectConst payload)
     const uint32_t projectId = payload["projectId"] | 0u;
     const bool forceTakeOver = payload["forceTakeOver"] | false;
     const uint32_t estimateMinutes = payload["estimatedDurationMinutes"] | 0u;
-    (void)projectId; // recorded implicitly via the owner; not surfaced back in demo
     int idx = sessionIndexForResource(resourceId);
     if (idx < 0)
         return;
@@ -115,6 +114,7 @@ void DemoWebsocket::handleStartSession(JsonObjectConst payload)
     DemoSession session;
     session.id = _nextSessionId++;
     session.user = _currentUser;
+    session.projectId = projectId;
     session.startEpoch = time(nullptr);
     if (maxMinutes != 0)
     {
