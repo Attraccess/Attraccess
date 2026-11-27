@@ -37,9 +37,5 @@
   "errorAction": "Unable to change the meter. Try again.",
   "errorNotFound": "This meter no longer exists.",
   "emptyActive": "No active meters. Create one, or restore an archived meter.",
-  "missing": "The chosen meter was archived or removed. Choose another one.",
-  "renameLabel": "Rename {{name}}",
-  "archiveLabel": "Archive {{name}}",
-  "restoreLabel": "Restore {{name}}",
-  "deleteLabel": "Delete {{name}}"
+  "missing": "The chosen meter was archived or removed. Choose another one."
 }

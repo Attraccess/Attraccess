@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@heroui/react';
+import { ArchiveIcon, ArchiveRestoreIcon, PencilIcon, Trash2Icon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ResourceMeterDto,
@@ -9,10 +9,10 @@ import {
   UseGetResourceMeteringStatusKeyFn,
   UseListResourceMetersKeyFn,
 } from '@attraccess/react-query-client';
-import { ConfirmableButton, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StatusAlert, TableRowActions, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../../hooks/useAuth';
 import { getApiErrorMessage } from '../../../../utils/apiError';
-import { MeterNameEditor } from './MeterNameEditor';
+import { MeterNameForm } from './MeterNameForm';
 import en from './en.json';
 import de from './de.json';
 
@@ -23,7 +23,7 @@ const ERROR_KEYS: Record<string, string> = {
   METER_NOT_FOUND: 'errorNotFound',
 };
 
-/** Rename, archive or restore, and delete one meter, for users who may edit the resource. */
+/** The ⋮ menu of one meter (rename, archive or restore, delete), for users who may edit the resource. */
 export function MeterActions({ resourceId, meter }: { resourceId: number; meter: ResourceMeterDto }) {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
@@ -56,48 +56,47 @@ export function MeterActions({ resourceId, meter }: { resourceId: number; meter:
   if (!hasPermission('resources.update')) return null;
   return (
     <div className="flex flex-col items-end gap-2">
-      <div className="flex flex-wrap items-start justify-end gap-2">
-        {/* A new name settles a name clash, and an older message would no longer be true. */}
-        <MeterNameEditor
+      {renaming ? (
+        <MeterNameForm
           resourceId={resourceId}
           meter={meter}
-          isDisabled={pending}
+          // A new name settles a name clash, and an older message would no longer be true.
           onSaved={() => setErrorKey(undefined)}
-          onEditingChange={setRenaming}
+          onClose={() => setRenaming(false)}
         />
-        {!renaming && meter.archivedAt && (
-          <Button
-            size="sm"
-            variant="secondary"
-            aria-label={t('restoreLabel', { name: meter.name })}
-            isDisabled={pending}
-            isPending={restore.isPending}
-            onPress={() => void run(() => restore.mutateAsync({ path }))}
-          >
-            {t('restore')}
-          </Button>
-        )}
-        {!renaming && !meter.archivedAt && (
-          <ConfirmableButton
-            label={t('archive')}
-            status="warning"
-            buttonProps={{ size: 'sm', 'aria-label': t('archiveLabel', { name: meter.name }) }}
-            isDisabled={pending}
-            confirm={{ title: t('archiveTitle', { name: meter.name }), message: t('archiveMessage') }}
-            onConfirm={() => run(() => archive.mutateAsync({ path }))}
-          />
-        )}
-        {!renaming && meter.deletable && (
-          <ConfirmableButton
-            label={t('delete')}
-            status="error"
-            buttonProps={{ size: 'sm', 'aria-label': t('deleteLabel', { name: meter.name }) }}
-            isDisabled={pending}
-            confirm={{ title: t('deleteTitle', { name: meter.name }), message: t('deleteMessage') }}
-            onConfirm={() => run(() => remove.mutateAsync({ path }), { METER_IN_USE: 'errorInUseDelete' })}
-          />
-        )}
-      </div>
+      ) : (
+        <TableRowActions
+          itemName={meter.name}
+          isPending={pending}
+          actions={[
+            { key: 'rename', label: t('rename'), icon: PencilIcon, onPress: () => setRenaming(true) },
+            {
+              key: 'restore',
+              label: t('restore'),
+              icon: ArchiveRestoreIcon,
+              isHidden: !meter.archivedAt,
+              onPress: () => run(() => restore.mutateAsync({ path })),
+            },
+            {
+              key: 'archive',
+              label: t('archive'),
+              icon: ArchiveIcon,
+              isHidden: !!meter.archivedAt,
+              confirm: { title: t('archiveTitle', { name: meter.name }), message: t('archiveMessage') },
+              onPress: () => run(() => archive.mutateAsync({ path })),
+            },
+            {
+              key: 'delete',
+              label: t('delete'),
+              icon: Trash2Icon,
+              tone: 'danger',
+              isHidden: !meter.deletable,
+              confirm: { title: t('deleteTitle', { name: meter.name }), message: t('deleteMessage') },
+              onPress: () => run(() => remove.mutateAsync({ path }), { METER_IN_USE: 'errorInUseDelete' }),
+            },
+          ]}
+        />
+      )}
       {errorKey && (
         // HeroUI's Alert is presentational: without the role, screen readers do not hear the refusal.
         <div role="alert">

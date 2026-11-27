@@ -37,9 +37,5 @@
   "errorAction": "Der Zähler konnte nicht geändert werden. Versuche es erneut.",
   "errorNotFound": "Diesen Zähler gibt es nicht mehr.",
   "emptyActive": "Keine aktiven Zähler. Erstelle einen Zähler oder stelle einen archivierten wieder her.",
-  "missing": "Der gewählte Zähler wurde archiviert oder entfernt. Wähle einen anderen aus.",
-  "renameLabel": "Umbenennen: {{name}}",
-  "archiveLabel": "Archivieren: {{name}}",
-  "restoreLabel": "Wiederherstellen: {{name}}",
-  "deleteLabel": "Löschen: {{name}}"
+  "missing": "Der gewählte Zähler wurde archiviert oder entfernt. Wähle einen anderen aus."
 }

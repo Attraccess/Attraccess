@@ -52,14 +52,14 @@ describe('meter permissions', () => {
     expect(screen.getByText('Heartbeats')).toBeInTheDocument();
     expect(screen.getByText('110')).toBeInTheDocument();
     expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Rename\b/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Actions for/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: en.create })).not.toBeInTheDocument();
   });
 
   it('allows resource editors to create and rename meters without needing billing permission', () => {
     state.permissions.add('resources.update');
     render(<MetersCard resourceId={7} />);
-    expect(screen.getByRole('button', { name: /^Rename\b/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Actions for Heartbeats' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: en.create })).toBeInTheDocument();
   });
 

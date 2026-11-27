@@ -11,10 +11,10 @@ The overview shows each meter's **lifetime consumption**, including readings out
 
 ## Archive or delete a meter
 
-Everyone who may edit the resource can take a meter out of use in the **Meters** card:
+Everyone who may edit the resource can take a meter out of use in the **Meters** card. Each meter has a **⋮** menu with its actions, including **Rename**:
 
 - **Archive** is for a meter you no longer need. It is hidden from the overview, the billing settings and the meter choice of flow nodes. New sessions no longer measure or bill it, and periodic collection stops. Nothing is lost: lifetime consumption, readings, sessions and bills are kept. You can restore it at any time.
-- **Delete** removes a meter for good, for example one you created by mistake. The button only appears for a meter without any history: it never recorded a value, no session, reading request or shared time segment refers to it, and no running session captured it. A meter with history can only be archived.
+- **Delete** removes a meter for good, for example one you created by mistake. The menu entry only appears for a meter without any history: it never recorded a value, no session, reading request or shared time segment refers to it, and no running session captured it. A meter with history can only be archived.
 
 While a running session (including one that is just starting or ending) uses a meter, you cannot archive or delete it. Try again after the session has ended.
 
@@ -22,7 +22,7 @@ Pending and failed charges do not prevent archiving. They stay in the list of un
 
 Flow nodes do not prevent archiving or deleting, and Attraccess does not change them. A node that still selects such a meter shows **Meter archived or removed** and is marked with "Choose a meter belonging to this resource". You can still save the flow, but the node stays marked. Until you choose another meter or remove the node, each run of a **Report meter** node for an archived meter fails with the flow error `METER_ARCHIVED` and records nothing. Update these flows to avoid repeated errors.
 
-Archived meters are listed under **Archived meters** in the **Meters** card, visible only to people who may edit the resource. There you can restore, rename or, without history, delete them. A new meter may use the name of an archived one. Restoring is refused while an active meter has the same name; rename one of the two first. After restoring a meter, flow nodes that select it work again. Archiving, restoring and deleting are recorded in the audit log.
+Archived meters are listed under **Archived meters** in the **Meters** card, visible only to people who may edit the resource. Their **⋮** menu lets you restore or rename them and, without history, delete them. A new meter may use the name of an archived one. Restoring is refused while an active meter has the same name; rename one of the two first. After restoring a meter, flow nodes that select it work again. Archiving, restoring and deleting are recorded in the audit log.
 
 ## Reporting values
 
