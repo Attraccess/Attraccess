@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest';
+import { I18nProvider } from '@heroui/react';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,8 +28,10 @@ describe('AutomaticUpdatesPanel', () => {
   beforeEach(() => {
     // Monday 2026-11-30, 12:00 UTC. Only the date is faked, so the UI's timers keep working.
     vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-11-30T12:00:00Z') });
+    // Only the browser's zone is faked: the time field reads the rest to format its segments.
+    const { resolvedOptions } = Intl.DateTimeFormat.prototype;
     vi.spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions').mockImplementation(function (this: Intl.DateTimeFormat) {
-      return { timeZone: 'Europe/Berlin', locale: 'en-US' } as Intl.ResolvedDateTimeFormatOptions;
+      return { ...resolvedOptions.call(this), timeZone: 'Europe/Berlin' };
     });
   });
   afterEach(() => {
@@ -76,7 +79,7 @@ describe('AutomaticUpdatesPanel', () => {
     expect(dialog).toHaveTextContent('restart during the scheduled windows');
     expect(hoisted.setUpdatePolicyMock).not.toHaveBeenCalled();
 
-    await user.click(within(dialog).getByRole('button', { name: 'Turn on automatic updates' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Turn on' }));
     expect(hoisted.setUpdatePolicyMock).toHaveBeenCalledWith({
       body: {
         checksEnabled: true,
@@ -150,6 +153,17 @@ describe('AutomaticUpdatesPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
     const { schedule } = hoisted.setUpdatePolicyMock.mock.calls[0][0].body;
     expect(shownHour * 60 + shownMinute).toBe(schedule.startMinute);
+  });
+
+  it('shows the start time with leading zeros, also where the locale drops them', async () => {
+    hoisted.updatePolicy = { ...ENABLED_POLICY, schedule: { ...ENABLED_POLICY.schedule, startMinute: 90 } };
+    renderWithQuery(
+      <I18nProvider locale="de">
+        <AutomaticUpdatesPanel />
+      </I18nProvider>,
+    );
+    const segments = await screen.findAllByRole('spinbutton');
+    expect(segments.slice(0, 2).map((segment) => segment.textContent)).toEqual(['01', '30']);
   });
 
   it('says that nothing is installed while the update check is off', async () => {

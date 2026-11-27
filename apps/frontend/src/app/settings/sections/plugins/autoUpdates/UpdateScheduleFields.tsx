@@ -62,6 +62,8 @@ export function UpdateScheduleFields({ form, errors, onChange, isDisabled }: Pro
           value={form.startMinute === null ? null : new Time(Math.floor(form.startMinute / 60), form.startMinute % 60)}
           onChange={(time) => onChange({ startMinute: time ? time.hour * 60 + time.minute : null })}
           hourCycle={24}
+          // German would show 01:30 as "1:30", unlike the window text below.
+          shouldForceLeadingZeros
           isDisabled={isDisabled}
           isInvalid={errors.startMinute}
           isRequired

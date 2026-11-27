@@ -179,6 +179,7 @@
     "discard": "Änderungen verwerfen",
     "cancel": "Abbrechen",
     "confirmTitle": "Automatische Updates einschalten?",
+    "confirmAction": "Einschalten",
     "confirmMessage": "Attraccess installiert dann Plugin-Updates selbst und startet in den geplanten Zeitfenstern neu. Der Neustart unterbricht die Nutzung kurz.",
     "saved": "Einstellungen für automatische Updates gespeichert",
     "saveError": "Die Einstellungen für automatische Updates konnten nicht gespeichert werden",

@@ -179,6 +179,7 @@
     "discard": "Discard changes",
     "cancel": "Cancel",
     "confirmTitle": "Turn on automatic updates?",
+    "confirmAction": "Turn on",
     "confirmMessage": "Attraccess will install plugin updates on its own and restart during the scheduled windows. The restart interrupts use for a short time.",
     "saved": "Automatic update settings saved",
     "saveError": "Could not save the automatic update settings",

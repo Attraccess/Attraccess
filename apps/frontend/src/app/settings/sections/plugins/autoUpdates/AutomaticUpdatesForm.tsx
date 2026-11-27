@@ -95,7 +95,8 @@ export function AutomaticUpdatesForm({ policy }: Props) {
       ) : (
         <p className="text-sm text-muted">{t('autoUpdates.offHint')}</p>
       )}
-      <div className="flex gap-2">
+      {/* Wraps: the German labels do not fit side by side on a phone. */}
+      <div className="flex flex-wrap gap-2">
         {switchesOn ? (
           <ConfirmableButton
             label={t('autoUpdates.turnOn')}
@@ -103,6 +104,8 @@ export function AutomaticUpdatesForm({ policy }: Props) {
             confirm={{
               title: t('autoUpdates.confirmTitle'),
               message: t('autoUpdates.confirmMessage'),
+              // Short: the dialog's buttons sit in one row, which has to fit a phone.
+              confirmLabel: t('autoUpdates.confirmAction'),
               cancelLabel: t('autoUpdates.cancel'),
               confirmDataCy: 'plugins-auto-updates-confirm-button',
             }}
