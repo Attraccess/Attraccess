@@ -1,5 +1,5 @@
 import { DualAuthGuard } from '@attraccess/plugins-backend-sdk';
-import { ExecutionContext, INestApplication } from '@nestjs/common';
+import { ExecutionContext, INestApplication, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { of, Subject } from 'rxjs';
 import supertest from 'supertest';
@@ -24,8 +24,7 @@ const routes: { method: Method; path: string; body?: object; status: number }[] 
   { method: 'post', path: '/flows/5/node-previews/plugin.test.node', body: { config: {} }, status: 201 },
   { method: 'get', path: '/flows/5/logs', status: 200 },
   { method: 'get', path: '/flows/5/logs/recording', status: 200 },
-  { method: 'post', path: '/flows/5/logs/recording', body: { durationMinutes: 5 }, status: 201 },
-  { method: 'delete', path: '/flows/5/logs/recording', status: 200 },
+  { method: 'post', path: '/flows/5/logs/recording/keep-alive', status: 201 },
   { method: 'get', path: '/flows/5/logs/live', status: 200 },
 ];
 
@@ -45,8 +44,7 @@ describe('GlobalFlowsController permissions', () => {
   const flowLogs = {
     getLogs: jest.fn().mockReturnValue({ logs: [] }),
     getStatus: jest.fn().mockReturnValue({ recording: false }),
-    start: jest.fn().mockReturnValue({ recording: true }),
-    stop: jest.fn().mockReturnValue({ recording: false }),
+    keepAlive: jest.fn().mockReturnValue({ recording: true }),
     subjectFor: jest.fn(() => new Subject()),
     releaseSubject: jest.fn(),
   };
@@ -111,5 +109,18 @@ describe('GlobalFlowsController permissions', () => {
     expect(globalFlows.update).toHaveBeenCalledWith(5, { enabled: false }, actor);
     expect(globalFlows.delete).toHaveBeenCalledWith(5, actor);
     expect(globalFlows.saveCanvas).toHaveBeenCalledWith(5, { nodes: [], edges: [] }, actor);
+  });
+
+  it('keeps the recording of an unknown flow from starting with a 404', async () => {
+    permissions.add('resources.update');
+    globalFlows.get.mockRejectedValueOnce(new NotFoundException());
+    await supertest(app.getHttpServer()).post('/flows/404/logs/recording/keep-alive').expect(404);
+    expect(flowLogs.keepAlive).not.toHaveBeenCalled();
+  });
+
+  it('keeps the recording alive under the global flow key', async () => {
+    permissions.add('resources.update');
+    await supertest(app.getHttpServer()).post('/flows/5/logs/recording/keep-alive').expect(201);
+    expect(flowLogs.keepAlive).toHaveBeenCalledWith('flow:5');
   });
 });

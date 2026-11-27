@@ -1,26 +1,17 @@
 {
   "title": "Flow Logs",
-  "subtitle": "Logs werden nur während einer Aufzeichnung gesammelt und bleiben sichtbar, bis du diese Seite verlässt oder neu lädst",
+  "subtitle": "Logs werden aufgezeichnet, solange jemand in diesem Flow-Editor arbeitet, und bleiben sichtbar, bis du diese Seite verlässt oder neu lädst.",
   "confetti": "Konfetti für diesen Besuch aktivieren",
   "recording": {
-    "start": "Aufzeichnung starten",
-    "stop": "Aufzeichnung stoppen",
-    "duration": "Aufzeichnen für",
-    "active": "Aufzeichnung · noch {{countdown}}",
-    "hint": "Aufzeichnung ist aus. Starte eine Aufzeichnung, um Logs für diesen Flow zu sammeln.",
-    "waiting": "Warte auf die nächste Flow-Ausführung…"
+    "on": "Aufzeichnung läuft",
+    "off": "Keine Aufzeichnung",
+    "waiting": "Warte auf die nächste Flow-Ausführung…",
+    "starting": "Logging wird gestartet…",
+    "paused": "Das Logging ist pausiert, weil du inaktiv warst. Bewege die Maus oder drücke eine Taste, um fortzufahren."
   },
   "download": {
     "label": "Herunterladen",
     "ndjson": "NDJSON (.ndjson)",
     "text": "Reiner Text (.txt)"
-  },
-  "duration": {
-    "m15": "15 Minuten",
-    "m30": "30 Minuten",
-    "h1": "1 Stunde",
-    "h4": "4 Stunden",
-    "h8": "8 Stunden",
-    "h24": "24 Stunden"
   }
 }

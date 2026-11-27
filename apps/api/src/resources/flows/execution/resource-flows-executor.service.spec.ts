@@ -278,7 +278,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     scope.initialNodes = [input];
     scope.nodesById = { input, output };
     scope.edgesBySourceAndHandle['input|'] = [{ source: 'input', target: 'output' }];
-    scope.flowLogs.start(1);
+    scope.flowLogs.keepAlive(1);
     await scope.service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {}).catch(() => undefined);
     const failure = scope.flowLogs
       .getLogs(1)
@@ -315,7 +315,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     scope.edgesBySourceAndHandle = {
       [`${inputNode.id}|`]: [{ source: inputNode.id, target: operatingNode.id }],
     };
-    scope.flowLogs.start(1);
+    scope.flowLogs.keepAlive(1);
 
     await scope.service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {});
 
@@ -868,7 +868,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     ];
     scope.edgesBySourceAndHandle[`${failureNode.id}|`] = [];
     scope.mqttClientService.publish = jest.fn().mockRejectedValue(new Error('Broker unavailable'));
-    scope.flowLogs.start(1);
+    scope.flowLogs.keepAlive(1);
 
     const result = await scope.service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { requestId: 'abc' });
 
@@ -904,7 +904,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     scope.edgesBySourceAndHandle[`${mqttNode.id}|failure`] = [];
     scope.edgesBySourceAndHandle[`${continuationNode.id}|`] = [];
     scope.mqttClientService.publish = jest.fn().mockRejectedValue(new Error('Broker unavailable'));
-    scope.flowLogs.start(1);
+    scope.flowLogs.keepAlive(1);
 
     const results = await scope.service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, { requestId: 'abc' });
 

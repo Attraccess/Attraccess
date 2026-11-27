@@ -124,7 +124,7 @@ describe('plugin node failure behaviour', () => {
 
   it('logs the failure and continues on the normal output', async () => {
     buildDoorFlow(registerFailingNode(), { failureBehavior: 'log-and-continue' });
-    scope.flowLogs.start(1);
+    scope.flowLogs.keepAlive(1);
 
     await expect(scope.service.handleResourceSessionStartedEvent(doorUnlockEvent())).resolves.toBeUndefined();
 

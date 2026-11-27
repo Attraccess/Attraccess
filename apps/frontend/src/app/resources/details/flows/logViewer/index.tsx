@@ -1,40 +1,13 @@
-import {
-  Accordion,
-  AccordionItem,
-  AccordionHeading,
-  AccordionTrigger,
-  AccordionPanel,
-  AccordionBody,
-  Button,
-  Chip,
-  Separator,
-  DrawerBody,
-  DrawerHeader,
-  TextArea,
-  ToggleButton,
-  useOverlayState,
-} from '@heroui/react';
-import { Select } from '../../../../../components/select/index';
-import { CircleStopIcon, CircleDotIcon, PartyPopperIcon } from 'lucide-react';
-import {
-  EmptyState,
-  PageHeader,
-  StandardDrawer,
-  useDateTimeFormatter,
-  useTranslations,
-} from '@attraccess/plugins-frontend-ui';
-import { ResourceFlowLog, ResourceFlowNodeDto } from '@attraccess/react-query-client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { DrawerBody, DrawerHeader, useOverlayState } from '@heroui/react';
+import { PageHeader, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { ResourceFlowLog } from '@attraccess/react-query-client';
+import { useEffect, useState } from 'react';
 import de from './de.json';
 import en from './en.json';
-import nodeTranslationsDe from '../node/de.json';
-import nodeTranslationsEn from '../node/en.json';
 import { useFlowContext } from '../context/index';
-import { useCountdown } from './useCountdown';
-import { DownloadLogsMenu } from './DownloadLogsMenu';
-import { prettyPayload } from './prettyPayload';
-import { triggerNodeOfRun } from './triggerNodeOfRun';
-import { useFlowCanvasQuery, useFlowLogRecording, useFlowNodeSchemasQuery } from '../flowOwner';
+import { newestUniqueLogs } from './newestUniqueLogs';
+import { LogViewerContent } from './LogViewerContent';
+import { useFlowLogRecording } from '../flowOwner';
 
 export interface Props {
   children: (open: () => void) => React.ReactNode;
@@ -42,65 +15,19 @@ export interface Props {
   onConfettiEnabledChange: (enabled: boolean) => void;
 }
 
-export const DEFAULT_DURATION_MINUTES = '15';
-
-export const DURATION_OPTIONS = [
-  { minutes: 15, labelKey: 'duration.m15' },
-  { minutes: 30, labelKey: 'duration.m30' },
-  { minutes: 60, labelKey: 'duration.h1' },
-  { minutes: 240, labelKey: 'duration.h4' },
-  { minutes: 480, labelKey: 'duration.h8' },
-  { minutes: 1440, labelKey: 'duration.h24' },
-];
-
 export function LogViewer(props: Props) {
   const { isOpen, setOpen, open } = useOverlayState();
+  const { t } = useTranslations({ de, en });
+  const { owner } = useFlowContext();
 
-  const { t, tExists } = useTranslations({
-    de: {
-      ...de,
-      nodes: nodeTranslationsDe.nodes,
-    },
-    en: {
-      ...en,
-      nodes: nodeTranslationsEn.nodes,
-    },
-  });
-
-  const [durationMinutes, setDurationMinutes] = useState(DEFAULT_DURATION_MINUTES);
-
-  const { liveLogs: sseLogs, owner } = useFlowContext();
-
-  const { data: flowData } = useFlowCanvasQuery(owner);
-  const { data: nodeSchemas } = useFlowNodeSchemasQuery(owner);
-
-  const nodeTitle = useCallback(
-    (node?: ResourceFlowNodeDto) => {
-      const nodeType = node?.type ?? 'flow';
-      const titleKey = 'nodes.' + nodeType + '.title';
-      if (tExists(titleKey)) {
-        return t(titleKey);
-      }
-
-      return nodeSchemas?.find((schema) => schema.type === nodeType)?.label ?? nodeType;
-    },
-    [nodeSchemas, t, tExists],
-  );
-
-  // Recording expires on its own; the status is polled while the drawer is open to notice. Status only —
-  // polling the logs endpoint would re-ship the whole buffer every tick.
-  const { recording, isRecording, logs, startRecording, stopRecording, isStarting, isStopping } = useFlowLogRecording(
-    owner,
-    { isOpen },
-  );
-
-  const countdown = useCountdown(isRecording ? recording?.expiresAt : null);
+  // The editor keeps the recording alive (FlowLogsProvider); the status is polled while the drawer is open to
+  // notice when it expires. Status only — polling the logs endpoint would re-ship the whole buffer every tick.
+  const { recording, isRecording, logs: fetchedLogs } = useFlowLogRecording(owner, { isOpen });
 
   const [recordedLogs, setRecordedLogs] = useState<ResourceFlowLog[]>([]);
-  const fetchedLogs = logs;
   const recordingStartedAt = recording?.startedAt;
 
-  // The server discards its buffer on stop. Keep downloaded entries for this page visit;
+  // The server discards its buffer when the recording expires. Keep downloaded entries for this page visit;
   // the SSE buffer already lasts for the lifetime of the flow page.
   useEffect(() => {
     if (!isRecording || !recordingStartedAt || !fetchedLogs?.length) return;
@@ -109,56 +36,8 @@ export function LogViewer(props: Props) {
     const currentLogs = fetchedLogs.filter((log) => new Date(log.createdAt).getTime() >= recordingStart);
     if (!currentLogs.length) return;
 
-    setRecordedLogs((previous) => [...new Map([...previous, ...currentLogs].map((log) => [log.id, log])).values()]);
+    setRecordedLogs((previous) => newestUniqueLogs([...previous, ...currentLogs]));
   }, [fetchedLogs, isRecording, recordingStartedAt]);
-
-  const logsWithNodes = useMemo(() => {
-    const allLogs = [...recordedLogs, ...(sseLogs ?? [])];
-    const uniqueLogs = [...new Map(allLogs.map((log) => [log.id, log])).values()];
-
-    return uniqueLogs.map((log) => {
-      const nodeOfLog = flowData?.nodes.find((node) => node.id === log.nodeId);
-
-      return {
-        ...log,
-        node: nodeOfLog,
-        title: `${nodeTitle(nodeOfLog)} -> ${log.type}`,
-      };
-    });
-  }, [flowData, recordedLogs, sseLogs, nodeTitle]);
-
-  const logsOrdered = useMemo(() => {
-    return [...logsWithNodes].sort((a, b) => b.id - a.id);
-  }, [logsWithNodes]);
-
-  const logsByRunId = useMemo(() => {
-    return (logsOrdered ?? []).reduce(
-      (acc, log) => {
-        acc[log.flowRunId] = [...(acc[log.flowRunId] ?? []), log];
-        return acc;
-      },
-      {} as Record<string, (ResourceFlowLog & { node: ResourceFlowNodeDto | undefined; title: string })[]>,
-    );
-  }, [logsOrdered]);
-
-  const formatDateTime = useDateTimeFormatter({
-    showSeconds: true,
-  });
-
-  const runHeader = useCallback(
-    (logsOfRun: typeof logsOrdered) => {
-      return {
-        title: nodeTitle(triggerNodeOfRun(logsOfRun)),
-        subtitle: formatDateTime(logsOfRun[logsOfRun.length - 1]?.createdAt),
-      };
-    },
-    [nodeTitle, formatDateTime],
-  );
-
-  const durationItems = useMemo(
-    () => DURATION_OPTIONS.map(({ minutes, labelKey }) => ({ key: String(minutes), label: t(labelKey) })),
-    [t],
-  );
 
   return (
     <>
@@ -169,92 +48,13 @@ export function LogViewer(props: Props) {
         </DrawerHeader>
 
         <DrawerBody>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-row flex-wrap items-end gap-2">
-              {isRecording ? (
-                <>
-                  <Chip color="danger" variant="soft" data-cy="flow-log-recording-chip">
-                    <CircleDotIcon className="w-4 h-4" />
-                    {t('recording.active', { countdown: countdown ?? '' })}
-                  </Chip>
-                  <Button
-                    variant="danger"
-                    isPending={isStopping}
-                    onPress={() => stopRecording()}
-                    data-cy="flow-log-stop-recording"
-                  >
-                    <CircleStopIcon className="w-4 h-4" />
-                    {t('recording.stop')}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Select
-                    label={t('recording.duration')}
-                    items={durationItems}
-                    value={durationMinutes}
-                    onChange={setDurationMinutes}
-                    className="min-w-40"
-                    data-cy="flow-log-duration-select"
-                  />
-                  <Button
-                    variant="primary"
-                    isPending={isStarting}
-                    onPress={() => startRecording(Number(durationMinutes))}
-                    data-cy="flow-log-start-recording"
-                  >
-                    <CircleDotIcon className="w-4 h-4" />
-                    {t('recording.start')}
-                  </Button>
-                </>
-              )}
-              {/* Keyed by the recording state: the row changes height then, and an open menu would cover its button. */}
-              <DownloadLogsMenu key={String(isRecording)} owner={owner} logs={logsOrdered} nodeTitle={nodeTitle} />
-            </div>
-
-            <ToggleButton
-              className="self-start"
-              isSelected={props.confettiEnabled}
-              onChange={props.onConfettiEnabledChange}
-            >
-              <PartyPopperIcon />
-              {t('confetti')}
-            </ToggleButton>
-
-            {!isRecording && logsOrdered.length === 0 && <EmptyState message={t('recording.hint')} />}
-            {isRecording && logsOrdered.length === 0 && <EmptyState message={t('recording.waiting')} />}
-
-            {Object.entries(logsByRunId).map(([runId, logsOfRun], index, self) => (
-              <div key={`${runId}-logs`}>
-                <div>
-                  <PageHeader {...runHeader(logsOfRun)} noMargin />
-
-                  <Accordion className="mt-2">
-                    {logsOfRun.map((log) => (
-                      <AccordionItem key={`${runId}-${log.id}`} id={`${runId}-${log.id}`}>
-                        <AccordionHeading>
-                          <AccordionTrigger>{log.title}</AccordionTrigger>
-                        </AccordionHeading>
-                        <AccordionPanel>
-                          <AccordionBody>
-                            {log.payload && (
-                              <TextArea
-                                readOnly
-                                rows={16}
-                                className="font-mono text-sm w-full"
-                                value={prettyPayload(log.payload)}
-                              />
-                            )}
-                          </AccordionBody>
-                        </AccordionPanel>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
-                </div>
-                {index < self.length - 1 && <Separator className="my-4" />}
-              </div>
-            ))}
-          </div>
+          {/* Rendered only while the drawer is open: it reads the live entries, which change many times a second. */}
+          <LogViewerContent
+            recordedLogs={recordedLogs}
+            isRecording={isRecording}
+            confettiEnabled={props.confettiEnabled}
+            onConfettiEnabledChange={props.onConfettiEnabledChange}
+          />
         </DrawerBody>
       </StandardDrawer>
     </>

@@ -10,24 +10,19 @@ const state = vi.hoisted(() => ({
   logs: [] as { id: number; flowRunId: string; nodeId?: string; type: string; createdAt: string }[],
 }));
 
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('../context/index', () => ({
-  useFlowContext: () => ({ liveLogs: state.logs, owner: { kind: 'resource', resourceId: 7 } }),
+  useFlowContext: () => ({ owner: { kind: 'resource', resourceId: 7 } }),
+  useFlowLogsContext: () => ({ liveLogs: state.logs, isPausedForInactivity: false }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useGetGlobalFlowCanvas: () => ({ data: undefined }),
   useGetGlobalFlowNodeSchemas: () => ({ data: undefined }),
   useGetGlobalFlowLogRecordingStatus: () => ({ data: undefined }),
-  useGetGlobalFlowLogRecordingStatusKey: 'global-recording',
   useGetGlobalFlowLogs: () => ({ data: undefined }),
-  useStartGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
-  useStopGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
   useGetResourceFlow: () => ({ data: { nodes: state.nodes } }),
   useGetNodeSchemas: () => ({ data: state.schemas }),
   useGetFlowLogRecordingStatus: () => ({ data: { isRecording: false } }),
   useGetResourceFlowLogs: () => ({ data: { logs: [] } }),
-  useStartFlowLogRecording: () => ({ mutate: vi.fn() }),
-  useStopFlowLogRecording: () => ({ mutate: vi.fn() }),
 }));
 
 beforeEach(() => {

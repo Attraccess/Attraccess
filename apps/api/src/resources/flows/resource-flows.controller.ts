@@ -3,9 +3,9 @@ import { ResourceFlowNodeResponseDto } from './dto/resource-flow-node-record-res
 
 import type { FlowNodeRecord } from '@attraccess/application-models';
 
-import { Body, Controller, Delete, Get, Logger, Param, ParseIntPipe, Post, Sse, Req, Put } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Param, ParseIntPipe, Post, Sse, Req, Put } from '@nestjs/common';
 
-import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { Observable } from 'rxjs';
 
@@ -18,7 +18,6 @@ import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper
 import {
   FlowLogRecordingDto,
   ResourceFlowLogsResponseDto,
-  StartFlowLogRecordingDto,
   ResolveResourceFlowNodeSchemaDto,
   ResourceFlowResponseDto,
   ResourceFlowSaveDto,
@@ -51,7 +50,7 @@ export class ResourceFlowsController {
   @ApiOperation({
     summary: 'Get resource flow logs',
     description:
-      'Retrieve the flow logs collected by the currently running recording, oldest first. Flow logs are never persisted: they are only collected while a recording is active and are discarded when it stops or expires.',
+      'Retrieve the flow logs collected by the currently running recording, oldest first. Flow logs are never persisted: the flow editor keeps a recording alive through the keep-alive endpoint while someone works in it, and the recording expires, discarding its logs, 15 minutes after the last renewal. This endpoint neither starts nor extends a recording.',
     operationId: 'getResourceFlowLogs',
   })
   @ApiParam({
@@ -77,7 +76,7 @@ export class ResourceFlowsController {
   @ApiOperation({
     summary: 'Get flow log recording status',
     description:
-      'Retrieve only whether a recording is currently active and when it started and expires. Cheap enough to poll: unlike the logs endpoint it never returns the collected entries.',
+      'Retrieve only whether a recording is currently active and when it started and expires. Recordings are kept alive by the flow editor through the keep-alive endpoint and expire 15 minutes after the last renewal. Cheap enough to poll: unlike the logs endpoint it never returns the collected entries, and it neither starts nor extends a recording.',
     operationId: 'getFlowLogRecordingStatus',
   })
   @ApiParam({ name: 'resourceId', type: 'integer', example: 1 })
@@ -87,35 +86,18 @@ export class ResourceFlowsController {
     return this.flowLogs.getStatus(resourceId);
   }
 
-  @Post('logs/recording')
+  @Post('logs/recording/keep-alive')
   @ApiOperation({
-    summary: 'Start recording flow logs',
+    summary: 'Keep flow log recording alive',
     description:
-      'Start collecting flow logs for this resource for the given duration (default 15 minutes, maximum 24 hours). Recording stops automatically when the duration elapses and all collected logs are discarded.',
-    operationId: 'startFlowLogRecording',
+      'Start recording flow logs for this resource, or extend the running recording, to 15 minutes from now. The flow editor calls this about once a minute while someone is working in it. A renewal never shortens a recording and keeps its start time and collected logs. When no renewal arrives for 15 minutes the recording expires and all collected logs are discarded.',
+    operationId: 'keepFlowLogRecordingAlive',
   })
   @ApiParam({ name: 'resourceId', type: 'integer', example: 1 })
-  @ApiBody({ type: StartFlowLogRecordingDto })
-  @ApiResponse({ status: 201, description: 'Recording started', type: FlowLogRecordingDto })
+  @ApiResponse({ status: 201, description: 'Recording started or extended', type: FlowLogRecordingDto })
   @ApiResponse({ status: 403, description: 'Insufficient permissions to manage resources' })
-  startFlowLogRecording(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-    @Body() body: StartFlowLogRecordingDto,
-  ): FlowLogRecordingDto {
-    return this.flowLogs.start(resourceId, body.durationMinutes);
-  }
-
-  @Delete('logs/recording')
-  @ApiOperation({
-    summary: 'Stop recording flow logs',
-    description: 'Stop the running recording and discard every log collected by it.',
-    operationId: 'stopFlowLogRecording',
-  })
-  @ApiParam({ name: 'resourceId', type: 'integer', example: 1 })
-  @ApiResponse({ status: 200, description: 'Recording stopped', type: FlowLogRecordingDto })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions to manage resources' })
-  stopFlowLogRecording(@Param('resourceId', ParseIntPipe) resourceId: number): FlowLogRecordingDto {
-    return this.flowLogs.stop(resourceId);
+  keepFlowLogRecordingAlive(@Param('resourceId', ParseIntPipe) resourceId: number): FlowLogRecordingDto {
+    return this.flowLogs.keepAlive(resourceId);
   }
 
   @Sse('logs/live')

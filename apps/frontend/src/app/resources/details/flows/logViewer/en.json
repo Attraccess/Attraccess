@@ -1,26 +1,17 @@
 {
   "title": "Flow Logs",
-  "subtitle": "Logs are collected only while recording and remain visible until you leave this page or reload",
+  "subtitle": "Logs are recorded while someone is working in this flow editor and stay visible until you leave or reload this page.",
   "confetti": "Enable confetti for this visit",
   "recording": {
-    "start": "Start recording",
-    "stop": "Stop recording",
-    "duration": "Record for",
-    "active": "Recording · {{countdown}} left",
-    "hint": "Recording is off. Start a recording to collect logs for this flow.",
-    "waiting": "Waiting for the flow to run…"
+    "on": "Recording",
+    "off": "Not recording",
+    "waiting": "Waiting for the flow to run…",
+    "starting": "Starting logging…",
+    "paused": "Logging is paused because you were inactive. Move the mouse or press a key to resume."
   },
   "download": {
     "label": "Download",
     "ndjson": "NDJSON (.ndjson)",
     "text": "Plain text (.txt)"
-  },
-  "duration": {
-    "m15": "15 minutes",
-    "m30": "30 minutes",
-    "h1": "1 hour",
-    "h4": "4 hours",
-    "h8": "8 hours",
-    "h24": "24 hours"
   }
 }

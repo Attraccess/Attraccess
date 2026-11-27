@@ -18,6 +18,7 @@ describe('FlowLogRecorderService', () => {
 
   afterEach(() => {
     service.onModuleDestroy();
+    jest.restoreAllMocks();
   });
 
   it('drops logs while no recording is active, without serializing the payload', () => {
@@ -30,56 +31,120 @@ describe('FlowLogRecorderService', () => {
     expect(service.getLogs(1).recording.isRecording).toBe(false);
   });
 
-  it('collects logs while recording and reports the expiry', () => {
-    const status = service.start(1, 15);
+  it('keepAlive starts a 15 minute recording when none is active', () => {
+    const now = Date.now();
+    jest.spyOn(Date, 'now').mockReturnValue(now);
 
+    const status = service.keepAlive(1);
     service.record(entry());
 
     expect(status.isRecording).toBe(true);
-    expect(status.startedAt.getTime()).toBeLessThanOrEqual(Date.now());
-    expect(status.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    expect(status.startedAt.getTime()).toBe(now);
+    expect(status.expiresAt.getTime()).toBe(now + 15 * 60_000);
     expect(service.getLogs(1).logs).toHaveLength(1);
     expect(JSON.parse(service.getLogs(1).logs[0].payload)).toEqual({ input: { hello: 'world' } });
   });
 
   it('only records for the resource being recorded', () => {
-    service.start(1);
+    service.keepAlive(1);
 
     service.record(entry(2));
 
     expect(service.getLogs(2).logs).toHaveLength(0);
   });
 
-  it('discards all logs when the recording is stopped', () => {
-    service.start(1);
+  it('keepAlive extends an active recording and keeps its start time and logs', () => {
+    const start = Date.now();
+    jest.spyOn(Date, 'now').mockReturnValue(start);
+    service.keepAlive(1);
     service.record(entry());
 
-    expect(service.stop(1).isRecording).toBe(false);
+    jest.spyOn(Date, 'now').mockReturnValue(start + 10 * 60_000);
+    const status = service.keepAlive(1);
+
+    expect(status.startedAt.getTime()).toBe(start);
+    expect(status.expiresAt.getTime()).toBe(start + 25 * 60_000);
+    expect(service.getLogs(1).logs).toHaveLength(1);
+  });
+
+  it('keepAlive never moves the expiry backwards', () => {
+    const start = Date.now();
+    jest.spyOn(Date, 'now').mockReturnValue(start);
+    service.keepAlive(1);
+
+    // A clock that went backwards must not shorten the recording.
+    jest.spyOn(Date, 'now').mockReturnValue(start - 5 * 60_000);
+    const status = service.keepAlive(1);
+
+    expect(status.expiresAt.getTime()).toBe(start + 15 * 60_000);
+  });
+
+  it('keepAlive on an expired recording starts a new, empty one', () => {
+    const start = Date.now();
+    jest.spyOn(Date, 'now').mockReturnValue(start);
+    service.keepAlive(1);
+    service.record(entry());
+
+    const later = start + 16 * 60_000;
+    jest.spyOn(Date, 'now').mockReturnValue(later);
+    const status = service.keepAlive(1);
+
+    expect(status.startedAt.getTime()).toBe(later);
+    expect(status.expiresAt.getTime()).toBe(later + 15 * 60_000);
     expect(service.getLogs(1).logs).toHaveLength(0);
   });
 
-  it('stops recording and discards logs once the duration elapses', () => {
-    service.start(1, 15);
+  it('stops recording and discards logs once no renewal arrives for 15 minutes', () => {
+    const start = Date.now();
+    jest.spyOn(Date, 'now').mockReturnValue(start);
+    service.keepAlive(1);
     service.record(entry());
 
-    jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 16 * 60_000);
+    jest.spyOn(Date, 'now').mockReturnValue(start + 15 * 60_000);
 
     expect(service.isRecording(1)).toBe(false);
     expect(service.getLogs(1).logs).toHaveLength(0);
-
-    jest.spyOn(Date, 'now').mockRestore();
   });
 
-  it('clamps the duration to 24 hours', () => {
-    const status = service.start(1, 60 * 48);
+  it('reading the status or the logs never starts a recording', () => {
+    service.getStatus(1);
+    service.getLogs(1);
 
-    expect(status.expiresAt.getTime() - Date.now()).toBeLessThanOrEqual(24 * 60 * 60_000);
+    expect(service.isRecording(1)).toBe(false);
+  });
+
+  it('reading the status or the logs never extends an active recording', () => {
+    const start = Date.now();
+    jest.spyOn(Date, 'now').mockReturnValue(start);
+    service.keepAlive(1);
+
+    jest.spyOn(Date, 'now').mockReturnValue(start + 10 * 60_000);
+    service.getStatus(1);
+    service.getLogs(1);
+
+    expect(service.getStatus(1).expiresAt.getTime()).toBe(start + 15 * 60_000);
+  });
+
+  it('gives entries ids above those of an earlier API process', () => {
+    const earlier = new FlowLogRecorderService();
+    earlier.keepAlive(1);
+    earlier.record(entry());
+    const earlierId = earlier.getLogs(1).logs[0].id;
+    earlier.onModuleDestroy();
+
+    jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 1_000);
+    const restarted = new FlowLogRecorderService();
+    restarted.keepAlive(1);
+    restarted.record(entry());
+
+    expect(restarted.getLogs(1).logs[0].id).toBeGreaterThan(earlierId);
+    restarted.onModuleDestroy();
   });
 
   it('publishes recorded logs to the resource stream', () => {
     const received: unknown[] = [];
     service.subjectFor(1).subscribe((event) => received.push(event));
-    service.start(1);
+    service.keepAlive(1);
 
     service.record(entry());
 

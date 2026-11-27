@@ -13,12 +13,12 @@ import {
   NodeTypes,
 } from '@xyflow/react';
 import { ResourceFlowLog, useGetOneResourceById } from '@attraccess/react-query-client';
-import { useLiveLogs } from '../liveLogs';
 import { FlowOwner, useFlowNodeSchemasQuery } from '../flowOwner';
 import type { NodeValidationError } from '../node/validationMessages';
 import { FlowCanvasNode } from '../node/FlowCanvasNode';
 import { FlowContext, type FlowContextType, type LiveLogReceiver } from './flowContext';
 import { groupValidationErrorsByNode } from './groupValidationErrorsByNode';
+import { FlowLogsProvider } from './FlowLogsProvider';
 
 export interface FlowProviderProps {
   children: ReactNode;
@@ -93,11 +93,6 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
     liveLogReceivers.current = liveLogReceivers.current.filter((r) => r !== receiver);
   }, []);
 
-  const { liveLogs } = useLiveLogs({
-    owner,
-    onUpdate: publishLiveLog,
-  });
-
   const { data: nodeSchemas } = useFlowNodeSchemasQuery(owner);
   const nodeSchemasByType = useMemo(
     () => new Map((nodeSchemas ?? []).map((schema) => [schema.type, schema])),
@@ -160,7 +155,6 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
       resourceType: (resource?.type as 'machine' | 'door') ?? 'machine',
       resourceSeparateUnlockAndUnlatch: Boolean(resource?.separateUnlockAndUnlatch),
       resourceAllowTakeOver: Boolean(resource?.allowTakeOver),
-      liveLogs: liveLogs ?? [],
       addLiveLogReceiver: addLiveLogReceiver,
       removeLiveLogReceiver: removeLiveLogReceiver,
       flowNodeTypes: flowNodeTypes,
@@ -186,7 +180,6 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
       resource?.type,
       resource?.separateUnlockAndUnlatch,
       resource?.allowTakeOver,
-      liveLogs,
       addLiveLogReceiver,
       removeLiveLogReceiver,
       flowNodeTypes,
@@ -199,7 +192,14 @@ export function FlowProvider({ children, owner }: Readonly<FlowProviderProps>) {
     ],
   );
 
-  return <FlowContext.Provider value={value}>{children}</FlowContext.Provider>;
+  return (
+    <FlowContext.Provider value={value}>
+      <FlowLogsProvider owner={owner} onLog={publishLiveLog}>
+        {children}
+      </FlowLogsProvider>
+    </FlowContext.Provider>
+  );
 }
 
 export { FlowContext, useFlowContext, type FlowContextType, type LiveLogReceiver } from './flowContext';
+export { useFlowLogsContext, type FlowLogsContextType } from './flowLogsContext';

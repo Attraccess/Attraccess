@@ -51,5 +51,16 @@
     "description": "Deine Änderungen an diesem Flow wurden nicht gespeichert. Wenn du die Seite jetzt verlässt, gehen sie verloren.",
     "leave": "Ohne Speichern verlassen",
     "stay": "Bleiben"
+  },
+  "logKeepAlive": {
+    "warning": {
+      "title": "Bist du noch da?",
+      "description": "Das Flow-Logging für diese Seite endet in 15 Minuten, wenn du nicht aktiv bist.",
+      "action": "Ich bin noch da"
+    },
+    "timedOut": {
+      "title": "Flow-Logging für diese Seite pausiert",
+      "description": "Du warst inaktiv, deshalb hält diese Seite das Flow-Logging nicht mehr aufrecht. Es läuft nur weiter, wenn jemand anderes an diesem Flow arbeitet. Bewege die Maus oder drücke eine Taste, um fortzufahren."
+    }
   }
 }
