@@ -1296,7 +1296,7 @@ API-Host auf PostgreSQL (Core- und Plugin-Migrationen, Plugin-Erkennung, `AppMod
 Plugin nicht den Zustand „geladen“ erreicht. Lizenzpflichtige Plugins laden, weil die Prüfung die von ihnen
 deklarierten Lizenzmodule gewährt; ihre Storage-Kompilierung und Migrationen laufen also trotzdem. `pack-test`
 prüft nur den Tarball und sieht daher nicht, was ein Host bei Installation oder Laden ablehnt. Der nächtliche
-`publish-plugins`-Job und der Veröffentlichungsschritt des Releases laufen erst, wenn sie bestanden wurde. Lokal führst du sie nach
+`publish-plugins`-Job und der Veröffentlichungsschritt des Releases laufen erst, wenn sie bestanden wurde. Lokal führen Sie sie nach
 `pnpm nx run-many --target=pack --projects=tag:type:plugin` aus; sie braucht PostgreSQL und eine administrative
 `TEST_DATABASE_URL`.
 
