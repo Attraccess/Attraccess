@@ -432,8 +432,11 @@ export function eligibleForPolicy(
   if (!policy.prerelease && !followsChannel && semver.prerelease(candidate.version)) return false;
   if (candidate.semverImpact === 'major') return false;
   if (followsChannel && mode === 'minor') return true;
-  if (mode === 'patch') return candidate.semverImpact === 'patch';
-  if (mode === 'minor') return candidate.semverImpact === 'patch' || candidate.semverImpact === 'minor';
+  // `prerelease` is the step to a prerelease on the installed minor line: nothing is smaller than a patch step, so
+  // once prereleases are allowed it counts as one.
+  const step = policy.prerelease && candidate.semverImpact === 'prerelease' ? 'patch' : candidate.semverImpact;
+  if (mode === 'patch') return step === 'patch';
+  if (mode === 'minor') return step === 'patch' || step === 'minor';
   return matchesSpec(candidate.version, installed.requestedSpec, policy.prerelease, resolvedRequestedVersion);
 }
 export function effectiveUpdateMode(

@@ -256,6 +256,16 @@ describe('plugin channel', () => {
       expect(eligibleForPolicy(candidate('0.3.0-nightly.4.9'), installed('next'), policy, next, true)).toBe(false);
     });
 
+    // A prerelease on the installed minor line is the smallest step there is: allowing prereleases has to include it.
+    it.each(['patch', 'minor'] as const)(
+      'takes it as a patch step once prereleases are allowed, in %s mode',
+      (mode) => {
+        const nightlyStep = candidate(next);
+        expect(eligibleForPolicy(nightlyStep, installed('latest'), { ...policy, mode, prerelease: true })).toBe(true);
+        expect(eligibleForPolicy(nightlyStep, installed('latest'), { ...policy, mode, prerelease: false })).toBe(false);
+      },
+    );
+
     it.each([
       ['permission additions', { permissionAdditions: ['READ_USERS'] }],
       ['a major jump', { semverImpact: 'major' as const }],
