@@ -83,7 +83,8 @@ Energiewerte benötigen eine eingerichtete Verbrauchsmessung; die Betriebszeit b
 
 1. Falls Sie inzwischen abgemeldet wurden, halten Sie Ihre Karte erneut an den Leser.
 2. Tippen Sie neben der von Ihnen genutzten Maschine auf **Stop**. Alternativ können Sie ihre Details öffnen und auf **Sitzung beenden** tippen.
-3. Füllen Sie gegebenenfalls das Formular zum Nutzungsende aus und warten Sie, bis das Display das Ende der Nutzung bestätigt.
+3. Fragt der Leser, ob die Maschine in Ordnung ist, beantworten Sie die Frage (siehe unten).
+4. Füllen Sie gegebenenfalls das Formular zum Nutzungsende aus und warten Sie, bis das Display das Ende der Nutzung bestätigt.
 
 ![Maschinendetails mit Nutzer, Startzeit, Dauer und der Schaltfläche Sitzung beenden](../../_media/attractap/usage-details.png)
 
@@ -91,6 +92,26 @@ _Mit dem Zurück-Pfeil gelangen Sie wieder zur Ressourcenliste. Beim Wechsel zwi
 
 > [!IMPORTANT]
 > **Abmelden** beendet Ihre Anmeldung am Leser. Eine laufende Maschinennutzung wird dadurch **nicht** beendet. Nutzen Sie **Stop** oder **Sitzung beenden**, wenn Sie mit der Maschine fertig sind.
+
+### „Ist die Maschine in Ordnung?“
+
+Mit dem Lizenzmodul maintenance fragt der Leser **Ist die Maschine in Ordnung?**, bevor er Ihre eigene Sitzung beendet, außer Ihre Administration hat die [Frage für die Ressource abgeschaltet](resources/maintenance.md#ist-die-maschine-in-ordnung-beim-sitzungsende) oder Sie dürfen ihre Wartung selbst verwalten.
+
+- **Maschine ist in Ordnung** beendet die Sitzung.
+- **Wartung nötig** öffnet ein Textfeld mit der Bildschirmtastatur. Beschreiben Sie das Problem (3 bis 500 Zeichen) und tippen Sie auf **Weiter**. Die Sitzung endet, und das Wartungsteam wird benachrichtigt.
+- **Abbrechen** lässt die Sitzung weiterlaufen.
+
+Die Formulare zum Nutzungsende folgen auf die Antwort; danach fragt der Leser nicht erneut. Die Zusammenfassung oder die Bestätigung zeigt **Wartungsteam benachrichtigt**, oder **Meldung nicht gesendet. Bitte erneut melden.**, wenn die Sitzung beendet wurde, die Anfrage aber nicht erstellt werden konnte. Beim Beenden einer fremden Sitzung wird nie gefragt.
+
+## Ein Problem melden
+
+Sie können jederzeit ein Problem melden, egal ob eine Sitzung läuft, und auch während die Ressource gewartet wird:
+
+1. Melden Sie sich mit Ihrer Karte an und tippen Sie auf den Namen der Ressource, um ihre Details zu öffnen.
+2. Tippen Sie unten auf **Problem melden**.
+3. Beschreiben Sie das Problem (3 bis 500 Zeichen) und tippen Sie auf **Senden**.
+
+Der Leser bestätigt mit **Wartungsteam benachrichtigt** oder zeigt **Meldung nicht gesendet** auf der Schaltfläche, damit Sie es erneut versuchen können. Die Schaltfläche erscheint nur mit dem Lizenzmodul maintenance und nur, wenn Sie die Wartung der Ressource nicht selbst verwalten dürfen. Attractap-Lite-Reader haben keinen Bildschirm und bieten weder die Schaltfläche noch die Frage.
 
 ### Zusammenfassung zum Nutzungsende
 
@@ -100,7 +121,7 @@ Nach dem erfolgreichen Beenden Ihrer eigenen Maschinennutzung zeigt der Leser **
 
 ![Zusammenfassung ohne Gebühr mit mittiger Dauer](../../_media/attractap/session-summary-unbilled.png)
 
-Die Zusammenfassung bleibt etwa **3,5 Sekunden** sichtbar und meldet Sie danach ab. Tippen Sie auf eine beliebige Stelle oder legen Sie erneut eine Karte auf, um sie früher zu schließen. Ein bereits gehaltener Finger oder eine bereits aufliegende Karte schließt sie nicht. Die Karte zum Schließen wird nicht zur Anmeldung verwendet; nehmen Sie sie weg und legen Sie sie zur Anmeldung erneut auf. Andere laufende Maschinennutzungen bleiben aktiv.
+Die Zusammenfassung bleibt etwa **3,5 Sekunden** sichtbar (etwa **6 Sekunden**, wenn sie auch das Ergebnis einer Wartungsanfrage nennt) und meldet Sie danach ab. Tippen Sie auf eine beliebige Stelle oder legen Sie erneut eine Karte auf, um sie früher zu schließen. Ein bereits gehaltener Finger oder eine bereits aufliegende Karte schließt sie nicht. Die Karte zum Schließen wird nicht zur Anmeldung verwendet; nehmen Sie sie weg und legen Sie sie zur Anmeldung erneut auf. Andere laufende Maschinennutzungen bleiben aktiv.
 
 Das Beenden aus der Liste, aus den Details oder nach dem Absenden eines Pflichtformulars zeigt dieselbe Zusammenfassung. Bei einem fehlgeschlagenen Stop erscheint sie nicht. Wenn Sie als Ressourcenverwalter, Einweiser oder Wartender die Sitzung einer anderen Person beenden, bleibt die bisherige Bestätigung erhalten und Sie bleiben angemeldet. Mit einem älteren Server ohne Zusammenfassungsdaten bleibt die bisherige Bestätigung erhalten.
 
