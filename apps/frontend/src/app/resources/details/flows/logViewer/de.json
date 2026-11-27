@@ -10,6 +10,11 @@
     "hint": "Aufzeichnung ist aus. Starte eine Aufzeichnung, um Logs für diesen Flow zu sammeln.",
     "waiting": "Warte auf die nächste Flow-Ausführung…"
   },
+  "download": {
+    "label": "Herunterladen",
+    "ndjson": "NDJSON (.ndjson)",
+    "text": "Reiner Text (.txt)"
+  },
   "duration": {
     "m15": "15 Minuten",
     "m30": "30 Minuten",
