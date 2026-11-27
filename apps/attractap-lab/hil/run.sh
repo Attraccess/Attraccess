@@ -183,9 +183,21 @@ fi
 # keys. The reader only streams it into its inactive slot and staging: its stop-before-burn build refuses the
 # burn, so this image never boots. Never on the secure-lab place, and only when run.sh built the stop-before-burn
 # reader itself (a supplied READER_IMAGE is not known to refuse burns). NO_CONVERSION_BUILD=1 skips it (tests skip).
+# Only variants with a secure profile build (ATTRACTAP_SECURE_PROFILE_BUILD, which also compiles in the reader's
+# conversion client) can be converted: for the others nothing is built and the module skips.
 SECURE_IMAGE_DIR=
 SECURE_IMAGE_MANIFEST=
-if [[ "$READER_PROFILE" == plain && -n "${built_plain_reader:-}" && "${NO_CONVERSION_BUILD:-}" != 1 ]]; then
+READER_SECURE_CONVERSION= # 1 or 0 for a reader built here, empty (unknown) otherwise
+if [[ "$READER_PROFILE" == plain && -n "${built_plain_reader:-}" ]]; then
+  READER_SECURE_CONVERSION="$(cd "$ROOT/apps/attractap/firmware" && python3 - "$VARIANT" <<'PY'
+import sys
+from build_firmwares import read_variant, secure_profile_build_enabled
+variant = sys.argv[1]
+print(int(secure_profile_build_enabled(variant, read_variant(variant)[1])))
+PY
+  )"
+fi
+if [[ "$READER_SECURE_CONVERSION" == 1 && "${NO_CONVERSION_BUILD:-}" != 1 ]]; then
   require_idf
   secure_build="$ROOT/apps/attractap/firmware/build/hil-secure-$VARIANT"
   (cd "$ROOT/apps/attractap/firmware" &&
@@ -312,6 +324,7 @@ GRPC_ENABLE_FORK_SUPPORT=0 PYTHONPATH="$HERE/../src:$HERE" LAB_PYTHON="$LAB_PYTH
   READER_OTA_IMAGE="${READER_OTA_IMAGE:-}" READER_BASE_VERSION="$READER_BASE_VERSION" READER_OTA_VERSION="$READER_OTA_VERSION" \
   OTA_ASSETS_DIR="$ATTRACTAP_FIRMWARE_ASSETS_DIR" \
   SECURE_IMAGE_DIR="$SECURE_IMAGE_DIR" SECURE_IMAGE_MANIFEST="$SECURE_IMAGE_MANIFEST" \
+  READER_SECURE_CONVERSION="$READER_SECURE_CONVERSION" \
   READER_IMAGE="$READER_IMAGE" READER_VARIANT="$VARIANT" READER_PROFILE="$READER_PROFILE" EMULATOR_IMAGE="$EMULATOR_IMAGE" \
   API_URL="http://127.0.0.1:$API_PORT" DATABASE_URL="$DATABASE_URL" \
   API_HOST="${API_HOST:-}" API_PORT="$API_PORT" READER_API_PORT="$READER_API_PORT" \

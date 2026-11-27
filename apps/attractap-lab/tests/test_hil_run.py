@@ -10,7 +10,10 @@ import subprocess
 import pytest
 
 RUN_SH = Path(__file__).parents[1] / "hil" / "run.sh"
+FIRMWARE = RUN_SH.parents[2] / "attractap" / "firmware"
 pytestmark = pytest.mark.skipif(not RUN_SH.is_file(), reason="hil/run.sh is not part of this package build")
+needs_firmware = pytest.mark.skipif(not (FIRMWARE / "build_firmwares.py").is_file(),
+                                    reason="the firmware sources are not part of this package build")
 
 
 def run(tmp_path, env, place_output=None, run_sh=RUN_SH, timeout=30):
@@ -80,13 +83,14 @@ def test_matching_place_goes_on_to_the_build(tmp_path):
     assert code == 1 and "Source ESP-IDF export.sh first" in stderr
 
 
-def test_published_elf_is_the_flashed_build_not_the_ota_rebuild(tmp_path):
-    """The OTA build rewrites the reader's build directory; the symbols published for coredumps must stay the flashed ELF's."""
+def run_to_api_start(tmp_path, variant="attractap-touch-v2", secure_profile_build="true", **env):
+    """Run run.sh with stand-in build tools until the API start, which fails. Returns what the API would have indexed."""
     bin_dir = tmp_path / "stubs"
     bin_dir.mkdir()
     # idf.py stand-in: its "ELF" names the version it was built with, so each build differs.
     (bin_dir / "idf.py").write_text(
-        '#!/bin/sh\nwhile [ $# -gt 0 ]; do case "$1" in -B) dir="$2";; -DATTRACTAP_VERSION_OVERRIDE=*) v="${1#*=}";; esac; shift; done\n'
+        f'#!/bin/sh\necho "$*" >>\'{tmp_path / "idf.log"}\'\n'
+        'while [ $# -gt 0 ]; do case "$1" in -B) dir="$2";; -DATTRACTAP_VERSION_OVERRIDE=*) v="${1#*=}";; esac; shift; done\n'
         'mkdir -p "$dir"; printf "elf:%s" "$v" >"$dir/attractap.elf"; printf "bin" >"$dir/attractap.bin"; printf "" >"$dir/flash_args"\n')
     (bin_dir / "esptool").write_text("#!/bin/sh\nwhile [ $# -gt 0 ]; do [ \"$1\" = -o ] && : >\"$2\"; shift; done\n")
     # pnpm stand-in (the API start): keep what the API would index, then fail so run.sh stops.
@@ -101,17 +105,48 @@ def test_published_elf_is_the_flashed_build_not_the_ota_rebuild(tmp_path):
     (root / "apps/attractap/firmware/tools").mkdir(parents=True)
     (root / "apps/attractap/firmware/tools/build_individual_ca_certs.py").write_text("")
     (root / "apps/attractap/firmware/version.txt").write_text("9.9.9\n")
+    # The real variant parser, with a variant file holding the one switch run.sh reads.
+    for name in ("build_firmwares.py", "secure_packaging.py"):
+        shutil.copy(FIRMWARE / name, root / "apps/attractap/firmware" / name)
+    (root / "apps/attractap/firmware/variants").mkdir()
+    (root / f"apps/attractap/firmware/variants/{variant}.cmake").write_text(
+        f'set(ATTRACTAP_SECURE_PROFILE_BUILD "{secure_profile_build}")\n')
     run_sh = root / "apps/attractap-lab/hil/run.sh"
     shutil.copy(RUN_SH, run_sh)
+    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "EMULATOR_IMAGE": "/dev/null",
+           "HIL_DATABASE_URL": "postgres://hil:hil@127.0.0.1:5432/hil", "READER_VARIANT": variant, **env}
+    code, stderr = run(tmp_path, env, place(f"board=attractap, profile=plain, variant={variant}"), run_sh)
+    assert code == 1, stderr
+    return tmp_path / "published"
+
+
+def secure_profile_builds(tmp_path):
+    return [line for line in (tmp_path / "idf.log").read_text().splitlines() if "-DATTRACTAP_SECURE_PROFILE=ON" in line]
+
+
+@needs_firmware
+def test_published_elf_is_the_flashed_build_not_the_ota_rebuild(tmp_path):
+    """The OTA build rewrites the reader's build directory; the symbols published for coredumps must stay the flashed ELF's."""
     # NO_CONVERSION_BUILD: this test is about the published ELF, not the "Secure this reader" image build.
-    env = {"PATH": f"{bin_dir}:{os.environ['PATH']}", "EMULATOR_IMAGE": "/dev/null", "NO_CONVERSION_BUILD": "1",
-           "HIL_DATABASE_URL": "postgres://hil:hil@127.0.0.1:5432/hil"}
-    code, _ = run(tmp_path, env, place("board=attractap, profile=plain, variant=attractap-touch-v2"), run_sh)
-    published = tmp_path / "published"
-    assert code == 1
+    published = run_to_api_start(tmp_path, NO_CONVERSION_BUILD="1")
     assert (published / "hil-reader.elf").read_bytes() == b"elf:"  # the base build has no version override
     manifest = json.loads((published / "firmwares.json").read_text())
     assert manifest["firmwares"][0]["buildId"] == hashlib.sha256(b"elf:").hexdigest()
+
+
+@needs_firmware
+def test_no_secure_image_for_a_variant_without_a_secure_profile_build(tmp_path):
+    # Reaching the API start also shows that nothing tried to package a secure image.
+    run_to_api_start(tmp_path, "attractap-touch", secure_profile_build="false")
+    assert secure_profile_builds(tmp_path) == []
+
+
+@needs_firmware
+def test_secure_image_for_a_variant_with_a_secure_profile_build(tmp_path):
+    # The stand-in build leaves nothing to package, so run.sh stops right after it, before the API start.
+    published = run_to_api_start(tmp_path)
+    assert len(secure_profile_builds(tmp_path)) == 1
+    assert not published.exists()
 
 
 @pytest.mark.skipif(shutil.which("openssl") is None, reason="needs the openssl command line tool")

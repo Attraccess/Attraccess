@@ -11,7 +11,8 @@ Covered: eligibility, a read-only preflight (and one that fails on a simulated p
 with a reset in the middle that resumes, staging and verification on the reader, the server ending the conversion
 instead of sending the burn (the reader drops its staging, stays plain and boots normally), a retry that is cancelled
 during the transfer, and the eFuse blocks read over USB before and after: unchanged. Never runs on the secure-lab place,
-and no release secure image ever boots: it only lands in the inactive app slot and the staging region.
+and no release secure image ever boots: it only lands in the inactive app slot and the staging region. Skips on variants
+without a secure profile build (run.sh sets READER_SECURE_CONVERSION=0): their firmware has no conversion client.
 """
 
 import json
@@ -26,7 +27,11 @@ from attractap_lab.drivers import ESPToolDriver
 
 from conftest import PROFILE, open_console, reboot_reader
 
-pytestmark = pytest.mark.skipif(PROFILE != efuse.PLAIN, reason="the conversion runs on the plain lab reader only")
+pytestmark = [
+    pytest.mark.skipif(PROFILE != efuse.PLAIN, reason="the conversion runs on the plain lab reader only"),
+    pytest.mark.skipif(os.environ.get("READER_SECURE_CONVERSION") == "0",
+                       reason=f"{os.environ.get('READER_VARIANT')} has no secure profile build, so no conversion"),
+]
 
 PASSPHRASE = "hil-recovery-passphrase"
 POLL_SECONDS = 2
