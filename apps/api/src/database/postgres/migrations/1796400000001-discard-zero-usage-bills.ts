@@ -7,8 +7,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * as the late meter correction refers to it. The balance triggers subtract the amount of a deleted bill, 0 here, so
  * no balance changes; the items go with their bill (ON DELETE CASCADE).
  */
-export class DiscardZeroUsageBills1796400000000 implements MigrationInterface {
-  name = 'DiscardZeroUsageBills1796400000000';
+export class DiscardZeroUsageBills1796400000001 implements MigrationInterface {
+  name = 'DiscardZeroUsageBills1796400000001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
@@ -19,9 +19,9 @@ export class DiscardZeroUsageBills1796400000000 implements MigrationInterface {
          AND NOT EXISTS (
            SELECT 1 FROM "billing_transaction_item" "item"
            WHERE "item"."billingTransactionId" = "bill"."id" AND "item"."unitPrice" <> 0 AND "item"."quantity" <> 0)
+         AND NOT EXISTS (SELECT 1 FROM "billing_transaction" "refund" WHERE "refund"."refundOfId" = "bill"."id")
          AND NOT EXISTS (
-           SELECT 1 FROM "billing_transaction" "other"
-           WHERE "other"."refundOfId" = "bill"."id" OR "other"."correctionOfId" = "bill"."id")
+           SELECT 1 FROM "billing_transaction" "correction" WHERE "correction"."correctionOfId" = "bill"."id")
          AND NOT EXISTS (
            SELECT 1 FROM "resource_metering_session" "meter"
            WHERE "meter"."usageId" = "bill"."resourceUsageId" AND "meter"."status" = 'pending'

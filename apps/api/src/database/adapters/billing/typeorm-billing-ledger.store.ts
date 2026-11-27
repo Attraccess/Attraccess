@@ -200,8 +200,11 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
         { pendingMeter: ResourceMeteringSessionStatus.Pending },
       )
       .andWhere(
-        `NOT EXISTS (SELECT 1 FROM "billing_transaction" "other" WHERE "other"."refundOfId" = "billing_transaction"."id"
-          OR "other"."correctionOfId" = "billing_transaction"."id")`,
+        `NOT EXISTS (SELECT 1 FROM "billing_transaction" "refund" WHERE "refund"."refundOfId" = "billing_transaction"."id")`,
+      )
+      .andWhere(
+        `NOT EXISTS (SELECT 1 FROM "billing_transaction" "correction"
+          WHERE "correction"."correctionOfId" = "billing_transaction"."id")`,
       )
       .execute();
     return Boolean(deleted.affected);

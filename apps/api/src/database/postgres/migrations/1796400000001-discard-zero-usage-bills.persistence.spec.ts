@@ -16,11 +16,11 @@ import {
 import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { postgresMigrations } from './index';
-import { DiscardZeroUsageBills1796400000000 } from './1796400000000-discard-zero-usage-bills';
+import { DiscardZeroUsageBills1796400000001 } from './1796400000001-discard-zero-usage-bills';
 
 jest.setTimeout(120_000);
 
-describe('DiscardZeroUsageBills1796400000000 (persistence)', () => {
+describe('DiscardZeroUsageBills1796400000001 (persistence)', () => {
   let source: DataSource;
   let userId: number;
   let resourceId: number;
@@ -35,7 +35,7 @@ describe('DiscardZeroUsageBills1796400000000 (persistence)', () => {
   const run = async (direction: 'up' | 'down') => {
     const runner = source.createQueryRunner();
     try {
-      await new DiscardZeroUsageBills1796400000000()[direction](runner);
+      await new DiscardZeroUsageBills1796400000001()[direction](runner);
     } finally {
       await runner.release();
     }

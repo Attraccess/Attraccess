@@ -1,8 +1,9 @@
-import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { BillingTransaction } from './billing-transaction.entity';
 import { ApiProperty } from '@nestjs/swagger';
 
 @Entity()
+@Index('IDX_billing_transaction_item_transaction', ['billingTransactionId'])
 export class BillingTransactionItem {
   @PrimaryGeneratedColumn()
   @ApiProperty({ description: 'The unique identifier of the billing transaction item', example: 1 })

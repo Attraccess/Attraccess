@@ -9,6 +9,7 @@ import {
   UpdateDateColumn,
   OneToMany,
   OneToOne,
+  Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
@@ -16,6 +17,8 @@ import { ResourceUsage } from './resourceUsage.entity';
 import { BillingTransactionItem as BillingTransactionItems } from './billing-transaction-item.entity';
 
 @Entity()
+@Index('IDX_billing_transaction_refund_of', ['refundOfId'])
+@Index('IDX_billing_transaction_correction_of', ['correctionOfId'])
 export class BillingTransaction {
   @PrimaryGeneratedColumn()
   @ApiProperty({

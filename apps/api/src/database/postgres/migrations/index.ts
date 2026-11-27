@@ -11,7 +11,8 @@ import { RoleNetworkActions1796200000003 } from './1796200000003-role-network-ac
 import { ResourceListVisibility1796300000000 } from './1796300000000-resource-list-visibility';
 import { PermittedResourceIndexes1796300000001 } from './1796300000001-permitted-resource-indexes';
 import { NfcCardType1796300000002 } from './1796300000002-nfc-card-type';
-import { DiscardZeroUsageBills1796400000000 } from './1796400000000-discard-zero-usage-bills';
+import { BillingTransactionReferenceIndexes1796400000000 } from './1796400000000-billing-transaction-reference-indexes';
+import { DiscardZeroUsageBills1796400000001 } from './1796400000001-discard-zero-usage-bills';
 
 /** The released PostgreSQL migration track, in order. Later schema changes are appended here as new migrations. */
 export const postgresMigrations = [
@@ -28,5 +29,6 @@ export const postgresMigrations = [
   ResourceListVisibility1796300000000,
   PermittedResourceIndexes1796300000001,
   NfcCardType1796300000002,
-  DiscardZeroUsageBills1796400000000,
+  BillingTransactionReferenceIndexes1796400000000,
+  DiscardZeroUsageBills1796400000001,
 ];
