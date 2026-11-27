@@ -222,6 +222,7 @@
     "plugin.zip_uploaded": "Plugin archive uploaded",
     "plugin.zip_deleted": "Plugin archive deleted",
     "plugin.retry_requested": "Plugin retry requested",
+    "plugin.restart_requested": "Plugin restart requested",
     "billing.transaction.updated": "Billing transaction updated",
     "meter_charge.waived": "Meter charge waived",
     "meter.updated": "Meter updated",
@@ -265,6 +266,7 @@
     "plugin-package": "Plugin package",
     "plugin-registry": "Plugin registry",
     "plugin-policy": "Plugin policy",
+    "plugin-system": "Plugin system",
     "flow": "Global flow"
   },
   "fields": {
@@ -356,6 +358,7 @@
     "permissionRemovals": "Removed permissions",
     "migrationOutcome": "Migration result",
     "activationOutcome": "Activation result",
+    "pendingChanges": "Pending plugin changes",
     "restartRequested": "Restart requested",
     "rollbackOutcome": "Rollback result",
     "updateOverride": "Package update policy",

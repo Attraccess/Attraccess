@@ -19,6 +19,7 @@ import { AddPluginRegistryDto } from './dto/npm-plugin-request.dto';
 import { InstalledNpmPlugin, NpmPluginAuditState, NpmPluginService } from './npm-plugin.service';
 
 import { PluginService } from './plugin.service';
+import { isPluginRestartRequired } from './runtime/restart-required';
 
 import { PluginUninstallService } from './plugin-uninstall.service';
 
@@ -28,7 +29,9 @@ type PackageOverride = NonNullable<InstalledNpmPlugin['updateOverride']>;
 
 /**
  * Plugin package, registry and lifecycle changes made by an administrator, and their audit. Without an actor
- * (an internal caller) nothing is audited and the restart stays with the caller, as for the HTTP routes.
+ * (an internal caller) nothing is audited. Package changes only mark a restart as required
+ * (`markPluginRestartRequired`); the administrator restarts with {@link restart}. A retry still restarts
+ * at once.
  */
 @Injectable()
 export class PluginAdministrationService {
@@ -121,19 +124,21 @@ export class PluginAdministrationService {
   async removePackageGraph(packageName: string, approvedDependants: string[], actor?: AuditActor) {
     const removing = this.npmPluginService.removalPlan(packageName);
     const pluginNames = this.pluginNamesOf(removing);
-    await this.npmPluginService.removeInstalled(packageName, Boolean(actor), approvedDependants);
+    const pluginIds = this.pluginIdsOf(removing);
+    await this.npmPluginService.removeInstalled(packageName, approvedDependants);
+    await this.stopRemoved(pluginIds);
     await this.clearHealthEntries(pluginNames);
     for (const plugin of removing) await this.recordPackage(actor, 'plugin.removed', plugin);
-    if (actor) this.pluginService.requestRestart();
   }
 
   async removeInstalled(packageName: string, actor?: AuditActor) {
     const installed = this.npmPluginService.listInstalled().find((plugin) => plugin.name === packageName);
     const pluginNames = this.pluginNamesOf(installed ? [installed] : []);
-    await this.npmPluginService.removeInstalled(packageName, Boolean(actor));
+    const pluginIds = this.pluginIdsOf(installed ? [installed] : []);
+    await this.npmPluginService.removeInstalled(packageName);
+    await this.stopRemoved(pluginIds);
     await this.clearHealthEntries(pluginNames);
     if (installed) await this.recordPackage(actor, 'plugin.removed', installed);
-    if (actor) this.pluginService.requestRestart();
   }
 
   /**
@@ -141,15 +146,26 @@ export class PluginAdministrationService {
    * directories, so discovery still finds them.
    */
   private pluginNamesOf(packages: Array<Pick<InstalledNpmPlugin, 'installPath'>>): string[] {
+    return this.manifestsOf(packages).map((manifest) => manifest.name);
+  }
+
+  private pluginIdsOf(packages: Array<Pick<InstalledNpmPlugin, 'installPath'>>): string[] {
+    return this.manifestsOf(packages).map((manifest) => manifest.id);
+  }
+
+  private manifestsOf(packages: Array<Pick<InstalledNpmPlugin, 'installPath'>>) {
     const directories = new Set(packages.map((plugin) => plugin.installPath));
-    return PluginService.getDiscoveredPlugins()
-      .filter((manifest) => directories.has(manifest.pluginDirectory))
-      .map((manifest) => manifest.name);
+    return PluginService.getDiscoveredPlugins().filter((manifest) => directories.has(manifest.pluginDirectory));
   }
 
   /** The removed plugins' health entries go, so no door stays blocked by a plugin that is gone. */
   private async clearHealthEntries(pluginNames: string[]) {
     for (const name of pluginNames) await this.pluginUninstall.clearHealthEntries(name);
+  }
+
+  /** Stops the reader and BLE use of the removed packages' still running code (by plugin id, read before removal). */
+  private async stopRemoved(pluginIds: string[]) {
+    for (const id of pluginIds) await this.pluginUninstall.stopRemovedPlugin(id);
   }
 
   async addRegistry(body: AddPluginRegistryDto, actor: AuditActor) {
@@ -194,13 +210,21 @@ export class PluginAdministrationService {
     this.pluginService.requestRestart();
   }
 
+  /** Restarts the API process, which applies every pending plugin change. Allowed when none is pending. */
+  async restart(actor: AuditActor) {
+    await this.record(actor, 'plugin.restart_requested', 1, 'plugin-system', {
+      pendingChanges: isPluginRestartRequired() ? 1 : 0,
+      restartRequested: 1,
+    });
+    this.pluginService.requestRestart();
+  }
+
   async uploadPlugin(file: FileUpload, actor?: AuditActor) {
-    const plugin = await this.pluginService.uploadPlugin(file, Boolean(actor));
+    const plugin = await this.pluginService.uploadPlugin(file);
     await this.record(actor, 'plugin.zip_uploaded', auditSubjectKeyId(plugin.name), 'plugin-package', {
       ...auditPluginIdentity(plugin),
       restartRequested: 1,
     });
-    if (actor) this.pluginService.requestRestart();
     return plugin;
   }
 
@@ -214,24 +238,24 @@ export class PluginAdministrationService {
         : undefined);
     if (installed) {
       const pluginNames = this.pluginNamesOf([installed]);
-      await this.npmPluginService.removeInstalled(installed.name, Boolean(actor));
+      const pluginIds = this.pluginIdsOf([installed]);
+      await this.npmPluginService.removeInstalled(installed.name);
+      await this.stopRemoved(pluginIds);
       await this.clearHealthEntries(pluginNames);
       await this.recordPackage(actor, 'plugin.removed', installed);
-      if (actor) this.pluginService.requestRestart();
       return;
     }
-    await this.pluginUninstall.deletePlugin(pluginId, Boolean(actor));
+    await this.pluginUninstall.deletePlugin(pluginId);
     await this.record(actor, 'plugin.zip_deleted', auditSubjectKeyId(plugin?.name ?? pluginId), 'plugin-package', {
       ...auditPluginIdentity(plugin),
       pluginId,
       restartRequested: 1,
     });
-    if (actor) this.pluginService.requestRestart();
   }
 
   /**
    * Runs an install or replacement and records its lifecycle state (integrity, migration, activation,
-   * rollback) as the operation filled it in, also when it fails. A restart it requested still happens.
+   * rollback) as the operation filled it in, also when it fails. The operation marks the restart its changes need.
    */
   private async installWithAudit(
     actor: AuditActor | undefined,
@@ -271,11 +295,9 @@ export class PluginAdministrationService {
       const installed = await operation(state);
       const outcome = installed.state === 'quarantined' ? 'failed' : 'succeeded';
       await this.record(actor, action, subjectId, 'plugin-package', lifecycle(), outcome, state.context?.operationId);
-      if (state.context && state.restartRequested) this.pluginService.requestRestart();
       return installed;
     } catch (error) {
       await this.record(actor, action, subjectId, 'plugin-package', lifecycle(), 'failed', state.context?.operationId);
-      if (state.context && state.restartRequested) this.pluginService.requestRestart();
       throw error;
     }
   }
@@ -309,7 +331,7 @@ export class PluginAdministrationService {
     actor: AuditActor | undefined,
     action: PluginAuditAction,
     subjectId: number,
-    subjectType: 'plugin-package' | 'plugin-registry' | 'plugin-policy',
+    subjectType: 'plugin-package' | 'plugin-registry' | 'plugin-policy' | 'plugin-system',
     details: AuditDetails,
     outcome: 'succeeded' | 'failed' = 'succeeded',
     operationId?: string,

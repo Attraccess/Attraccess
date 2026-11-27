@@ -14,6 +14,8 @@ import { PluginClassificationService } from '../plugin-classification.service';
 
 import { PluginService } from '../plugin.service';
 
+import { snapshotRunningFrontend } from '../runtime/frontend-snapshots';
+
 import { PendingNpmPluginAudit } from './audit-state';
 
 import {
@@ -178,7 +180,15 @@ export class NpmPluginState {
     const backupDirectory = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY);
     const backup = join(backupDirectory, backupName ?? backupDirectoryName(pluginDirectory(name)));
     await mkdir(backupDirectory, { recursive: true });
-    if (existsSync(target)) await rename(target, backup);
+    if (existsSync(target)) {
+      // The running version stays loaded until the restart; so does its frontend.
+      await snapshotRunningFrontend(
+        PluginService.PLUGIN_PATH,
+        PluginService.getDiscoveredPlugins(),
+        pluginDirectory(name),
+      );
+      await rename(target, backup);
+    }
     try {
       await rename(source, target);
       return { target, backup };

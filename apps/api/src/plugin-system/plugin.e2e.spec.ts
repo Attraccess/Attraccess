@@ -220,9 +220,7 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
     expect(plugin).toBeDefined();
 
     const owned = { deleteAllForPlugin: async () => undefined } as never;
-    await new PluginUninstallService(new PluginService(), owned, owned).deletePlugin(
-      (plugin as LoadedPluginManifest).id,
-    );
+    await new PluginUninstallService(owned, owned).deletePlugin((plugin as LoadedPluginManifest).id);
 
     expect(existsSync(join(PLUGIN_PATH, PLUGIN_NAME))).toBe(false);
     expect(restartSpy).toHaveBeenCalledTimes(0);

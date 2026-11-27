@@ -8,6 +8,9 @@ import { PassThrough } from 'stream';
 import { PluginController } from './plugin.controller';
 import { PluginAdministrationService } from './plugin-administration.service';
 import { PluginService } from './plugin.service';
+import { markPluginRestartRequired } from './runtime/restart-required';
+import { snapshotRunningFrontend } from './runtime/frontend-snapshots';
+import { markPluginRemoved } from './runtime/removed-plugins';
 import { PluginUninstallService } from './plugin-uninstall.service';
 import { PluginModule } from './plugin.module';
 import { LoadedPluginManifest } from './plugin.manifest';
@@ -55,6 +58,7 @@ describe('PluginController', () => {
       deletePlugin: jest.fn(),
       requestRestart: jest.fn(),
       clearHealthEntries: jest.fn(),
+      stopRemovedPlugin: jest.fn(),
     };
     npmService = {
       findInstalledByPluginId: jest.fn(),
@@ -91,7 +95,46 @@ describe('PluginController', () => {
   it('reports when plugins are globally disabled', () => {
     PluginModule.configure({ DISABLE_PLUGINS: true });
 
-    expect(controller.getPluginSystemStatus()).toEqual({ disabled: true, instanceId: expect.any(String) });
+    expect(controller.getPluginSystemStatus()).toEqual({
+      disabled: true,
+      instanceId: expect.any(String),
+      restartRequired: false,
+    });
+  });
+
+  it('reports a restart as required once plugin changes are marked', () => {
+    expect(controller.getPluginSystemStatus().restartRequired).toBe(false);
+
+    markPluginRestartRequired();
+
+    expect(controller.getPluginSystemStatus().restartRequired).toBe(true);
+  });
+
+  describe('restartPluginSystem', () => {
+    it('audits the request and restarts the process', async () => {
+      markPluginRestartRequired();
+
+      await expect(controller.restartPluginSystem(req)).resolves.toEqual({ ok: true });
+
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          domain: 'administration',
+          action: 'plugin.restart_requested',
+          subject: { type: 'plugin-system', id: 1 },
+          details: { pendingChanges: 1, restartRequested: 1 },
+        }),
+      );
+      expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    });
+
+    it('restarts even when no plugin change is pending', async () => {
+      await expect(controller.restartPluginSystem(req)).resolves.toEqual({ ok: true });
+
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({ details: { pendingChanges: 0, restartRequested: 1 } }),
+      );
+      expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('retryPlugin', () => {
@@ -137,6 +180,15 @@ describe('PluginController', () => {
       await expect(controller.retryPlugin(plugin.id, req)).rejects.toThrow(BadRequestException);
       expect(service.requestRestart).not.toHaveBeenCalled();
     });
+  });
+
+  it('no longer lists a removed plugin while its code runs until the restart', () => {
+    jest
+      .spyOn(PluginService, 'getPluginsWithLoadStatus')
+      .mockReturnValue([frontendPlugin('kept'), frontendPlugin('removed')]);
+    markPluginRemoved('removed');
+
+    expect(controller.getAllPlugins().map((plugin) => plugin.id)).toEqual(['kept']);
   });
 
   describe('getFrontendPluginFile', () => {
@@ -198,6 +250,27 @@ describe('PluginController', () => {
         .getStream()
         .on('error', () => undefined)
         .destroy();
+    });
+
+    it('keeps serving the running version after an update replaced its files, until the restart', async () => {
+      const plugin = frontendPlugin('updated');
+      jest.spyOn(PluginService, 'getPlugins').mockReturnValue([plugin]);
+      mkdirSync(join(root, 'updated', 'frontend'), { recursive: true });
+      writeFileSync(join(root, 'updated', 'frontend', 'index.js'), 'v1');
+      const read = async () => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of controller.getFrontendPluginFile('updated', 'index.js', res).getStream())
+          chunks.push(chunk as Buffer);
+        return Buffer.concat(chunks).toString();
+      };
+
+      await snapshotRunningFrontend(root, [plugin], 'updated');
+      writeFileSync(join(root, 'updated', 'frontend', 'index.js'), 'v2');
+      expect(await read()).toBe('v1');
+
+      // The restart loads the new version and serves its files.
+      PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
+      expect(await read()).toBe('v2');
     });
 
     it('throws when the plugin is unknown', () => {
@@ -355,14 +428,14 @@ describe('PluginController', () => {
     const file = { originalname: 'plugin.zip' } as FileUpload;
     service.uploadPlugin.mockResolvedValue({ name: 'uploaded' });
     await expect(controller.uploadPlugin(file, {}, req)).resolves.toEqual({ name: 'uploaded' });
-    expect(service.uploadPlugin).toHaveBeenCalledWith(file, true);
-    expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    expect(service.uploadPlugin).toHaveBeenCalledWith(file);
+    expect(service.requestRestart).not.toHaveBeenCalled();
   });
 
   it('delegates non-npm plugin deletion to the plugin service', async () => {
     await controller.deletePlugin('plugin-id', req);
-    expect(service.deletePlugin).toHaveBeenCalledWith('plugin-id', true);
-    expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    expect(service.deletePlugin).toHaveBeenCalledWith('plugin-id');
+    expect(service.requestRestart).not.toHaveBeenCalled();
   });
 
   it('delegates marketplace search with an optional registry', () => {
@@ -382,10 +455,10 @@ describe('PluginController', () => {
 
     await controller.deletePlugin(plugin.id, req);
 
-    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', true);
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
     // Its health entries go like an uploaded plugin's, by the manifest's plugin name.
     expect(service.clearHealthEntries).toHaveBeenCalledWith(plugin.name);
-    expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    expect(service.requestRestart).not.toHaveBeenCalled();
     expect(service.deletePlugin).not.toHaveBeenCalled();
   });
 
@@ -396,8 +469,10 @@ describe('PluginController', () => {
 
     await controller.removeInstalledPackage('@attraccess/plugin', req);
 
-    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', true);
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
     expect(service.clearHealthEntries).toHaveBeenCalledWith('npm-runtime-name');
+    // Its code runs until the restart: its reader and BLE use stops by its plugin id, not by a shared name.
+    expect(service.stopRemovedPlugin).toHaveBeenCalledWith(plugin.id);
   });
 
   it('uses the data-preserving npm removal flow when npm manifest discovery fails', async () => {
@@ -405,8 +480,8 @@ describe('PluginController', () => {
 
     await controller.deletePlugin('npm-plugin-id', req);
 
-    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin', true);
-    expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    expect(npmService.removeInstalled).toHaveBeenCalledWith('@attraccess/plugin');
+    expect(service.requestRestart).not.toHaveBeenCalled();
     expect(service.deletePlugin).not.toHaveBeenCalled();
   });
 
@@ -419,8 +494,8 @@ describe('PluginController', () => {
 
     await controller.deletePlugin(plugin.id, req);
 
-    expect(service.deletePlugin).toHaveBeenCalledWith(plugin.id, true);
-    expect(service.requestRestart).toHaveBeenCalledTimes(1);
+    expect(service.deletePlugin).toHaveBeenCalledWith(plugin.id);
+    expect(service.requestRestart).not.toHaveBeenCalled();
     expect(npmService.removeInstalled).not.toHaveBeenCalled();
   });
 });

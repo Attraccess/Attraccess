@@ -25,6 +25,9 @@ import { NpmPluginService } from './npm-plugin.service';
 import { PluginAdministrationService } from './plugin-administration.service';
 
 import { PluginService } from './plugin.service';
+import { isPluginRestartRequired } from './runtime/restart-required';
+import { frontendAssetRoot } from './runtime/frontend-snapshots';
+import { isPluginRemoved } from './runtime/removed-plugins';
 
 import { AuthenticatedRequest, Auth, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 
@@ -39,6 +42,8 @@ import { Response } from 'express';
 import { FileUpload } from '../common/types/file-upload.types';
 
 import { PluginSystemStatusDto } from './dto/plugin-system-status.dto';
+
+import { RestartPluginSystemResponseDto } from './dto/restart-plugin-system-response.dto';
 
 import { RetryPluginResponseDto } from './dto/retry-plugin-response.dto';
 
@@ -313,7 +318,8 @@ export class PluginController {
     type: [LoadedPluginManifest],
   })
   getAllPlugins() {
-    return PluginService.getPluginsWithLoadStatus();
+    // A removed plugin runs until the restart, but it is gone for the admin and its frontend files are: not listed.
+    return PluginService.getPluginsWithLoadStatus().filter((plugin) => !isPluginRemoved(plugin.id));
   }
 
   @Get('status')
@@ -321,7 +327,24 @@ export class PluginController {
   @ApiOperation({ summary: 'Get plugin system status', operationId: 'getPluginSystemStatus' })
   @ApiResponse({ status: 200, type: PluginSystemStatusDto })
   getPluginSystemStatus(): PluginSystemStatusDto {
-    return { disabled: arePluginsDisabled(), instanceId: PLUGIN_SYSTEM_INSTANCE_ID };
+    return {
+      disabled: arePluginsDisabled(),
+      instanceId: PLUGIN_SYSTEM_INSTANCE_ID,
+      restartRequired: isPluginRestartRequired(),
+    };
+  }
+
+  @Post('restart')
+  @Auth('system.plugins.manage')
+  @NotAnMcpTool('Host lifecycle: restarts the API process')
+  @ApiOperation({
+    summary: 'Restart the API process to apply pending plugin changes',
+    operationId: 'restartPluginSystem',
+  })
+  @ApiResponse({ status: 201, type: RestartPluginSystemResponseDto })
+  async restartPluginSystem(@Req() req: AuthenticatedRequest): Promise<RestartPluginSystemResponseDto> {
+    await this.pluginAdministration.restart(auditActorOf(req.user));
+    return { ok: true };
   }
 
   @Post(':pluginId/retry')
@@ -363,8 +386,9 @@ export class PluginController {
     }
 
     const segments = frontendAssetSegments(filePath);
+    // An update waiting for the restart keeps serving the frontend of the version that runs.
     const opened = openFrontendAsset(
-      PluginService.PLUGIN_PATH,
+      frontendAssetRoot(PluginService.PLUGIN_PATH, plugin),
       plugin.pluginDirectory,
       plugin.main.frontend.directory,
       segments,

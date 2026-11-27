@@ -4,6 +4,7 @@ import { Sidebar } from './sidebar/index';
 import { Header } from './header';
 import { DonationPrompt } from '../../components/DonationPrompt';
 import { UpdateNotificationBanner } from '../../components/UpdateNotificationBanner';
+import { PluginRestartBanner } from '../../components/PluginRestartBanner';
 import { ServerNotAvailable } from '../serverNotAvailable';
 import { useLiveTransactionUpdates } from '../billing/dashboard/summary/live-updates';
 import { useQueryClient } from '@tanstack/react-query';
@@ -122,6 +123,9 @@ export function Layout({ children }: LayoutProps) {
 
         {/* Update notification banner (admins only) */}
         <UpdateNotificationBanner />
+
+        {/* Plugin changes waiting for a restart (plugin administrators only) */}
+        <PluginRestartBanner />
 
         {/* Server unavailable inline notice */}
         <ServerNotAvailable />

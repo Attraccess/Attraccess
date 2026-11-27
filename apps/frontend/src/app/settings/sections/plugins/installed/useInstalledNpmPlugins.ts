@@ -9,8 +9,8 @@ import { useCallback, useMemo } from 'react';
 /**
  * The npm-installed plugins by name and by install directory, plus a way to merge fresher records (update checks, policy saves) into the cache.
  * The list is loaded once per visit of the section and a failed load reads as no installed packages: within a visit it
- * only changes through this section, which merges the records it gets back or reloads the page after an install,
- * replacement or removal. Leaving the section drops the cache (gcTime 0), so the next visit loads it again.
+ * only changes through this section, which merges the records it gets back, reloads it after an install or
+ * replacement (`useRefreshAfterPluginChange`) and reloads the page after a removal. Leaving the section drops the cache (gcTime 0), so the next visit loads it again.
  */
 export function useInstalledNpmPlugins() {
   const queryClient = useQueryClient();

@@ -222,6 +222,7 @@
     "plugin.zip_uploaded": "Plugin-Archiv hochgeladen",
     "plugin.zip_deleted": "Plugin-Archiv gelöscht",
     "plugin.retry_requested": "Erneuter Plugin-Versuch angefordert",
+    "plugin.restart_requested": "Plugin-Neustart angefordert",
     "billing.transaction.updated": "Abrechnung geändert",
     "meter_charge.waived": "Zählerkosten erlassen",
     "meter.updated": "Zähler geändert",
@@ -265,6 +266,7 @@
     "plugin-package": "Plugin-Paket",
     "plugin-registry": "Plugin-Registry",
     "plugin-policy": "Plugin-Regel",
+    "plugin-system": "Plugin-System",
     "flow": "Globaler Flow"
   },
   "fields": {
@@ -356,6 +358,7 @@
     "permissionRemovals": "Entfernte Berechtigungen",
     "migrationOutcome": "Migrationsergebnis",
     "activationOutcome": "Aktivierungsergebnis",
+    "pendingChanges": "Ausstehende Plugin-Änderungen",
     "restartRequested": "Neustart angefordert",
     "rollbackOutcome": "Ergebnis der Wiederherstellung",
     "updateOverride": "Update-Regel für dieses Paket",

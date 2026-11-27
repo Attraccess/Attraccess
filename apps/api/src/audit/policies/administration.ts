@@ -264,6 +264,10 @@ rules['plugin.retry_requested'] = {
   subject: 'plugin-package',
   fields: { pluginId: identifier, pluginName: text, pluginVersion: text, restartRequested: flag },
 };
+rules['plugin.restart_requested'] = {
+  subject: 'plugin-system',
+  fields: { pendingChanges: flag, restartRequested: flag },
+};
 
 export const ADMINISTRATION_AUDIT_ACTIONS = Object.keys(rules) as AdministrationAuditAction[];
 
@@ -287,7 +291,8 @@ export type AdministrationAuditAction =
       | 'package_policy_updated'
       | 'zip_uploaded'
       | 'zip_deleted'
-      | 'retry_requested'}`;
+      | 'retry_requested'
+      | 'restart_requested'}`;
 
 /** Numeric grouping key for public string-keyed subjects; retain the original key in event details.
  * This persisted identifier hash is never a password hash; changing it would split audit history. */
