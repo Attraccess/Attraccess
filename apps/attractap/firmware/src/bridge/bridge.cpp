@@ -12,6 +12,7 @@
 #include "esp_core_dump.h"
 #endif
 
+#include "../api/conversion/conversion_migration.hpp"
 #include "../bt_setup/bt_setup.hpp"
 #include "../logger/logger.hpp"
 #include "../platform.hpp"
@@ -63,9 +64,13 @@ namespace bridge
             LedInputs in;
             in.factoryReset = true;
             show(ledLevels(in, millis()));
-            nvs_flash_deinit();
-            const esp_err_t err = nvs_flash_erase();
-            if (err != ESP_OK) logger.errorf("NVS erase failed: %s", esp_err_to_name(err));
+            // Never while a conversion's data is staged (the bridge has no staging region, so this always passes).
+            if (ConversionMigration::nvsErasePermitted())
+            {
+                nvs_flash_deinit();
+                const esp_err_t err = nvs_flash_erase();
+                if (err != ESP_OK) logger.errorf("NVS erase failed: %s", esp_err_to_name(err));
+            }
 #if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
             // A crash dump holds copies of task stacks, which may include the Wi-Fi password or the PIN.
             esp_core_dump_image_erase();

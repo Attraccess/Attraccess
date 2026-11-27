@@ -21,6 +21,7 @@
 #include "api/security/reader_link.hpp"
 #endif
 #include "api/security/build_profile.hpp"
+#include "api/conversion/conversion_migration.hpp"
 #include "logger/logger.hpp"
 #include "platform.hpp"
 #include "utils.hpp"
@@ -100,16 +101,20 @@ static void logLoopStackUsage()
 
 extern "C" void app_main(void)
 {
-    // NVS backs all settings (the Arduino core used to initialize it implicitly).
-    // The erase path only triggers on a truly incompatible/corrupt partition —
-    // same recovery the Arduino core performed.
-    esp_err_t nvsErr = nvs_flash_init();
-    if (nvsErr == ESP_ERR_NVS_NO_FREE_PAGES || nvsErr == ESP_ERR_NVS_NEW_VERSION_FOUND)
+    // NVS backs all settings (the Arduino core used to initialize it implicitly). The erase path only triggers on a
+    // truly incompatible/corrupt partition (same recovery the Arduino core performed), and never while a "Secure this
+    // reader" conversion's data waits in the staging region. On the secure app's first boot after a conversion this
+    // also migrates the staged settings into encrypted NVS (step 8, src/api/conversion/conversion_migration.hpp).
+    const esp_err_t nvsErr = static_cast<esp_err_t>(ConversionMigration::initNvs());
+    if (nvsErr != ESP_OK)
     {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        nvsErr = nvs_flash_init();
+        // Not fatal while staged conversion data is kept: the reader stays up instead of rebooting in a loop.
+        mainLogger.errorf("NVS init failed: %s", esp_err_to_name(nvsErr));
+        if (ConversionMigration::nvsErasePermitted())
+        {
+            ESP_ERROR_CHECK(nvsErr);
+        }
     }
-    ESP_ERROR_CHECK(nvsErr);
 
 #ifndef ATTRACTAP_SECURE_PROFILE
     // Console input (serialCommandHandler) reads from the USB-Serial-JTAG

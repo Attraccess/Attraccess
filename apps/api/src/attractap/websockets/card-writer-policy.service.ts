@@ -1,7 +1,8 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { SettingsStoreService } from '../../settings/settings-store.service';
 import { ATTRACTAP_KEYS, ATTRACTAP_PARENT } from '../../settings/constants';
-import { CardWriterMode, CardWriterSettingsDto } from '../dtos/card-writer-settings.dto';
+import { CARD_WRITER_MODES, CardWriterMode, CardWriterSettingsDto } from '../dtos/card-writer-settings.dto';
+import { ATTRACTAP_READER_STORE, type AttractapReaderStore } from '../reader-store.port';
 import { auditSubjectKeyId } from '../../audit/policies/administration';
 import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../audit/recorder/audit-event';
 
@@ -54,9 +55,12 @@ export class CardWriterPolicyService {
   @Inject(AUDIT_RECORDER)
   private readonly audit: AuditRecorder;
 
+  @Inject(ATTRACTAP_READER_STORE)
+  private readonly readers: AttractapReaderStore;
+
   async get(): Promise<CardWriterSettingsDto> {
     const storedMode = await this.settings.getPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.cardWriterMode);
-    const mode: CardWriterMode = storedMode === 'selected' ? 'selected' : 'all';
+    const mode: CardWriterMode = CARD_WRITER_MODES.find((known) => known === storedMode) ?? 'all';
     const raw = await this.settings.getPlainSetting(ATTRACTAP_PARENT, ATTRACTAP_KEYS.cardWriterReaders);
     let readerIds: number[];
     try {
@@ -123,6 +127,7 @@ export class CardWriterPolicyService {
 
   async isAllowed(readerId: number): Promise<boolean> {
     const { mode, readerIds } = await this.get();
+    if (mode === 'secured') return (await this.readers.findSecurity(readerId))?.secured === true;
     return mode === 'all' || readerIds.includes(readerId);
   }
 

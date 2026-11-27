@@ -135,8 +135,8 @@ report says. A failing report and removing the pairing both clear the state. The
 own statement and no hardware attestation; plain readers show nothing here.
 
 **Secured** also needs the fingerprints of the reader's Secure Boot keys, which the server records only
-when it secures the reader. That procedure is not available yet, so secure readers show **Not secured**
-for now. See [Reader Security](attractap/reader-security.md#reader-identity-and-the-secured-status).
+when it secures the reader with **Secure this reader**. A secure reader without them, such as a device-lab
+reader (chip **Lab key (not secured)**), shows **Not secured**. See [Reader Security](attractap/reader-security.md#reader-identity-and-the-secured-status).
 
 ### What an attacker can and cannot do
 

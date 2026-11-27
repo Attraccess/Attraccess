@@ -75,6 +75,7 @@ ResetScreen Display::resetScreen;
 SupervisionScreen Display::supervisionScreen;
 MassIntroductionScreen Display::massIntroductionScreen;
 FirmwareUpdateScreen Display::firmwareUpdateScreen;
+SecureConversionScreen Display::secureConversionScreen;
 StatusScreen Display::statusScreen;
 ConfirmScreen Display::confirmScreen;
 NetworkStatusScreen Display::networkStatusScreen;

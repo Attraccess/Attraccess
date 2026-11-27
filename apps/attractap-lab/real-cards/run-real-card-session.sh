@@ -41,6 +41,8 @@ if [[ -z "${READER_IMAGE:-}" ]]; then
   firmware="$ROOT/apps/attractap/firmware"
   build="$firmware/build/real-cards-$VARIANT"
   echo "building the reader firmware (INFO logs, test hooks, beeper off) ..."
+  # Conversion client builds need sdkconfig.conversion (ATT-1208), applied only to a fresh sdkconfig.
+  grep -q '^CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED=y' "$build/sdkconfig" 2>/dev/null || rm -f "$build/sdkconfig"
   (cd "$firmware" && python3 tools/build_individual_ca_certs.py >/dev/null &&
     idf.py -B "$build" -DSDKCONFIG="$build/sdkconfig" -DATTRACTAP_VARIANT="$VARIANT" \
       -DATTRACTAP_LOG_LEVEL=INFO -DATTRACTAP_TEST_HOOKS=ON -DATTRACTAP_BEEPER_DEFAULT=OFF build >"$RUN_DIR/reader-build.log" 2>&1)

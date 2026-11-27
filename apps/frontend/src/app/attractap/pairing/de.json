@@ -156,6 +156,7 @@
       "jtag-enabled": "Die Debug-Schnittstelle (JTAG) ist aktiv.",
       "rom-download-open": "Der ROM-Download-Modus ist offen.",
       "secure-version-below-floor": "Die Anti-Rollback-Version liegt unter der geforderten."
-    }
+    },
+    "labKey": "Laborschlüssel (nicht gesichert)"
   }
 }
