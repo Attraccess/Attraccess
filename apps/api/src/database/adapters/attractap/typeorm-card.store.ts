@@ -27,7 +27,7 @@ async function lockCardOwner(manager: EntityManager, userId: number): Promise<vo
     .getOne();
 }
 
-/** The unique index on `lower(uid)` (migration NfcCardUniqueUid1796500000000): one card record per UID. */
+/** The unique index on `lower(uid)` (migration NfcCardUniqueUid1796500000100): one card record per UID. */
 export const NFC_CARD_UID_INDEX = 'UQ_nfc_card_uid_lower';
 
 /** True only when the unique index on the card UID rejected the write; other violations are not this one. */

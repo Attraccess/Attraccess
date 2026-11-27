@@ -2,13 +2,13 @@ import { Logger } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
 import { postgresMigrations } from './index';
-import { NfcCardUniqueUid1796500000000 } from './1796500000000-nfc-card-unique-uid';
+import { NfcCardUniqueUid1796500000100 } from './1796500000100-nfc-card-unique-uid';
 
 jest.setTimeout(120_000);
 
 type CardRow = { id: number; uid: string; isActive?: boolean; createdAt?: string; userId?: number; type?: string };
 
-describe('NfcCardUniqueUid1796500000000 (persistence)', () => {
+describe('NfcCardUniqueUid1796500000100 (persistence)', () => {
   let source: DataSource;
   let warn: jest.SpyInstance;
 
@@ -28,7 +28,7 @@ describe('NfcCardUniqueUid1796500000000 (persistence)', () => {
   const run = async (direction: 'up' | 'down') => {
     const runner = source.createQueryRunner();
     try {
-      await new NfcCardUniqueUid1796500000000()[direction](runner);
+      await new NfcCardUniqueUid1796500000100()[direction](runner);
     } finally {
       await runner.release();
     }

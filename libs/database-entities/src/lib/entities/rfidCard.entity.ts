@@ -12,7 +12,7 @@ export class NFCCard {
 
   /**
    * Unique without letter case: the index `UQ_nfc_card_uid_lower` on `lower(uid)` (PostgreSQL migration
-   * NfcCardUniqueUid1796500000000). Not declared here, as TypeORM cannot express an index on an expression; the
+   * NfcCardUniqueUid1796500000100). Not declared here, as TypeORM cannot express an index on an expression; the
    * stored letter case is kept.
    */
   @Column({

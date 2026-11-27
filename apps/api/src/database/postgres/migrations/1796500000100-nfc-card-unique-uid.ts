@@ -16,8 +16,8 @@ interface ResolvedGroup {
  *
  * `down` drops the index only: deleted duplicates are not restored.
  */
-export class NfcCardUniqueUid1796500000000 implements MigrationInterface {
-  name = 'NfcCardUniqueUid1796500000000';
+export class NfcCardUniqueUid1796500000100 implements MigrationInterface {
+  name = 'NfcCardUniqueUid1796500000100';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     const groups: ResolvedGroup[] = await queryRunner.query(
