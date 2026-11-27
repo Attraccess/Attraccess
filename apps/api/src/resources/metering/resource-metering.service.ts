@@ -227,16 +227,19 @@ export class ResourceMeteringService implements OnModuleInit {
             definition.collect.interimIntervalMinutes * 60_000
         )
           continue;
-        if (await this.store.existsLifecycleAttempt(meter.resourceId)) continue;
-        const { byMeter } = await findActiveMeterSessions(this.store, meter.resourceId, [meter.id]);
-        const running = (byMeter.get(meter.id) ?? []).flatMap(({ session }) => (session ? [session] : []));
-        // A session measured per session is read at its own measuring point; everyone else shares one reading.
-        // Each session follows the allocation it captured at its start.
-        const own = running.filter((session) => session.accounting === 'per-session');
-        const shared = running.filter((session) => session.accounting !== 'per-session');
-        const targets = [...own, ...shared.slice(0, 1)];
-        this.interimAttempts.set(key, { at: Date.now(), running: true });
+        // Claim the meter before the next await, so an overlapping tick cannot start a second collection.
+        this.interimAttempts.set(key, { at: attempt?.at ?? 0, running: true });
+        let collected = false;
         try {
+          if (await this.store.existsLifecycleAttempt(meter.resourceId)) continue;
+          const { byMeter } = await findActiveMeterSessions(this.store, meter.resourceId, [meter.id]);
+          const running = (byMeter.get(meter.id) ?? []).flatMap(({ session }) => (session ? [session] : []));
+          // A session measured per session is read at its own measuring point; everyone else shares one reading.
+          // Each session follows the allocation it captured at its start.
+          const own = running.filter((session) => session.accounting === 'per-session');
+          const shared = running.filter((session) => session.accounting !== 'per-session');
+          const targets = [...own, ...shared.slice(0, 1)];
+          collected = true;
           for (const session of targets.length ? targets : [null])
             await this.runOperation(
               session ?? { id: null, meterId: meter.id, resourceId: meter.resourceId, usageId: null },
@@ -247,7 +250,9 @@ export class ResourceMeteringService implements OnModuleInit {
               },
             );
         } finally {
-          this.interimAttempts.set(key, { at: Date.now(), running: false });
+          if (collected) this.interimAttempts.set(key, { at: Date.now(), running: false });
+          else if (attempt) this.interimAttempts.set(key, attempt);
+          else this.interimAttempts.delete(key);
         }
       } catch (error) {
         this.logger.warn(`Meter ${meter.id} collection failed: ${this.reason(error)}`);
