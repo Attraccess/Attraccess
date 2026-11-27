@@ -19,7 +19,7 @@ both. Nothing has been printed or test-fitted yet: see [Not yet verified](#not-y
   the Attraccess wordmark unless a customer asks otherwise.
 - **Tap tile**: the card target over the NFC antenna, 36 mm square and 1.8 mm proud of the faceplate:
   a black top with a white keyhole on a white body. Its flange sits behind the cap's front wall, so it
-  cannot be pried off from outside. The board's eight LEDs shine into it from behind and light up the
+  cannot be pried off from outside. The board's 16 LEDs shine into it from behind and light up the
   white rim round the black top.
 - **Dock**: the back plate, 13.9 mm from the board's component side. It is screwed to the wall (five
   holes; the lower pair matches the 60 mm spacing of a flush-mount box) or onto the stand. Under the

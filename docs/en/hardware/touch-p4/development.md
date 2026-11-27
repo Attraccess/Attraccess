@@ -120,7 +120,7 @@ autorouter's committed result, a grid router for the remaining connections, and 
 | `build_sch.py`, `sch_*.py` | The schematic: title blocks, revision history, one layout per sheet, the drawing engine, connectivity check and overlap lint. |
 | `geometry.py`, `placement.py`, `board.py`, `board_setup.py` | Outline, display, slot, antenna, LED, sensor and dock positions, `COPPER_LAYERS`; part positions; zones, keep-outs, rules, net classes. |
 | `build_pcb.py` | Builds the board (`place`), exports and imports the autorouter files (`dsn`, `ses`), fills zones (`finish`). |
-| `routes_mcu.py`, `routes_board.py`, `routes_signal.py`, `routes_sdio.py`, `routes_wifi.py` | Fixed routes: MCU fan-out, flash, display bus; 48 V, Ethernet, DC filter, ground vias; the 90 ohm USB pair; the length-matched SDIO bus (HDG 1.4.9); the Wi-Fi module's converter. |
+| `routes_mcu.py`, `routes_board.py`, `routes_ring.py`, `routes_signal.py`, `routes_sdio.py`, `routes_wifi.py` | Fixed routes: MCU fan-out, flash, display bus; 48 V, Ethernet, DC filter, ground vias; antenna feeds and LED ring; the 90 ohm USB pair; the length-matched SDIO bus (HDG 1.4.9); the Wi-Fi module's converter. |
 | `finish_route.py`, `route_grid.py`, `post_route.py` | Grid router for what the autorouter leaves open; wider supply tracks, return and stitching vias, and `--fix` to take back what DRC flags. |
 | `silk.py`, `silk_refdes.py` | Silkscreen of both sides (logo from `case/logo/`, GPIO map, notes) and the designators. |
 | `check_overlap.py`, `check_netlist.py`, `test_design.py` | Overlapping bodies; netlist against `design.py` and I2C address clashes; the `test` target. |

@@ -59,11 +59,13 @@ Das 3D-druckbare Gehäuse selbst ist unter [Gehäuse](hardware/touch-p4/case.md)
 | Ethernet-Buchse | x 68,8 bis 84,9, y 71,2 bis 92,8, öffnet nach unten in ihren Ausschnitt. Pin-Reihen bei y 73,0 und 75,55, hinter dem Display |
 | Ausschnitt für den Ethernet-Stecker | x über 69,5, y über 92,5 (16,5 x 51) |
 | Ausschnitt für den DC-Stecker | x unter 12, y über 107,5 (12 x 36) |
-| NFC-Schleife | 35 x 37, Mitte (44,5; 117), auf der Displayseite |
-| LEDs | x 29,5; 39,5; 49,5; 59,5 bei y 95,6 und 139,0, jeweils in einem Fenster von 3,4 x 3,0 mit freigestellten Ecken |
-| Befestigungslöcher (3,2 mm) | (4; 3,5), (82; 3,5), (17,9; 139,4), (66,3; 117) |
-| DC-Buchse | x 1,2 bis 10,2, y 93,6 bis 108, öffnet nach unten in den DC-Ausschnitt |
-| DC-Klemme | Mitte (16,7; 100,2), die Drähte treten von unten im Winkel von 40 Grad ein |
+| Tap-Kachel (am Gehäuse) | Mitte (43; 117), auf der Mittellinie des Gehäuses; Schleife, LED-Ring und Kachel haben diese Mitte gemeinsam |
+| NFC-Schleife | 35 x 37, Mitte (43; 117), auf der Displayseite |
+| LEDs | 16 auf einem quadratischen Ring, auf jeder Seite 21,4 von (43; 117) entfernt (x 21,6 und 64,4, y 95,6 und 138,4), vier je Seite bei 5,35 und 16,05 von der Seitenmitte, 10,7 voneinander entlang des Rings; jede in einem Fenster von 3,4 x 3,0 mit freigestellten Ecken, die lange Seite entlang des Rings |
+| PN532-Block | unter dem Display, Chip bei (21,5; 80,1), Senderpins nach unten zu den Antennenzuleitungen |
+| Befestigungslöcher (3,2 mm) | (4; 3,5), (82; 3,5), (17,4; 140), (16; 122) |
+| DC-Buchse | x 0,2 bis 9,2, y 93,6 bis 108, öffnet nach unten in den DC-Ausschnitt |
+| DC-Klemme | Mitte (15,5; 100,2), die Drähte treten von unten im Winkel von 40 Grad ein |
 | USB-C | rechter Platinenrand, y 13,5 bis 22,5, öffnet seitlich |
 | Massepads des Displays (5 x 5, blank, Displayseite) | (12,0; 23,5), (64,2; 37,2), (48; 17), (18; 36,5) |
 
@@ -161,11 +163,18 @@ verwenden wäre ein neuer Display-Abschnitt.
 - **USB-C** liegt am Seitenrand hinter dem Display und braucht keine Öffnung im Gehäuse, wenn vor dem Zusammenbau
   geflasht wird.
 - **Befestigungslöcher.** Keine Leiterbahnen auf den äußeren Lagen innerhalb von 3,3 mm um die Mitte eines Lochs
-  (Schraubenköpfe oder Abstandshalter bis 6,6 mm). Am Loch neben der NFC-Schleife gibt es auch keine Kupferfläche auf
-  den äußeren Lagen (siehe [NFC](#nfc)).
+  (Schraubenköpfe oder Abstandshalter bis 6,6 mm). Das vierte Loch stand bei (66,3; 117) in der Lücke des Kupfers um
+  die NFC-Schleife, bis die Tap-Kachel auf etwa 44 mm wuchs. Das Gehäuse setzt um jedes Loch einen Dom mit 3,7 mm
+  Radius, mindestens 0,3 mm vom Körper der Kachel entfernt (LED-Ring plus 0,8, Ecken mit 5 bis 6 mm gerundet). Rechts
+  der Kachel bräuchte das x 69,2 oder mehr, der Ethernet-Ausschnitt lässt für die 1,9 mm Platine, die die anderen
+  Löcher haben, höchstens 66,0; unter der Kachel und zwischen ihr und dem Display ist auch kein Platz. Das Loch sitzt
+  bei (16; 122), zwischen Kachel und DC-Ausschnitt (Dom 1,1 mm von der Kachel, 2,4 mm Platine zum Ausschnitt), auf
+  Höhe einer LED des Rings, abseits seiner 5-V-Vias. Das dritte Loch rückte 0,6 mm zur Ecke, nach (17,4; 140), weg
+  von der unteren linken LED des Rings (1,9 mm Platine zum unteren Rand). Das untere rechte Viertel der Platine hat
+  jetzt keine Schraube: Der Körper der Kachel, flach auf der Displayseite um die Schleife, hält es.
 - **Summer** BZ701 strahlt seitlich ab, zum unteren Platinenrand (Schallöffnung auf der Seite zu U701): Nahe daran eine
   Öffnung lassen.
-- **LEDs** brauchen einen Diffusor vor den Fenstern.
+- **LEDs** brauchen einen Diffusor vor den Fenstern: den weißen Körper der Tap-Kachel, etwa 5 mm weißes ABS.
 - **NFC.** Kein Metall (Schrauben, Platten, geschirmtes Kabel) in oder direkt hinter der Schleife.
 
 ### Gehäusepassung
@@ -241,28 +250,30 @@ Schiene des WLAN-Moduls (U302, dieselbe Schaltung):
 | U103 | 0,70 | 0,25 | oben |
 | U302 | 0,47 | 0,34 | oben |
 | Hintergrundbeleuchtung (4S2P, 39 mA, AP3032) | 0,13 | 0,13 | 13 V bei 39 mA, 85 % |
-| 8 SK6812MINI-E | 0,30 | 0,10 (Firmware-Grenze) | 12 mA je Farbe; die Firmware hält alle Kanäle unter 100 mA |
+| 16 SK6812MINI-E | 0,58 | 0,10 (Firmware-Grenze) | 12 mA je Farbe; die Firmware hält alle Kanäle zusammen unter 100 mA |
 | PN532 | 0,12 | 0,12 | Sender 100 mA (die Anpassung hält ihn unter 60 mA) plus 20 mA |
 | Summer | 0,10 | 0, solange das NFC-Feld an ist | MLT-8530 95 mA bei 5 Vo-p; die Firmware piept, nachdem das Feld aus ist |
 | Pegelwandler, Entladewiderstände | 0,003 | 0,003 | |
-| **Summe** | **1,82** | **0,94** | |
+| **Summe** | **2,10** | **0,94** | |
 
 | Quelle | Nennwert | Reserve beim Maximum | Reserve bei Auslegung |
 |---|---|---|---|
-| USB-C (eFuse-Grenze) | mindestens 1,8 A (R110 1,65 k) | 48 % | -1 % |
-| DC-Wandler AP63205 | 2 A | 53 % | 9 % |
-| PoE-Modul DP9900M-5V | 1,8 A bis 70 °C (9 W), 1,2 A bei 85 °C (6 W) | 48 % (22 % bei 85 °C) | -1 % |
+| USB-C (eFuse-Grenze) | mindestens 1,8 A (R110 1,65 k) | 48 % | -17 % |
+| DC-Wandler AP63205 | 2 A | 53 % | -5 % |
+| PoE-Modul DP9900M-5V | 1,8 A bis 70 °C (9 W), 1,2 A bei 85 °C (6 W) | 48 % (22 % bei 85 °C) | -17 % |
 
 - Jede 5-V-Quelle behält bei den Maximalwerten der Hersteller mit den Firmware-Grenzen mindestens 30 % (LEDs unter 100
   mA; Summer und NFC-Feld nicht gleichzeitig). Unter diesen Grenzen beträgt die Summe der Auslegungswerte 1,52 A, 16 %
-  unter den Nennwerten von eFuse und PoE-Modul.
-- Bei den vollen 1,82 A hält das eFuse den Strom an seiner Grenze und lässt die Schiene einbrechen (automatischer
-  Neustart, TPS259470A), das PoE-Modul läuft 1 % über seinem Nennwert, und seine eigene Strombegrenzung deckt das ab.
+  unter den Nennwerten von eFuse und PoE-Modul. Die Grenze gilt für alle LEDs zusammen, die 16 LEDs des Rings lassen
+  diese Werte also, wie sie mit 8 waren.
+- Bei den vollen 2,10 A (alle 16 LEDs voll weiß, 0,58 A, was die Firmware nie zulässt) hält das eFuse den Strom an
+  seiner Grenze und lässt die Schiene einbrechen (automatischer Neustart, TPS259470A), das PoE-Modul läuft 17 % über
+  seinem Nennwert, und seine eigene Strombegrenzung deckt das ab, der DC-Wandler 5 %.
   Nichts wird beschädigt. Die Summe stapelt außerdem Werte, die nicht zusammenfallen (die 380 mA des P4 neben den 0,5 A
   seines Kerns, Emitterimpulse, die Auslegung des C5 von 0,6 A gegenüber seinen 426 mA).
 - Die Sicherung des DC-Eingangs (1,1 A Haltestrom bei 25 °C, 0,7 A bei 60 °C) ist mit allem eingeschaltet das knappste
   Bauteil: Der DC-Eingang zieht bei 12 V 0,75 A, wenn die 5-V-Schiene 1,5 A trägt; im typischen Betrieb bei 40 °C hält
-  sie 0,66 A gegenüber 0,28 A gezogenem Strom.
+  sie 0,65 A gegenüber 0,28 A gezogenem Strom.
 - Ohne Firmware (MCU im Reset) halten Widerstände LEDs, Hintergrundbeleuchtung und Summer aus. Das eFuse begrenzt USB
   auf 1,8 bis 2,2 A und öffnet unter 3,9 bis 4,0 V; DC-Wandler und PoE-Modul begrenzen sich selbst.
 
@@ -467,9 +478,13 @@ Die Isolation an einem bestückten Gerät prüfen, bevor das Labor es tut, und d
   mehr Induktivität). Nicht modelliert: die DC-Klemme 6 mm entfernt und, bei der LAN-Version, Ethernet-Stecker und Kabel
   8 mm neben der Schleife. Beide, und eine Karte oder ein Telefon, senken die Induktivität ein wenig.
 - **Kupfer um die Schleife** ist an einer Stelle offen: eine Lücke von 2,5 mm in allen Lagen zum Ethernet-Ausschnitt
-  hin, damit es keine Kurzschlusswindung ist (Metall über der Lücke: 1,25 auf 1,03 uH). Die Befestigungsschraube bei
-  (66,3; 117) steht in dieser Lücke, daher tragen die äußeren Lagen innerhalb von 3,3 mm um sie kein Kupfer. Mit der
-  Lücke nehmen die Kupferflächen 2 %; die Metallrückseite des Displays nimmt nichts, was zählt.
+  hin, auf Höhe der Schleifenmitte zwischen den LEDs 5 und 6 des Rings, damit es keine Kurzschlusswindung ist (Metall
+  über der Lücke: 1,25 auf 1,08 uH). Die 5-V-Schiene des LED-Rings ist dort ebenfalls offen: Ihre 100-nF-Kondensatoren
+  verbinden sie bei 13,56 MHz mit Masse, eine geschlossene Schiene schlösse die Windung also auch. Nur die
+  LED-Datenleitung kreuzt die Lücke; sie endet im Eingang einer LED, keiner niedrigen Impedanz. In der Lücke steht
+  keine Schraube mehr. `simulate` prüft jedes Netz, und Masse, 5 V und 3,3 V zusammen, auf um die Schleife
+  geschlossenes Kupfer. Mit der Lücke nehmen die Kupferflächen 2 %; die Metallrückseite des Displays nimmt nichts, was
+  zählt.
 - **Dämpfung:** 1,5 ohm je Zweig, Güte etwa 25. Je 20 bis 35 mW, höchstens 75 mW bei beliebiger Streuung der Bauteile
   für Schleifen bis 1,25 uH (ausgelegt für 0,1 W).
 - **EMV-Filter:** 560 nH und 220 pF je Seite, Eckfrequenz 14,3 MHz.
@@ -498,11 +513,52 @@ Die Isolation an einem bestückten Gerät prüfen, bevor das Labor es tut, und d
 - **PN532:** I2C gewählt mit I0 high, I1 low (NXPs Application Note; die Tabelle des Datenblatts allein lässt sich so
   und so lesen). Der eigene Regler des Chips speist Analog- und Senderversorgung; Reset-Schwelle 0,9 x die
   3,3-V-Versorgung, obwohl der Chip aus 5 V läuft. Die 100 nF der Analogversorgung des PN532 sitzen 4,1 mm von ihrem
-  Pin; die Vias des Senders nehmen den Platz darüber ein.
+  Pin; die Vias des Senders nehmen den Platz daneben ein.
+- **Lage.** Die Schleife sitzt auf der Mittellinie des Gehäuses (x 43), konzentrisch mit LED-Ring und Tap-Kachel. Der
+  PN532-Block (Chip, EMV-Filter, Anpassung, Dämpfung, Empfangspfad, Quarz, Versorgungen) stand zwischen DC-Ausschnitt
+  und Schleife, bis die linke Seite des Rings diese Spalte brauchte; er sitzt jetzt unter dem Display links vom
+  Flexkabel, so gedreht, dass die Senderpins nach unten zeigen, mit denselben Bauteilen an denselben Stellen relativ
+  zum Chip. Die Antennenzuleitungen laufen von den Dämpfungswiderständen auf der Rückseite zwischen den Ausschnitten
+  der oberen linken Ecke des Rings hindurch, dann auf der Vorderseite zu den Enden der Schleife: etwa 25 mm
+  Zuleitungspaar statt 12. Das fügt geschätzt 10 nH (unter 1 % der Schleife) in Reihe hinzu, die `sim/nfc_loop.py`
+  nicht abbildet (es nimmt die Schleife aus dem Footprint); die Abstimmung am aufgebauten Gerät erfasst sie.
 
 Das sind Startwerte. Zuerst die Schleife messen, dann C513/C517, C514/C515/C518/C519, R504/R505 und R506 mit einem
 Netzwerkanalysator an einem aufgebauten Gerät mit montiertem Display abstimmen. Die LAN-Version für sich abstimmen, mit
 eingestecktem Kabel ([Inbetriebnahmeplan](hardware/touch-p4/bring-up.md)).
+
+## LED-Ring
+
+16 SK6812MINI-E, umgekehrt bestückt: Jede leuchtet durch ein Fenster in der Platine in den weißen Körper der
+Tap-Kachel, einen Lichtleiter, der flach auf der Displayseite um die Schleife liegt. Das Gehäuse legt den weißen
+Randstreifen der Kachel genau über den Ring.
+
+- **Ring.** Ein Quadrat, auf jeder Seite 21,4 mm von der Mitte der Kachel (43; 117) entfernt. Enger lässt die
+  Schleife es nicht zu: Die Fenster halten die 1,03 mm vom Kupfer der Schleife (oben und unten 18,75 mm von der Mitte),
+  die die alte obere Reihe hatte; links und rechts ist die Schleife schmaler, 1,88 mm. Die lange Seite jeder LED liegt
+  entlang des Rings.
+- **Anzahl und Abstand.** Der Ring ist 171 mm lang; 16 LEDs stehen 10,7 mm auseinander, vier je Seite, einen halben
+  Abstand von jeder Ecke, sodass der Abstand auch um die Ecken gleich bleibt (zwei LEDs 5,35 mm beiderseits jeder
+  Ecke). Durch etwa 5 mm weißes ABS verschwimmt ein Lichtpunkt mit seinen Nachbarn, wenn die LEDs nicht weiter als
+  etwa die doppelte Dicke auseinander stehen; das Licht verteilt sich außerdem seitlich im Körper der Kachel, bevor es
+  am Rand austritt. 10,7 mm liegt an dieser Grenze, 12 LEDs (14,3 mm) zeigten Flecken, 20 (8,6 mm) brächten vier
+  Bauteile mehr für wenig. Ein erster Druck mit der Platine zeigt, ob der Rand gleichmäßig leuchtet; was bleibt, kann
+  die Firmware durch Dimmen ausgleichen. Auf den Ecken sitzt nichts: Eine LED dort stieße an die DC-Klemme und ließe
+  keinen Platz für die Antennenzuleitungen.
+- **Datenleitung.** In der Reihenfolge der Kette ist LED 0 die obere linke, von der Bauteilseite gesehen; die Kette
+  läuft in dieser Ansicht im Uhrzeigersinn, für den Benutzer vorn also gegen den Uhrzeigersinn, oben rechts
+  beginnend. LED k ist D701 + k für k bis 7 und D702 + k ab 8 (D710 bis D717 kamen nach den Bauteilen der
+  Manipulationserkennung ins Blatt), ihr Kondensator C703 + k bzw. C708 + k. Die Datenleitung kreuzt die Lücke im
+  Kupfer um die Schleife zwischen den LEDs 5 und 6.
+- **5 V.** Eine 0,6-mm-Schiene auf In2 außerhalb des Rings, ein Via und ein 100-nF-Kondensator in der Lücke nach jeder
+  LED. Die Schiene ist dort offen, wo das Kupfer um die Schleife offen ist (zwischen den LEDs 5 und 6), sonst wäre sie
+  eine Kurzschlusswindung (siehe [NFC](#nfc)). Der Kondensator der LED 5 sitzt außerhalb des Rings, nicht in der
+  Lücke.
+- **Strom.** Die Firmware hält alle Kanäle aller LEDs zusammen unter 100 mA (Regel 20 in [Pinbelegung und
+  Firmware-Portierung](hardware/touch-p4/firmware-port.md)); mit 16 LEDs sind das im Mittel 6 mA je LED statt 12. Der
+  Auslegungswert, jeder Kanal mit 12 mA, verdoppelt sich auf 0,58 A ([Leistungsbilanz](#leistungsbilanz)).
+- **Kosten.** Acht LEDs und Kondensatoren mehr mit denselben Teilenummern: keine neue Stücklistenzeile, 0,4 bis 0,8 USD
+  je Platine ([Teile und Beschaffung](hardware/touch-p4/parts.md#kosten)).
 
 ## Ethernet
 
@@ -663,7 +719,7 @@ einem Raum mit 40 °C:
 
 | Rest der Platine | Modul sendet | USB | DC 12 V | PoE |
 |---|---|---|---|---|
-| typischer Betrieb | selten (0,40 W) | 57 bis 67 °C | 59 bis 70 °C | 63 bis 75 °C |
+| typischer Betrieb | selten (0,40 W) | 57 bis 67 °C | 59 bis 70 °C | 63 bis 77 °C |
 | typischer Betrieb | 40 % (0,78 W) | 59 bis 76 °C | 62 bis 79 °C | 65 bis 84 °C |
 | typischer Betrieb | 50 % (0,88 W) | 60 bis 78 °C | 62 bis 81 °C | 66 bis 86 °C |
 | typischer Betrieb | ständig (1,36 W) | 63 bis 89 °C | 65 bis 92 °C | 69 bis 97 °C |
@@ -759,16 +815,17 @@ das Datenblatt v0.7 und den Schaltplan 1.52 des ESP32-P4-Function-EV-Board.
 
 `sim/thermal.py`, Lehrbuchwerte für ruhende Luft, ±40 %, Anstieg über den Raum:
 
-| Versorgung | Typischer Betrieb | Platine | Wärmste Stelle | Display | WLAN-Modul: Platine darunter, Hohlraum | Alles lange eingeschaltet: Platine, LED-Reihen, Platine am WLAN-Modul, Hohlraum |
+| Versorgung | Typischer Betrieb | Platine | Wärmste Stelle | Display | WLAN-Modul: Platine darunter, Hohlraum | Alles lange eingeschaltet: Platine, LED-Ring, Platine am WLAN-Modul, Hohlraum |
 |---|---|---|---|---|---|---|
-| USB | 2,5 W | +22 K | +33 K | +16 K | +27 K, +16 K | +39 K, +70 K, +48 K, +29 K |
-| DC 12 V | 2,9 W | +26 K | +37 K | +19 K | +30 K, +19 K | +46 K, +75 K, +54 K, +34 K |
-| PoE | 3,5 W | +31 K | +40 K | +23 K | +35 K, +23 K | +52 K, +82 K, +60 K, +38 K |
+| USB | 2,5 W | +23 K | +30 K | +18 K | +29 K, +17 K | +39 K, +50 K, +50 K, +29 K |
+| DC 12 V | 2,9 W | +26 K | +35 K | +21 K | +32 K, +19 K | +47 K, +59 K, +56 K, +34 K |
+| PoE | 3,5 W | +31 K | +39 K | +24 K | +37 K, +23 K | +53 K, +63 K, +63 K, +39 K |
 
-Bei 25 °C ist der typische Betrieb weit von jeder Grenze entfernt. Bei 40 °C an PoE: Display 63 °C (Grenze 70), Luft um
-das PoE-Modul 71 °C (85), Luft außerhalb des WLAN-Moduls 63 bis 75 °C (85); Display und PoE-Modul mit weniger Reserve,
-als die Schätzung genau ist. Alles lange eingeschaltet liegt jenseits dessen, was das Gehäuse abführen kann (die
-LED-Reihen, auf schmalem Kupfer zwischen den Ausschnitten, 70 bis 80 K über dem Raum); die Firmware begrenzt die LEDs
+Bei 25 °C ist der typische Betrieb weit von jeder Grenze entfernt. Bei 40 °C an PoE: Display 64 °C (Grenze 70), Luft um
+das PoE-Modul 71 °C (85), Luft außerhalb des WLAN-Moduls 63 bis 77 °C (85); Display und PoE-Modul mit weniger Reserve,
+als die Schätzung genau ist. Alles lange eingeschaltet liegt jenseits dessen, was das Gehäuse abführen kann (der
+LED-Ring, auf schmalem Kupfer zwischen den Ausschnitten, 50 bis 63 K über dem Raum; die zwei Achterreihen erreichten 70
+bis 80 K); die Firmware begrenzt die LEDs
 und überwacht die Chiptemperatur. Nachrechnung von Hand: 3,4 W über die 0,0107 m² der Platine mit den
 Oberflächenkoeffizienten des Modells ergeben 31 K, innerhalb von 3 % des Modells.
 
@@ -806,8 +863,9 @@ Das Minimum der Platine ist auf 0,11 mm gesetzt.
 
 - **Von Hand per Skript geroutet und gesperrt:** 48-V-Netze, Ethernet-Paare und Mittelanzapfungen; die DC-Eingangskette,
   die Summerschaltung und der Ausgang des PoE-Moduls; die linken und unteren Pins des PHY; die Antennenzuleitungen und
-  der SDIO-Bus; die lokalen Verbindungen von Beschleunigungs- und Näherungssensor; der 5-V-Bus der oberen LED-Reihe und
-  die LED-Datenverbindung zwischen den Reihen; am MCU fast jeder Signalpin (vollständige Route oder eine feste
+  der SDIO-Bus; die lokalen Verbindungen von Beschleunigungs- und Näherungssensor; der LED-Ring (Datenleitung von LED
+  zu LED, das 5-V-Pad jeder LED zu ihrem Kondensator und einem Via, und die 5-V-Schiene auf In2 um den Ring, offen an
+  der Lücke des Kupfers um die Schleife); am MCU fast jeder Signalpin (vollständige Route oder eine feste
   Leiterbahn zu einem Via, von dem aus der Router in jede Richtung weiterkann), mit benachbarten Vias abwechselnd in
   zwei Reihen und auf 0,45 bis 0,5 mm gespreizten Leiterbahnen; der Fan-out der NFC-Host-Signale am PN532; UART0 TX und
   das Backlight-PWM über die Rückseite.
@@ -825,7 +883,8 @@ Das Minimum der Platine ist auf 0,11 mm gesetzt.
   alle 5 mm und alle 2,5 mm entlang der Oberkante und um das WLAN-Modul. Keine Füllung ist mehr als 5,6 mm von einem
   Masse-Via entfernt. Von 42 Vias schneller Signale haben 25 ein Masse-Via innerhalb von 1,5 mm; 6 keines innerhalb von
   3 mm (höchstens 3,8 mm), an den dicht gepackten Ethernet-Vias über dem MCU und am PHY.
-- **Spannungsabfall** (`sim/irdrop.py`): höchstens 0,13 V an der fernen LED-Reihe mit 1,5 A auf 5 V; keine äußere
+- **Spannungsabfall** (`sim/irdrop.py`): höchstens 0,07 V mit 1,9 A auf 5 V (jede Last mit ihrem Auslegungswert, die 16 LEDs mit
+  je 36 mA); keine äußere
   Leiterbahn über dem Strom für 20 K Anstieg. Die 1,5 A des USB-Eingangs laufen 13 mm auf einer 0,62 mm breiten inneren
   Leiterbahn, 0,1 mm von einer Fläche, die ihre 70 mW aufnimmt.
 - Teardrops werden nicht hinzugefügt (KiCad erzeugt sie nur interaktiv); die größeren Via-Pads übernehmen einen Teil
@@ -954,7 +1013,9 @@ und Last). Keine Brücken in den Leitungen.
   Vias fest in den Füllungen.
 - **LED-Footprint:** KiCads, mit um 0,1 mm kürzeren Pads, sodass sie 0,3 mm Abstand zum gefrästen Fenster von 3,4 x 3,0
   mm mit freigestellten Ecken halten (runde gefräste Ecken, eckiger LED-Körper 3,2 x 2,8 mm, 0,2 mm Umrisstoleranz).
-  Kopfüber montiert, sind die Pads das Spiegelbild der Zeichnung.
+  Kopfüber montiert, sind die Pads das Spiegelbild der Zeichnung. Courtyard 0,1 mm um Pads und Fenster (IPC-7351B,
+  geringste Materialdichte) statt KiCads 0,25 mm: Die zwei LEDs an jeder Ecke des Rings stehen rechtwinklig
+  zueinander, ihre Courtyards 0,13 mm auseinander.
 - **Spulen-Footprints** sind als SMD markiert, damit ein Bestückungsexport nur für SMD sie behält.
 - **Bestückungswinkel** von PN532 (Tokmas), Transistor, Widerstandsarrays und Pegelwandler weichen von JLCPCBs
   Bibliothek ab; der Export korrigiert sie. `check-footprints` vergleicht jedes Footprint mit JLCPCBs Bibliothek.

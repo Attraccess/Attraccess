@@ -15,7 +15,7 @@ ihrer Bauteile. Mit **Harte Anforderung** markierte Regeln sind Pflicht, keine E
 | # | Regel | Was sonst passiert | Detail |
 |---|---|---|---|
 | 1 | Den Buzzer-Pin (GPIO46) nie auf High lassen; den Ton in jedem Fehlerpfad beenden | 180 mA Gleichstrom durch die Spule, das Doppelte ihres Nennwerts; ihr Widerstand ist überlastet | [NFC, Buzzer und LEDs](#nfc-buzzer-und-leds) |
-| 2 | LEDs: Weiß höchstens mit 70 %, nur für Sekunden. Dauerlicht mit 30 % oder weniger | Die LED-Reihen sitzen auf schmalem Kupfer zwischen den Aussparungen; dauerhaft weißes Licht mit 70 % macht sie etwa 30 K wärmer als den Rest der Platine | [Temperatur](#temperatur) |
+| 2 | LEDs: Weiß höchstens mit 70 %, nur für Sekunden. Dauerlicht mit 30 % oder weniger | Die LEDs sitzen auf schmalem Kupfer zwischen den Aussparungen; dauerhaft weißes Licht mit 70 % macht sie etwa 10 K wärmer als den Rest der Platine | [Temperatur](#temperatur) |
 | 3 | Den Temperatursensor des Chips lesen; über etwa 80 °C erst die LEDs, dann die Hintergrundbeleuchtung dimmen | In einem Raum von 40 °C am PoE kommen das Display und das PoE-Modul nahe an ihre Grenzen | [Temperatur](#temperatur) |
 | 4 | Den Reset des Ethernet-PHY über den IO-Expander pulsen, bevor der EMAC startet | Der PHY kann mit falscher Adresse oder ohne Takt hochkommen | [Ethernet](#ethernet) |
 | 5 | esp-hosted: Board „none“, SDMMC-Slot 0, Reset-GPIO 45; die Reset-Leitung muss auf High enden | Die Vorgaben sind die von Espressifs Platine (Slot 1, GPIO54); der C5 bleibt im Reset: `send_op_cond returned 0x107` | [WLAN-Co-Prozessor](#wlan-co-prozessor-esp-hosted) |
@@ -73,7 +73,7 @@ nach dem Hochlaufen der 3,3-V-Schiene 120 bis 280 ms im Reset (der Chip verlangt
 | 44 | SDIO CMD | 51 k Pull-up |
 | 45 | C5_EN | setzt den ESP32-C5 zurück, über 1 k |
 | 46 | BUZZER | 2,7-kHz-Rechtecksignal, High = Spule an |
-| 47 | LED_DATA | 8 x SK6812, GRB, 800 kbit/s; 100 k Pull-down |
+| 47 | LED_DATA | 16 x SK6812 im Ring, GRB, 800 kbit/s; 100 k Pull-down |
 | 48 | nicht beschaltet | |
 | 49 | NFC_IRQ | PN532 P70_IRQ, active low |
 | 50 | NFC_RST | PN532 RSTPD_N, 10 k Pull-down: auf High treiben, damit er läuft |
@@ -301,10 +301,14 @@ Start setzen:
   High lassen: Die Spule führt dann 180 mA Gleichstrom, das Doppelte ihres Nennwerts, und ihr
   Vorwiderstand mehr, als er verträgt. Den Ton in jedem Fehlerpfad beenden und spätestens nach wenigen
   Sekunden; ihn nur ertönen lassen, solange das NFC-Feld aus ist.
-- **LEDs**: acht adressierbare LEDs an GPIO47 (`led_strip`, RMT). Aus Sicht des Benutzers beginnt die
-  Kette oben rechts am NFC-Feld, läuft von rechts nach links am oberen Rand entlang (LED 1 bis 4), dann
-  von links nach rechts am unteren Rand (LED 5 bis 8). Weiß höchstens mit 70 % (die Grenze des
-  LED-Datenblatts für alle drei Farben zusammen); siehe Regeln 2 und 20. Ein Widerstand hält die
+- **LEDs**: 16 adressierbare LEDs an GPIO47 (`led_strip`, RMT, `max_leds` 16), gleichmäßig verteilt in
+  einem quadratischen Ring unter dem Rand der Tap-Kachel, vier je Seite, keine auf einer Ecke. Aus Sicht
+  des Benutzers beginnt die Kette am rechten Ende der Oberseite und läuft gegen den Uhrzeigersinn um den
+  Ring: oben von rechts nach links (LED 1 bis 4), die linke Seite hinunter (LED 5 bis 8), unten von links
+  nach rechts (LED 9 bis 12), die rechte Seite hinauf (LED 13 bis 16). Benachbarte LEDs stehen entlang
+  des Rings 10,7 mm auseinander, auch um die Ecken, sodass eine Animation gleichmäßig nach dem Index
+  fortschreitet. Weiß höchstens mit 70 % (die Grenze des LED-Datenblatts für alle drei Farben zusammen);
+  siehe Regeln 2 und 20: Die 100-mA-Grenze gilt für alle 16 zusammen. Ein Widerstand hält die
   Datenleitung auf Low, daher bleiben die LEDs während des Resets dunkel.
 
 ### Secure Boot und Chip-Revision
@@ -326,8 +330,8 @@ Er liest den Chip, den die thermische Schätzung 5 K über der Platine darunter 
 bis 40 K über dem Raum ansetzt.
 
 - Das geschlossene Gehäuse enthält 2,5 bis 3,5 W, daher bestimmen Raumtemperatur und LEDs, wie warm es
-  wird. Geschätzter Anstieg der Platine über den Raum im typischen Betrieb: 22 K (USB), 26 K (DC), 31 K
-  (PoE); wenn lange alles an ist 39 bis 52 K, mit den LED-Reihen bei 70 bis 82 K.
+  wird. Geschätzter Anstieg der Platine über den Raum im typischen Betrieb: 23 K (USB), 26 K (DC), 31 K
+  (PoE); wenn lange alles an ist 39 bis 53 K, mit dem LED-Ring bei 50 bis 63 K.
 - In einem Raum von 40 °C am PoE setzt die Schätzung das Display auf 63 °C (Grenze 70 °C) und die Luft um
   das PoE-Modul auf 71 °C (Grenze 85 °C) an: knapper, als die Schätzung genau ist.
 - Über etwa 80 °C am Chip: erst die LEDs dimmen, dann die Hintergrundbeleuchtung, und das melden; reicht

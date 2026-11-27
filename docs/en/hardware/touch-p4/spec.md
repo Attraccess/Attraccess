@@ -49,7 +49,7 @@ the NFC field is on. Internal rails: 3.3 V (TLV62569, 2 A, 36 % headroom at the 
 | Wi-Fi and Bluetooth LE | ESP32-C5-MINI-1 module (esp-hosted over SDIO) | Wi-Fi 6 on 2.4 GHz and 5 GHz (EU channels 36 to 64 indoors only, and 100 to 140), Bluetooth LE 5; the module's own PCB antenna in the board's top left corner |
 | Ethernet (lan) | IP101GRI PHY, HY931147C jack with magnetics | 10/100 Mbit/s, RMII |
 | USB-C | ESP32-P4 USB Serial/JTAG | flashing, console and debugging (USB 2.0 full speed) |
-| Feedback | 8 RGB LEDs SK6812MINI-E, buzzer | the LEDs shine through the board around the NFC area |
+| Feedback | 16 RGB LEDs SK6812MINI-E, buzzer | the LEDs shine through the board in a ring round the NFC area, into the tap tile's rim |
 | Tamper | LIS2DH12 accelerometer, VCNL4040 proximity sensor, DRV5032 hall switch | knocks and tilt, the reader leaving its dock |
 | Service | RESET and BOOT buttons, UART0 and supply test points | inside the case |
 

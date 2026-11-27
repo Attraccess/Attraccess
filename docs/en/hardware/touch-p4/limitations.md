@@ -114,7 +114,7 @@ not reopened without a new reason.
 - **Reached.** Every cable port, the display edges and flex, the NFC area and the glass. Not shown: the LED
   windows (SK6812MINI-E rated 2 kV HBM, a handling figure), the buzzer holes (no rating for buzzer or FET)
   and the two floating lock screws.
-- **Why.** A diode at each of eight LEDs, the buzzer and the screws is not practical; what decides these is
+- **Why.** A diode at each of 16 LEDs, the buzzer and the screws is not practical; what decides these is
   the air and surface path through the case, which no datasheet gives.
 - **Mitigation.** ESD pre-test on the first readers before the lab: 8 kV air on every LED window, the
   buzzer holes, the seams and the glass edges, 4 kV contact on the lock screws.
@@ -146,7 +146,7 @@ What only a built board can settle. Each is a step in the [Bring-up plan](hardwa
 | Wi-Fi range | The antenna model is a stand-in of the same size and kind, not Espressif's antenna | Range on both bands against a reader in use, in the case on the wall |
 | esp-hosted link | Two unresolved reports from custom boards (timeouts, CRC errors put down to timing margin); unknown whether the C5's SDIO unit behaves like the C6's | Raw throughput and error count at 40 and 50 MHz before anything else uses the link |
 | PoE isolation | The copper keeps the 3 mm rule; what lies inside parts and assembly is untested: the module, C102, and the tape between jack pin 9 and the display | Isolation test on an assembled unit before the lab; ask the lab whether it tests it |
-| Heat | Estimate ±40 %; inside limits in typical use, little to spare on PoE at 40 °C (display 63 °C of 70, Wi-Fi module's air up to 75 °C of 85) | Closed case on the wall, after an hour, including the air beside the Wi-Fi module. If warmer, LEDs and backlight are what the firmware takes back |
+| Heat | Estimate ±40 %; inside limits in typical use, little to spare on PoE at 40 °C (display 64 °C of 70, Wi-Fi module's air up to 77 °C of 85) | Closed case on the wall, after an hour, including the air beside the Wi-Fi module. If warmer, LEDs and backlight are what the firmware takes back |
 | Tamper sensors | Proximity reading depends on the dock's colour; infrared through the white plastic; hall switch on at the dock, off after 9 to 33 mm of lift (simulated) | Readings on and off the dock with the dock colours in use, with light on the case; hall switch distances; whether the magnet changes the buzzer's sound; accelerometer thresholds that tell a knock from a door closing |
 | Hot-plugging a 24 V supply | Simulated: converter input at most 31 V at 24 V (34.7 V at 26.4 V), limit 40 V | Measure on the first board with a few metres of thick wire to a stiff supply |
 | Surge levels | EN 50130-4:2011 surge levels for DC lines not yet read from the purchased standard | Read before the lab ([CE and market checklist](hardware/touch-p4/compliance.md)) |

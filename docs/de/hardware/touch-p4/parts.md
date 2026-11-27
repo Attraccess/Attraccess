@@ -45,7 +45,7 @@ seines Herstellers vor.
 | HRO TYPE-C-31-M-12 | J101 | nicht angegeben | keine gefunden |
 | Same Sky (CUI) PJ-002A | J102 | Aktiv | [DigiKey](https://www.digikey.com/en/products/detail/same-sky-formerly-cui-devices/PJ-002A/96962) |
 | WAGO 250-202 | J103 | Aktiv | [DigiKey](https://www.digikey.com/en/products/detail/wago-corporation/250-202/15573398) |
-| OPSCO SK6812MINI-E | D701 bis D708 | nicht angegeben | keine gefunden |
+| OPSCO SK6812MINI-E | D701 bis D708, D710 bis D717 | nicht angegeben | keine gefunden |
 | Huaneng MLT-8530 | BZ701 | nicht angegeben | keine gefunden |
 
 ## Freigegebene Alternativen
@@ -161,6 +161,11 @@ Display-Panel, das JLCPCB nicht bestückt.
 - Bei 1000 Platinen schlägt JLCPCB einen 2-x-1-Nutzen vor (182 x 143,5 mm, 500 Nutzen), um die
   Bestückungskosten zu senken. Nicht angefragt.
 - Die WLAN-Version lässt die Ethernet- und PoE-Bauteile weg; allein das PoE-Modul kostet 4,50 pro Platine.
+- **Nach diesem Angebot** kamen für die Tap-Kachel acht SK6812MINI-E (D710 bis D717) und acht 100-nF-Kondensatoren
+  (C716 bis C723) zum LED-Ring hinzu, mit Teilenummern, die die Platine schon hat: keine neue Stücklistenzeile und
+  keine Feeder-Gebühr. Mit den Preisen von LCSC für die LED (0,093 je Stück ab 5, 0,048 ab 2000, November 2026)
+  und JLCPCBs Bestückung je Lötstelle sind das etwa 0,8 USD je Platine bei 5 bis 10 Platinen und 0,4 bei 1000; das
+  nächste Angebot bestätigt es.
 
 ### Lagen, Vias und Oberfläche
 

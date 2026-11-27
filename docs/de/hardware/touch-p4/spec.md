@@ -51,7 +51,7 @@ Schienen: 3,3 V (TLV62569, 2 A, 36 % Reserve bei den Auslegungswerten), 1,1-V-Ke
 | WLAN und Bluetooth LE | Modul ESP32-C5-MINI-1 (esp-hosted über SDIO) | Wi-Fi 6 auf 2,4 GHz und 5 GHz (EU-Kanäle 36 bis 64 nur in Innenräumen, und 100 bis 140), Bluetooth LE 5; die eigene Platinenantenne des Moduls in der oberen linken Ecke der Platine |
 | Ethernet (lan) | PHY IP101GRI, Buchse HY931147C mit Übertrager | 10/100 Mbit/s, RMII |
 | USB-C | ESP32-P4 USB Serial/JTAG | Flashen, Konsole und Debugging (USB 2.0 Full Speed) |
-| Rückmeldung | 8 RGB-LEDs SK6812MINI-E, Summer | die LEDs leuchten durch die Platine rund um den NFC-Bereich |
+| Rückmeldung | 16 RGB-LEDs SK6812MINI-E, Summer | die LEDs leuchten durch die Platine in einem Ring um den NFC-Bereich, in den Rand der Tap-Kachel |
 | Manipulationsschutz | Beschleunigungssensor LIS2DH12, Näherungssensor VCNL4040, Hall-Schalter DRV5032 | Klopfen und Neigung, der Leser verlässt sein Dock |
 | Service | Taster RESET und BOOT, UART0 und Testpunkte der Versorgung | im Gehäuse |
 

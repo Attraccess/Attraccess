@@ -23,7 +23,7 @@ the [Documentation](#documentation) list at the end leads to the details.
 | Ethernet (lan version) | IP101GRI PHY + HY931147C jack | 10/100, RMII |
 | PoE (lan version) | DP9900M-5V isolated module | IEEE 802.3af |
 | Power | DC 12 to 24 V (barrel jack or WAGO terminal), PoE, or USB-C 5 V | any combination may be connected; USB-C is the service port for flashing and debugging |
-| Feedback | 8 RGB LEDs (SK6812MINI-E), buzzer | the LEDs shine through the board around the NFC area |
+| Feedback | 16 RGB LEDs (SK6812MINI-E), buzzer | the LEDs shine through the board in a ring round the NFC area, into the tap tile's rim |
 | Tamper detection | LIS2DH12 accelerometer, VCNL4040 proximity sensor, DRV5032 hall switch | knocks, tilt, and the reader leaving its dock; the firmware does not read them yet |
 
 Values, ranges and limits are in the [specification](hardware/touch-p4/spec.md); the

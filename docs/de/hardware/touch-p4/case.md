@@ -20,7 +20,7 @@ passt in beide. Noch nichts wurde gedruckt oder anprobiert: siehe [Noch nicht ge
   Leser werden mit dem Attraccess-Schriftzug ausgeliefert, sofern ein Kunde nichts anderes wünscht.
 - **Tap-Kachel**: das Kartenziel über der NFC-Antenne, 36 mm im Quadrat und 1,8 mm über der Frontplatte:
   eine schwarze Oberseite mit weißem Schlüsselloch auf einem weißen Körper. Ihr Flansch sitzt hinter der
-  Frontwand der Kappe, so lässt sie sich von außen nicht abhebeln. Die acht LEDs der Platine leuchten von
+  Frontwand der Kappe, so lässt sie sich von außen nicht abhebeln. Die 16 LEDs der Platine leuchten von
   hinten hinein und lassen den weißen Rand um die schwarze Oberseite leuchten.
 - **Dock**: die Rückplatte, 13,9 mm von der Bestückungsseite der Platine entfernt. Sie wird an die Wand
   geschraubt (fünf Löcher; das untere Paar entspricht dem 60-mm-Abstand einer Unterputzdose) oder auf den

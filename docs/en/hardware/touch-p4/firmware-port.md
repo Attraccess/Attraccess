@@ -14,7 +14,7 @@ marked **hard** are requirements, not advice.
 | # | Rule | Otherwise | Detail |
 |---|---|---|---|
 | 1 | Never leave the buzzer pin (GPIO46) high; stop the tone in every error path | 180 mA DC through the coil, twice its rating; its resistor overloaded | [NFC, buzzer and LEDs](#nfc-buzzer-and-leds) |
-| 2 | LEDs: white at 70 % at most, only for seconds. Steady light at 30 % or less | The LED rows sit on narrow copper between cut-outs; steady white at 70 % makes them about 30 K warmer than the rest of the board | [Temperature](#temperature) |
+| 2 | LEDs: white at 70 % at most, only for seconds. Steady light at 30 % or less | The LEDs sit on narrow copper between cut-outs; steady white at 70 % makes them about 10 K warmer than the rest of the board | [Temperature](#temperature) |
 | 3 | Read the chip's temperature sensor; dim LEDs, then backlight, above about 80 °C | In a 40 °C room on PoE the display and the PoE module get close to their limits | [Temperature](#temperature) |
 | 4 | Pulse the Ethernet PHY's reset through the IO expander before the EMAC starts | The PHY may come up with the wrong address or without its clock | [Ethernet](#ethernet) |
 | 5 | esp-hosted: board "none", SDMMC slot 0, reset GPIO 45; the reset line must end high | Defaults are those of Espressif's board (slot 1, GPIO54); the C5 stays in reset: `send_op_cond returned 0x107` | [Wi-Fi co-processor](#wi-fi-co-processor-esp-hosted) |
@@ -72,7 +72,7 @@ chip asks for 50 us).
 | 44 | SDIO CMD | 51 k pull-up |
 | 45 | C5_EN | resets the ESP32-C5, through 1 k |
 | 46 | BUZZER | 2.7 kHz square wave, high = coil on |
-| 47 | LED_DATA | 8 x SK6812, GRB, 800 kbit/s; 100 k pull-down |
+| 47 | LED_DATA | 16 x SK6812 in a ring, GRB, 800 kbit/s; 100 k pull-down |
 | 48 | not connected | |
 | 49 | NFC_IRQ | PN532 P70_IRQ, active low |
 | 50 | NFC_RST | PN532 RSTPD_N, 10 k pull-down: drive high to run |
@@ -286,10 +286,14 @@ start:
   high: the coil then carries 180 mA DC, twice its rating, and its series resistor more than it is made
   for. Stop the tone in every error path and after a few seconds at the latest; sound it only while the
   NFC field is off.
-- **LEDs**: eight addressable LEDs on GPIO47 (`led_strip`, RMT). Seen from the user, the chain starts top
-  right of the NFC field, runs right to left along the top (LED 1 to 4), then left to right along the
-  bottom (LED 5 to 8). White at 70 % at most (the LED datasheet's limit for all three colours together);
-  see rules 2 and 20. A resistor holds the data line low, so the LEDs stay dark during reset.
+- **LEDs**: 16 addressable LEDs on GPIO47 (`led_strip`, RMT, `max_leds` 16), evenly spaced in a square
+  ring under the rim of the tap tile, four per side, none on a corner. Seen from the user, the chain
+  starts at the right end of the top side and runs counter-clockwise round the ring: right to left along
+  the top (LED 1 to 4), down the left side (LED 5 to 8), left to right along the bottom (LED 9 to 12), up
+  the right side (LED 13 to 16). Adjacent LEDs are 10.7 mm apart along the ring, also round the corners,
+  so an animation steps evenly by index. White at 70 % at most (the LED datasheet's limit for all three
+  colours together); see rules 2 and 20: the 100 mA limit is for all 16 together. A resistor holds the
+  data line low, so the LEDs stay dark during reset.
 
 ### Secure boot and chip revision
 
@@ -310,8 +314,8 @@ driver). It reads the chip, which the thermal estimate puts 5 K above the board 
 above the room in typical use.
 
 - The closed case holds 2.5 to 3.5 W, so room temperature and LEDs decide how warm it gets. Estimated
-  board rise over the room in typical use: 22 K (USB), 26 K (DC), 31 K (PoE); with everything on for a
-  long time 39 to 52 K, with the LED rows at 70 to 82 K.
+  board rise over the room in typical use: 23 K (USB), 26 K (DC), 31 K (PoE); with everything on for a
+  long time 39 to 53 K, with the LED ring at 50 to 63 K.
 - In a 40 °C room on PoE the estimate puts the display at 63 °C (limit 70 °C) and the air around the PoE
   module at 71 °C (limit 85 °C): closer than the estimate is exact.
 - Above about 80 °C at the chip: dim the LEDs first, then the backlight, and report it; if that is not

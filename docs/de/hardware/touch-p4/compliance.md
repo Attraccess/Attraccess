@@ -218,7 +218,7 @@ Nicht auf der Platine umgesetzt: eine Sicherung, klein genug, um den DC-Eingang 
 | BASF Ultrafuse PC/ABS FR Black | V-0 bei 1,5 mm und 3,0 mm [BASF TDS] |
 | ROSA „ABS FR V0“ | Datenblatt mit „ABS+“ überschrieben, gibt HB bei 1,5 und 3,0 mm an [ROSA TDS]. ROSA um einen Nachweis für V-0 bitten; sich nicht auf den Produktnamen verlassen. |
 
-ABS passt sonst zum Leser: Filament Unger gibt für seines etwa 95 °C an [Unger guide]. Bei typischer Nutzung an PoE in einem Raum von 40 °C erreicht die wärmste Stelle etwa 80 °C und das WLAN-Modul 79 °C (Schätzung). Bei langem Betrieb mit allem eingeschaltet würden die LED-Reihen 70 bis 80 K wärmer als der Raum; die Firmware begrenzt die LEDs ([Simulationen](hardware/touch-p4/simulations.md)).
+ABS passt sonst zum Leser: Filament Unger gibt für seines etwa 95 °C an [Unger guide]. Bei typischer Nutzung an PoE in einem Raum von 40 °C erreicht die wärmste Stelle etwa 80 °C und das WLAN-Modul 79 °C (Schätzung). Bei langem Betrieb mit allem eingeschaltet würde der LED-Ring 50 bis 63 K wärmer als der Raum; die Firmware begrenzt die LEDs ([Simulationen](hardware/touch-p4/simulations.md)).
 
 ## Prüfungen an den Anschlüssen
 

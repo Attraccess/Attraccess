@@ -97,9 +97,9 @@ The estimate puts the board 23 to 31 K above the room in typical use, depending 
 | # | Step | Pass |
 |---|---|---|
 | 1 | Closed case on a wall, normal firmware state (display on, Wi-Fi connected, NFC polling, LEDs at idle), each supply in turn. After an hour: chip temperature sensor, display front, air inside through the bottom notch. | chip 30 to 40 K above room, display front 15 to 25 K |
-| 2 | All LEDs at their brightest steady level, backlight full; thermocouple beside D702 and D707 (the LED rows are the warmest place then) | set the firmware's LED limit from this; the power budget keeps all LEDs together below 100 mA in any case |
+| 2 | All LEDs at their brightest steady level, backlight full; thermocouple beside D701 and D710 (the LED ring is the warmest place then) | set the firmware's LED limit from this; the power budget keeps all LEDs together below 100 mA in any case |
 | 3 | On PoE: module U102 after an hour (it stands in air as warm as the board) | note the value |
-| 4 | Air beside the Wi-Fi module (what its 85 °C rating is about): fine thermocouple in the gap between the module's right edge and the pull-ups, not touching copper, closed case on PoE. Once in normal state, once with the module sending 40 % of the time (an upload in steps, the firmware's limit). | Expected in a 40 °C room: 63 to 75 °C and 65 to 84 °C (scale by the test's room temperature; [design-notes.md](hardware/touch-p4/design-notes.md#heat)). Less than 5 K left to 85 °C at 40 °C in the second case: lower the firmware's transmit limit. |
+| 4 | Air beside the Wi-Fi module (what its 85 °C rating is about): fine thermocouple in the gap between the module's right edge and the pull-ups, not touching copper, closed case on PoE. Once in normal state, once with the module sending 40 % of the time (an upload in steps, the firmware's limit). | Expected in a 40 °C room: 63 to 77 °C and 65 to 84 °C (scale by the test's room temperature; [design-notes.md](hardware/touch-p4/design-notes.md#heat)). Less than 5 K left to 85 °C at 40 °C in the second case: lower the firmware's transmit limit. |
 | 5 | For rooms above 30 °C: repeat step 1 in a warm box at that temperature | display specified to 70 °C |
 
 ## Ethernet and PoE (lan version)
@@ -126,8 +126,8 @@ The estimate puts the board 23 to 31 K above the room in typical use, depending 
 
 | # | Step | Pass |
 |---|---|---|
-| 1 | MCU held in reset; then light each LED in turn. Never all eight at full white (the LED datasheet allows 70 % for white). | dark in reset; order and colours right |
-| 2 | Brightest pattern the firmware allows, 5 V current against all LEDs dark (all channels of all eight LEDs count; [design-notes.md](hardware/touch-p4/design-notes.md#power)) | rise below 100 mA |
+| 1 | MCU held in reset; then light each LED in turn. Never all 16 at full white (the LED datasheet allows 70 % for white). | dark in reset; order and colours right |
+| 2 | Brightest pattern the firmware allows, 5 V current against all LEDs dark (all channels of all 16 LEDs count; [design-notes.md](hardware/touch-p4/design-notes.md#power)) | rise below 100 mA |
 | 3 | Beep at 2.7 kHz. The sound leaves the buzzer on the side facing the lower board edge. Never leave the buzzer pin high: coil and resistor are made for a tone, not for DC. | loud enough in a workshop; no audible noise, no disturbance on the display |
 | 4 | Ask for a beep while the reader polls for cards (the power budget relies on beeping only with the field off) | NFC transmitter current (NFC step 3) gone while the buzzer sounds |
 

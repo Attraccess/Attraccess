@@ -121,7 +121,7 @@ committete Ergebnis des Autorouters, einen Raster-Router für die übrigen Verbi
 | `build_sch.py`, `sch_*.py` | Der Schaltplan: Schriftfelder, Revisionshistorie, ein Layout je Blatt, die Zeichen-Engine, Konnektivitätsprüfung und Überlappungs-Lint. |
 | `geometry.py`, `placement.py`, `board.py`, `board_setup.py` | Umriss, Positionen von Display, Schlitz, Antenne, LEDs, Sensoren und Dock, `COPPER_LAYERS`; Bauteilpositionen; Kupferflächen, Sperrflächen, Regeln, Netzklassen. |
 | `build_pcb.py` | Baut die Platine (`place`), exportiert und importiert die Dateien des Autorouters (`dsn`, `ses`), füllt die Kupferflächen (`finish`). |
-| `routes_mcu.py`, `routes_board.py`, `routes_signal.py`, `routes_sdio.py`, `routes_wifi.py` | Feste Routen: MCU-Fan-out, Flash, Displaybus; 48 V, Ethernet, DC-Filter, Masse-Vias; das 90-Ohm-USB-Paar; der längenangepasste SDIO-Bus (HDG 1.4.9); der Wandler des WLAN-Moduls. |
+| `routes_mcu.py`, `routes_board.py`, `routes_ring.py`, `routes_signal.py`, `routes_sdio.py`, `routes_wifi.py` | Feste Routen: MCU-Fan-out, Flash, Displaybus; 48 V, Ethernet, DC-Filter, Masse-Vias; Antennenzuleitungen und LED-Ring; das 90-Ohm-USB-Paar; der längenangepasste SDIO-Bus (HDG 1.4.9); der Wandler des WLAN-Moduls. |
 | `finish_route.py`, `route_grid.py`, `post_route.py` | Raster-Router für das, was der Autorouter offen lässt; breitere Versorgungsleiterbahnen, Rückstrom- und Stitching-Vias, und `--fix`, um zurückzunehmen, was die DRC meldet. |
 | `silk.py`, `silk_refdes.py` | Bestückungsdruck beider Seiten (Logo aus `case/logo/`, GPIO-Übersicht, Hinweise) und die Bezeichner. |
 | `check_overlap.py`, `check_netlist.py`, `test_design.py` | Überlappende Körper; Netzliste gegen `design.py` und I2C-Adresskonflikte; das Target `test`. |

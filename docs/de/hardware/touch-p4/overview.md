@@ -24,7 +24,7 @@ die Liste [Dokumentation](#dokumentation) am Ende führt zu den Einzelheiten.
 | Ethernet (LAN-Version) | PHY IP101GRI + Buchse HY931147C | 10/100, RMII |
 | PoE (LAN-Version) | isoliertes Modul DP9900M-5V | IEEE 802.3af |
 | Stromversorgung | DC 12 bis 24 V (Hohlstecker oder WAGO-Klemme), PoE oder USB-C 5 V | beliebige Kombinationen dürfen angeschlossen sein; USB-C ist der Serviceport zum Flashen und Debuggen |
-| Rückmeldung | 8 RGB-LEDs (SK6812MINI-E), Summer | die LEDs leuchten rund um den NFC-Bereich durch die Platine |
+| Rückmeldung | 16 RGB-LEDs (SK6812MINI-E), Summer | die LEDs leuchten in einem Ring um den NFC-Bereich durch die Platine, in den Rand der Tap-Kachel |
 | Manipulationserkennung | Beschleunigungssensor LIS2DH12, Näherungssensor VCNL4040, Hall-Schalter DRV5032 | Klopfen, Kippen und der Leser, der sein Dock verlässt; die Firmware liest sie noch nicht aus |
 
 Werte, Bereiche und Grenzen stehen in der [Spezifikation](hardware/touch-p4/spec.md); die

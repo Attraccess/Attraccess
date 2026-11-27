@@ -43,7 +43,7 @@ last-time-buy notice from its maker.
 | HRO TYPE-C-31-M-12 | J101 | not stated | none found |
 | Same Sky (CUI) PJ-002A | J102 | Active | [DigiKey](https://www.digikey.com/en/products/detail/same-sky-formerly-cui-devices/PJ-002A/96962) |
 | WAGO 250-202 | J103 | Active | [DigiKey](https://www.digikey.com/en/products/detail/wago-corporation/250-202/15573398) |
-| OPSCO SK6812MINI-E | D701 to D708 | not stated | none found |
+| OPSCO SK6812MINI-E | D701 to D708, D710 to D717 | not stated | none found |
 | Huaneng MLT-8530 | BZ701 | not stated | none found |
 
 ## Approved alternates
@@ -153,6 +153,10 @@ not fit.
 - At 1000 boards JLCPCB suggests a 2 x 1 panel (182 x 143.5 mm, 500 panels) to lower the assembly cost.
   Not quoted.
 - The wifi version leaves out the Ethernet and PoE parts; the PoE module alone is 4.50 per board.
+- **After this quote** the LED ring for the tap tile added eight SK6812MINI-E (D710 to D717) and eight 100 nF
+  capacitors (C716 to C723) of part numbers the board already has: no new parts line and no feeder fee. At
+  LCSC's prices for the LED (0.093 each from 5, 0.048 from 2000, November 2026) and JLCPCB's placement per joint,
+  that is about 0.8 USD per board at 5 to 10 boards and 0.4 at 1000, to be confirmed by the next quote.
 
 ### Layers, vias and finish
 

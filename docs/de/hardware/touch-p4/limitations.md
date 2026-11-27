@@ -129,7 +129,7 @@ Abweichung; ohne neuen Grund wird es nicht wieder aufgerollt.
 - **Erreicht.** Jeder Kabelanschluss, die Kanten und das Flexkabel des Displays, der NFC-Bereich und das
   Glas. Nicht gezeigt: die LED-Fenster (die SK6812MINI-E ist mit 2 kV HBM bemessen, ein Handhabungswert),
   die Summerlöcher (keine Bemessung für Summer oder FET) und die zwei schwebenden Verschlussschrauben.
-- **Warum.** Eine Diode an jeder der acht LEDs, am Summer und an den Schrauben ist nicht praktikabel; was
+- **Warum.** Eine Diode an jeder der 16 LEDs, am Summer und an den Schrauben ist nicht praktikabel; was
   hier entscheidet, ist der Luft- und Kriechweg durch das Gehäuse, den kein Datenblatt angibt.
 - **Abhilfe.** ESD-Vortest an den ersten Lesern vor dem Labor: 8 kV Luft an jedem LED-Fenster, den
   Summerlöchern, den Fugen und den Glaskanten, 4 kV Kontakt an den Verschlussschrauben.
@@ -163,7 +163,7 @@ Was nur eine aufgebaute Platine klären kann. Jeder Punkt ist ein Schritt im
 | WLAN-Reichweite | Das Antennenmodell ist ein Platzhalter gleicher Größe und Art, nicht Espressifs Antenne | Reichweite auf beiden Bändern gegenüber einem Leser im Einsatz, im Gehäuse an der Wand |
 | esp-hosted-Verbindung | Zwei ungeklärte Berichte von eigenen Platinen (Zeitüberschreitungen, CRC-Fehler, auf zu knappes Timing zurückgeführt); unbekannt, ob sich die SDIO-Einheit des C5 wie die des C6 verhält | Raw-Durchsatz und Fehlerzahl bei 40 und 50 MHz, bevor irgendetwas anderes die Verbindung nutzt |
 | PoE-Isolation | Das Kupfer hält die 3-mm-Regel ein; was in den Bauteilen und in der Baugruppe liegt, ist ungeprüft: das Modul, C102 und das Klebeband zwischen Pin 9 der Buchse und dem Display | Isolationsprüfung an einer bestückten Einheit vor dem Labor; das Labor fragen, ob es sie prüft |
-| Wärme | Schätzung ±40 %; im typischen Betrieb innerhalb der Grenzen, wenig Reserve an PoE bei 40 °C (Display 63 °C von 70, Luft am WLAN-Modul bis 75 °C von 85) | Geschlossenes Gehäuse an der Wand, nach einer Stunde, einschließlich der Luft neben dem WLAN-Modul. Ist es wärmer, nimmt die Firmware LEDs und Hintergrundbeleuchtung zurück |
+| Wärme | Schätzung ±40 %; im typischen Betrieb innerhalb der Grenzen, wenig Reserve an PoE bei 40 °C (Display 64 °C von 70, Luft am WLAN-Modul bis 77 °C von 85) | Geschlossenes Gehäuse an der Wand, nach einer Stunde, einschließlich der Luft neben dem WLAN-Modul. Ist es wärmer, nimmt die Firmware LEDs und Hintergrundbeleuchtung zurück |
 | Manipulationssensoren | Der Wert des Näherungssensors hängt von der Farbe des Docks ab; Infrarot durch den weißen Kunststoff; Hall-Schalter auf dem Dock an, aus nach 9 bis 33 mm Anheben (simuliert) | Werte auf dem Dock und abseits davon mit den verwendeten Dockfarben, mit Licht auf dem Gehäuse; Schaltabstände des Hall-Schalters; ob der Magnet den Klang des Summers verändert; Schwellen des Beschleunigungssensors, die ein Klopfen von einer schließenden Tür unterscheiden |
 | Hot-Plug eines 24-V-Netzteils | Simuliert: Eingang des Wandlers höchstens 31 V bei 24 V (34,7 V bei 26,4 V), Grenze 40 V | An der ersten Platine messen, mit einigen Metern dickem Draht zu einem steifen Netzteil |
 | Surge-Pegel | Die Surge-Pegel der EN 50130-4:2011 für DC-Leitungen noch nicht in der gekauften Norm gelesen | Vor dem Labor lesen ([CE- und Marktcheckliste](hardware/touch-p4/compliance.md)) |
