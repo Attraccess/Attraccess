@@ -562,6 +562,44 @@ describe('BillingService', () => {
         );
       });
 
+      it('keeps a bill whose session price a negative flow item cancels out, completed at 0 with its items', async () => {
+        const bill = await pendingBill([{ name: 'Member discount', unitPrice: -10 }]);
+
+        const transaction = await f.service.chargeForResourceUsage(
+          billableUsage({ creditsPerUsage: 10 }),
+          fakeTransactionScope(),
+        );
+
+        expect(transaction).toMatchObject({ id: bill.id, status: BillingTransactionStatus.Completed });
+        expect(transaction?.amount).toBeCloseTo(0);
+        expect(transaction?.items).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ name: 'PER_SESSION', unitPrice: 10 }),
+            expect.objectContaining({ name: 'Member discount', unitPrice: -10 }),
+          ]),
+        );
+        expect(f.liveNotifications.notifyTransactionRemoved).not.toHaveBeenCalled();
+      });
+
+      it('keeps a bill whose flow items cancel out on a resource without rates', async () => {
+        const bill = await pendingBill([
+          { name: 'Material', unitPrice: 5 },
+          { name: 'Material refund', unitPrice: -5 },
+        ]);
+
+        const transaction = await f.service.chargeForResourceUsage(billableUsage(), fakeTransactionScope());
+
+        expect(transaction).toMatchObject({ id: bill.id, status: BillingTransactionStatus.Completed });
+        expect(transaction?.amount).toBeCloseTo(0);
+        expect(transaction?.items).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ name: 'Material', unitPrice: 5 }),
+            expect.objectContaining({ name: 'Material refund', unitPrice: -5 }),
+          ]),
+        );
+        expect(f.ledgerStore.transactions).toHaveLength(1);
+      });
+
       it('completes the bill at 0 while a priced meter reading is pending, as the anchor of its late correction', async () => {
         const bill = await pendingBill([{ name: 'Energy', unitPrice: 0 }]);
         f.ledgerStore.pendingPricedMeterUsages.add(22);
