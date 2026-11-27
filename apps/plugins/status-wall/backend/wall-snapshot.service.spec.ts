@@ -14,7 +14,7 @@ async function setup() {
   status.onModuleInit();
   snapshots.onModuleInit();
   fake.state.resources = [{ id: 1, name: 'Laser', imageUrl: null }];
-  const wall = await walls.create({ name: 'Hall', selection: { all: true, resourceIds: [], groupIds: [] } });
+  const wall = await walls.create(1, { name: 'Hall', selection: { all: true, resourceIds: [], groupIds: [] } });
   const advance = (ms: number) => (now = new Date(now.getTime() + ms));
   return { ...fake, snapshots, wall, advance };
 }

@@ -1,8 +1,9 @@
-import { Auth, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseIntPipe, Post, Put } from '@nestjs/common';
+import { Auth, NotAnMcpTool, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseIntPipe, Post, Put, Req } from '@nestjs/common';
 import {
   ApiBody,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -35,8 +36,10 @@ export class WallsController {
   @ApiOperation({ summary: 'Create a status wall' })
   @ApiBody({ type: WallBody })
   @ApiCreatedResponse({ type: WallDto })
-  create(@Body(validated(WallBody)) body: WallBody): Promise<Wall> {
-    return this.walls.create(body);
+  @ApiForbiddenResponse({ description: '"All resources" needs a manager who sees the whole machine list' })
+  @ApiNotFoundResponse({ description: 'A selected resource or group does not exist or is hidden from the caller' })
+  create(@Body(validated(WallBody)) body: WallBody, @Req() request: AuthenticatedRequest): Promise<Wall> {
+    return this.walls.create(request.user, body);
   }
 
   @Put(':id')
@@ -44,9 +47,14 @@ export class WallsController {
   @ApiParam(WALL_ID)
   @ApiBody({ type: WallBody })
   @ApiOkResponse({ type: WallDto })
-  @ApiNotFoundResponse()
-  update(@Param('id', ParseIntPipe) id: number, @Body(validated(WallBody)) body: WallBody): Promise<Wall> {
-    return this.walls.update(id, body);
+  @ApiForbiddenResponse({ description: '"All resources" needs a manager who sees the whole machine list' })
+  @ApiNotFoundResponse({ description: 'Unknown wall, or a selected resource or group that is missing or hidden' })
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body(validated(WallBody)) body: WallBody,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<Wall> {
+    return this.walls.update(request.user, id, body);
   }
 
   @Post(':id/regenerate')

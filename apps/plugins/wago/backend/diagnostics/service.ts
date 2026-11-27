@@ -1,4 +1,9 @@
-import { Auth, type PluginContext, type PluginFlowNodeReference } from '@attraccess/plugins-backend-sdk';
+import {
+  Auth,
+  ResourceVisible,
+  type PluginContext,
+  type PluginFlowNodeReference,
+} from '@attraccess/plugins-backend-sdk';
 import { Controller, Get, Inject, Injectable, NotFoundException, Param, ParseIntPipe } from '@nestjs/common';
 import type { WagoDiagnostics } from '../../diagnostics-types';
 import { type WagoResourceDiagnostics } from '../../diagnostics-types';
@@ -442,6 +447,7 @@ export class WagoDiagnosticsController {
     return this.diagnostics.get(id);
   }
   @Get('resources/:id/diagnostics')
+  @ResourceVisible('id')
   getResource(@Param('id', ParseIntPipe) id: number) {
     return this.diagnostics.getResource(id);
   }
