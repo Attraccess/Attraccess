@@ -19,7 +19,7 @@ export default class MatterPlugin implements AttraccessFrontendPlugin {
   pluginStore!: PluginStore;
 
   getPluginName(): string {
-    return 'matter-plugin@0.5.0';
+    return 'matter-plugin@0.5.1';
   }
 
   getDependencies(): string[] {

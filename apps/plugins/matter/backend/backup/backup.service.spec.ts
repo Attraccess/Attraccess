@@ -42,7 +42,7 @@ describe('MatterBackupService', () => {
     expect(readHeader(file)).toMatchObject({
       backupId: view.id,
       fabricId: view.fabricId,
-      pluginVersion: '0.5.0-alpha.0',
+      pluginVersion: '0.5.1-alpha.0',
     });
     const key = (await h.keys.currentKey())?.key as Buffer;
     const { body } = decryptBackup(file, key);

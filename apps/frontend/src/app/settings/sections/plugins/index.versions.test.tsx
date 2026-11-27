@@ -49,7 +49,7 @@ describe('PluginsSection update checks and version replacement', () => {
     expect(await screen.findByText('Plugin updates are available')).toBeInTheDocument();
     expect(
       screen.getByText(
-        '1 installed marketplace plugin can be updated. Review the available version before applying it.',
+        'One installed marketplace plugin has an update. Automatic updates are off, so nothing is installed on its own. Review the updates to install them.',
       ),
     ).toBeInTheDocument();
     expect(hoisted.checkAllInstalledPackagesMock).toHaveBeenCalledOnce();

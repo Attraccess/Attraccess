@@ -146,11 +146,14 @@ Lizenzschlüssel und E-Mail-Server (SMTP) sind keine Umgebungsvariablen. Tragen 
 
 ## Plugins
 
-| Variable          | Standard               | Beschreibung                                 |
-| ----------------- | ---------------------- | -------------------------------------------- |
-| `PLUGIN_DIR`      | `/app/storage/plugins` | Verzeichnis für Plugins                      |
-| `DISABLE_PLUGINS` | `false`                | Plugin-System deaktivieren                   |
-| `RESTART_BY_EXIT` | `false`                | Anwendung bei Absturz automatisch neustarten |
+| Variable                    | Standard               | Beschreibung                                 |
+| --------------------------- | ---------------------- | -------------------------------------------- |
+| `PLUGIN_DIR`                | `/app/storage/plugins` | Verzeichnis für Plugins                      |
+| `DISABLE_PLUGINS`           | `false`                | Plugin-System deaktivieren                   |
+| `RESTART_BY_EXIT`           | `false`                | Anwendung bei Absturz automatisch neustarten |
+| `ATTRACCESS_PLUGIN_CHANNEL` | `latest`               | Plugin-Release-Kanal: `latest` oder `next`   |
+
+`ATTRACCESS_PLUGIN_CHANNEL` ist das npm-Dist-Tag, das der Marktplatz und Plugin-Installationen standardmäßig verwenden: `latest` (veröffentlichte Plugin-Versionen) oder `next` (Nightly-Builds). Offizielle Release-Images verwenden `latest`; die Nightly-Images (`nightly-<sha>`, `nightly-latest`) setzen `next`, damit ein Nightly-Host die Nightly-Builds der Plugins installiert und neuere anbietet. Der Kanal schaltet die [automatischen Updates](plugins/installing-plugins.md#automatische-updates) nicht ein. Mit der Variable überschreiben Sie den Standard des Images; jeder andere Wert stoppt die API beim Start mit einem Konfigurationsfehler. Siehe [Plugins installieren](plugins/installing-plugins.md#release-kanäle).
 
 ## Statische Dateien
 

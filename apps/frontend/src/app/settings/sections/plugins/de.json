@@ -45,7 +45,7 @@
     "details": "Details",
     "installed": "Installiert",
     "update": "Plugin aktualisieren",
-    "updateDescription": "Prüfe kompatible veröffentlichte Versionen und aktualisiere dieses installierte Marketplace-Plugin.",
+    "updateDescription": "Prüfen Sie kompatible veröffentlichte Versionen und aktualisieren Sie dieses installierte Marketplace-Plugin.",
     "install": "Installieren",
     "noResults": "Keine Pakete gefunden. Inkompatible Pakete bleiben mit dem Grund sichtbar.",
     "loadError": "Der Marktplatz konnte nicht geladen werden.",
@@ -127,29 +127,67 @@
   },
   "noPermissions": "Keine angefordert",
   "updatePolicy": {
-    "title": "Automatische Updates",
-    "description": "Installierte Pakete werden nur in ihrer ursprünglichen Registry geprüft. Hauptversionen, neue Berechtigungen, Vorabversionen und veraltete Pakete werden nie automatisch installiert.",
-    "enabled": "Nach Updates suchen",
-    "enabledHint": "Deaktivierte Prüfungen lassen installierte Pakete unverändert.",
-    "mode": "Standard-Update-Regel",
-    "modeHint": "Ein Plugin kann eine strengere Regel verwenden.",
-    "prerelease": "Vorabversionen erlauben",
-    "prereleaseHint": "Vorabversionen werden nie automatisch installiert.",
     "checkNow": "Alle jetzt prüfen",
     "checked": "Plugin-Update-Prüfungen abgeschlossen",
     "checkError": "Plugin-Updates konnten nicht geprüft werden",
-    "saved": "Update-Regel gespeichert",
-    "saveError": "Update-Regel konnte nicht gespeichert werden",
     "available": "Update verfügbar",
     "availableTitle": "Plugin-Updates sind verfügbar",
-    "availableDescription": "{{count}} installiertes Marketplace-Plugin kann aktualisiert werden. Prüfe die verfügbare Version vor der Installation.",
     "reviewUpdates": "Updates prüfen",
-    "modes": {
-      "off": "Aus",
+    "availableDescription": {
+      "one": "Für ein installiertes Marktplatz-Plugin gibt es ein Update.",
+      "many": "Für {{count}} installierte Marktplatz-Plugins gibt es Updates."
+    },
+    "installsInWindow": "Automatische Updates sind eingeschaltet: Attraccess installiert die Updates, die seine Schutzregeln erlauben, im nächsten Update-Zeitfenster und startet dann neu. Sie können sie auch jetzt prüfen und installieren.",
+    "manualOnly": "Automatische Updates sind ausgeschaltet, es wird also nichts von selbst installiert. Prüfen Sie die Updates, um sie zu installieren.",
+    "checksOff": "Die Update-Prüfung ist ausgeschaltet, es wird also nichts von selbst installiert. Prüfen Sie die Updates, um sie zu installieren."
+  },
+  "autoUpdates": {
+    "title": "Automatische Updates",
+    "description": "Attraccess darf Plugin-Updates selbst installieren und neu starten, nur zu den Zeiten, die Sie wählen.",
+    "checks": "Nach Plugin-Updates suchen",
+    "enabled": "Updates automatisch installieren",
+    "offHint": "Aus: Attraccess zeigt verfügbare Updates an, installiert aber nichts und startet dafür nicht neu.",
+    "needsChecks": "Die Update-Prüfung ist ausgeschaltet, es wird also nichts installiert.",
+    "checksOffHint": "Die Update-Prüfung ist ausgeschaltet: Attraccess sucht weder nach Plugin-Updates noch installiert es welche.",
+    "step": "Größter Update-Schritt",
+    "stepHint": "Begrenzt, welche Updates gemeldet und, sobald automatische Updates eingeschaltet sind, installiert werden. Ein Plugin kann unter „Version verwalten“ eine eigene Einstellung haben.",
+    "steps": {
       "patch": "Nur Patches",
       "minor": "Patches und Minor",
       "follow": "Paketregel folgen"
-    }
+    },
+    "weekdays": "Wochentage",
+    "weekdaysRequired": "Wählen Sie mindestens einen Wochentag.",
+    "weekday": {
+      "1": "Montag",
+      "2": "Dienstag",
+      "3": "Mittwoch",
+      "4": "Donnerstag",
+      "5": "Freitag",
+      "6": "Samstag",
+      "7": "Sonntag"
+    },
+    "start": "Startzeit",
+    "startRequired": "Geben Sie eine Startzeit ein.",
+    "duration": "Dauer (Minuten)",
+    "durationHint": "1 bis 1440. Ein Zeitfenster darf über Mitternacht reichen.",
+    "durationInvalid": "Geben Sie eine Dauer von 1 bis 1440 Minuten ein.",
+    "timeZone": "Zeitzone",
+    "timeZoneHint": "Die Startzeit ist eine Uhrzeit in dieser Zone.",
+    "timeZoneRequired": "Wählen Sie eine Zeitzone.",
+    "nextWindow": "Nächstes Update-Zeitfenster: {{start}} bis {{end}} ({{timeZone}})",
+    "openWindow": "Update-Zeitfenster ist jetzt offen: {{start}} bis {{end}} ({{timeZone}})",
+    "restartNote": "Attraccess startet in diesem Zeitfenster neu, wenn es ein Update installiert hat.",
+    "save": "Speichern",
+    "turnOn": "Automatische Updates einschalten",
+    "discard": "Änderungen verwerfen",
+    "cancel": "Abbrechen",
+    "confirmTitle": "Automatische Updates einschalten?",
+    "confirmAction": "Einschalten",
+    "confirmMessage": "Attraccess installiert dann Plugin-Updates selbst und startet in den geplanten Zeitfenstern neu. Der Neustart unterbricht die Nutzung kurz.",
+    "saved": "Einstellungen für automatische Updates gespeichert",
+    "saveError": "Die Einstellungen für automatische Updates konnten nicht gespeichert werden",
+    "loadError": "Die Einstellungen für automatische Updates konnten nicht geladen werden"
   },
   "deleteTooltip": "Plugin entfernen",
   "deleteConfirmation": {
@@ -219,7 +257,7 @@
     "noVersions": "Es sind keine anderen Versionen verfügbar.",
     "detailsHeading": "Version {{version}}",
     "settingsHeading": "Update-Einstellungen",
-    "settingsDescription": "Diese Regeln bestimmen, welche Versionen die Update-Prüfung anbietet. Speichern installiert nichts.",
+    "settingsDescription": "Diese Regeln bestimmen, welche Versionen die Update-Prüfung anbietet und automatische Updates installieren dürfen. Beim Speichern wird nicht sofort etwas installiert.",
     "specDescription": "Eine genaue Version, ein Bereich wie ^1.2.0 oder ein Kanal wie latest.",
     "updateTo": "Auf {{version}} aktualisieren",
     "downgradeTo": "Auf {{version}} zurückstufen",
@@ -229,7 +267,8 @@
     "showOlderIncompatible": "{{count}} ältere inkompatible Versionen anzeigen",
     "hideOlderIncompatible": "Ältere inkompatible Versionen ausblenden",
     "details": "Release-Details",
-    "update": "Aktualisieren"
+    "update": "Aktualisieren",
+    "automaticUpdatesOff": "Automatische Updates sind auf diesem Host ausgeschaltet. Diese Einstellung installiert nichts, solange sie nicht unter „Automatische Updates“ eingeschaltet sind."
   },
   "dependencies": {
     "title": "Plugin-Abhängigkeiten",
@@ -241,7 +280,7 @@
     "reuse": "Bereits installiert · wird weiterverwendet",
     "replace": "Wird ersetzt",
     "requiredBy": "Von installierten Plugins benötigt",
-    "removalDescription": "Behalte dieses Plugin oder entferne die folgenden abhängigen Plugins ausdrücklich zusammen. Plugin-Daten bleiben erhalten.",
+    "removalDescription": "Behalten Sie dieses Plugin oder entfernen Sie die folgenden abhängigen Plugins ausdrücklich zusammen. Plugin-Daten bleiben erhalten.",
     "removeTogether": "Diese abhängigen Plugins ebenfalls entfernen",
     "approveChanges": "Ich bestätige die Installation dieser Abhängigkeiten und ihre Berechtigungen"
   }

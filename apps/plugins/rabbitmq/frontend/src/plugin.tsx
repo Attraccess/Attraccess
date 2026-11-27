@@ -74,7 +74,7 @@ function RabbitmqDetailPanels({ mqttServerId }: { mqttServerId: number }) {
 
 export default class RabbitmqPlugin implements AttraccessFrontendPlugin {
   getPluginName(): string {
-    return 'rabbitmq-plugin@0.2.0';
+    return 'rabbitmq-plugin@0.2.1';
   }
 
   getDependencies(): string[] {

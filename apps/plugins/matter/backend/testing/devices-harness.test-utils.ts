@@ -201,7 +201,7 @@ export async function createHarness() {
   const audit = jest.fn(async () => ({ status: 'recorded' as const }));
   const context = {
     hostVersion: '2.0.0',
-    manifest: { id: 'matter', name: 'matter', version: '0.5.0-alpha.0', pluginDirectory: 'matter' },
+    manifest: { id: 'matter', name: 'matter', version: '0.5.1-alpha.0', pluginDirectory: 'matter' },
     logger: { debug: jest.fn(), warn: jest.fn(), error: jest.fn(), log: jest.fn() },
     storage: fake.storage,
     persistence: fake.persistence,

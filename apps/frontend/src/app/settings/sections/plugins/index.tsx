@@ -1,4 +1,3 @@
-import { Button } from '@attraccess/plugins-frontend-ui';
 import { useGetPluginSystemStatus } from '@attraccess/react-query-client';
 import type { MarketplacePluginDto } from '@attraccess/react-query-client';
 import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react';
@@ -6,6 +5,8 @@ import { useState } from 'react';
 import { ReaderUiAlerts } from '../../../readerUi/ReaderUiAlerts';
 import { UploadPluginModal } from '../../../plugins/UploadPluginModal';
 import { SettingsSection } from '../../components/SettingsSection';
+import { AutomaticUpdatesPanel } from './autoUpdates/AutomaticUpdatesPanel';
+import { UpdatesAvailableAlert } from './installed/UpdatesAvailableAlert';
 import { PluginErrorModal } from './installed/PluginErrorModal';
 import { PluginsTable } from './installed/PluginsTable';
 import { PluginToolbar } from './installed/PluginToolbar';
@@ -38,8 +39,6 @@ export function PluginsSection() {
   const [versionPlugin, setVersionPlugin] = useState<VersionPlugin | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
 
-  const availableUpdates = installed.filter((plugin) => plugin.updateCheck?.state === 'available');
-
   return (
     <SettingsSection title={t('title')} description={t('description')} fullWidth>
       <div data-cy="plugins-list-card" className="flex flex-col gap-4">
@@ -51,24 +50,8 @@ export function PluginsSection() {
             </AlertContent>
           </Alert>
         ) : null}
-        {availableUpdates.length > 0 ? (
-          <Alert status="warning" data-cy="plugins-list-updates-available">
-            <AlertContent>
-              <AlertTitle>{t('updatePolicy.availableTitle')}</AlertTitle>
-              <AlertDescription>
-                {t('updatePolicy.availableDescription', { count: String(availableUpdates.length) })}
-              </AlertDescription>
-              <Button
-                className="mt-2"
-                variant="secondary"
-                size="sm"
-                onPress={() => setVersionPlugin(availableUpdates[0])}
-              >
-                {t('updatePolicy.reviewUpdates')}
-              </Button>
-            </AlertContent>
-          </Alert>
-        ) : null}
+        <AutomaticUpdatesPanel />
+        <UpdatesAvailableAlert onReview={setVersionPlugin} />
         <PluginToolbar
           onOpenMarketplace={() => marketplace.setIsOpen(true)}
           onOpenUpload={() => setIsUploadOpen(true)}

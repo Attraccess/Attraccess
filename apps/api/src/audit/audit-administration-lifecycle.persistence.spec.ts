@@ -321,7 +321,8 @@ describe('administration lifecycle hooks', () => {
       setUpdatePolicy: jest.fn().mockResolvedValue({
         checksEnabled: true,
         mode: 'minor',
-        maintenanceWindow: { startMinute: 180, durationMinutes: 60 },
+        automaticUpdates: true,
+        schedule: { weekdays: [1, 5], startMinute: 180, durationMinutes: 60, timeZone: 'Europe/Berlin' },
         prerelease: false,
       }),
     };
@@ -346,6 +347,16 @@ describe('administration lifecycle hooks', () => {
     });
     expect(events[3].details).not.toHaveProperty('migrationOutcome');
     expect(events[3].details).not.toHaveProperty('restartRequested');
+    expect(events.find((event) => event.action === 'plugin.update_policy_updated')?.details).toEqual({
+      checksEnabled: 1,
+      automaticUpdates: 1,
+      updateMode: 'minor',
+      maintenanceWeekdays: '1,5',
+      maintenanceStartMinute: 180,
+      maintenanceDurationMinutes: 60,
+      maintenanceTimeZone: 'Europe/Berlin',
+      prerelease: 0,
+    });
   });
 
   it('records observed install/replacement outcomes and preserves failed-operation errors without persisting their text', async () => {

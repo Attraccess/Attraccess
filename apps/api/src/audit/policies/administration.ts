@@ -39,7 +39,8 @@ export function safeAuditSender(value: string): string {
 export interface AdministrationAuditInput {
   action: string;
   operationId?: string;
-  actorId: number;
+  /** Null only for the system actor, on the actions the host performs on its own. */
+  actorId: number | null;
   authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number;
   subjectType: string;
@@ -175,7 +176,11 @@ export const registry = { registryId: identifier, registryName: text, registryUr
 
 export const policy = {
   checksEnabled: flag,
+  automaticUpdates: flag,
   updateMode: enumeration('off', 'patch', 'minor', 'follow'),
+  // ISO weekdays, comma separated; empty while no day is chosen.
+  maintenanceWeekdays: (v: unknown) => typeof v === 'string' && /^([1-7](,[1-7]){0,6})?$/.test(v),
+  maintenanceTimeZone: text,
   maintenanceStartMinute: count,
   maintenanceDurationMinutes: count,
   prerelease: flag,
@@ -338,6 +343,20 @@ function administrationDetails(
   return details;
 }
 
+/** What the host does without a user: installing a plugin update, restarting for it and reporting how it activated. */
+const SYSTEM_ACTIONS: readonly string[] = [
+  'plugin.replaced',
+  'plugin.restart_requested',
+  'plugin.activation_completed',
+];
+
+function validActor(input: AdministrationAuditInput): boolean {
+  if (input.actorId !== null) return positive(input.actorId);
+  return (
+    SYSTEM_ACTIONS.includes(input.action) && input.authenticationMethod === undefined && input.apiTokenId === undefined
+  );
+}
+
 export function projectAdministrationAuditEvent(input: AdministrationAuditInput): AdministrationAuditInput | null {
   try {
     const source = administrationEventFields(input);
@@ -349,8 +368,7 @@ export function projectAdministrationAuditEvent(input: AdministrationAuditInput)
     )
       return null;
     const rule = rules[input.action];
-    if (!rule || input.subjectType !== rule.subject || !positive(input.actorId) || !positive(input.subjectId))
-      return null;
+    if (!rule || input.subjectType !== rule.subject || !validActor(input) || !positive(input.subjectId)) return null;
     const method = input.authenticationMethod ?? 'session';
     if (
       !isAuthenticationMethod(method) ||

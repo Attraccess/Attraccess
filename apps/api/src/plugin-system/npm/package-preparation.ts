@@ -29,6 +29,7 @@ import {
   samePermissions,
   validateEntries,
   verifyIntegrity,
+  UPDATE_SETTINGS_VERSION,
 } from './package-models';
 
 import { NpmPackageCatalog } from './package-catalog';
@@ -162,6 +163,7 @@ export class NpmPackagePreparation {
         updateOverride: replacing?.updateOverride ?? 'inherit',
         updateCheck: null,
         knownGoodVersion: replacing?.version ?? null,
+        updateSettingsVersion: UPDATE_SETTINGS_VERSION,
       };
       return { installed, source, staging };
     } catch (error) {

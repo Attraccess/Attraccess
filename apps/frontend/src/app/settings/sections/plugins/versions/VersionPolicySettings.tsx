@@ -2,6 +2,7 @@ import { Button } from '@attraccess/plugins-frontend-ui';
 import {
   type InstalledNpmPluginDto,
   usePluginControllerUpdateInstalledPackagePolicy,
+  usePluginControllerUpdatePolicy,
 } from '@attraccess/react-query-client';
 import { Description, Input, Label, TextField } from '@heroui/react';
 import { useState } from 'react';
@@ -18,12 +19,16 @@ interface Props {
 
 const OVERRIDES = ['inherit', 'off', 'patch', 'minor', 'follow'] as const;
 
-/** The package's update rules. Saving them changes which versions update checks offer; it installs nothing. */
+/**
+ * The package's update rules: which versions update checks offer, and so which ones automatic updates may install.
+ * Saving them installs nothing right away.
+ */
 export function VersionPolicySettings({ packageName, fallbackSpec }: Props) {
   const { t } = usePluginsTranslations();
   const toast = useToastMessage();
   const { installedByName, mergeInstalled } = useInstalledNpmPlugins();
   const installed = installedByName.get(packageName);
+  const { data: globalUpdatePolicy } = usePluginControllerUpdatePolicy();
   const { mutateAsync: updateInstalledPluginPolicy, isPending } = usePluginControllerUpdateInstalledPackagePolicy();
   const [requestedSpec, setRequestedSpec] = useState(installed?.requestedSpec ?? fallbackSpec);
   const [updateOverride, setUpdateOverride] = useState<InstalledNpmPluginDto['updateOverride']>(
@@ -55,6 +60,11 @@ export function VersionPolicySettings({ packageName, fallbackSpec }: Props) {
         onChange={(value) => setUpdateOverride(value as InstalledNpmPluginDto['updateOverride'])}
         items={OVERRIDES.map((value) => ({ key: value, label: t(`versionManagement.overrides.${value}`) }))}
       />
+      {globalUpdatePolicy && !globalUpdatePolicy.automaticUpdates ? (
+        <p className="text-sm text-muted" data-cy="plugins-list-override-inactive-hint">
+          {t('versionManagement.automaticUpdatesOff')}
+        </p>
+      ) : null}
       <Button variant="secondary" className="self-start" isPending={isPending} onPress={() => void save()}>
         {t('versionManagement.savePolicy')}
       </Button>

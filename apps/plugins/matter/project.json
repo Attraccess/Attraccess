@@ -148,7 +148,7 @@
     },
     "pack": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["build"],
       "inputs": ["{projectRoot}/package/**/*"],
       "outputs": ["{projectRoot}/dist"],
@@ -159,7 +159,7 @@
     },
     "pack-test": {
       "executor": "nx:run-commands",
-      "cache": true,
+      "cache": false,
       "dependsOn": ["pack", "plugins-backend-sdk:build"],
       "inputs": [
         "{projectRoot}/package/**/*",
