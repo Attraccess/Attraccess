@@ -60,6 +60,15 @@ render() {
     stamp_generated board-render
 }
 
+# The board with every component's 3D model as one STL, and the bare board as STEP, for the printable mock board
+# (case/cad/tools/mock_board.py makes the mock's files from them).
+export_3d() {
+    local out="${1:?pcb.sh export-3d needs an output folder}"
+    mkdir -p "$out"
+    cli pcb export stl -f --subst-models -o "$out/board.stl" "$PCB"
+    cli pcb export step -f --board-only -o "$out/board-only.step" "$PCB"
+}
+
 # Freerouting 2.5.0 is built for Java 25.
 java_bin() {
     local java="${JAVA:-}"
@@ -168,6 +177,7 @@ case "${1:-}" in
     check-footprints) check_footprints ;;
     simulate) simulate ;;
     render) render ;;
+    export-3d) shift; export_3d "$@" ;;
     # The three generator steps overwrite the KiCad files. See docs/en/hardware/touch-p4/development.md.
     generate-library) shift; bootstrap make_lib.py "$@" ;;
     check-source) check_source ;;
@@ -175,6 +185,6 @@ case "${1:-}" in
     place) bootstrap build_pcb.py place && bootstrap check_overlap.py ;;
     route) autoroute && finish_routing ;;
     route-finish) finish_routing ;;
-    *) echo "Usage: $0 erc|drc|check-netlist|check-package|check-source|check-footprints|simulate|simulate-antenna|export|render|generate-library <dir>|generate-schematic|place|route|route-finish" >&2
+    *) echo "Usage: $0 erc|drc|check-netlist|check-package|check-source|check-footprints|simulate|simulate-antenna|export|export-3d <dir>|render|generate-library <dir>|generate-schematic|place|route|route-finish" >&2
        exit 1 ;;
 esac

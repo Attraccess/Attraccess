@@ -136,7 +136,7 @@ Die Hardware (Einschmelzmuttern, Schrauben, Klebeband, Kabelbinder) ist in der
 | --- | --- |
 | [`cad/attractap-touch-case.sc`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-touch-case.sc) | Die Konstruktion, ein SolidCraft-Dokument (Version 0.45.0). Jede Druckdatei wird daraus exportiert. |
 | [`cad/attractap-assembly.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-assembly.step) | Der ganze Leser zusammengebaut, für andere CAD-Programme. |
-| Platinen-Attrappe: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.stl) | Druckbarer Platzhalter für die Platine, um die Passung zu prüfen, bevor die echte Platine vorliegt. |
+| Platinen-Attrappe: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.stl) | Druckbarer Platzhalter für die Platine, mit den Körpern aller Bauteile, um die Passung mit Auge und Hand zu prüfen, bevor die echte Platine vorliegt. Es ist die Ethernet- und PoE-Ausführung (`lan`), in der jedes Bauteil bestückt ist; die WLAN-Ausführung lässt nur Bauteile weg. Drucken Sie sie in voller Größe auf der Rückseite (der Displayseite), Bauteile oben, mit Stützen von der Druckplatte: das Ende des WLAN-Moduls über dem Antennenausschnitt und die USB-C-Buchse in ihrer Aussparung ragen über die Platine. Die Öffnungen der RJ45-Buchse und der Hohlstecker-Buchse werden als Brücken gedruckt. Die 3MF- und STL-Dateien haben die Formen der Bauteilmodelle, mit an der Rückseite abgeschnittenen Pins und ausgefülltem Raum unter dem PoE-Modul; die STEP-Datei hat stattdessen um jedes Bauteil einen Quader, damit sie klein bleibt. Erzeugt aus der KiCad-Platine von `cad/tools/mock_board.py`. |
 | Display-Attrappe: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.stl) | Platzhalter für das Display, mit den angenommenen Displaymaßen (siehe [Noch nicht geprüft](#noch-nicht-geprüft)). |
 | [`board/attractap-touch-p4.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/board/attractap-touch-p4.step) | Die Platine allein (ohne Bauteile), aus dem aktuellen Layout exportiert. Die Konstruktion enthält diese Datei, am 27. November 2026 für den LED-Ring und die verschobenen Befestigungslöcher neu importiert; importieren Sie sie nach einer Änderung der Platinenkontur oder der Löcher erneut. |
 | [`logo/attraccess-wordmark.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-wordmark.svg), [`attraccess-keyhole.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-keyhole.svg), [`attraccess-logo-mono.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-logo-mono.svg) | Logo-Umrisse für die Einlagen der Frontplatte und der Tap-Kachel; das Logo im Bestückungsdruck der Platine wird aus demselben Ordner gezeichnet. |
@@ -161,7 +161,9 @@ Die Hardware (Einschmelzmuttern, Schrauben, Klebeband, Kabelbinder) ist in der
   die der Platine entnommen sind.
 - **Export**: Führen Sie nach einer Änderung `cad/tools/export_parts.py` aus. Es schreibt Kappe,
   Frontplatte (schlicht und mit Schriftzug), Tap-Kachel, Dock, Displayrahmen, Display-Attrappe und die Baugruppe; Ständer und
-  Platinen-Attrappe exportiert es nicht. In SolidCraft 0.45.0 bleibt die Option, die Teile auf ihre
+  Platinen-Attrappe exportiert es nicht. Die Platinen-Attrappe entsteht aus der KiCad-Platine:
+  `bash tools/pcb.sh export-3d <Ordner>` dort, wo KiCad 10 ist (oder im Container `kicad10-np`), dann
+  `uv run case/cad/tools/mock_board.py <Ordner>`, beides aus `apps/attractap/hardware/touch-p4`. In SolidCraft 0.45.0 bleibt die Option, die Teile auf ihre
   Druckfläche legt, ohne Wirkung; deshalb dreht das Skript jedes Teil vor dem Export mit einer
   vorübergehenden Verschiebung.
 - **Szenen der Anleitung**: `manual/attractap-manual-scenes.sc` ist eine Kopie des Designs mit zusätzlichen
@@ -171,13 +173,15 @@ Die Hardware (Einschmelzmuttern, Schrauben, Klebeband, Kabelbinder) ist in der
   Displays. Außerdem zeigen sie noch die alte Front mit Lichtfenstern, LED-Diffusoren und Einlagen in der Kappe,
   von vor der Frontplatte und der Tap-Kachel (27. November 2026).
 
-Die Skripte sind reines Python ohne Abhängigkeiten; führen Sie sie mit `python3 -I` aus. Sie steuern
+Die Skripte sind reines Python ohne Abhängigkeiten; führen Sie sie mit `python3 -I` aus. Die Ausnahme ist
+`cad/tools/mock_board.py`, das numpy, scipy und manifold3d braucht; `uv run` holt sie. Sie steuern
 SolidCraft über sein Kommandozeilenwerkzeug (der Pfad am Anfang jedes Skripts ist der für macOS) oder
 schreiben Step-Dateien dafür und nutzen `rsvg-convert` für Beschriftungen.
 
 | Skript | Was es erzeugt |
 | --- | --- |
 | `cad/tools/export_parts.py` | STEP-, 3MF- und STL-Dateien von Kappe, Frontplatte, Tap-Kachel, Dock, Displayrahmen, Display-Attrappe und Baugruppe |
+| `cad/tools/mock_board.py` | STEP-, 3MF- und STL-Dateien der Platinen-Attrappe, aus der Platine mit ihren Bauteilmodellen |
 | `manual/tools/scenes.py`, `scenelib.py` | Szenen, Kameras und Beschriftungen der Abbildungen der Anleitung |
 | `manual/tools/gen_hardware.py`, `gen_strain_relief.py`, `gen_wall_route.py` | Step-Dateien, die der Szenendatei der Anleitung Schrauben, Einschmelzmuttern, Kabel und Kabelbinder hinzufügen |
 | `manual/tools/drill.py` | Die Bohrschablone |

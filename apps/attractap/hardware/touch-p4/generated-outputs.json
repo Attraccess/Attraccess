@@ -27,6 +27,15 @@
     "outputs": ["apps/attractap/hardware/touch-p4/case/cad/*.{3mf,step,stl}"],
     "command": "python3 -I apps/attractap/hardware/touch-p4/case/cad/tools/export_parts.py"
   },
+  "mock-board": {
+    "sources": [
+      "apps/attractap/hardware/touch-p4/kicad/attractap-touch-p4.kicad_pcb",
+      "apps/attractap/hardware/touch-p4/kicad/lib/attractap.3dshapes/**",
+      "apps/attractap/hardware/touch-p4/case/cad/tools/mock_board.py"
+    ],
+    "outputs": ["apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.{3mf,step,stl}"],
+    "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh export-3d <folder> (KiCad 10), then uv run apps/attractap/hardware/touch-p4/case/cad/tools/mock_board.py <folder>"
+  },
   "manual-figures": {
     "sources": [
       "apps/attractap/hardware/touch-p4/case/manual/attractap-manual-scenes.sc",

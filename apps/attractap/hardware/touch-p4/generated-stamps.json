@@ -1,7 +1,8 @@
 {
   "board-fab": "e104fab549bdec76e8365abfe04c6323b047f01016c3362d331b5c1a5508daed",
   "board-render": "add7002e66079f4bb37c8eaba25d1666ff82ee16f3dfe200e1a9a42dae4a0578",
-  "case-parts": "c449ec49f15bf06a7e4112725dbb6fcbb7698aa1ae828db1e6936d4a7a91c947",
-  "manual-figures": "0cf42a40e2bf38e9be1ca2843b428c4395d0335604961b76d01d16f8734bc067",
-  "manual-pdf": "f8aa216ce61b064ed35193301f9828d2343db5b2d0f32cb188ab6eb614b7c302"
+  "case-parts": "74cc1d52e97daef69b85a2af6670e2c92772042cdd3032baaf4e88effc6048d4",
+  "manual-figures": "1affa88aaf68816d2fddd69ce5c33137c692be15cca2e43b4d0dd0beecfd612d",
+  "manual-pdf": "f8aa216ce61b064ed35193301f9828d2343db5b2d0f32cb188ab6eb614b7c302",
+  "mock-board": "be7e90f0567e5508598079dfc2c295180d2e9ed94cc0cb3fa1a04342de456018"
 }

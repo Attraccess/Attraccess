@@ -4,7 +4,7 @@ display frame, mock display and the whole assembly.
     python3 -I export_parts.py [design.sc] [output folder]
 
 Run it after a change to the design, for example to `disp_gap`, `disp_t`, `lens_t` or the dock's magnet holder. The
-stand and the mock board are not exported here; their files stay as they are.
+stand is not exported here; its files stay as they are. The mock board's files come from `mock_board.py`.
 
 STEP files keep the parts where they are in the design. 3MF and STL files are laid on the print face with the centre of
 mass over the origin: SolidCraft 0.45.0 ignores `lay_on_print_faces`, so each part is moved before its export. The

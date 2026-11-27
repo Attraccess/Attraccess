@@ -131,7 +131,7 @@ The hardware (heat-set inserts, screws, tape, cable ties) is listed in the
 | --- | --- |
 | [`cad/attractap-touch-case.sc`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-touch-case.sc) | The design, a SolidCraft document (version 0.45.0). Every print file is exported from it. |
 | [`cad/attractap-assembly.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-assembly.step) | The whole reader assembled, for other CAD tools. |
-| Mock board: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.stl) | Printable stand-in for the board, to check the fit before the real board is at hand. |
+| Mock board: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.stl) | Printable stand-in for the board, with the bodies of all its components, to check the fit by eye and by hand before the real board is at hand. It is the Ethernet and PoE build (`lan`), which fits every part; the Wi-Fi build only leaves parts out. Print it at full scale on its back face (the display side), components up, with supports from the build plate: the end of the Wi-Fi module over the antenna cut-out and the USB-C socket in its notch overhang the board. The openings of the RJ45 jack and the DC jack print as bridges. The 3MF and STL files have the shapes of the component models, with the pins cut off at the back face and the space under the PoE module filled; the STEP file has a box round each part instead, to stay small. Made from the KiCad board by `cad/tools/mock_board.py`. |
 | Mock display: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.stl) | Stand-in for the display, with the assumed display dimensions (see [Not yet verified](#not-yet-verified)). |
 | [`board/attractap-touch-p4.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/board/attractap-touch-p4.step) | The bare board (no parts) exported from the current layout. The design embeds this file, re-imported on 27 November 2026 for the LED ring and the moved mounting holes; import it again after a change to the board outline or holes. |
 | [`logo/attraccess-wordmark.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-wordmark.svg), [`attraccess-keyhole.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-keyhole.svg), [`attraccess-logo-mono.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-logo-mono.svg) | Logo outlines for the inlays of the faceplate and the tap tile; the board's silkscreen logo is drawn from the same folder. |
@@ -156,7 +156,9 @@ The hardware (heat-set inserts, screws, tape, cable ties) is listed in the
   taken from the board.
 - **Export**: after a change, run `cad/tools/export_parts.py`. It writes cap,
   the faceplate (plain and with the wordmark), tap tile, dock, display frame, mock display and the assembly; stand and mock
-  board are not exported by it. In SolidCraft 0.45.0 the option that lays parts on their print face
+  board are not exported by it. The mock board is made from the KiCad board: `bash tools/pcb.sh export-3d <folder>` where
+  KiCad 10 is (or in the `kicad10-np` container), then `uv run case/cad/tools/mock_board.py <folder>`, both from
+  `apps/attractap/hardware/touch-p4`. In SolidCraft 0.45.0 the option that lays parts on their print face
   has no effect, so the script turns each part with a temporary move before the export.
 - **Manual scenes**: `manual/attractap-manual-scenes.sc` is a copy of the design with extra bodies
   for illustration; print files never come from it. It, the renders on this page and the manual's
@@ -165,13 +167,15 @@ The hardware (heat-set inserts, screws, tape, cable ties) is listed in the
   old front with light windows, LED diffusers and inlays in the cap, from before the faceplate and the
   tap tile (27 November 2026).
 
-The scripts are plain Python without dependencies; run them with `python3 -I`. They drive SolidCraft
+The scripts are plain Python without dependencies; run them with `python3 -I`. The exception is
+`cad/tools/mock_board.py`, which needs numpy, scipy and manifold3d; `uv run` fetches them. They drive SolidCraft
 through its command-line tool (the path at the top of each script is the macOS one) or write step
 files for it, and use `rsvg-convert` for labels.
 
 | Script | What it makes |
 | --- | --- |
 | `cad/tools/export_parts.py` | STEP, 3MF and STL files of cap, faceplate, tap tile, dock, display frame, mock display and assembly |
+| `cad/tools/mock_board.py` | STEP, 3MF and STL files of the mock board, from the board with its component models |
 | `manual/tools/scenes.py`, `scenelib.py` | Scenes, cameras and labels of the manual's figures |
 | `manual/tools/gen_hardware.py`, `gen_strain_relief.py`, `gen_wall_route.py` | Step files that add screws, inserts, cables and cable ties to the manual's scene file |
 | `manual/tools/drill.py` | The drilling template |
