@@ -21,7 +21,7 @@ One reader needs five printed parts for the wall, six for the desk. The print fi
 | --- | --- | --- | --- | --- |
 | Cap (front shell) | `attractap-cap.3mf` | 1 | RAL 5021 | its front face |
 | Faceplate (cover over the front) | `attractap-faceplate.3mf`, or `attractap-faceplate-logo.3mf` with the wordmark | 1 | RAL 5021, stripe and wordmark white | its front face |
-| Tap tile | `attractap-tile.3mf` | 1 | Black top and keyhole, plain white body | its top |
+| Tap tile | `attractap-tile.3mf` | 1 | Black top and keyhole, plain white body | its back |
 | Dock (back plate) | `attractap-dock.3mf` | 1 | Marble white | its back |
 | Display frame | `attractap-display-frame.3mf` | 1 | Any | its PCB side |
 | Stand (desk only) | `attractap-stand.3mf` | 1 | Marble white | its desk face |

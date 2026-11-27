@@ -48,7 +48,7 @@ def groups(design):
     cap_x, cap_y, _ = body["Cap"]["center_of_mass"]
     plate_y = (body["Faceplate"]["bbox"]["min"][1] + body["Faceplate"]["bbox"]["max"][1]) / 2
     tile_y = (body["Tile"]["bbox"]["min"][1] + body["Tile"]["bbox"]["max"][1]) / 2
-    tile_top = body["Tile top"]["bbox"]["max"][2]
+    tile_back = body["Tile"]["bbox"]["min"][2]
     # the faceplate with the wordmark: the letters are cut out of it and filled with the inlays
     logo = {"command": "solid.combine", "params": {"name": "FaceplateLogo", "target": "Faceplate", "tools": wordmark,
                                                    "operation": "cut", "keep_tools": True}}
@@ -68,9 +68,8 @@ def groups(design):
         [logo, move(faceplate + wordmark, "PlateLay", translate=[0, 0, depth], **face_down),
          move(faceplate + wordmark, "PlateCentre", translate=[0, plate_y, 0]),
          export("attractap-faceplate-logo.3mf", faceplate + wordmark, **FINE)],
-        # the tile lies on its black top
-        [move(tile, "TileLay", translate=[0, 0, tile_top], **face_down),
-         move(tile, "TileCentre", translate=[0, tile_y, 0]),
+        # the tile lies on its flat back, black top up: printed face down, its white rim would overhang
+        [move(tile, "TileLay", translate=[0, -tile_y, -tile_back]),
          export("attractap-tile.3mf", tile, **FINE)],
         # the dock lies on its back, as it is in the design
         [move(["Dock"], "DockCentre", translate=centred("Dock")), export("attractap-dock.3mf", ["Dock"], **FINE)],

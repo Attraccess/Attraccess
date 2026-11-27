@@ -21,7 +21,7 @@ Ein Leser braucht fünf gedruckte Teile für die Wand und sechs für den Tisch. 
 | --- | --- | --- | --- | --- |
 | Kappe (vordere Schale) | `attractap-cap.3mf` | 1 | RAL 5021 | ihrer Vorderseite |
 | Frontplatte (Abdeckung der Front) | `attractap-faceplate.3mf`, oder `attractap-faceplate-logo.3mf` mit Schriftzug | 1 | RAL 5021, Streifen und Schriftzug weiß | ihrer Vorderseite |
-| Tap-Kachel | `attractap-tile.3mf` | 1 | Oberseite und Schlüsselloch schwarz, Körper reines Weiß | ihrer Oberseite |
+| Tap-Kachel | `attractap-tile.3mf` | 1 | Oberseite und Schlüsselloch schwarz, Körper reines Weiß | ihrer Rückseite |
 | Dock (Rückplatte) | `attractap-dock.3mf` | 1 | Marmorweiß | ihrer Rückseite |
 | Displayrahmen | `attractap-display-frame.3mf` | 1 | Beliebig | seiner Platinenseite |
 | Ständer (nur Tisch) | `attractap-stand.3mf` | 1 | Marmorweiß | seiner Tischseite |
