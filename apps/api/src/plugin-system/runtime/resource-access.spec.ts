@@ -287,13 +287,18 @@ describe('plugin resourceAccess', () => {
     expect(Object.keys(access).sort()).toEqual(
       [
         'canMaintain',
+        'canSee',
         'canSeeUsageAttribution',
         'canStart',
+        'filterVisible',
+        'filterVisibleGroups',
         'getActiveSessions',
         'getMaintenanceWindows',
+        'getResourceListScope',
         'hasPermission',
         'listResourceIdsIntroduced',
         'listResourceIdsMaintained',
+        'listVisibleResourceIds',
       ].sort(),
     );
   });

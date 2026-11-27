@@ -1,4 +1,4 @@
-import { Global, Inject, Module, DynamicModule, Type, Logger } from '@nestjs/common';
+import { Global, Inject, Module, DynamicModule, FactoryProvider, Type, Logger } from '@nestjs/common';
 
 import { ModuleRef } from '@nestjs/core';
 
@@ -13,6 +13,8 @@ import {
   MqttServerHostProvider,
   PLUGIN_AUDIT_HOST_PROVIDER,
   PluginAuditHostProvider,
+  PLUGIN_RESOURCE_VISIBILITY_HOST,
+  PluginResourceVisibilityHost,
   PluginContext,
   PluginFlowsContext,
   PluginPermission,
@@ -252,8 +254,9 @@ export class PluginModule {
         PluginBleService,
         ...READER_PROVIDERS,
         ReaderUiWiring,
+        getImplementationClass().resourceVisibilityProvider(),
       ],
-      exports: [PluginEventsService],
+      exports: [PluginEventsService, PLUGIN_RESOURCE_VISIBILITY_HOST],
       controllers: [PluginController],
     };
   }
@@ -497,6 +500,17 @@ export class PluginModule {
     };
 
     return PluginSandboxService.createGuardedContext(base, manifest.permissions ?? []);
+  }
+
+  /**
+   * Answers the SDK's `@ResourceVisible()` decorator on plugin routes. PluginModule is global, so every plugin module
+   * resolves the token; a host that did not provide it would fail to start instead of leaving the routes unchecked.
+   */
+  protected static resourceVisibilityProvider(): FactoryProvider<PluginResourceVisibilityHost> {
+    return {
+      provide: PLUGIN_RESOURCE_VISIBILITY_HOST,
+      useFactory: () => createHostResourceAccessContext(getImplementationClass().hostRefs()),
+    };
   }
 
   /** Lazy host accessors for the runtime context factories; each call throws until bootstrap completed. */

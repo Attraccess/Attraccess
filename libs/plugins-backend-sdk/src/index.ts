@@ -13,6 +13,7 @@ export * from './lib/semver';
 export * from './lib/reader-ui';
 export * from './lib/plugin-notifications';
 export * from './lib/plugin-resource-access';
+export * from './lib/plugin-resource-visibility';
 export * from './lib/plugin-license';
 export * from './lib/plugin-ble';
 export * from './lib/plugin-ble-validation';
