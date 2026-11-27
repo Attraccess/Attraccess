@@ -336,6 +336,7 @@ export class PluginController {
 
   @Post('restart')
   @Auth('system.plugins.manage')
+  @NotAnMcpTool('Host lifecycle: restarts the API process')
   @ApiOperation({
     summary: 'Restart the API process to apply pending plugin changes',
     operationId: 'restartPluginSystem',
