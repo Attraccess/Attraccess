@@ -1,0 +1,18 @@
+{
+  "title": "Ist die Maschine in Ordnung?",
+  "description": "Bevor deine Sitzung endet: Muss die Maschine gewartet werden?",
+  "machineOk": "Maschine ist in Ordnung",
+  "needsMaintenance": "Wartung nötig",
+  "reasonLabel": "Was ist das Problem?",
+  "reasonPlaceholder": "z.B. Der Not-Aus-Schalter klemmt",
+  "cancel": "Abbrechen",
+  "continue": "Weiter",
+  "filed": {
+    "title": "Die Wartungsberechtigten wurden benachrichtigt",
+    "description": "Deine Wartungsanfrage wurde gesendet."
+  },
+  "notFiled": {
+    "title": "Wartungsanfrage nicht gesendet",
+    "description": "Deine Sitzung wurde beendet, aber die Wartungsanfrage konnte nicht gesendet werden. Bitte versuche es über „Problem melden“ erneut."
+  }
+}

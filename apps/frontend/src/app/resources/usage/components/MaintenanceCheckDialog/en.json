@@ -1,0 +1,18 @@
+{
+  "title": "Is the machine OK?",
+  "description": "Before your session ends: does the machine need maintenance?",
+  "machineOk": "Machine is OK",
+  "needsMaintenance": "Needs maintenance",
+  "reasonLabel": "What's wrong?",
+  "reasonPlaceholder": "e.g. The emergency stop button is stuck",
+  "cancel": "Cancel",
+  "continue": "Continue",
+  "filed": {
+    "title": "Maintainers have been notified",
+    "description": "Your maintenance request was sent."
+  },
+  "notFiled": {
+    "title": "Maintenance request not sent",
+    "description": "Your session ended, but the maintenance request could not be sent. Please use \"Report a problem\" to try again."
+  }
+}

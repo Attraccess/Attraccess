@@ -38,6 +38,10 @@
       }
     },
     "machine": {
+      "maintenanceCheck": {
+        "label": "Beim Sitzungsende „Maschine in Ordnung?“ fragen",
+        "description": "Bevor jemand die eigene Sitzung beendet, fragen die Web-App und Attractap-Touch-Reader, ob die Maschine in Ordnung ist oder gewartet werden muss. Wer ihre Wartung verwaltet, wird nicht gefragt."
+      },
       "allowTakeOver": {
         "label": "Übernahme erlauben",
         "description": "Wenn aktiviert, kann die Ressource von anderen Benutzern übernommen werden ohne dass der aktuelle Nutzer die Ressource freigeben muss. Hat keine Wirkung, wenn „Maximale parallele Sitzungen“ größer als 1 ist."

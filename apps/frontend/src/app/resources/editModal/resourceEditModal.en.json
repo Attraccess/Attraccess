@@ -38,6 +38,10 @@
       }
     },
     "machine": {
+      "maintenanceCheck": {
+        "label": "Ask 'Machine OK?' when a session ends",
+        "description": "Before users end their own session, the web app and Attractap Touch readers ask whether the machine is OK or needs maintenance. People who manage its maintenance are not asked."
+      },
       "allowTakeOver": {
         "label": "Allow Takeover",
         "description": "If enabled, the resource can be taken over by other users without the current user having to release the resource. Has no effect when Max parallel sessions is greater than 1."

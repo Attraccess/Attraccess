@@ -22,6 +22,14 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
     useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
   }))()),
 }));
+// The maintenance check stays off here: MaintenanceCheckDialog/endSessionFlow.test.tsx covers it.
+vi.mock('../../hooks/useMaintenanceCheck', () => ({
+  useMaintenanceCheck: () => ({
+    requestMaintenanceCheck: () => Promise.resolve({}),
+    showMaintenanceRequestResult: () => undefined,
+    modal: null,
+  }),
+}));
 vi.mock('@attraccess/react-query-client', () => ({
   useResourceUsageEndSession: () => ({ mutate: vi.fn(), isPending: false }),
   useResourceUsageGetActiveSession: () => ({ data: null }),
