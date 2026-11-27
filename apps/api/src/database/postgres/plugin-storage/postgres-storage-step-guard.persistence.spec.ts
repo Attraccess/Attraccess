@@ -150,6 +150,33 @@ describe('PostgreSQL migrations on adopted tables', () => {
     expect(await versions()).toEqual([1, 2]);
   });
 
+  it('drops a required column that only its NOT NULL constrains', async () => {
+    await sql(`ALTER TABLE "${DEVICES}" ADD COLUMN "label" varchar NOT NULL DEFAULT 'x'`);
+    const withLabel = table(
+      { id: f.id(), address: f.string(), state: f.string(), note: f.string().optional(), label: f.string() },
+      { physicalName: DEVICES, indexes: [{ name: 'UQ_demo_devices_address', fields: ['address'], unique: true }] },
+    );
+    const compiled = compilePluginStorage(
+      'demo',
+      definePluginStorage({
+        tables: { devices },
+        migrations: [
+          { version: 1, name: 'baseline', steps: [step.createTable('devices', withLabel)] },
+          { version: 2, name: 'drop', steps: [step.dropColumn('devices', 'label')] },
+        ],
+        adoption: { legacyMigrations: ['CreateDevices1700000000000'] },
+      }),
+      { reservedTables: new Set() },
+    );
+
+    await runner.migrate(compiled);
+
+    expect(await versions()).toEqual([1, 2]);
+    expect(
+      await sql(`SELECT 1 FROM information_schema.columns WHERE table_name = '${DEVICES}' AND column_name = 'label'`),
+    ).toEqual([]);
+  });
+
   it('refuses to drop an index that belongs to another table', async () => {
     // A 1.x index name that, on this database, is the index of another plugin's table.
     const named = table(
