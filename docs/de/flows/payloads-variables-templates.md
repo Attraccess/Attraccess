@@ -267,7 +267,7 @@ Beim Beispielwert `42` sendet der Wahr-Zweig `{"temperature":42,"limit":40}`. **
 
 ## Durchläufe prüfen und Fehler finden
 
-Öffnen Sie **Flow-Protokolle**, wählen Sie eine Aufzeichnungsdauer und klicken Sie vor dem Auslösen auf **Aufzeichnung starten**. Prüfen Sie `input` und `output` der Knoteneinträge, um genaue Pfade und Änderungen der Felder zu sehen. Protokolle werden während der Aufzeichnung gesammelt und bleiben bis zum Verlassen oder Neuladen der Seite sichtbar.
+Öffnen Sie **Flow-Logs**, wählen Sie eine Aufzeichnungsdauer und klicken Sie vor dem Auslösen auf **Aufzeichnung starten**. Prüfen Sie `input` und `output` der Knoteneinträge, um genaue Pfade und Änderungen der Felder zu sehen. Protokolle werden während der Aufzeichnung gesammelt und bleiben bis zum Verlassen oder Neuladen der Seite sichtbar. Vorher können Sie sie über **Herunterladen** als NDJSON oder reinen Text speichern, etwa für einen Fehlerbericht. Die Datei kann personenbezogene Daten aus den Payloads enthalten.
 
 | Symptom                                | Prüfen                                                                                                                       |
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |

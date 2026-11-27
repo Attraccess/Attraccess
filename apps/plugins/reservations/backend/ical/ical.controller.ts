@@ -1,4 +1,4 @@
-import { Auth, type AuthenticatedRequest, SessionOnlyGuard } from '@attraccess/plugins-backend-sdk';
+import { Auth, type AuthenticatedRequest, NotAnMcpTool, SessionOnlyGuard } from '@attraccess/plugins-backend-sdk';
 import {
   Body,
   Controller,
@@ -56,6 +56,7 @@ export class IcalFeedsController {
 
   @Post()
   @UseGuards(SessionOnlyGuard)
+  @NotAnMcpTool('Secret management: returns the feed URL token; session only')
   @ApiForbiddenResponse({ description: 'Session authentication required (API tokens cannot issue feed URLs)' })
   @ApiOperation({
     summary: 'Create a calendar feed',
@@ -88,6 +89,7 @@ export class IcalFeedsController {
   @Post(':id/regenerate')
   @HttpCode(200)
   @UseGuards(SessionOnlyGuard)
+  @NotAnMcpTool('Secret management: returns the feed URL token; session only')
   @ApiForbiddenResponse({ description: 'Session authentication required (API tokens cannot issue feed URLs)' })
   @ApiOperation({
     summary: 'Issue a new secret URL; the old one answers 404 immediately',

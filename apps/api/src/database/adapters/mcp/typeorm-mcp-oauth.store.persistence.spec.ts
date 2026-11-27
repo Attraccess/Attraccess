@@ -111,6 +111,20 @@ describe('MCP OAuth store on real PostgreSQL', () => {
     expect(await store.findToken('kept-access', 'access')).not.toBeNull();
   });
 
+  it('lists only the active grants of a user, newest first', async () => {
+    await first.getRepository(User).save({ id: 2, username: 'two', email: 'two@example.com' });
+    const client = await registered();
+    const older = await store.createGrant({ ...newGrant(client.clientId), userId: 2 });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const newer = await store.createGrant({ ...newGrant(client.clientId), userId: 2 });
+    const revoked = await store.createGrant({ ...newGrant(client.clientId), userId: 2 });
+    await store.revokeGrant(revoked.id, new Date());
+    await store.createGrant({ ...newGrant(client.clientId), userId: 2, expiresAt: hoursAgo(1) });
+    await store.createGrant({ ...newGrant(client.clientId), userId: 1 });
+
+    expect((await store.listActiveGrantsForUser(2)).map((grant) => grant.id)).toEqual([newer.id, older.id]);
+  });
+
   describe('single use across independent connections', () => {
     it('lets exactly one of many concurrent consumers rotate a refresh token', async () => {
       const client = await registered();

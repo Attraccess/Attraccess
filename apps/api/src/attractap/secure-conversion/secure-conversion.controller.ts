@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Inject, Param, ParseIntPipe, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { AttractapSecureConversionRecord } from '@attraccess/application-models';
-import { Auth, AuthAny, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthAny, AuthenticatedRequest, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import { auditActorOf } from '../../audit/recorder/audit-event';
 import { LicenseModuleType } from '../../license/license.service';
 import { RequiresLicense } from '../../license/require-license.decorator';
@@ -79,6 +79,7 @@ export class SecureConversionController {
 
   @Post('readers/:id/secure-conversion')
   @Auth('system.settings.manage')
+  @NotAnMcpTool('Irreversible hardware action: burns eFuses and needs the typed confirmation in the web UI')
   @ApiOperation({ summary: 'Start securing a reader', operationId: 'startSecureConversion' })
   @ApiResponse({ status: 201, type: SecureConversionStatusDto })
   @ApiResponse({ status: 409, description: 'A gate is not met or another conversion is running' })
@@ -102,6 +103,7 @@ export class SecureConversionController {
   @Post('readers/:id/secure-conversion/retry')
   @Auth('system.settings.manage')
   @HttpCode(200)
+  @NotAnMcpTool('Irreversible hardware action: burns eFuses and needs the typed confirmation in the web UI')
   @ApiOperation({ summary: 'Retry a failed conversion when safe', operationId: 'retrySecureConversion' })
   @ApiResponse({ status: 200, type: SecureConversionStatusDto })
   async retry(

@@ -10,6 +10,11 @@
     "hint": "Recording is off. Start a recording to collect logs for this flow.",
     "waiting": "Waiting for the flow to run…"
   },
+  "download": {
+    "label": "Download",
+    "ndjson": "NDJSON (.ndjson)",
+    "text": "Plain text (.txt)"
+  },
   "duration": {
     "m15": "15 minutes",
     "m30": "30 minutes",
