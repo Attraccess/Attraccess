@@ -54,33 +54,36 @@ async function readPackedPlugins(): Promise<PackedPlugin[]> {
       return project.tags?.includes('type:plugin');
     });
   const packed: PackedPlugin[] = [];
-  for (const project of projects) {
-    const dist = join(PLUGINS_ROOT, project, 'dist');
-    const files = existsSync(dist) ? readdirSync(dist).filter((file) => file.endsWith('.tgz')) : [];
-    if (files.length !== 1)
-      throw new Error(`apps/plugins/${project}/dist has ${files.length} tarballs; run the pack target of ${project}`);
-    const tarball = readFileSync(join(dist, files[0]));
-    const unpacked = mkdtempSync(join(tmpdir(), 'packed-plugin-'));
-    try {
-      await tar.x({ file: join(dist, files[0]), cwd: unpacked, filter: (path) => path === 'package/package.json' });
-      const manifest = JSON.parse(readFileSync(join(unpacked, 'package/package.json'), 'utf8')) as PluginManifest;
-      // The marketplace installs official plugins under this name, and their storage names derive from it.
-      if (manifest.name !== `@attraccess/plugin-${project}`)
-        throw new Error(`apps/plugins/${project} packs as ${manifest.name}, not @attraccess/plugin-${project}`);
-      packed.push({
-        name: manifest.name,
-        version: manifest.version,
-        tarball,
-        integrity: `sha512-${createHash('sha512').update(tarball).digest('base64')}`,
-        shasum: createHash('sha1').update(tarball).digest('hex'),
-        manifest,
-        licenseModules: manifest.attraccess?.license?.modules ?? [],
-      });
-    } finally {
-      rmSync(unpacked, { recursive: true, force: true });
-    }
-  }
+  for (const project of projects) packed.push(await readPackedPlugin(project));
   return packed;
+}
+
+/** The tarball the `pack` target of `project` left in its dist folder, checked to carry the plugin's npm name. */
+async function readPackedPlugin(project: string): Promise<PackedPlugin> {
+  const dist = join(PLUGINS_ROOT, project, 'dist');
+  const files = existsSync(dist) ? readdirSync(dist).filter((file) => file.endsWith('.tgz')) : [];
+  if (files.length !== 1)
+    throw new Error(`apps/plugins/${project}/dist has ${files.length} tarballs; run the pack target of ${project}`);
+  const tarball = readFileSync(join(dist, files[0]));
+  const unpacked = mkdtempSync(join(tmpdir(), 'packed-plugin-'));
+  try {
+    await tar.x({ file: join(dist, files[0]), cwd: unpacked, filter: (path) => path === 'package/package.json' });
+    const manifest = JSON.parse(readFileSync(join(unpacked, 'package/package.json'), 'utf8')) as PluginManifest;
+    // The marketplace installs official plugins under this name, and their storage names derive from it.
+    if (manifest.name !== `@attraccess/plugin-${project}`)
+      throw new Error(`apps/plugins/${project} packs as ${manifest.name}, not @attraccess/plugin-${project}`);
+    return {
+      name: manifest.name,
+      version: manifest.version,
+      tarball,
+      integrity: `sha512-${createHash('sha512').update(tarball).digest('base64')}`,
+      shasum: createHash('sha1').update(tarball).digest('hex'),
+      manifest,
+      licenseModules: manifest.attraccess?.license?.modules ?? [],
+    };
+  } finally {
+    rmSync(unpacked, { recursive: true, force: true });
+  }
 }
 
 function tarballUrl(plugin: PackedPlugin): string {
