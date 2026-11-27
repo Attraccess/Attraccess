@@ -1,5 +1,5 @@
-"""Fixed routes away from the MCU: 48 V nets, Ethernet pairs, PHY fan-out, antenna feeds, LED supply and
-link, DC input, ground vias of modules and ICs, and the via fan-out of all supply pads into the planes."""
+"""Fixed routes away from the MCU: 48 V nets, Ethernet pairs, PHY fan-out, antenna feeds, the LED ring, DC
+input, ground vias of modules and ICs, and the via fan-out of all supply pads into the planes."""
 
 import math
 
@@ -7,12 +7,13 @@ import pcbnew
 
 import geometry as G
 from board import B_, F, IN2, V, dog, mm, unV
+from placement import LED_VIA, LED_VIA_OUT, led_frame, led_gap_index, led_refs
 
 
 def module_ground(B):
     """Ground vias that plane_fanout() cannot place: twelve between the nine ground pads under the Wi-Fi
     module, two beside the output ground pad of the PoE module (under the module, on the secondary
-    side) and one for the backlight driver."""
+    side), one for the backlight driver and one under the ESD part U603."""
     # The Wi-Fi module's nine ground pads (1.2 mm at 1.65 mm): a via in the middle of each of the twelve
     # 0.45 mm gaps between two neighbours, where Espressif's land pattern has them (ESP32-C5-MINI-1 datasheet
     # v1.4, fig. 11-1). The smallest via, 0.45 mm, just fills a gap and touches no paste; the order fills and
@@ -31,6 +32,11 @@ def module_ground(B):
     x, y = B.pad('U601', 2)
     B.track([(x, y), (x, y + 0.9), (x + 0.25, y + 1.15)], 'GND', 0.25)
     B.via(x + 0.25, y + 1.15, 'GND')
+    # ESD part of the touch lines U603: its ground pin sits between two signal pins whose tracks close it in; a
+    # via under the package, between its two pad rows
+    x, y = B.pad('U603', '2')
+    B.track([(x, y), (x, y - 0.95)], 'GND', 0.25)
+    B.via(x, y - 0.95, 'GND')
     # QFN ground pins: straight into the exposed pad, which has the vias (the gap is too narrow for the fill)
     for ref in ('U201', 'U401', 'U501'):
         fp = B.fp[ref]
@@ -169,44 +175,90 @@ def mdi_routes(B):
 
 
 def nfc_feeds(B):
-    """Antenna feeds: straight up from the two damping resistors, under the DC terminal, then right.
-    The upper one ends on the outer end of the loop, the lower one crosses the turns through the gap
-    in the keep-out to the inner end."""
-    a1, a2 = B.pad('ANT501', '1'), B.pad('ANT501', '2')
-    nets = B.d.parts['ANT501'].nets
-    for a, net in ((a1, nets['1']), (a2, nets['2'])):
-        ref = 'R504' if net == 'NFC_ANT1' else 'R505'
+    """Antenna feeds from the two damping resistors below the PN532 block to the loop: on the back layer past
+    the 5 V rail and between the cut-outs of the LED ring's upper left corner, then on the front layer down
+    to the loop's ends. The one to the outer end (NFC_ANT2) runs on the right; the one to the inner end
+    crosses the turns through the gap in the keep-out."""
+    a_out, a_in = B.pad('ANT501', '1'), B.pad('ANT501', '2')          # outer end NFC_ANT2, inner end NFC_ANT1
+    w = 0.3
+    for ref, net, ant, lane, turn in (('R505', 'NFC_ANT2', a_out, a_out[0] - 0.9, 95.5),
+                                      ('R504', 'NFC_ANT1', a_in, a_out[0] - 1.6, None)):
         r = B.pad(ref, next(n for n, v in B.d.parts[ref].nets.items() if v == net))
-        B.track([r, (r[0], a[1]), a], net, 0.3)
+        v1 = (r[0], r[1] + 1.0)
+        B.track([r, v1], net, w)
+        B.via(*v1, net, size=0.6, drill=0.3)
+        if turn:                                    # outer: down the right lane, a via above the loop's corner
+            v2 = (lane, G.ANT_C[1] - G.ANT_H / 2)
+            B.track([v1, (lane, v1[1] + lane - v1[0]), v2], net, w, layer=B_)
+        else:                                       # inner: diagonally to the left lane, a via beside the LED
+            v2 = (lane, G.ANT_C[1] - G.ANT_H / 2 + 1.5)
+            B.track([v1, (lane, v1[1] + lane - v1[0]), v2], net, w, layer=B_)
+        B.via(*v2, net, size=0.6, drill=0.3)
+        B.track([v2, (lane, ant[1]), ant], net, w)
 
 
-def led_link(B):
-    """Data line from the top LED row to the bottom row, on the inner layer past the DC connectors."""
-    n = len(G.LED_X)
-    last, first = 'D%d' % (700 + n), 'D%d' % (701 + n)    # end of the top row, start of the bottom row
-    net = B.d.parts[last].nets['4']
-    a, c = B.pad(last, '4'), B.pad(first, '2')
-    x = G.ANT_C[0] + G.ANT_W / 2 + 1.7          # between the antenna and the DC connectors
-    v1, v2 = (a[0] + 1.9, a[1] + 1.3), (c[0] + 1.9, c[1] - 1.3)
-    B.track([a, (a[0] + 0.9, a[1] + 0.3), v1], net, 0.15)
-    B.via(*v1, net)
-    B.track([v1, (x, v1[1] + (x - v1[0])), (x, v2[1] - (x - v2[0])), v2], net, 0.15, layer=IN2)
-    B.via(*v2, net)
-    B.track([v2, (v2[0], c[1] - 0.43), (v2[0] - 0.43, c[1]), c], net, 0.15)
+# corners of the 5 V rail on In2 are cut off by this much (bottom left: the mounting hole H803)
+LED_RAIL_CHAMFER = 3.0
 
 
-def led_power(B):
-    """5 V for the top LED row: a bus in the strip between the display's lower edge and the LED windows."""
-    yb = G.LED_BUS_Y
-    xs = []
-    for i in range(len(G.LED_X)):
-        p3 = B.pad('D%d' % (701 + i), '3')
-        cap = B.pad('C%d' % (703 + i), '1')
-        B.track([(p3[0], yb), p3], '+5V', 0.5)
-        B.track(dog(p3, cap), '+5V', 0.3)
-        xs.append(p3[0])
-    for x1, x2 in zip(xs, xs[1:]):                # one segment per LED, so every junction is an end point
-        B.track([(x1, yb), (x2, yb)], '+5V', 0.6)
+def led_ring(B):
+    """The LED ring: the data line from LED to LED, each LED's supply pad to its capacitor and a via, and the
+    5 V rail on In2 that joins the vias. The rail runs round the ring outside the LEDs and stays open where the
+    copper round the NFC loop is open (geometry.NFC_GAP): closed, it would be a shorted turn round the loop
+    (its capacitors join it to ground at 13.56 MHz). The data line does cross that gap: it ends in an LED's
+    input, which is no low impedance."""
+    n = len(G.LEDS)
+    refs = led_refs()
+    gap = led_gap_index()
+    w = 0.2
+    vias = []
+    for k in range(n):
+        f = led_frame(k)
+        ref, cref = refs[k]
+        p3 = B.pad(ref, '3')
+        c1 = B.pad(cref, '1')
+        via = f(*(LED_VIA_OUT if k == gap else LED_VIA))
+        vias.append(via)
+        if k == gap:
+            B.track(dog(p3, c1), '+5V', 0.4)
+        else:                                       # along the pad's outer edge, clear of the capacitor's ground
+            B.track([p3, f(2.775, -1.08), c1], '+5V', 0.3)
+        B.track([c1, via], '+5V', 0.4)
+        B.via(*via, '+5V', size=0.8, drill=0.4)
+        if k + 1 == n:
+            break
+        net = B.d.parts[ref].nets['4']
+        out, nxt = B.pad(ref, '4'), B.pad(refs[k + 1][0], '2')
+        # the next LED's input in this LED's frame
+        x0, y0, rot = G.LEDS[k]
+        c, s_ = round(math.cos(math.radians(rot))), round(math.sin(math.radians(rot)))
+        dx, dy = nxt[0] - x0, nxt[1] - y0
+        nx, ny = dx * c - dy * s_, dx * s_ + dy * c
+        if abs(ny + 0.75) < 0.01:                   # the next LED on the same side: past the capacitor's inner end
+            pts = [out, f(5.6, 0.75), f(7.1, -0.75), nxt]
+        else:                                       # round a corner
+            d = ny - 0.75 - 0.4
+            pts = [out, f(nx - d, 0.75), f(nx, ny - 0.4), nxt]
+        B.track(pts, net, w)
+    # the rail: from the LED after the gap round the ring to the LED before it
+    order = [(gap + 1 + j) % n for j in range(n)]
+    pts = []
+    for j, k in enumerate(order):
+        v = vias[k]
+        if j and G.LEDS[k][2] != G.LEDS[order[j - 1]][2]:
+            # corner: the square's corner point, cut off
+            prev = pts[-1]
+            corner = (v[0], prev[1]) if G.LEDS[order[j - 1]][2] in (0, 180) else (prev[0], v[1])
+            ux, uy = (corner[0] - prev[0]), (corner[1] - prev[1])
+            la = math.hypot(ux, uy)
+            vx, vy = (v[0] - corner[0]), (v[1] - corner[1])
+            lb = math.hypot(vx, vy)
+            ch = min(LED_RAIL_CHAMFER, la, lb)
+            pts.append((corner[0] - ux / la * ch, corner[1] - uy / la * ch))
+            pts.append((corner[0] + vx / lb * ch, corner[1] + vy / lb * ch))
+        pts.append(v)
+    for a, b in zip(pts, pts[1:]):                  # one segment each, so every junction is an end point
+        B.track([a, b], '+5V', 0.6, layer=IN2)
 
 
 def phy_fanout(B):
@@ -434,13 +486,12 @@ def plane_fanout(B):
     Returns the pads for which no free spot was found (the autorouter has to deal with those).
     """
     VIA_R, HOLE_R, CLR, W = 0.225, 0.1, 0.14, 0.25
-    x3, y3 = G.PLANE_3V3_TONGUE
     gnd, p3v3 = B.names.get('GND', 'GND'), B.names.get('+3V3', '+3V3')
 
     def has_plane(net, x, y):
         if net == gnd:
             return True
-        return net == p3v3 and (y < 88.0 or (x < x3 - 0.8 and y < y3 - 0.8))
+        return net == p3v3 and y < G.PLANE_3V3_Y - 1.0
     pads = []                                    # (net, x1, y1, x2, y2) of every pad
     for ref, fp in B.fp.items():
         for pad in fp.Pads():
@@ -457,7 +508,7 @@ def plane_fanout(B):
         dx, dy = x2 - x1, y2 - y1
         t = 0.0 if dx == dy == 0 else max(0.0, min(1.0, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)))
         return math.hypot(px - x1 - t * dx, py - y1 - t * dy)
-    holes = [G.SLOT] + [(x - 2.0, y - 1.8, x + 2.0, y + 1.8) for y in (G.LED_Y_TOP, G.LED_Y_BOT) for x in G.LED_X]
+    holes = [G.SLOT] + G.led_cutouts(0.2)
     ax, ay = G.ANT_C
     keep = holes + [G.WIFI_KEEPOUT, (ax - G.ANT_W / 2 - 1, ay - G.ANT_H / 2 - 1, ax + G.ANT_W / 2 + 1, ay + G.ANT_H / 2 + 1)]
     kr = G.MOUNT_KEEPOUT_R + 0.3

@@ -242,7 +242,7 @@ Order form:
 | Smallest via | 0.45 mm pad, 0.2 mm hole (about one via in five; most have 0.5 mm pads). Free with inner layers at 0.45 mm or wider: leave "Min via hole size/diameter" at "0.3mm/(0.4/0.45mm)"; smaller choices cost 39 USD and more |
 | Vias | "Epoxy Filled & Capped", no charge, and required: C208, C223 and C226 at the MCU have a via in the pad, and the twelve ground vias between the Wi-Fi module's ground pads touch the pads (Espressif's land pattern). No other via lies under paste. "Tented" is not offered with inner layers |
 | Solder mask | green: the 0.1 mm webs between the MCU's pins are JLCPCB's limit for green |
-| Milled openings | flex slot 10.5 x 21.6 mm, eight LED windows 3.4 x 3.0 mm with relieved corners, a cut 28.9 x 6.0 mm in the top edge under the Wi-Fi antenna, two cut-away corners, plated slots at the DC jack and USB-C |
+| Milled openings | flex slot 10.5 x 21.6 mm, 16 LED windows 3.4 x 3.0 mm with relieved corners, a cut 28.9 x 6.0 mm in the top edge under the Wi-Fi antenna, two cut-away corners, plated slots at the DC jack and USB-C |
 | Outline tolerance | the regular +/-0.2 mm |
 | Surface finish | ENIG (18 USD on 5 boards, 48 on 100, 336 on 1000). Not the free OSP: JLCPCB excludes it for contact areas, and the four display ground pads and 30 test points would stay bare copper |
 | Impedance control | "Yes", +/-10 % (33 USD per order): USB pair 90 ohm differential (0.14 mm lines, 0.15 mm gap, back layer over In4), Ethernet 50 ohm (0.155 mm, component side over In1), from JLCPCB's calculator for this stack-up; the fab may adjust widths |
@@ -295,6 +295,7 @@ its design.
 | A | 2026-11-25 | Industry review: eFuse and ideal diodes on the 5 V rail, reset supervisor, damped DC input, TLV62569 3.3 V converter, test points, DC and PoE present to the firmware |
 | A | 2026-11-25 | Industry review: layout rework (ESP32-P4 land pattern, decoupling, USB pair, impedance), 2.0 x 1.6 mm crystal, designators on the silkscreen, assembly drawing |
 | A | 2026-11-25 | Wi-Fi module ESP32-C5-MINI-1 (2.4 and 5 GHz, PCB antenna) instead of the ESP32-C6-MINI-1U, with a 3.3 V converter of its own |
+| A | 2026-11-27 | Tap tile: 16 LEDs in a ring round the NFC loop, the loop on the case centre line, the PN532 below the display, the fourth mounting hole left of the tile |
 
 ### Before an order
 

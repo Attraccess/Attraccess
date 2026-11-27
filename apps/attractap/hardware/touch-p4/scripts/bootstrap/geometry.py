@@ -38,8 +38,6 @@ FLEX_BEHIND_LCD = (14.5, 72.5, 62.5, 89.4)
 # shallow angle straight into J601 (a 3 mm slot on the first print forced it in at an angle). The stiff
 # part may lie over the slot; it rests on the metal back, not on the board.
 SLOT = (33.05, 73.3, 54.65, 83.8)
-# The 5 V bus of the top LED row runs at this height, between the display's lower edge and the LEDs
-LED_BUS_Y = 93.3
 # Cut-away corner that leaves room for the Ethernet plug and cable: 51 mm from the jack to the lower
 # board edge, for a plug with its boot (30 mm) and the cable's bend into the wall behind it. That
 # length puts the jack behind the lower right corner of the display. Its through-hole pins stand out
@@ -74,16 +72,50 @@ POCKET_Y = 107.5
 # Area on the component side the display flex covers, from SLOT into J601: no tall parts here
 FLEX_KEEPOUT = [(32.5, 66.0, 55.5, 84.5)]
 
+# The tap tile on the front: a raised square on the case's centre line, over the NFC loop. Loop, LED ring
+# and tile share this centre.
+TILE_C = (43.0, 117.0)
 # NFC loop antenna centre (footprint ANT501)
-ANT_C = (44.5, 117.0)
+ANT_C = TILE_C
 ANT_W, ANT_H = 35.0, 37.0
 
-# Addressable LEDs (reverse mount, shine through the board): centre x positions and the two rows
-LED_X = (29.5, 39.5, 49.5, 59.5)
-LED_Y_TOP = 95.6
-LED_Y_BOT = 139.0
+# Addressable LEDs (reverse mount, shine through the board into the tile's white body): a square ring round
+# the loop, LED_RING from the centre on every side, so the tile's rim band lies straight over them. The ring
+# is as tight as the loop allows: the cut-outs keep the 1.03 mm from the loop's copper that the old top row
+# had (loop copper ends 18.75 mm above the centre, a cut-out 1.62 mm from the LED's centre). 16 LEDs, evenly
+# 10.7 mm apart along the ring, half a pitch from each corner; four per side.
+LED_RING = 18.75 + 1.03 + 1.62
+LED_COUNT = 16
+LED_PITCH = 8 * LED_RING / LED_COUNT
 LED_WINDOW = (3.4, 3.0)                     # cut-out per LED; it is part of the LED footprint
 LED_CUTOUT = (3.64, 3.24)                   # the same including the corner reliefs: what is really milled away
+
+
+def led_ring():
+    """(x, y, rotation) of each LED in the order the data line passes them: the top side from left to right,
+    then clockwise in this (component side) view, so counter-clockwise for the user in front. Each LED's long
+    axis lies along the ring, its data input towards the LED before it and its supply and input pads on the
+    outer side."""
+    cx, cy = TILE_C
+    s, p = LED_RING, LED_PITCH
+    along = [-1.5 * p, -0.5 * p, 0.5 * p, 1.5 * p]
+    top = [(cx + a, cy - s, 0) for a in along]
+    right = [(cx + s, cy + a, 270) for a in along]
+    bottom = [(cx - a, cy + s, 180) for a in along]
+    left = [(cx - s, cy - a, 90) for a in along]
+    return top + right + bottom + left
+
+
+LEDS = led_ring()
+
+
+def led_cutouts(grow=0.0):
+    """(x1, y1, x2, y2) of the milled LED cut-outs, each enlarged by grow on every side."""
+    out = []
+    for x, y, rot in LEDS:
+        w, h = LED_CUTOUT if rot in (0, 180) else LED_CUTOUT[::-1]
+        out.append((x - w / 2 - grow, y - h / 2 - grow, x + w / 2 + grow, y + h / 2 + grow))
+    return out
 
 # Wi-Fi module ESP32-C5-MINI-1 (datasheet v1.4, fig. 11-1): 15.4 mm wide, 21.3 mm long; its pads centred
 # 7.7 mm above its lower edge, its antenna area the 5.85 mm at the other end. Placed antenna up at the top
@@ -128,11 +160,21 @@ JACK_REAR_CLEAR_Y = 70.0
 # Where the autorouter must not go (the hand-routed 48 V tracks live here)
 POE_ROUTER_KEEPOUT = [(77.35, 35.0, 86.0, 71.4), (79.0, 30.6, 86.0, 35.0), (79.6, 71.4, 86.0, 78.6)]
 
-MOUNT_HOLES = ((4.0, 3.5), (82.0, 3.5), (17.9, 139.4), (66.3, 117.0))
-# The last one stands in the gap of the copper around the NFC loop. Under its screw head and the insert
-# on the other side the outer layers carry no copper: metal that cuts through the solder mask on both
-# sides of the gap would close that copper into a shorted turn (simulated: 1.25 uH become 1.03 uH).
-NFC_GAP_HOLE = MOUNT_HOLES[3]
+# The fourth hole stood in the gap of the copper round the NFC loop, at (66.3, 117), until the tap tile grew.
+# The case puts a boss of radius TILE_BOSS_R round each hole, and the tile's body (the LED ring plus
+# TILE_BODY_MARGIN, corners rounded with up to TILE_BODY_CORNER) must keep TILE_BOSS_GAP from it. Between the
+# tile and the Ethernet cut-away there is no room for that (x 69.2 at least, and 66.0 at most for the web the
+# other holes have), nor below the tile or between the tile and the display. On the left there is: between the
+# tile and the DC cut-away, beside an LED (not a 5 V via) of the ring. The third hole moved 0.6 mm towards the
+# corner, clear of the ring's lower left LED.
+MOUNT_HOLES = ((4.0, 3.5), (82.0, 3.5), (17.4, 140.0), (16.0, 122.0))
+MOUNT_HOLE_R = 1.6
+TILE_BOSS_R, TILE_BOSS_GAP, TILE_BODY_MARGIN, TILE_BODY_CORNER = 3.7, 0.3, 0.8, 6.0
+MOUNT_WEB = 1.9                             # board material round a hole: what the upper holes have to the top edge
+# The copper round the NFC loop (pours of every layer, the LED ring's 5 V rail) is open in one place, between
+# the loop's right edge and the Ethernet cut-away, between the two right-hand LEDs next to the loop's centre
+# line: closed, it would be a shorted turn (simulated: 1.25 uH become 1.08 uH). x1, y1, x2, y2.
+NFC_GAP = (ANT_C[0] + ANT_W / 2 - 1.0, ANT_C[1] - 1.25, NOTCH_X, ANT_C[1] + 1.25)
 # Hall switch U703 that senses the magnet in the dock: the magnet sits in front of this point, on the
 # component side. Free board area away from the buzzer (15 mm) and the inductors (22 mm and more).
 HALL = (12.5, 38.2)
@@ -149,8 +191,8 @@ DOCK_PLATE = 13.9                           # component side to the dock's plate
 DOCK_OPENINGS = ((68.0, 70.4, 85.6, 93.6), (68.5, 33.8, 84.5, 57.0))
 MOUNT_KEEPOUT_R = 3.3                       # screw head / standoff: no tracks on the outer layers
 
-# The 3.3 V plane covers the display area and reaches the NFC parts left of the antenna: (x, y) corner
-PLANE_3V3_TONGUE = (25.3, 136.6)
+# The 3.3 V plane covers the display area down to this line (the NFC chip sits above it now)
+PLANE_3V3_Y = 89.0
 
 # Copper layers. With 6 every signal layer lies next to an unbroken plane:
 #   F.Cu signals and parts / In1 ground / In2 signals / In3 3.3 V / In4 ground / B.Cu signals, core rail, antenna

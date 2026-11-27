@@ -107,8 +107,7 @@ def zones(B):
     B.keepout([(l, t), (r, t), (r, bt), (l, bt), (l, n2), (nx, n2), (nx, n1), (l, n1)], all_cu,
               'NFC antenna: no tracks', pours=True, tracks=True, vias=True)
     # copper around the loop must stay open on one side, otherwise it acts as a shorted turn
-    B.keepout(rect(ax + G.ANT_W / 2 - 1.0, ay - 2.0, G.NOTCH_X, ay + 0.5), all_cu,
-              'NFC antenna: gap in the surrounding copper', pours=True)
+    B.keepout(rect(*G.NFC_GAP), all_cu, 'NFC antenna: gap in the surrounding copper', pours=True)
     B.keepout(rect(*G.WIFI_KEEPOUT), all_cu, 'Wi-Fi antenna: no copper', pours=True, tracks=True, vias=True)
     for x1, y1, x2, y2 in G.POE_PRIMARY:
         B.keepout(rect(x1, y1, x2, y2), all_cu, 'PoE primary side: no secondary copper pour', pours=True)
@@ -136,9 +135,7 @@ def zones(B):
     for hx, hy in G.MOUNT_HOLES:
         octagon = [(hx + rr * math.cos(math.pi / 8 + i * math.pi / 4), hy + rr * math.sin(math.pi / 8 + i * math.pi / 4))
                    for i in range(8)]
-        bare = (hx, hy) == G.NFC_GAP_HOLE
-        B.keepout(octagon, (F, B_), 'mounting hole: no %s under the screw head' % ('copper' if bare else 'tracks'),
-                  pours=bare, tracks=True, vias=True)
+        B.keepout(octagon, (F, B_), 'mounting hole: no tracks under the screw head', pours=False, tracks=True, vias=True)
     # fiducials: the pick-and-place camera wants bare copper in the 2 mm mask opening and nothing else
     # within the pad's clearance (0.5 mm pad radius + 0.6 mm). The pour keeps that clearance by itself;
     # tracks and vias are kept out here, so that the routers see it too.
@@ -157,10 +154,8 @@ def zones(B):
     B.zone('GND', IN1, full, priority=0, thermal=None, name='GND plane')
     B.zone('GND', F, full, priority=0, thermal=None, name='GND top fill')
     B.zone('GND', B_, full, priority=0, thermal=None, name='GND bottom fill')
-    # 3.3 V plane, display area only (nothing below the slot needs it as a plane)
-    x3, y3 = G.PLANE_3V3_TONGUE
-    B.zone('+3V3', PLANE_3V3, [(0.3, 0.3), (W - 0.3, 0.3), (W - 0.3, 89.0), (x3, 89.0), (x3, y3), (0.3, y3)],
-           priority=0, thermal=None, name='3V3 plane')
+    # 3.3 V plane, display area only (nothing below it needs it as a plane)
+    B.zone('+3V3', PLANE_3V3, rect(0.3, 0.3, W - 0.3, G.PLANE_3V3_Y), priority=0, thermal=None, name='3V3 plane')
     if SIX:
         # Six layers: the 3.3 V plane has a layer of its own (In3) and stays whole. In2 keeps the signal
         # tracks, with ground filled in between them; a second ground plane (In4) is the reference of

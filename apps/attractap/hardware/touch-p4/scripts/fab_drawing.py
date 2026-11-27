@@ -190,8 +190,9 @@ def features():
             ('Corner cut-away, right', '%.1f to %.1f' % (G.NOTCH_X, G.BOARD_W), '%.1f to %.1f' % (G.NOTCH_Y, G.BOARD_H),
              'Ethernet plug'),
             ('Corner cut-away, left', '0 to %.1f' % G.POCKET_X, '%.1f to %.1f' % (G.POCKET_Y, G.BOARD_H), 'DC plug'),
-            ('LED windows (8)', ', '.join('%.1f' % v for v in G.LED_X), '%.1f, %.1f' % (G.LED_Y_TOP, G.LED_Y_BOT),
-             '%.1f x %.1f centred, corner reliefs' % (w, h))]
+            ('LED windows (%d), square ring' % len(G.LEDS), '%.2f, %.2f' % (G.TILE_C[0] - G.LED_RING, G.TILE_C[0] + G.LED_RING),
+             '%.2f, %.2f' % (G.TILE_C[1] - G.LED_RING, G.TILE_C[1] + G.LED_RING),
+             '%.1f x %.1f centred (long side along the ring), %.2f apart, corner reliefs' % (w, h, G.LED_PITCH))]
     for i, (x, y) in enumerate(G.MOUNT_HOLES):
         rows.append(('Mounting hole %d' % (i + 1), '%.1f' % x, '%.1f' % y, '3.2 unplated'))
     rows.append(('Outer corners', '', '', 'r 2.0'))

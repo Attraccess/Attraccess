@@ -432,9 +432,12 @@ def fix_footprint(name, text, fresh=True):
 
 
 # The LED is KiCad's footprint with its pads 0.1 mm shorter on the side of the cut-out. KiCad's pads end
-# 0.25 mm from the relieved corners of the cut-out, and a milled outline may lie 0.2 mm off.
+# 0.25 mm from the relieved corners of the cut-out, and a milled outline may lie 0.2 mm off. Its courtyard is
+# 0.1 mm round the pads and the milled cut-out (IPC-7351B, least material) instead of KiCad's 0.25 mm: the two
+# LEDs next to each corner of the ring round the NFC loop stand at right angles 0.8 mm apart.
 LED_SOURCE = ('LED_SMD', 'LED_SK6812MINI-E_3.2x2.8mm_P1.5mm_ReverseMount')
 LED_NAME, LED_PAD_TRIM = 'LED_SK6812MINI-E_ReverseMount_Clear', 0.1
+LED_COURTYARD = (3.5, 1.72)
 
 
 def led_footprint():
@@ -450,6 +453,11 @@ def led_footprint():
         x = float(at[1])
         size[1] = round(float(size[1]) - LED_PAD_TRIM, 3)
         at[1] = round(x + (LED_PAD_TRIM / 2 if x > 0 else -LED_PAD_TRIM / 2), 3)
+    for rect in find(tree, 'fp_rect'):
+        if first(rect, 'layer')[1] == 'F.CrtYd':
+            cx, cy = LED_COURTYARD
+            first(rect, 'start')[1:3] = [-cx, -cy]
+            first(rect, 'end')[1:3] = [cx, cy]
     return dumps(tree) + '\n'
 
 

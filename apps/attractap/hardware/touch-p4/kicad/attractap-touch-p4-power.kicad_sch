@@ -6,7 +6,7 @@
 	(paper "A2")
 	(title_block
 		(title "Attractap Touch P4: Power input")
-		(date "2026-11-25")
+		(date "2026-11-27")
 		(rev "A")
 		(company "Attraccess")
 		(comment 1 "USB-C, DC and PoE inputs, supply OR-ing, 3.3 V buck converter")

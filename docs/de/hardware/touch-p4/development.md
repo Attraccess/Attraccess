@@ -248,7 +248,7 @@ Bestellformular:
 | Kleinste Via | 0,45 mm Pad, 0,2 mm Bohrung (etwa jede fünfte Via; die meisten haben 0,5-mm-Pads). Kostenlos mit Innenlagen bei 0,45 mm oder breiter: "Min via hole size/diameter" auf "0.3mm/(0.4/0.45mm)" lassen; kleinere Auswahlmöglichkeiten kosten 39 USD und mehr |
 | Vias | "Epoxy Filled & Capped", ohne Aufpreis, und nötig: C208, C223 und C226 am MCU haben eine Via im Pad, und die zwölf Masse-Vias zwischen den Masse-Pads des WLAN-Moduls berühren die Pads (Espressifs Land Pattern). Keine andere Via liegt unter Lotpaste. "Tented" wird mit Innenlagen nicht angeboten |
 | Lötstopplack | grün: Die 0,1-mm-Stege zwischen den Pins des MCU sind JLCPCBs Grenze für Grün |
-| Gefräste Öffnungen | Flexschlitz 10,5 x 21,6 mm, acht LED-Fenster 3,4 x 3,0 mm mit freigestellten Ecken, ein Ausschnitt 28,9 x 6,0 mm in der Oberkante unter der WLAN-Antenne, zwei abgeschnittene Ecken, durchkontaktierte Langlöcher an der DC-Buchse und an USB-C |
+| Gefräste Öffnungen | Flexschlitz 10,5 x 21,6 mm, 16 LED-Fenster 3,4 x 3,0 mm mit freigestellten Ecken, ein Ausschnitt 28,9 x 6,0 mm in der Oberkante unter der WLAN-Antenne, zwei abgeschnittene Ecken, durchkontaktierte Langlöcher an der DC-Buchse und an USB-C |
 | Umrisstoleranz | die übliche +/-0,2 mm |
 | Oberfläche | ENIG (18 USD für 5 Platinen, 48 für 100, 336 für 1000). Nicht das kostenlose OSP: JLCPCB schließt es für Kontaktflächen aus, und die vier Masse-Pads für das Display und die 30 Testpunkte blieben blankes Kupfer |
 | Impedanzkontrolle | "Yes", +/-10 % (33 USD pro Bestellung): USB-Paar 90 Ohm differenziell (0,14-mm-Leitungen, 0,15 mm Abstand, Rückseitenlage über In4), Ethernet 50 Ohm (0,155 mm, Bestückungsseite über In1), aus JLCPCBs Rechner für diesen Lagenaufbau; die Fertigung darf die Breiten anpassen |
@@ -302,6 +302,7 @@ datierten Stände ihres Designs.
 | A | 2026-11-25 | Industry review: eFuse and ideal diodes on the 5 V rail, reset supervisor, damped DC input, TLV62569 3.3 V converter, test points, DC and PoE present to the firmware |
 | A | 2026-11-25 | Industry review: layout rework (ESP32-P4 land pattern, decoupling, USB pair, impedance), 2.0 x 1.6 mm crystal, designators on the silkscreen, assembly drawing |
 | A | 2026-11-25 | Wi-Fi module ESP32-C5-MINI-1 (2.4 and 5 GHz, PCB antenna) instead of the ESP32-C6-MINI-1U, with a 3.3 V converter of its own |
+| A | 2026-11-27 | Tap tile: 16 LEDs in a ring round the NFC loop, the loop on the case centre line, the PN532 below the display, the fourth mounting hole left of the tile |
 
 ### Vor einer Bestellung
 

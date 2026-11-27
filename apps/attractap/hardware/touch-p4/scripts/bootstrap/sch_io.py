@@ -190,12 +190,15 @@ def expander(cv, P_, x, y):
 # ---- UI ----------------------------------------------------------------------------------------------
 def ui(cv, P_, top):
     leds(cv, P_, 30.48, top + 45.72)
-    buzzer(cv, P_, 309.88, top + 15.24)
+    buzzer(cv, P_, 337.82, top + 165.1)
     tamper(cv, P_, 50.8, top + 170.18)
 
 
 def leds(cv, P_, x, y):
-    """Level shifter and the LED chain, D701 to D708 in the order the data passes them."""
+    """Level shifter and the LED chain in the order the data passes them: two rows of eight round the ring
+    (placement.led_refs: D701 to D708, then D710 to D717)."""
+    from placement import led_refs
+    refs = led_refs()
     cv.begin('LED data level shifter and addressable LEDs')
     u = cv.put(P_['U701'], x + 25.4, y - P)
     a, yo, vcc = u.pin('2'), u.pin('4'), u.pin('5')
@@ -210,26 +213,28 @@ def leds(cv, P_, x, y):
     cv.wire(yo, 'R701.1')
     pitch = 35.56
     x0 = yo[0] + 45.72
-    for row in range(2):
+    per_row = 8
+    for row in range(len(refs) // per_row):
         yy = yo[1] + 58.42 * row
         rail = yy - 25.4
         cv.power('+5V', x0 - 30.48, rail)
         if row == 0:
             cv.hang(P_['C702'], x0 - 22.86, rail, note=True)
-        for k in range(4):
-            i = 4 * row + k
-            d = cv.put(P_['D70%d' % (i + 1)], x0 + pitch * k, yy, fields={'Reference': (4.6, 9.4), 'Value': (8.6, 11.1)})
+        for k in range(per_row):
+            i = per_row * row + k
+            ref, cref = refs[i]
+            d = cv.put(P_[ref], x0 + pitch * k, yy, fields={'Reference': (4.6, 9.4), 'Value': (8.6, 11.1)})
             vdd = d.pin('3')
             cv.wire(vdd, (vdd[0], rail))
-            cv.hang(P_['C7%02d' % (i + 3)], vdd[0] + 12.7, rail, note=True)
+            cv.hang(P_[cref], vdd[0] + 12.7, rail, note=True)
             if k:
-                cv.wire('D70%d.4' % i, 'D70%d.2' % (i + 1))
-        cv.wire((x0 - 30.48, rail), (x0 + pitch * 3 + 12.7, rail))
-    cv.wire('R701.2', 'D701.2')
-    out = cv.at('D704.4')
+                cv.wire('%s.4' % refs[i - 1][0], '%s.2' % ref)
+        cv.wire((x0 - 30.48, rail), (x0 + pitch * (per_row - 1) + 12.7, rail))
+    cv.wire('R701.2', '%s.2' % refs[0][0])
+    out = cv.at('%s.4' % refs[per_row - 1][0])
     yw = out[1] + 25.4
     cv.wire(out, (out[0] + 5.08, out[1]), (out[0] + 5.08, yw), (x0 - 35.56, yw),
-            (x0 - 35.56, out[1] + 58.42), 'D705.2')
+            (x0 - 35.56, out[1] + 58.42), '%s.2' % refs[per_row][0])
 
 
 def buzzer(cv, P_, x, y):

@@ -89,7 +89,7 @@ NOTES = {
         'Backlight: 8 LEDs 4S2P, 39 mA. Brightness: PWM on BL_PWM at 25-40 kHz (low = off).',
     ],
     'ui': [
-        'LEDs are reverse-mount parts shining through the board. Data flows D701 -> D708.',
+        '16 reverse-mount LEDs in a ring, shining through the board. Data: D701 -> D708, D710 -> D717.',
         'Buzzer: drive BUZZER with a 2.7 kHz square wave (LEDC). Its coil is between pads 1 and 2;',
         'pads 3 and 4 only hold the part. R705 keeps the LED data line low while the MCU is in reset.',
         'Tamper: U702 accelerometer on I2C0 at 0x19, events read over I2C (INT1 on TP814). U703 hall switch:',
@@ -108,7 +108,7 @@ CHECKED_BY = 'nobody yet: sign-off before ordering (docs: Releasing)'
 # Revision A has not been built; these are the dated states of its design, newest last. The release notes have
 # the same table (a test compares them).
 REV = 'A'
-DATE = '2026-11-25'
+DATE = '2026-11-27'
 HISTORY = [
     ('2026-11-15', 'First design, generated from the circuit description'),
     ('2026-11-21', 'Review: Ethernet jack, silkscreen, tamper sensors (accelerometer, hall switch, proximity)'),
@@ -123,6 +123,8 @@ HISTORY = [
                    '2.0 x 1.6 mm crystal, designators on the silkscreen, assembly drawing'),
     ('2026-11-25', 'Wi-Fi module ESP32-C5-MINI-1 (2.4 and 5 GHz, PCB antenna) instead of the ESP32-C6-MINI-1U, '
                    'with a 3.3 V converter of its own'),
+    ('2026-11-27', 'Tap tile: 16 LEDs in a ring round the NFC loop, the loop on the case centre line, the PN532 '
+                   'below the display, the fourth mounting hole left of the tile'),
 ]
 
 

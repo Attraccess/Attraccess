@@ -215,15 +215,10 @@ def ui(d):
     d.R('100R', 'LED_DATA_5V', 'LED_D0')
     d.C('22u', '+5V', size='0805', desc='LED supply')
     d.group('Addressable LEDs')
-    n_led = 8                       # two rows of four, see geometry.LED_X
-    for i in range(n_led):
-        nets = {'1': 'GND', '2': 'LED_D%d' % i, '3': '+5V'}
-        if i + 1 < n_led:
-            nets['4'] = 'LED_D%d' % (i + 1)
-        d.add('D', 'SK6812MINI-E', 'attractap:SK6812MINI-E',
-              'attractap:LED_SK6812MINI-E_ReverseMount_Clear', nets, nc=() if i + 1 < n_led else ('4',),
-              lcsc='C5149201', mpn='SK6812MINI-E', desc='RGB LED, reverse mount')
-        d.C('100n', '+5V', desc='LED %d' % (i + 1))
+    # A ring of 16 round the NFC loop (geometry.LEDS), the data line from one to the next. The first eight
+    # keep their numbers from the two rows of the earlier layout; the other eight come at the end of the sheet.
+    for i in range(8):
+        led(d, i)
     d.group('Buzzer')
     # The coil is between pads 1 (+) and 2 (-), which lie side by side opposite the sound port. Pads 3
     # and 4, next to the port, only hold the part down.
@@ -277,6 +272,23 @@ def ui(d):
     # the 3.3 V converter's output capacitance, which TI limits)
     d.C('4.7u', '+3V3', size='0603', desc='proximity sensor: emitter pulses of up to 200 mA')
     d.R('10k', '+3V3', 'PROX_INT', desc='proximity sensor interrupt: open drain')
+    d.group('Addressable LEDs, second half of the ring')
+    for i in range(8, N_LED):
+        led(d, i)
+
+
+N_LED = 16
+
+
+def led(d, i):
+    """LED i of the chain (from 0) and its capacitor."""
+    nets = {'1': 'GND', '2': 'LED_D%d' % i, '3': '+5V'}
+    if i + 1 < N_LED:
+        nets['4'] = 'LED_D%d' % (i + 1)
+    d.add('D', 'SK6812MINI-E', 'attractap:SK6812MINI-E',
+          'attractap:LED_SK6812MINI-E_ReverseMount_Clear', nets, nc=() if i + 1 < N_LED else ('4',),
+          lcsc='C5149201', mpn='SK6812MINI-E', desc='RGB LED, reverse mount')
+    d.C('100n', '+5V', desc='LED %d' % (i + 1))
 
 
 def mech(d):

@@ -6,7 +6,7 @@
 	(paper "A4")
 	(title_block
 		(title "Attractap Touch P4: Mechanical")
-		(date "2026-11-25")
+		(date "2026-11-27")
 		(rev "A")
 		(company "Attraccess")
 		(comment 1 "Mounting holes, fiducials and test points")

@@ -35,8 +35,7 @@ from routes_board import (
     buzzer_routes,
     dc_route,
     ep_vias,
-    led_link,
-    led_power,
+    led_ring,
     mdi_routes, shield_route, buck_routes, usb_power_routes,
     module_ground,
     nfc_feeds,
@@ -106,7 +105,7 @@ def build():
     mdi_routes(B)
     shield_route(B)
     nfc_feeds(B)
-    led_link(B)
+    led_ring(B)
     dc_route(B)
     small_links(B)
     tamper_routes(B)
@@ -114,7 +113,6 @@ def build():
     buzzer_routes(B)
     phy_fanout(B)
     mcu_escape(B)
-    led_power(B)
     flash_routes(B)
     nfc_host(B)
     uart_escape(B)
@@ -163,6 +161,13 @@ STALE_PARTS = {'R104', 'R105', 'R705', 'L103', 'C117', 'D106', 'D103', 'FB102', 
                'TP801'}
 STALE_PARTS |= {'TP%d' % n for n in range(816, 833)} | {'C%d' % n for n in range(301, 307)} | \
     {'R%d' % n for n in range(301, 313)}
+# The LED ring and the tap tile: the loop moved to the case's centre line, the PN532 block from beside the loop
+# to below the display, the LEDs from two rows into a ring. The session's tracks of the NFC and LED nets, and
+# whatever it laid below the display and where the PN532 block stands now, are not taken over.
+STALE_NETS |= {'NFC_' + n for n in ('TX1', 'TX2', 'F1', 'F2', 'M1', 'M2', 'ANT1', 'ANT2', 'VMID', 'RX', 'RXC', 'X1', 'X2',
+                                    'TVDD', 'AVDD', 'DVDD', 'VBAT', 'IRQ', 'RST', 'SCL', 'SDA')} | \
+    {'LED_D%d' % n for n in range(16)}
+STALE_AREAS = [(0.0, 89.5, G.NOTCH_X, G.BOARD_H), (11.5, 76.0, 33.0, 89.5)]
 
 
 def routes_of_session(path):
@@ -207,6 +212,9 @@ def drop_stale(board):
             continue
         ends = [unV(t.GetPosition())] if t.GetClass() == 'PCB_VIA' else [unV(t.GetStart()), unV(t.GetEnd())]
         if any(kx1 - 0.5 <= x <= kx2 + 0.5 and ky1 - 0.5 <= y <= ky2 + 0.5 for x, y in ends):
+            gone.append(t)
+            continue
+        if any(ax1 <= x <= ax2 and ay1 <= y <= ay2 for x, y in ends for ax1, ay1, ax2, ay2 in STALE_AREAS):
             gone.append(t)
             continue
         via = t.GetClass() == 'PCB_VIA'
@@ -437,10 +445,9 @@ def drop_vias_in_pads(board):
 def drop_edge_violations(board, clearance=0.3):
     """Remove the autorouter's tracks and vias that come closer than the edge clearance to the board edge
     or a cut-out (it keeps a slightly smaller distance of its own). finish_route.py routes them again."""
-    w, h = G.LED_CUTOUT
     holes = [(G.NOTCH_X, G.NOTCH_Y, G.BOARD_W + 9, G.BOARD_H + 9), (-9, G.POCKET_Y, G.POCKET_X, G.BOARD_H + 9), G.SLOT,
              (G.WIFI_NOTCH[0], -9, G.WIFI_NOTCH[1], G.WIFI_NOTCH[2])]
-    holes += [(x - w / 2, y - h / 2, x + w / 2, y + h / 2) for y in (G.LED_Y_TOP, G.LED_Y_BOT) for x in G.LED_X]
+    holes += G.led_cutouts()
     # outside the board outline: four half planes as wide rectangles
     holes += [(-9, -9, 0, G.BOARD_H + 9), (G.BOARD_W, -9, G.BOARD_W + 9, G.BOARD_H + 9), (-9, -9, G.BOARD_W + 9, 0),
               (-9, G.BOARD_H, G.BOARD_W + 9, G.BOARD_H + 9)]
@@ -480,9 +487,7 @@ if __name__ == '__main__':
         # only for the autorouter (not saved): keep it out of the isolated 48 V area
         helper = Board(b, None, {})
         boxes = list(G.POE_ROUTER_KEEPOUT)
-        w, h = G.LED_CUTOUT                       # the router does not keep its tracks off board cut-outs
-        boxes += [(x - w / 2 - 0.14, y - h / 2 - 0.3, x + w / 2 + 0.14, y + h / 2 + 0.3)
-                  for y in (G.LED_Y_TOP, G.LED_Y_BOT) for x in G.LED_X]
+        boxes += G.led_cutouts(0.3)               # the router does not keep its tracks off board cut-outs
         x1, y1, x2, y2 = G.SLOT
         boxes.append((x1 - 0.3, y1 - 0.3, x2 + 0.3, y2 + 0.3))
         boxes.append((G.NOTCH_X - 0.35, G.NOTCH_Y - 0.35, G.BOARD_W + 1, G.BOARD_H + 1))      # Ethernet cut-away

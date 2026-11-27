@@ -318,15 +318,53 @@ class GeometryTest(unittest.TestCase):
         for x1, y1, x2, y2 in geometry.DOCK_OPENINGS:
             self.assertGreater(math.hypot(max(x1 - ex, 0, ex - x2), max(y1 - ey, 0, ey - y2)), spot)
 
-    def test_bare_mounting_hole_is_the_one_in_the_gap_around_the_nfc_loop(self):
-        # board_setup.py keeps the copper around the loop open between the loop's right edge and the Ethernet
-        # cut-away, 2 mm above to 0.5 mm below the loop's centre. The screw that stands there must find no
-        # copper under its head: on both sides of the gap it would close the copper into a shorted turn.
-        hx, hy = geometry.NFC_GAP_HOLE
-        ax, ay = geometry.ANT_C
-        self.assertIn(geometry.NFC_GAP_HOLE, geometry.MOUNT_HOLES)
-        self.assertTrue(ax + geometry.ANT_W / 2 - 1.0 < hx < geometry.NOTCH_X)
-        self.assertTrue(ay - 2.0 - geometry.MOUNT_KEEPOUT_R < hy < ay + 0.5 + geometry.MOUNT_KEEPOUT_R)
+    def test_led_ring_is_even_and_round_the_tile_centre(self):
+        # 16 LEDs on a square ring round the tile's centre, the same offset on every side, evenly spaced along
+        # the ring (also round the corners), each cut-out 1.03 mm or more from the loop's copper
+        leds = geometry.LEDS
+        cx, cy = geometry.TILE_C
+        s = geometry.LED_RING
+        self.assertEqual(len(leds), geometry.LED_COUNT)
+        self.assertEqual(geometry.ANT_C, geometry.TILE_C)
+        for x, y, _rot in leds:
+            self.assertAlmostEqual(max(abs(x - cx), abs(y - cy)), s)
+        steps = [abs(xb - xa) + abs(yb - ya) for (xa, ya, _), (xb, yb, _) in zip(leds, leds[1:] + leds[:1])]
+        for d in steps:
+            self.assertAlmostEqual(d, geometry.LED_PITCH)
+        hw, hh = geometry.ANT_W / 2 + 0.4, geometry.ANT_H / 2 + 0.25     # loop copper: feed pad, outer track
+        for x1, y1, x2, y2 in geometry.led_cutouts():
+            gap = max(cx - hw - x2, x1 - cx - hw, cy - hh - y2, y1 - cy - hh)
+            self.assertGreaterEqual(gap, 1.03 - 1e-6)
+
+    def test_gap_round_the_nfc_loop_lies_between_two_leds_and_has_no_screw(self):
+        # board_setup.py keeps the copper round the loop open between the loop's right edge and the Ethernet
+        # cut-away. The LED ring's 5 V rail is open there too (routes_board.led_ring); no LED, and no
+        # mounting hole with its metal screw and insert, may stand in it.
+        x1, y1, x2, y2 = geometry.NFC_GAP
+        self.assertGreater(x2, geometry.ANT_C[0] + geometry.ANT_W / 2)
+        for cx1, cy1, cx2, cy2 in geometry.led_cutouts(1.5):
+            self.assertFalse(cx1 < x2 and cx2 > x1 and cy1 < y2 and cy2 > y1)
+        r = geometry.MOUNT_KEEPOUT_R
+        for hx, hy in geometry.MOUNT_HOLES:
+            self.assertFalse(x1 - r < hx < x2 + r and y1 - r < hy < y2 + r)
+
+    def test_mounting_hole_bosses_clear_the_tap_tile(self):
+        # the case's boss round each hole keeps its distance from the tile's body (the LED ring plus a margin,
+        # rounded corners of 5 to 6 mm: 5 mm is the worse case), and each hole has board round it
+        cx, cy = geometry.TILE_C
+        half = geometry.LED_RING + geometry.TILE_BODY_MARGIN
+        for hx, hy in geometry.MOUNT_HOLES:
+            for corner in (5.0, geometry.TILE_BODY_CORNER):
+                inner = half - corner
+                dx, dy = max(abs(hx - cx) - inner, 0), max(abs(hy - cy) - inner, 0)
+                self.assertGreaterEqual(math.hypot(dx, dy) - corner - geometry.TILE_BOSS_R, geometry.TILE_BOSS_GAP,
+                                        (hx, hy))
+            web = geometry.MOUNT_HOLE_R + geometry.MOUNT_WEB
+            self.assertTrue(web <= hx <= geometry.BOARD_W - web and web <= hy <= geometry.BOARD_H - web)
+            if hy > geometry.NOTCH_Y - web:
+                self.assertLessEqual(hx, geometry.NOTCH_X - web)
+            if hy > geometry.POCKET_Y - web:
+                self.assertGreaterEqual(hx, geometry.POCKET_X + web)
 
     def test_stack_up_matches_the_layer_count(self):
         # one dielectric between every two copper layers, and a board of 1.6 mm (JLCPCB: +-10 %)

@@ -8,6 +8,7 @@ are. The display side is hidden in the finished reader; it carries the assembly 
 Texts are 1.0 mm high or more with 0.15 mm lines (JLCPCB's capability table asks for 1 mm). Everything is placed by hand on
 free board area; check() names any text that lies on a pad, on another text or off the board.
 """
+import math
 import os
 import re
 
@@ -248,22 +249,31 @@ def component_side(S):
     x48 = G.POE_PRIMARY[0][0]
     S.line([(x48, 57.4), (x48, G.JACK_REAR_CLEAR_Y + 0.4)], dash=(1.0, 0.7))
     S.text('PoE 48V', x48 + 1.4, 64.4, 1.0, rot=90)
-    # ---- LED numbers as the firmware counts them
-    for i, x in enumerate(G.LED_X):
-        S.text(str(i), x, G.LED_Y_TOP + 3.15)
-        S.text(str(7 - i), x, G.LED_Y_BOT - 3.0)
+    # ---- LED numbers as the firmware counts them, inside the ring beside each LED
+    for i, (x, y, _rot) in enumerate(G.LEDS):
+        S.text(str(i), *led_label(x, y, 3.2))
     # ---- the free area behind the NFC loop: name, GPIO map, where to read more
-    left, mid = 28.5, G.ANT_C[0]
+    mid = G.ANT_C[0]
+    left, right = mid - 16.0, mid + 16.1
     S.logo('attraccess-keyhole.svg', left, 100.9, 7.0)
-    S.logo('attraccess-wordmark.svg', 33.8, 101.2, 3.4)
-    S.text('ATTRACTAP TOUCH P4', 33.8, 106.9, 1.2, align='l')
-    S.text('REV A', 60.6, 106.9, 1.0, align='r', tag=True)
-    S.line([(left, 109.3), (60.6, 109.3)])
+    S.logo('attraccess-wordmark.svg', left + 5.3, 101.2, 3.4)
+    S.text('ATTRACTAP TOUCH P4', left + 5.3, 106.9, 1.2, align='l')
+    S.text('REV A', right, 106.9, 1.0, align='r', tag=True)
+    S.line([(left, 109.3), (right, 109.3)])
     bottom = gpio_map(S, left, 111.2)
-    S.line([(left, bottom + 0.1), (60.6, bottom + 0.1)])
+    S.line([(left, bottom + 0.1), (right, bottom + 0.1)])
     S.text('NO USER SERVICEABLE PARTS INSIDE.', mid, bottom + 2.0)
     S.text('JUST KIDDING. EVERYTHING IS.', mid, bottom + 3.7)
     S.text(URL, mid, bottom + 6.3)
+
+
+def led_label(x, y, inward):
+    """Where an LED's number goes: inward mm from the LED's centre towards the ring's centre line (0.6 mm more
+    on the left and right sides, where a number of two digits lies across the ring)."""
+    cx, cy = G.TILE_C
+    if abs(y - cy) > abs(x - cx):
+        return x, y - math.copysign(inward, y - cy)
+    return x - math.copysign(inward + 0.6, x - cx), y
 
 
 def display_side(S):
@@ -278,9 +288,8 @@ def display_side(S):
     S.text('CLIP PINS TO 1 MM', G.JACK_X - 0.8, G.JACK_Y - 9.9, 1.0, BACK)
     S.text('48V', G.JACK_X + 7.1, G.JACK_Y - 6.9, 1.0, BACK)
     # ---- LED numbers, and the tap point in the middle of the loop
-    for i, x in enumerate(G.LED_X):
-        S.text(str(i), x + 3.0, G.LED_Y_TOP, 1.0, BACK)
-        S.text(str(7 - i), x + 3.0, G.LED_Y_BOT, 1.0, BACK)
+    for i, (x, y, _rot) in enumerate(G.LEDS):
+        S.text(str(i), *led_label(x, y, 2.6), 1.0, BACK)
     ax, ay = G.ANT_C
     S.logo('attraccess-keyhole.svg', ax - 2.25, ay - 7.5, 9.0, BACK)
     S.text('NFC 13.56 MHZ', ax, ay + 4.2, 1.0, BACK)
@@ -365,10 +374,9 @@ def touches(g, rect, margin):
 
 def cutouts():
     """The board's notches, pocket, slot and LED windows as boxes (x1, y1, x2, y2)."""
-    w, h = G.LED_CUTOUT
     holes = [(G.NOTCH_X, G.NOTCH_Y, G.BOARD_W, G.BOARD_H), (0, G.POCKET_Y, G.POCKET_X, G.BOARD_H), G.SLOT,
              (G.WIFI_NOTCH[0], 0, G.WIFI_NOTCH[1], G.WIFI_NOTCH[2])]
-    return holes + [(x - w / 2, y - h / 2, x + w / 2, y + h / 2) for y in (G.LED_Y_TOP, G.LED_Y_BOT) for x in G.LED_X]
+    return holes + G.led_cutouts()
 
 
 def check(S, only=None, lines=()):

@@ -6,7 +6,7 @@
 	(paper "A3")
 	(title_block
 		(title "Attractap Touch P4: Wi-Fi")
-		(date "2026-11-25")
+		(date "2026-11-27")
 		(rev "A")
 		(company "Attraccess")
 		(comment 1 "ESP32-C5-MINI-1 co-processor (esp-hosted over SDIO) and its 3.3 V converter")

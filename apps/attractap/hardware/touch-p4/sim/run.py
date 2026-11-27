@@ -14,11 +14,12 @@ import isolation
 import nfc_loop
 import nfc_match
 import pdn
+import shorted_turn
 import si
 import spice
 import test_solvers
 import thermal
-from board import OX, OY, Board, geometry, inside, short
+from board import Board, geometry, short
 
 failed = []
 
@@ -49,18 +50,14 @@ def nfc(board):
     for name, l in zip(('modified Wheeler formula', 'current-sheet expression'), nfc_loop.closed_forms()):
         check(abs(free[0] / l - 1) < 0.06, 'in free air by the %s (Mohan et al. 1999): %.3f uH, the solver %+.1f %%'
               % (name, l * 1e6, (free[0] / l - 1) * 100))
-    # the copper of the outer layers must end outside the screw head and the insert at the hole in the gap
-    hx, hy = geometry.NFC_GAP_HOLE[0] + OX, geometry.NFC_GAP_HOLE[1] + OY
-    ring = np.array([[hx + r * np.cos(a), hy + r * np.sin(a)] for r in (2.0, 2.9) for a in np.linspace(0, 2 * np.pi, 72)])
-    under = False
-    for z in board.zones:
-        if z['layer'] in ('F.Cu', 'B.Cu'):
-            for p in z['polys']:
-                hit = inside(p['outline'], ring)
-                for hole in p['holes']:
-                    hit &= ~inside(hole, ring)
-                under |= bool(hit.any())
-    check(not under, 'no copper on the outer layers within 2.9 mm of the mounting hole in that gap')
+    # no closed copper round the loop, on any layer: every net alone, and the supply nets together
+    for what, closes in shorted_turn.check(board):
+        check(not closes, 'no closed copper round the loop: %s' % what)
+    # no mounting hole (a metal screw and insert) in the gap of the copper round it
+    gx1, gy1, gx2, gy2 = geometry.NFC_GAP
+    r = geometry.MOUNT_KEEPOUT_R
+    check(not any(gx1 - r < hx < gx2 + r and gy1 - r < hy < gy2 + r for hx, hy in geometry.MOUNT_HOLES),
+          'no mounting hole within %.1f mm of the gap in the copper round the loop' % r)
 
     p = nfc_match.parts(board)
     print('   matching: series %g pF, parallel %s pF, damping %g ohm, receive divider %g k / %g k; loop capacitance %.1f pF'
@@ -289,10 +286,10 @@ def heat(board):
             text += ', fuse holds %.2f A against %.2f A' % (hold, amps)
         check(ok, text + ': inside every limit in a room of 40 degC')
         t, at, parts, on, lcd = thermal.solve(board, supply, 1)
-        print('        %-9s everything on for a long time, %.1f W: board +%.0f K, LED rows +%.0f K, display +%.0f K, '
+        print('        %-9s everything on for a long time, %.1f W: board +%.0f K, LED ring +%.0f K, display +%.0f K, '
               'Wi-Fi module: board under it +%.0f K, cavity +%.0f K'
               % (supply, sum(w[1] for w in parts.values()) + thermal.INTO_THE_AIR[supply][1], t[on].mean(),
-                 max(at['D70%d' % k] for k in range(1, 9)), thermal.display_rise(t[lcd & on].mean()), at['U301'],
+                 max(at[ref] for ref in thermal.LEDS), thermal.display_rise(t[lcd & on].mean()), at['U301'],
                  0.5 * (1 + thermal.DOCK_SHARE) * t[on].mean()))
 
 
@@ -307,7 +304,7 @@ def dock_magnet():
 
 
 def supply_tracks(board):
-    print('Supply tracks with every load at its supply-sizing figure (1.65 A on the 5 V rail)')
+    print('Supply tracks with every load at its supply-sizing figure (%.2f A on the 5 V rail)' % sum(irdrop.RAIL_5V.values()))
     for net, source, loads, label in irdrop.CASES:
         drops, busy = irdrop.solve(board, net, source, loads)
         # IPC-2221's heating is for long conductors: a neck shorter than 1 mm between a pad and a wide track

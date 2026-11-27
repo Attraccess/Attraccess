@@ -118,10 +118,10 @@ def ipc2221(board, w_mm, layer, rise=20.0):
     return (0.048 if layer in ('F.Cu', 'B.Cu') else 0.024) * rise ** 0.44 * area ** 0.725
 
 
-# Every 5 V load at its supply-sizing figure at once (design notes, "Power budget"): 1.65 A on the
-# 5 V rail, more than the firmware ever draws.
+# Every 5 V load at its supply-sizing figure at once (design notes, "Power budget"): 1.9 A on the
+# 5 V rail with the 16 LEDs at 36 mA each, more than the firmware ever draws.
 RAIL_5V = {'U103.4': 1.00, 'L601.1': 0.13, 'FB501.1': 0.12, 'R702.1': 0.09,
-           **{'D%d.3' % (701 + i): 0.036 for i in range(8)}}
+           **{'D%d.3' % (701 + k if k < 8 else 702 + k): 0.036 for k in range(16)}}
 CASES = [
     ('+5V', 'U105.6', RAIL_5V, 'from USB (eFuse)'), ('+5V', 'Q102.3', RAIL_5V, 'from the DC converter'),
     ('+5V', 'Q101.3', RAIL_5V, 'from PoE'),

@@ -96,8 +96,8 @@ def loop(board, mesh=1.25, copper=True, wall=None, bridge=False, filaments=7):
     """(inductance in henry, resistance in ohm) of the loop.
 
     copper: with the pours around the loop. wall: distance in mm to a metal plate behind the reader.
-    bridge: metal across the gap in the copper at the mounting hole, as a screw head through the solder
-    mask would be."""
+    bridge: metal across the gap in the copper round the loop (geometry.NFC_GAP), as a screw head through the
+    solder mask or a track of a supply net there would be."""
     m, n_in, n_out = _model(board, mesh, copper, wall, bridge, filaments)
     z, _ = m.impedance(F0, n_in, n_out)
     return z.imag / (2 * np.pi * F0), z.real
@@ -113,7 +113,8 @@ def _model(board, mesh, copper, wall, bridge, filaments):
         nx, ny = int((geometry.ANT_W + 28) / mesh), int((geometry.ANT_H + 30) / mesh)
         mask = copper_mask(board, x0, y0, nx, ny, mesh)
         if bridge:
-            hx, hy = geometry.NFC_GAP_HOLE[0] + OX, geometry.NFC_GAP_HOLE[1] + OY
+            gx1, gy1, gx2, gy2 = geometry.NFC_GAP
+            hx, hy = (gx1 + gx2) / 2 + OX, (gy1 + gy2) / 2 + OY
             yy, xx = np.mgrid[0:ny, 0:nx]
             mask |= np.hypot(x0 + (xx + 0.5) * mesh - hx, y0 + (yy + 0.5) * mesh - hy) < 3.0
         m.sheet(mask, x0 * MM, y0 * MM, mesh * MM, 35e-6, 0.1 * MM)

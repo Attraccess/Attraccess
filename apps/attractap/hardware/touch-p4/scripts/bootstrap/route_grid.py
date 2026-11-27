@@ -252,10 +252,8 @@ def build_raster(board, net, width, clearance, pads, tracks, vias, groups, soft_
         R.rect(l, 0, G.POCKET_Y, G.POCKET_X, G.BOARD_H, e)
         R.rect(l, G.WIFI_NOTCH[0], 0, G.WIFI_NOTCH[1], G.WIFI_NOTCH[2], e)
         R.rect(l, *G.SLOT, e)
-        w, h = G.LED_CUTOUT
-        for y in (G.LED_Y_TOP, G.LED_Y_BOT):
-            for x in G.LED_X:
-                R.rect(l, x - w / 2, y - h / 2, x + w / 2, y + h / 2, e)
+        for x1, y1, x2, y2 in G.led_cutouts():
+            R.rect(l, x1, y1, x2, y2, e)
         for x1, y1, x2, y2 in G.POE_ROUTER_KEEPOUT:
             R.rect(l, x1, y1, x2, y2, half)
         for hx, hy in G.MOUNT_HOLES:

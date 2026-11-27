@@ -248,7 +248,7 @@ def flash_routes(B):
 
 def nfc_host(B):
     """Fan-outs of the four NFC host signals at both ends. At the MCU they are neighbouring pins and
-    leave to the left between two capacitors; at the PN532 the pull-ups sit right below the pins. In
+    leave to the left between two capacitors; at the PN532 the pull-ups sit right above the pins. In
     both places a track of one signal easily shuts in the next pin, so each gets a fixed track to a
     via. The long run between the vias is left to the router."""
     p = B.pad
@@ -260,22 +260,22 @@ def nfc_host(B):
         via = (x - run - 0.4, y + turn)
         B.track([(x, y), (x - run, y), via], net, w)
         B.via(*via, net)
-    # PN532
+    # PN532: host pins on its upper side, the pull-ups above them
     irq, scl, sda, rst = p('U501', 25), p('U501', 27), p('U501', 28), p('U501', 38)
     r501, r502, r503 = p('R501', '2'), p('R502', '2'), p('R503', '1')
-    v = (irq[0], irq[1] + 0.99)
+    v = (irq[0], irq[1] - 0.99)
     B.track([irq, v], 'NFC_IRQ', w)
     B.via(*v, 'NFC_IRQ')
     B.track(dog(scl, r501), 'NFC_SCL', w)
-    v = (r501[0] - 1.0, r501[1] + 0.36)
+    v = (r501[0] + 1.0, r501[1] - 0.36)
     B.track(dog(r501, v), 'NFC_SCL', w)
     B.via(*v, 'NFC_SCL')
     B.track(dog(sda, r502), 'NFC_SDA', w)
-    v = (r502[0] + 0.8, r502[1] - 0.64)
+    v = (r502[0] - 0.8, r502[1] + 0.64)
     B.track(dog(r502, v, 'd'), 'NFC_SDA', w)
     B.via(*v, 'NFC_SDA')
     B.track(dog(rst, r503), 'NFC_RST', w)
-    v = (r503[0], r503[1] + 0.9)
+    v = (r503[0], r503[1] - 0.9)
     B.track([r503, v], 'NFC_RST', w)
     B.via(*v, 'NFC_RST')
 

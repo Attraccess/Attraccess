@@ -6,7 +6,7 @@
 	(paper "A3")
 	(title_block
 		(title "Attractap Touch P4: MCU power")
-		(date "2026-11-25")
+		(date "2026-11-27")
 		(rev "A")
 		(company "Attraccess")
 		(comment 1 "ESP32-P4 supply pins, decoupling, 1.1 V core converter")

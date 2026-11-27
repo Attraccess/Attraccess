@@ -15,8 +15,12 @@ SILK_KEEP_IN = {
     'RJ45-TH_HY931147C': (-12.6, -99, 99, 99),
     # USB-C, turned 90 degrees at (82.3, 18.0): the receptacle stands out over the right edge (x = 86)
     'USB-C_SMD-TYPE-C-31-M-12_1': (-99, -99, 99, 3.65),
-    # DC jack, turned 90 degrees at (8.05, 97.3): the plug end lies in the cut-away below y = 107.5
-    'DC-IN-TH_PJ-002A': (-9.9, -99, 99, 99),
+    # DC jack, turned 90 degrees at (7.05, 97.3): the plug end lies in the cut-away below y = 107.5, and its left
+    # side over the rounded corner of the board there; the outline ends at y = 105.9
+    'DC-IN-TH_PJ-002A': (-8.6, -99, 99, 99),
+    # DC terminal at (15.5, 100.2): its lower edge lay over the rounded inside corner of the DC cut-away, its right
+    # side on the outline of the LED ring's upper left LEDs; the outline ends at y = 107.2 and x = 19.5
+    'CONN-TH_4P-P3.5-2601-3102': (-99, -99, 4.0, 7.0),
     # Wi-Fi module (geometry.WIFI_MODULE): its antenna end stands over the cut in the top edge, whose floor
     # lies 7.9 mm above the module's centre; the outline stops 0.5 mm short of it
     'CONN-SMD_ESP32-C5-MINI-1-N4': (-99, -7.4, 99, 99),

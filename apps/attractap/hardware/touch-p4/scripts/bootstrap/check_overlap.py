@@ -25,8 +25,8 @@ def body_box(fp):
 
 
 def courtyards_apart(fa, fb):
-    """Whether two parts' courtyards, as drawn (a part turned by 45 degrees has a diamond), do not overlap.
-    The boxes above are axis-aligned and overstate a turned part."""
+    """Whether two parts' courtyards, as drawn (a part turned by 45 degrees has a diamond, a mounting hole a
+    circle), do not overlap. The boxes above are axis-aligned and overstate such a part."""
     ca, cb = fa.GetCourtyard(pcbnew.F_CrtYd), fb.GetCourtyard(pcbnew.F_CrtYd)
     if not (ca.OutlineCount() and cb.OutlineCount()):
         return False
@@ -52,7 +52,8 @@ def main():
             ox = min(ax2, bx2) - max(ax1, bx1)
             oy = min(ay2, by2) - max(ay1, by1)
             if ox > -MARGIN and oy > -MARGIN:
-                turned = any(fps[r].GetOrientationDegrees() % 90 for r in (a, c))
+                # a part turned by 45 degrees, or a mounting hole with its round courtyard: the boxes overstate it
+                turned = any(fps[r].GetOrientationDegrees() % 90 or r.startswith('H') for r in (a, c))
                 if turned and courtyards_apart(fps[a], fps[c]):
                     continue
                 bad += 1

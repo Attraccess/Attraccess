@@ -5,13 +5,46 @@ build_pcb.py: ``B.put(ref, x, y, rot)`` places a part.
 All coordinates are board millimetres (see geometry.py), rotations in degrees
 counter-clockwise. Passive pad 1 is at -x for rotation 0, at +y (below) for 90.
 """
+import math
+
 import geometry as G
 
 MCU = (43.0, 50.0)          # ESP32-P4 centre
 FPC = (43.85, 67.7)         # display connector origin
 PHY = (67.6, 64.6)          # Ethernet PHY centre
 DCDC = (9.0, 70.0)          # DC input converter (U104) centre
-NFC = (19.3, 123.2)         # PN532 centre
+NFC = (21.5, 80.1)          # PN532 centre: below the display, above the LED ring's upper left corner
+
+
+def led_refs():
+    """(LED, its capacitor) in the order of the data line: the first eight are D701 to D708 with C703 to C710,
+    the eight added for the ring come after the tamper parts on the sheet, D710 to D717 with C716 to C723."""
+    return [('D%d' % (701 + k), 'C%d' % (703 + k)) if k < 8 else ('D%d' % (702 + k), 'C%d' % (708 + k))
+            for k in range(len(G.LEDS))]
+
+
+# In an LED's own frame (led_frame): its capacitor in the gap after it, and the 5 V via beside that on the line
+# of the 5 V rail; for the LED before the gap in the copper round the loop, outside the ring instead
+LED_CAP, LED_VIA = (4.6, -0.6), (4.6, -2.6)
+LED_CAP_OUT, LED_VIA_OUT = (2.9, -2.45), (1.6, -2.6)
+
+
+def led_gap_index():
+    """The LED before the gap in the copper round the loop (geometry.NFC_GAP lies between it and the next)."""
+    gy = (G.NFC_GAP[1] + G.NFC_GAP[3]) / 2
+    for k, (x, y, rot) in enumerate(G.LEDS):
+        _nx, ny, _r = G.LEDS[(k + 1) % len(G.LEDS)]
+        if rot == 270 and x > G.NFC_GAP[0] and y < gy < ny:
+            return k
+    raise ValueError('no LED next to the gap')
+
+
+def led_frame(k):
+    """Board position of a point given in LED k's own frame: x along the ring in the data's direction, y
+    towards the loop (negative: outside the ring)."""
+    x, y, rot = G.LEDS[k]
+    c, s = round(math.cos(math.radians(rot))), round(math.sin(math.radians(rot)))
+    return lambda lx, ly: (x + lx * c + ly * s, y - lx * s + ly * c)
 
 
 def place(B):
@@ -230,8 +263,9 @@ def place(B):
 
     # ===== DC input: both connectors at the top of the tongue's left margin. The jack opens downwards
     # into the second cut-away (see geometry.POCKET_X / POCKET_Y), so its plug stays inside the outline.
-    put('J102', 8.05, 97.3, 90)    # barrel jack
-    put('J103', 16.7, 100.2, 0)    # DC terminal, wires enter from below at 40 degrees; + on the left
+    # Both sit 1.0 and 1.2 mm further left than in the first layout: the LED ring's upper left LED needs the room.
+    put('J102', 7.05, 97.3, 90)    # barrel jack
+    put('J103', 15.5, 100.2, 0)    # DC terminal, wires enter from below at 40 degrees; + on the left
     # fuse, reverse-polarity diode, input filter and TVS next to the converter, in the left column behind
     # the display. From the bottom up: fuse, diode, filter (inductor on the left, its capacitor on the
     # right), TVS, converter.
@@ -296,53 +330,57 @@ def place(B):
     put('C410', 66.6, 76.6, 90)        # shield to ground, 1 nF 3 kV
     put('R413', 63.9, 76.6, 90)
 
-    # ================================================= NFC (tongue, left margin)
+    # ================================================= NFC (below the display, left of the flex)
     put('ANT501', G.ANT_C[0], G.ANT_C[1], 0)
     n = rel(NFC)
-    # The PN532 block is a column between the DC cut-away and the antenna. The chip is turned so that
-    # its transmitter pins face up, the crystal pins left, the host pins down and reset/VBAT right.
-    n('U501', 0, 0, 180)
-    # transmitter chains, straight up to the antenna feeds: TX2 on the left, TX1 on the right
-    n('L502', -1.5, -6.2, 90)
-    n('C516', -3.4, -7.7, 180)
-    n('C517', -1.5, -9.2, 90)
-    n('C518', -3.4, -10.3, 180)
-    n('C519', -3.4, -11.4, 180)
-    n('R505', -1.5, -12.0, 90)
-    n('L501', 1.5, -6.2, 90)
-    n('C512', 3.4, -7.7, 0)
-    n('C513', 1.5, -9.2, 90)
-    n('C514', 3.4, -10.3, 0)
-    n('C515', 3.4, -11.4, 0)
-    n('R504', 1.5, -12.0, 90)
-    n('C508', 0.0, -5.3, 90)       # TVDD, between the two chains
-    n('C507', 5.1, -9.5, 90)
-    n('FB503', 5.1, -6.2, 90)
-    # left strip, top to bottom: AVDD supply, receive path
-    n('FB502', -5.4, -12.6, 0)
-    n('C505', -5.4, -11.4, 180)
-    # AVDD 100 nF: at the foot of the strip, 4 mm from the chip's AVDD pin (pin 8). The band right above
+    # The PN532 block sits in the free strip between the display's lower part and the LED ring, its
+    # transmitter pins facing down to the antenna feeds at the ring's upper left corner: the crystal pins
+    # right, the host pins up, reset/VBAT left. (Until the LED ring it sat beside the loop, the same block
+    # turned by 180 degrees.)
+    n('U501', 0, 0, 0)
+    # transmitter chains, straight down to the antenna feeds: TX1 on the left, TX2 on the right
+    n('L501', -1.5, 6.2, 270)
+    n('C512', -3.4, 7.7, 180)
+    n('C513', -1.5, 9.2, 270)
+    n('C514', -3.4, 10.3, 180)
+    n('C515', -3.4, 11.4, 180)
+    n('R504', -1.5, 12.0, 270)
+    n('L502', 1.5, 6.2, 270)
+    n('C516', 3.4, 7.7, 0)
+    n('C517', 1.5, 9.2, 270)
+    n('C518', 3.4, 10.3, 0)
+    n('C519', 3.4, 11.4, 0)
+    n('R505', 1.5, 12.0, 270)
+    n('C508', 0.0, 5.3, 270)       # TVDD, between the two chains
+    n('C507', -5.1, 9.5, 270)
+    n('FB503', -5.1, 6.2, 270)
+    # right strip, top to bottom: AVDD supply, receive path
+    n('FB502', 5.4, 12.6, 180)
+    n('C505', 5.4, 11.4, 0)
+    # AVDD 100 nF: at the head of the strip, 4 mm from the chip's AVDD pin (pin 8). The band right below
     # that pin is taken by the transmitter's vias and the VMID and TVDD tracks.
-    n('C506', -5.4, -4.8, 180)
-    n('C521', -5.4, -9.2, 180)
-    n('R507', -5.4, -8.1, 0)
-    n('C520', -5.4, -7.0, 0)
-    n('R506', -5.4, -5.9, 180)
-    # crystal on the left of the chip
-    n('Y501', -5.4, -0.5, 270)
-    n('C510', -6.25, -3.3, 90)
-    n('C511', -4.55, 2.3, 270)
-    # right strip: VBAT, DVDD, reset
-    n('C502', 4.7, -2.8, 0)
-    n('C504', 4.7, -1.7, 0)
-    n('R503', 4.7, -0.6, 0)
-    # below the chip: host interface, bulk capacitors
-    n('C509', -1.25, 4.8, 270)
-    n('R501', 0.75, 5.0, 90)
-    n('R502', 1.85, 5.0, 90)
-    n('C503', 4.4, 4.6, 0)
-    n('C501', 4.4, 6.2, 0)
-    n('FB501', 4.4, 7.8, 0)
+    n('C506', 5.4, 4.8, 0)
+    n('C521', 5.4, 9.2, 0)
+    n('R507', 5.4, 8.1, 180)
+    n('C520', 5.4, 7.0, 180)
+    n('R506', 5.4, 5.9, 0)
+    # crystal on the right of the chip
+    n('Y501', 5.4, 0.5, 90)
+    n('C510', 6.25, 3.3, 270)
+    n('C511', 4.55, -2.3, 90)
+    # left strip: VBAT, DVDD, reset
+    n('C502', -4.7, 2.8, 180)
+    n('C504', -4.7, 1.7, 180)
+    n('R503', -4.7, 0.6, 180)
+    # above the chip: the host lines' pull-ups and the PVDD capacitor (beside them: the 3.3 V converter's
+    # parts above leave no room for it in the row)
+    n('R501', -0.75, -5.0, 270)
+    n('R502', -1.85, -5.0, 270)
+    n('C509', 2.4, -3.85, 0)
+    # bulk capacitors and the supply's ferrite in a column on the left
+    n('C501', -7.9, 1.9, 90)
+    n('C503', -7.9, 5.1, 90)
+    n('FB501', -7.9, 8.3, 90)
 
     # ========================================================= LEDs and buzzer
     # level shifter for the LED data line, in the left column behind the display
@@ -350,16 +388,18 @@ def place(B):
     put('C701', 6.0, 61.6, 90)
     put('R701', 12.0, 60.2, 0)
     put('C702', 3.0, 61.2, 0)
-    xs = G.LED_X
-    for i, x in enumerate(xs):                       # top row, left to right
-        put('D%d' % (701 + i), x, G.LED_Y_TOP, 0)
-        put('C%d' % (703 + i), x + 4.6, G.LED_Y_TOP - 0.6, 270)   # +5V pad on top, at the supply bus
-    for i, x in enumerate(reversed(xs)):             # bottom row, right to left
-        put('D%d' % (701 + len(xs) + i), x, G.LED_Y_BOT, 180)
-        put('C%d' % (703 + len(xs) + i), x - 4.6, G.LED_Y_BOT + 0.6, 90)
+    # the ring (geometry.LEDS) in the data line's order, each capacitor in the gap after its LED, across the
+    # ring, its 5 V pad outside; the LED before the gap in the copper round the loop has it outside the ring
+    gap = led_gap_index()
+    for k, ((ref, cref), (x, y, rot)) in enumerate(zip(led_refs(), G.LEDS)):
+        put(ref, x, y, rot)
+        if k == gap:
+            put(cref, *led_frame(k)(*LED_CAP_OUT), rot)
+        else:
+            put(cref, *led_frame(k)(*LED_CAP), (rot + 270) % 360)
     put('BZ701', 6.4, 52.0, 180)
     put('R702', 13.2, 48.4, 0)
-    put('D%d' % (701 + 2 * len(G.LED_X)), 13.6, 52.0, 90)    # flyback diode: the D number after the LEDs
+    put('D709', 13.6, 52.0, 90)    # flyback diode
     put('Q701', 13.2, 56.6, 0)
     put('R703', 16.6, 55.6, 0)
     put('R704', 16.6, 57.6, 0)
@@ -392,9 +432,9 @@ def place(B):
         'TP815': (G.PROX[0] - 1.7, G.PROX[1] - 3.8),   # proximity sensor INT, up and left of its pin 6
         # 1 mm pads on every rail, both I2C buses and the RMII clock, each next to its circuit
         'TP816': (13.0, 75.5), 'TP817': (16.0, 75.5), 'TP818': (66.5, 11.0), 'TP819': (66.5, 26.2),
-        'TP820': (59.0, 46.5), 'TP821': (24.7, 111.0), 'TP822': (22.0, 108.4), 'TP823': (22.5, 102.4),
-        'TP824': (61.0, 78.0), 'TP825': (26.5, 63.0), 'TP826': (26.5, 65.5), 'TP827': (17.0, 131.5),
-        'TP828': (17.0, 134.0), 'TP829': (57.0, 84.5), 'TP830': (61.2, 80.8),
+        'TP820': (59.0, 46.5), 'TP821': (30.2, 86.0), 'TP822': (30.2, 88.6), 'TP823': (30.2, 83.4),
+        'TP824': (61.0, 78.0), 'TP825': (26.5, 63.0), 'TP826': (26.5, 65.5), 'TP827': (52.5, 87.6),
+        'TP828': (52.5, 90.2), 'TP829': (57.0, 84.5), 'TP830': (61.2, 80.8),
         'TP831': (G.WIFI_MODULE[0] - 17.2, 9.0),          # the Wi-Fi module's rail, left of its inductor
     }
     for ref, (x, y) in tps.items():
