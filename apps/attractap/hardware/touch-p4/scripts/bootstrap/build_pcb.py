@@ -35,10 +35,8 @@ from routes_board import (
     buzzer_routes,
     dc_route,
     ep_vias,
-    led_ring,
     mdi_routes, shield_route, buck_routes, usb_power_routes,
     module_ground,
-    nfc_feeds,
     phy_fanout,
     plane_fanout,
     poe_routes,
@@ -58,6 +56,7 @@ from routes_mcu import (
     psram_ring,
     uart_escape,
 )
+from routes_ring import led_ring, nfc_feeds
 from routes_sdio import sdio_bus
 from routes_wifi import wifi_buck_routes
 from routes_signal import usb_connector, usb_pair
