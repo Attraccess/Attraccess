@@ -66,6 +66,7 @@ ARG ESP_GDB_VERSION=16.2_20250324
 RUN python3 -m venv /opt/venv && \
     /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
     /opt/venv/bin/pip install --no-cache-dir esp-coredump && \
+    /opt/venv/bin/pip uninstall -y pip && \
     mkdir -p /opt/esp-gdb && cd /opt/esp-gdb && \
     arch="$(uname -m)"; case "$arch" in aarch64|arm64) gdb_arch=aarch64-linux-gnu ;; *) gdb_arch=x86_64-linux-gnu ;; esac && \
     curl -fsSL -o xtensa-gdb.tar.gz "https://github.com/espressif/binutils-gdb/releases/download/esp-gdb-v${ESP_GDB_VERSION}/xtensa-esp-elf-gdb-${ESP_GDB_VERSION}-${gdb_arch}.tar.gz" && \
@@ -90,7 +91,7 @@ WORKDIR /app
 # Minimal runtime libs for native Node modules and privilege drop.
 # - python3: runs esp-coredump for server-side coredump symbolication
 # - openssh-client: the WAGO plugin spawns ssh, ssh-agent, ssh-add, ssh-keygen and ssh-keyscan
-# - ca-certificates: TLS trust store for the spawned tools
+# - ca-certificates: the system trust store the full image had (Node's --use-system-ca, Python)
 # - tzdata: compose files set TZ
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
