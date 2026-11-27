@@ -136,19 +136,31 @@ Abweichung; ohne neuen Grund wird es nicht wieder aufgerollt.
 - **Revision B.** Modul neben den Slot-0-Pins des P4, mit dem Core-Wandler auf der anderen Seite des P4,
   für einen Bus auf der Vorderlage.
 
-### ESD an den LED-Fenstern, am Summer und an den Verschlussschrauben (Review-Punkt 9.1)
+### ESD an der Fuge der Tap-Kachel, am Summer und an den Verschlussschrauben (Review-Punkt 9.1)
 
 - **Ziel.** Jeder Anschluss und jede Fläche erreicht den Prüfpegel (4 kV Kontakt, 8 kV Luft, Kriterium B),
   gezeigt durch die Bemessung des schützenden Bauteils.
-- **Erreicht.** Jeder Kabelanschluss, die Kanten und das Flexkabel des Displays, der NFC-Bereich und das
-  Glas. Nicht gezeigt: die LED-Fenster (die SK6812MINI-E ist mit 2 kV HBM bemessen, ein Handhabungswert),
-  die Summerlöcher (keine Bemessung für Summer oder FET) und die zwei schwebenden Verschlussschrauben.
+- **Erreicht.** Jeder Kabelanschluss, die Kanten und das Flexkabel des Displays und das Glas. Nicht gezeigt:
+  die Fuge um die Tap-Kachel, die Summerlöcher (keine Bemessung für Summer oder FET) und die zwei schwebenden
+  Verschlussschrauben.
+- **Die Fuge der Kachel.** Die Kachel steht in einer quadratischen Öffnung von 45,2 mm in Frontplatte und
+  Kappe, mit 0,2 mm Fuge ringsum, an der Stelle, die Benutzer am meisten berühren. Hinter der Fuge hat eine
+  Entladung 2,4 mm durch Frontplatte und Kappenwand, 0,8 mm entlang dem Flansch der Kachel (seine Kante
+  23,6 mm von der Mitte) und 2,9 mm hinab zur Platine: Dort sitzen die 16 `+5V_LED`-Vias des Rings
+  (abgedeckt) 24,0 mm von der Mitte, ihr Rand an der Kante des Flansches, etwa 6 mm Luft- und Kriechweg von
+  der Fuge. Massefläche liegt ebenso nah daneben. Die LEDs selbst (die SK6812MINI-E ist mit 2 kV HBM
+  bemessen, ein Handhabungswert) sitzen unter dem Körper der Kachel, hinter einem längeren Weg.
 - **Warum.** Eine Diode an jeder der 16 LEDs, am Summer und an den Schrauben ist nicht praktikabel; was
-  hier entscheidet, ist der Luft- und Kriechweg durch das Gehäuse, den kein Datenblatt angibt.
-- **Abhilfe.** ESD-Vortest an den ersten Lesern vor dem Labor: 8 kV Luft an jedem LED-Fenster, den
-  Summerlöchern, den Fugen und den Glaskanten, 4 kV Kontakt an den Verschlussschrauben.
-- **Revision B**, falls der Vortest fehlschlägt: Diffusoren mit einem Flansch, der die Fuge schließt,
-  gegenüber dem Anschluss versetzte Summerlöcher, Verschlussschrauben aus Nylon.
+  hier entscheidet, ist der Luft- und Kriechweg durch das Gehäuse, den kein Datenblatt angibt. Die Vias zu
+  verlegen ist keine kleine Änderung: nach innen lassen die Pads der LEDs keinen Platz, nach außen endet die
+  Platine rechts und unten 2,5 mm hinter der Schiene.
+- **Abhilfe.** ESD-Vortest an den ersten Lesern vor dem Labor: 8 kV Luft rund um die Fuge der Kachel (ihre
+  Ecken und die Abschnitte auf Höhe der 5-V-Vias der LEDs) und auf ihre Oberseite, die Summerlöcher, die
+  Fugen der Frontplatte und die Glaskanten, 4 kV Kontakt an den Verschlussschrauben.
+- **Revision B**, falls der Vortest an der Kachel fehlschlägt: ein breiterer Flansch, bis 26 mm von der
+  Mitte, sodass die Vias 2 mm darunter liegen und der Weg sich entlang der Rückseite des Flansches
+  fortsetzt; oder die 5-V-Schiene des Rings und ihre Vias innerhalb der Kante des Flansches, mit rechts und
+  unten vergrößerter Platine. Gegenüber dem Anschluss versetzte Summerlöcher, Verschlussschrauben aus Nylon.
 
 ### Bezeichner der kleinen Passivbauteile (Review-Punkt 7.6)
 

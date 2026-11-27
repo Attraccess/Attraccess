@@ -284,8 +284,8 @@ Items below A−, each with its entry in [limitations](hardware/touch-p4/limitat
 
 Items at A− that also have a deviation entry: 2.4 (USB-only supply held to 500 mA; the PoE module's
 headroom at 85 °C, added after grading), 6.2 (five
-features at the fab's limit), 7.6 (small passives on the assembly drawing only) and 9.1 (LED
-windows, buzzer, lock screws). Item 5.2 has a deviation for the SDIO bus (two layer changes per
+features at the fab's limit), 7.6 (small passives on the assembly drawing only) and 9.1 (tap
+tile's seam, buzzer, lock screws). Item 5.2 has a deviation for the SDIO bus (two layer changes per
 line), added after grading.
 
 ## Running the review

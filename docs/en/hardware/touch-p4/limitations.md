@@ -120,19 +120,29 @@ not reopened without a new reason.
 - **Revision B.** Module next to the P4's slot 0 pins with the core converter moved to the P4's other side,
   for a front-layer bus.
 
-### ESD at the LED windows, buzzer and lock screws (review item 9.1)
+### ESD at the tap tile's seam, buzzer and lock screws (review item 9.1)
 
 - **Target.** Every port and surface reaches the test level (4 kV contact, 8 kV air, criterion B), shown
   by the protecting part's rating.
-- **Reached.** Every cable port, the display edges and flex, the NFC area and the glass. Not shown: the LED
-  windows (SK6812MINI-E rated 2 kV HBM, a handling figure), the buzzer holes (no rating for buzzer or FET)
-  and the two floating lock screws.
+- **Reached.** Every cable port, the display edges and flex and the glass. Not shown: the seam round the
+  tap tile, the buzzer holes (no rating for buzzer or FET) and the two floating lock screws.
+- **The tile's seam.** The tile stands in a 45.2 mm square opening of faceplate and cap with a 0.2 mm seam
+  all round, the spot users touch most. Behind the seam a discharge has 2.4 mm through faceplate and cap
+  wall, 0.8 mm along the tile's flange (its edge 23.6 mm from the centre) and 2.9 mm down to the board:
+  there the ring's 16 `+5V_LED` vias (tented) sit 24.0 mm from the centre, their edge at the flange's edge,
+  about 6 mm of air and surface from the seam. Ground pour lies beside them as close. The LEDs themselves
+  (SK6812MINI-E rated 2 kV HBM, a handling figure) sit under the tile's body, behind a longer path.
 - **Why.** A diode at each of 16 LEDs, the buzzer and the screws is not practical; what decides these is
-  the air and surface path through the case, which no datasheet gives.
-- **Mitigation.** ESD pre-test on the first readers before the lab: 8 kV air on every LED window, the
-  buzzer holes, the seams and the glass edges, 4 kV contact on the lock screws.
-- **Revision B**, if the pre-test fails: diffusers with a flange that closes the seam, buzzer holes offset
-  from the port, nylon lock screws.
+  the air and surface path through the case, which no datasheet gives. Moving the vias is not a small
+  change: inwards the LEDs' pads leave no room, outwards the board ends 2.5 mm beyond the rail on the
+  right and bottom sides.
+- **Mitigation.** ESD pre-test on the first readers before the lab: 8 kV air all round the tile's seam (its
+  corners and the stretches level with the LEDs' 5 V vias) and on its top, the buzzer holes, the faceplate's
+  seams and the glass edges, 4 kV contact on the lock screws.
+- **Revision B**, if the pre-test fails at the tile: a wider flange, out to 26 mm from the centre, so the
+  vias lie 2 mm under it and the path runs on along the flange's back; or the ring's 5 V rail and vias
+  inside the flange's edge with the board grown on the right and bottom. Buzzer holes offset from the port,
+  nylon lock screws.
 
 ### Designators of the small passives (review item 7.6)
 

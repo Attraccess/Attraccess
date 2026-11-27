@@ -172,8 +172,8 @@ files for it, and use `rsvg-convert` for labels.
     0.1 mm for 5 N on the tile's centre.
 - **Inserts close to the front face.** Only 2.9 mm lie between the board and the front wall. The
   insert holes of the four PCB bosses are 3.2 mm deep (`pcb_ins_depth`), reaching 0.3 mm into the
-  2.4 mm front wall and leaving 2.1 mm. Check on the first print that pressing the inserts in does
-  not mark the front.
+  cap's 1.4 mm front wall (2.4 mm before the faceplate took its outer 1 mm) and leaving 1.1 mm. Check on
+  the first print that pressing the inserts in does not mark the front or lift the faceplate.
 - **Dock magnet.** The ring is at X 30.5, Y 10.95 (board point 12.5, 38.2); the magnet's face is
   10.3 mm from the hall switch, which by calculation gives 22 mT, four times what the switch needs.
   Check on the first board that the switch reads "on the dock" with the reader hung and "off" once it

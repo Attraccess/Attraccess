@@ -28,10 +28,10 @@ dürfen beliebige Kombinationen angeschlossen sein, und die höchste Spannung sp
 | PoE (Version lan) | IEEE-802.3af-Endgerät (Powered Device), 37 bis 57 V an der Buchse (isoliertes Modul DP9900M-5V) | typisch 3,4 W; bei der höchsten Leistungsaufnahme der Platine etwa 6,5 W | Isolation des Moduls (1500-V-Prüfung), TVS-Diode und Ferritperlen an seinem Eingang, 3 mm Kriechstrecke auf der Platine |
 | USB-C (Service) | 5 V, USB-2.0-Port oder Type-C-Quelle | höchstens 0,5 A, wenn USB die einzige Quelle ist (Firmware-Grenze; geschätzt 0,43 A) | eFuse: Sanftanlauf, Strombegrenzung 1,8 bis 2,2 A, Abschaltung über 5,53 bis 5,74 V und unter 3,9 V, Rückstromsperre; ESD-Array |
 
-Höchste Leistungsaufnahme an der 5-V-Schiene: 1,04 A nach den Maximalwerten der Hersteller,
-1,62 A nach deren Werten für die Auslegung der Versorgung, mit zwei Firmware-Grenzen: die
+Höchste Leistungsaufnahme an der 5-V-Schiene: 1,05 A nach den Maximalwerten der Hersteller,
+1,63 A nach deren Werten für die Auslegung der Versorgung, mit zwei Firmware-Grenzen: die
 LEDs zusammen bei 192 mA oder darunter und kein Piepton, solange das NFC-Feld an ist. Ein
-strombegrenzter Schalter hält die LEDs unter 0,31 A, was die Firmware auch sendet. Interne
+strombegrenzter Schalter hält die LEDs unter 0,33 A, was die Firmware auch sendet. Interne
 Schienen: 3,3 V (TLV62569, 2 A, 36 % Reserve bei den Auslegungswerten), 1,1-V-Kern
 (TLV62569, vom MCU gesetzt).
 
@@ -64,7 +64,7 @@ für den Ethernet-Anschluss ([Konformitäts-Checkliste](hardware/touch-p4/compli
 
 | Prüfung | Ziel | Wo |
 |---|---|---|
-| Elektrostatische Entladung, IEC 61000-4-2 | 4 kV Kontakt, 8 kV Luft, Kriterium B | alles, was berührt werden kann: Glas und seine Kanten, LED-Fenster, Fugen, Schrauben; die Schirme der Steckverbinder. Schutz je Anschluss in den [Designnotizen](hardware/touch-p4/design-notes.md) |
+| Elektrostatische Entladung, IEC 61000-4-2 | 4 kV Kontakt, 8 kV Luft, Kriterium B | alles, was berührt werden kann: Glas und seine Kanten, die Tap-Kachel und ihre Fuge, Fugen, Schrauben; die Schirme der Steckverbinder. Schutz je Anschluss in den [Designnotizen](hardware/touch-p4/design-notes.md) |
 | Gestrahlte Störfestigkeit | 3 V/m, 80 MHz bis 6 GHz | gesamter Leser |
 | Schnelle Transienten, HF-Gleichtakt | 0,5 kV; 3 V | Ethernet; der DC-Eingang, wenn sein Kabel länger als 3 m sein darf |
 | Surge | 0,5 kV Leitung gegen Erde | Ethernet mit Innenraumkabeln über 30 m. Der DC-Eingang ist für den Surge der EN 50130-4 Leitung gegen Erde über 42 Ohm ausgelegt (simuliert: höchstens 39,6 V am Wandler, Grenze 40 V) |

@@ -42,7 +42,7 @@ marked **hard** are requirements, not advice.
 
 What the board does itself: resistors hold the LEDs, backlight, buzzer and PN532 off until the firmware
 drives their pins, and the supervisor U204 holds the MCU in reset for 120 to 280 ms after the 3.3 V rail is up (the
-chip asks for 50 us). A current-limited switch (U705) holds the LED ring below 232 to 306 mA whatever the
+chip asks for 50 us). A current-limited switch (U705) holds the LED ring below 255 to 334 mA whatever the
 firmware sends; it is always on.
 
 ## ESP32-P4 GPIO map
@@ -306,11 +306,12 @@ start:
   - for smooth fades use temporal dithering (alternate between neighbouring values from frame to frame):
     with the limit, dim colours sit low in the 8-bit range, where single steps show.
 
-  Above the limit the switch U705 limits the ring at 232 to 306 mA and lets its supply sag: the ring dims
+  The LEDs draw 1 mA each on top while idle, so the ring takes 208 mA at the limit, 23 % below the switch's
+  lowest limit. Above the limit the switch U705 limits the ring at 255 to 334 mA and lets its supply sag: the ring dims
   and shifts colour (blue and green first), and the switch heats up and may turn off and on to cool. Nothing
   is damaged, but it is a firmware fault. The LEDs' PWM periods drift in and out of step; when they line
-  up, a mixed colour draws up to three times its average for part of each 0.8 ms period, which the 100 uF
-  capacitor C725 carries as long as the average stays within the limit.
+  up, a mixed colour draws up to three times its average for part of each 0.8 ms period, which the two 100 uF
+  capacitors C725 and C726 carry as long as the average stays within the limit.
 
 ### Secure boot and chip revision
 

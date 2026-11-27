@@ -161,9 +161,15 @@ not fit.
   LCSC's prices for the LED (0.093 each from 5, 0.048 from 2000, November 2026) and JLCPCB's placement per joint,
   that is about 0.8 USD per board at 5 to 10 boards and 0.4 at 1000, to be confirmed by the next quote.
 - **Also after this quote** the LED supply switch: TPS2553DBVR (U705, C55266, LCSC 0.20 each from 5, 0.11 from
-  3000, November 2026), a 100 uF electrolytic (C725) of the part the PoE module's output already uses, a 100 nF
-  and a 100 k. One new extended line: about 3.30 more feeder fee per order, and on the wifi version a second one,
-  since the electrolytic was a lan-only line. About 0.9 USD per board at 5 boards, 0.6 at 10, 0.2 at 1000.
+  3000, November 2026), two 100 uF electrolytics (C725, C726) of the part the PoE module's output already uses, a
+  100 nF and a 91 k (R708, UNI-ROYAL 0402WGF9102TCE, C4147). New lines: the switch (extended: about 3.30 more feeder
+  fee per order), the 91 k (whether JLCPCB counts it as a basic part is not checked; if not, another 3.30 per order),
+  and on the wifi version the electrolytic, which was a lan-only line. About 1.0 USD per board at 5 boards, 0.6 at
+  10, 0.2 at 1000 (the second electrolytic and the 91 k line added about 0.1 at 5 boards), to be confirmed by the
+  next quote.
+- **Also after this quote** the carrier filter in the LED data line where it crosses the gap round the NFC loop: a
+  2.2 k (R709) and a 39 pF (C727), part numbers the board already has: no new line, two placements. If tuning the
+  NFC matching drops its 39 pF, C727 keeps that line.
 
 ### Layers, vias and finish
 
@@ -207,8 +213,8 @@ divider's 3.9 k). The exceptions:
 - The power path: eFuse, ideal-diode controller and its MOSFET, supervisor, the two TVS of the DC input
   (SMBJ28A, SMBJ28CA), the 47 uF electrolytic, the eFuse divider's three 0.1 % thin-film resistors, and
   1.65 k, 22.1 k and 2.2 nF. Whether a basic part exists for the last three has not been checked.
-- The LED supply switch TPS2553DBVR and its 100 uF electrolytic, the same part as the PoE module's output
-  capacitor.
+- The LED supply switch TPS2553DBVR and its two 100 uF electrolytics, the same part as the PoE module's output
+  capacitor. Its limit resistor, 91 k (C4147), was not checked against the basic list.
 
 ## Sourcing risks
 

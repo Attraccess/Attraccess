@@ -60,7 +60,7 @@ The 3D-printable case itself is described in [Case](hardware/touch-p4/case.md).
 | Tap tile (on the case) | centred at (43, 117), on the case's centre line; loop, LED ring and tile share this centre |
 | NFC loop | 35 x 37, centre (43, 117), on the display side |
 | LEDs | 16 on a square ring 21.4 from (43, 117) on every side (x 21.6 and 64.4, y 95.6 and 138.4), four per side at 5.35 and 16.05 from the side's middle, 10.7 apart along the ring; each in a 3.4 x 3.0 window with relieved corners, long side along the ring |
-| LED supply | switch U705, level shifter U701 and the 100 uF C725 in a row between the flex slot and the ring's top side, x 36 to 58, y 84 to 93 |
+| LED supply | switch U705, level shifter U701 and the 100 uF C725 in a row between the flex slot and the ring's top side, x 36 to 58, y 84 to 93; the second 100 uF C726 between the DC cut-away and the ring's left side (x 12.6 to 19.2, y 110 to 117); the data line's carrier filter R709 (in the gap round the loop) and C727 at LED 6 (D707) |
 | PN532 block | below the display, chip at (21.5, 80.1), transmitter pins down towards the antenna feeds |
 | Mounting holes (3.2 mm) | (4, 3.5), (82, 3.5), (17.4, 140), (16, 122) |
 | DC jack | x 0.2 to 9.2, y 93.6 to 108, opens downwards into the DC cut-away |
@@ -186,7 +186,7 @@ checks. Heights are the makers' where given.
 | J401 pins | 1.45 out of the display side, unclipped | LCD module at 1.7 mm | 0.25; 0.7 clipped to 1 mm |
 | J101 USB-C | 3.25 | cap side wall | 0.63 |
 | C120 47 uF, 6.3 mm | 7.7 | dock plate; cap side wall | 6.2; 13.9 |
-| C725 100 uF, 6.3 mm (LED supply) | 5.4 nominal; the maker's height tolerance not checked | dock plate | about 8 |
+| C725, C726 100 uF, 6.3 mm (LED supply) | 5.4 nominal; the maker's height tolerance not checked | dock plate | about 8; C726 (board point 15.9, 113.3, 0.6 mm from the DC cut-away) not yet checked in the case model |
 | D106, D107, F102, U105, U106, U107, Q101, Q102, U204 | 2.4 at most | none within 3 mm | more than 3 |
 
 - The recesses are 1 mm wider than each part all round; the plate stays 2.2 mm thick there and prints without
@@ -244,30 +244,31 @@ Wi-Fi rail (U302, same circuit):
 | U103 | 0.70 | 0.25 | above |
 | U302 | 0.47 | 0.34 | above |
 | Backlight (4S2P, 39 mA, AP3032) | 0.13 | 0.13 | 13 V at 39 mA, 85 % |
-| 16 SK6812MINI-E | 0.31 (switch limit) | 0.20 (firmware limit) | 12 mA per colour, 0.58 A at full white; the switch U705 holds the ring below 232 to 306 mA, the firmware all channels together at 192 mA or less |
+| 16 SK6812MINI-E | 0.33 (switch limit) | 0.21 (firmware limit) | 12 mA per colour, 0.58 A at full white, 1 mA idle each; the switch U705 holds the ring below 255 to 334 mA, the firmware all channels together at 192 mA or less (208 mA with the idle current) |
 | PN532 | 0.12 | 0.12 | transmitter 100 mA (matching keeps it below 60 mA) plus 20 mA |
 | Buzzer | 0.10 | 0 while the NFC field is on | MLT-8530 95 mA at 5 Vo-p; firmware beeps after the field is off |
 | Level shifter, LED switch, bleed resistors | 0.003 | 0.003 | |
-| **Total** | **1.83** | **1.04** | |
+| **Total** | **1.85** | **1.05** | |
 
 | Source | Rating | Headroom at maximum | Headroom at sizing |
 |---|---|---|---|
-| USB-C (eFuse limit) | 1.8 A minimum (R110 1.65 k) | 42 % | -2 % |
+| USB-C (eFuse limit) | 1.8 A minimum (R110 1.65 k) | 42 % | -3 % |
 | DC converter AP63205 | 2 A | 48 % | 8 % |
-| PoE module DP9900M-5V | 1.8 A to 70 °C (9 W), 1.2 A at 85 °C (6 W) | 42 % (13 % at 85 °C) | -2 % |
+| PoE module DP9900M-5V | 1.8 A to 70 °C (9 W), 1.2 A at 85 °C (6 W) | 42 % (13 % at 85 °C) | -3 % |
 
 Before the LED switch, with the LEDs at 0.10 A (firmware) and 0.58 A (sizing): totals 0.94 and 2.10 A, headroom
 at maximum 48 % (USB), 53 % (DC), 48 % (PoE; 22 % at 85 °C), at sizing -17 %, -5 % and -17 %.
 
-- Each 5 V source keeps at least 30 % at the makers' maximum figures with the firmware limits (LEDs at 192 mA or
-  less; buzzer and NFC field not at once), except the PoE module above 70 °C: 13 %, an accepted deviation
-  ([Known limitations](hardware/touch-p4/limitations.md#headroom-of-the-poe-module-when-hot-review-item-24)). Under those limits
-  the sizing sum is 1.62 A, 10 % below the eFuse and PoE ratings.
+- Each 5 V source keeps at least 30 % at the makers' maximum figures with the firmware limits (LEDs at 192 mA or less,
+  0.21 A with their idle current; buzzer and NFC field not at once), except the PoE module above 70 °C: 13 %, an
+  accepted deviation ([Known
+  limitations](hardware/touch-p4/limitations.md#headroom-of-the-poe-module-when-hot-review-item-24)). Under those
+  limits the sizing sum is 1.63 A, 9 % below the eFuse and PoE ratings.
 - The firmware's LED limit is 192 mA because that is one colour on all 16 LEDs at full range: each LED drives a
   fixed 12 mA per colour and dims by PWM only, so a lower limit would cut the range of single colours. Mixed colours
   and white are scaled down to the same sum ([firmware rule 20](hardware/touch-p4/firmware-port.md)).
-- Sizing counts the ring at the switch's highest current limit, 0.31 A: whatever the firmware sends, the ring cannot
-  draw more (it drew 0.58 A at full white before the switch). At the full 1.83 A the eFuse and the PoE module run at
+- Sizing counts the ring at the switch's highest current limit, 0.33 A: whatever the firmware sends, the ring cannot
+  draw more (it drew 0.58 A at full white before the switch). At the full 1.85 A the eFuse and the PoE module run at
   their ratings and their own limits cover it, the DC converter keeps 8 %. Nothing is damaged. The sum also stacks
   figures that do not coincide (the P4's 380 mA next to its core's 0.5 A, emitter pulses, the C5's 0.6 A sizing
   against its 426 mA).
@@ -464,16 +465,29 @@ standard both sides are safe to touch).
 - **Loop:** 4 turns, 35 x 37 mm, 0.5 mm track, 0.9 mm pitch, display side. Simulated from the board's copper
   (`sim/nfc_loop.py`) at 13.56 MHz: 1.27 uH / 1.20 ohm in free air, 1.25 uH / 1.23 ohm on the board on wood or stone,
   1.20 uH / 1.24 ohm with a metal wall 18 mm behind. Own capacitance about 2.4 pF (acts like 2.5 % more inductance).
-  Not modelled: the DC terminal 6 mm away, the LED supply's electrolytic C725 (an aluminium can 6 mm above the loop's
-  upper edge, on the component side) and, on the lan version, the Ethernet plug and cable 8 mm beside the loop. They,
-  and a card or phone, lower the inductance a little.
+  Not modelled: the DC terminal 6 mm away, the LED supply's electrolytics C725 and C726 (aluminium cans 6 mm above the
+  loop's upper edge and 6 mm left of its left edge, on the component side) and, on the lan version, the Ethernet plug
+  and cable 8 mm beside the loop. They, and a card or phone, lower the inductance a little.
 - **Copper around the loop** is open in one place: a 2.5 mm gap in all layers towards the Ethernet cut-away, level
   with the loop's centre between the ring's LEDs 5 and 6, so it is not a shorted turn (metal across the gap: 1.25 to
   1.08 uH). The LED ring's 5 V rail (`+5V_LED`) is open there too: its 100 nF capacitors join it to ground at
-  13.56 MHz, so a closed rail would close the turn as well. Only the LED data line crosses the gap; it ends in an LED's input, no low
-  impedance. No screw stands in the gap any more. `simulate` checks every net, and ground, both 5 V nets and 3.3 V
-  together, for copper closed round the loop. With the gap the pours take 2 %; the display's metal back takes nothing that
-  counts.
+  13.56 MHz, so a closed rail would close the turn as well. No screw stands in the gap any more. With the gap the
+  pours take 2 %; the display's metal back takes nothing that counts.
+- **The LED data line** crosses the gap, and it does close a turn there: from LED 5's output (low impedance to its
+  supply) across the gap to LED 6's input, whose capacitance and clamp diodes lead to its ground. The carrier induces
+  about 2.9 V peak in that turn (mutual inductance 164 nH to the loop, 209 mA peak in the loop; Neumann's integral
+  over the ring's square), more than the step from a low level to the input's switching threshold (about 2.4 V): LEDs
+  6 to 15 could take wrong bits while the field is on, and the clamp diodes rectify the carrier. So LED 6's input sits
+  behind a low-pass: R709 2.2 k in the line, standing in the gap, and C727 39 pF to the LED's ground right beside its
+  input, both parts the board already has.
+  - It leaves 0.14 of the carrier, 0.40 V peak, and the turn stays at 2.2 k: 0.09 ohm reflected into the loop (Q 25.2
+    to 24.7, 0.14 nH), 1.3 mA in the turn, 2 mW in R709. 1 k with 100 pF would leave 0.34 V but reflect 0.19 ohm.
+  - The data edges arrive 31 to 103 ns late (time constant 86 ns). With one switching threshold between 30 and 70 % of
+    the supply a pulse grows or shrinks by 73 ns at most, against the SK6812's tolerance of 150 ns on T0H (0.3 us) and
+    T1H (0.6 us) at 800 kbit/s: 77 ns remain. LED 6 regenerates the signal for the rest of the chain.
+  - `simulate` checks every net, and ground, both 5 V nets and 3.3 V together, for copper closed round the loop, and
+    passes signal copper across the gap only behind such a filter (`shorted_turn.crossings`, parts in the gap counted
+    as conducting).
 - **Damping:** 1.5 ohm per leg, Q about 25. 20 to 35 mW each, 75 mW at most with any part spread for loops up to 1.25
   uH (rated 0.1 W).
 - **EMC filter:** 560 nH and 220 pF per side, corner 14.3 MHz.
@@ -536,21 +550,26 @@ guide that lies flat on the display side round the loop. The case puts the tile'
 - **Data line.** In the chain's order, LED 0 is the top left one seen from the component side; the chain runs
   clockwise in that view, so counter-clockwise for the user in front, starting top right. LED k is D701 + k for k up to
   7 and D702 + k from 8 (D710 to D717 came after the tamper parts on the sheet), its capacitor C703 + k or C708 + k.
-  The data line crosses the gap in the copper round the loop between LEDs 5 and 6.
+  The data line crosses the gap in the copper round the loop between LEDs 5 and 6, through the carrier filter R709 /
+  C727 (see [NFC](#nfc)).
 - **5 V.** The ring has its own supply, `+5V_LED`, behind the switch U705 (below). A 0.6 mm rail on In2 outside the
   ring, a via and a 100 nF capacitor in the gap after each LED. The rail is open where the copper round the loop is
   open (between LEDs 5 and 6), otherwise it would be a shorted turn (see [NFC](#nfc)). The capacitor of LED 5 sits
   outside the ring, out of the gap. The switch's output reaches the rail at the ring's top side between LEDs 1 and 2,
-  through C725; the level shifter takes its supply from the same place.
-- **Current.** Each LED drives a fixed 12 mA per colour channel and dims by PWM only: one colour on all 16 draws
-  192 mA, full white 0.58 A. The firmware keeps all channels of all LEDs together at 192 mA or less (rule 20 in
-  [Pin map and firmware port](hardware/touch-p4/firmware-port.md)), so single colours keep their full 8-bit range
-  and mixed colours and white are scaled down. Under the old limit of 100 mA they had 52 % of it.
+  through C725; the level shifter takes its supply from the same place. The second 100 uF, C726, joins the rail on the
+  ring's left side beside LED 14.
+- **Current.** Each LED drives a fixed 12 mA per colour channel and dims by PWM only: one colour on all 16 draws 192
+  mA, full white 0.58 A; each LED also draws 1 mA idle (datasheet IDD), 16 mA in all. The firmware keeps all channels
+  of all LEDs together at 192 mA or less (rule 20 in [Pin map and firmware port](hardware/touch-p4/firmware-port.md)),
+  so single colours keep their full 8-bit range and mixed colours and white are scaled down. Under the old limit of
+  100 mA they had 52 % of it.
 - **Supply switch.** TPS2553DBVR (U705, TI, SLVS841G), a current-limited switch, holds the ring below what the
-  5 V sources can spare if the firmware fails. R708 (100 k, 1 %) sets the limit. TI gives minimum, typical and maximum
+  5 V sources can spare if the firmware fails. R708 (91 k, 1 %) sets the limit. TI gives minimum, typical and maximum
   over process and temperature (equations 1 to 3, -40 to 125 °C junction): with the resistor's 1 % that is
-  **232 / 266 / 306 mA**. The minimum stays 21 % above the 192 mA the firmware allows; 110 k (211 / 243 / 280 mA)
-  would lower the ceiling by 26 mA but adds a parts line for a margin of only 10 %.
+  **255 / 292 / 334 mA**. The minimum stays 23 % above the 208 mA the ring draws at the firmware's limit (192 mA of PWM
+  current and 16 mA idle). The first value, 100 k (232 / 266 / 306 mA), left 11 %. 91 k is the largest E24 value
+  whose minimum stays above 250 mA, so it keeps the ceiling as low as that allows; 91.9 k (E96) would lower it by
+  3 mA.
   - *Why this part.* Its datasheet states the limit's minimum and maximum over temperature as equations down to
     75 mA. Other resistor-set switches (Silergy SY6280, Diodes AP2255x and AP2265x) were not checked against their
     limit tolerance at a 0.2 to 0.3 A setting; at 0.11 to 0.20 USD (LCSC C55266, an extended part at JLCPCB) the
@@ -560,14 +579,21 @@ guide that lies flat on the display side round the loop. The case puts the tile'
     power cycle. If the overload lasts, the switch heats (up to 1.5 W at a short, 182 °C/W) and turns off at 135 °C,
     on again 10 K cooler, until the load falls. Nothing is damaged; the LEDs see at most the rail's voltage.
   - *PWM peaks.* The LEDs' PWM periods (1.2 kHz) drift in and out of step. In step, mixed colours draw up to three
-    times their average for part of each period, up to 0.58 A for 0.28 ms at the firmware's limit with white. C725
-    (100 uF electrolytic, the part the PoE module's output already uses) carries the part above the switch's limit:
-    the ring's supply dips about 0.9 V. With every worst case at once (rail at 4.75 V, switch at its lowest limit,
-    capacitor 20 % low, all 16 LEDs in step) it reaches about 3.5 V for a fraction of a millisecond, below the LED's
-    3.7 V minimum: blue and green dim for that moment. Without C725 (2 uF on the ring) the supply would collapse each
-    time the LEDs come into step.
-  - *Inrush.* About 102 uF on the ring (C725, C701 and the 16 LEDs' 100 nF). The switch's soft start (1.1 ms) would
-    ask 0.46 A; it charges them at its limit instead, in about 2 ms, 0.23 to 0.31 A out of the 5 V rail.
+    times their average for part of each period: at the firmware's limit with white, 0.58 A for 0.28 ms, and the
+    16 mA idle current on top. C725 and C726 (two 100 uF electrolytics, the part the PoE module's output already uses)
+    carry the part above the switch's limit. Worst case (rail at 4.75 V, the switch at its lowest limit of 255 mA, both
+    capacitors 20 % low, all 16 LEDs in step): 0.34 A above the limit for 0.28 ms takes 0.58 V from 160 uF, the
+    capacitors' ESR another 0.08 to 0.17 V and the switch 0.02 V. The ring stays at 3.98 V or more, above the LED's
+    3.7 V minimum; typically (5.0 V, 292 mA, 200 uF) it dips by 0.5 V. LCSC lists no ESR for the part; 0.5 to 1 ohm
+    each is assumed, usual for a general-purpose 6.3 x 5.4 mm electrolytic at a few kHz.
+  - *Before the second capacitor.* C725 alone, with its ESR and the idle current counted, reached 3.1 to 3.3 V in that
+    worst case (3.5 V had been given without them): blue and green dimmed whenever the PWM periods aligned.
+  - *Remaining limitation.* The dip stays above 3.7 V only on a rail of 4.5 V or more. The board's sources keep
+    that while the LEDs may be on; USB alone (4.18 V on a weak port behind 0.5 ohm) runs with the LEDs off (firmware
+    rule). Below it, blue and green dim for a fraction of a millisecond when the PWM periods align; nothing is damaged.
+    Without the capacitors (2 uF on the ring) the supply would collapse each time the LEDs come into step.
+  - *Inrush.* About 202 uF on the ring (C725, C726, C701 and the 16 LEDs' 100 nF). The switch's soft start (1.1 ms)
+    would ask 0.9 A; it charges them at its limit instead, in 3 to 4 ms, 0.26 to 0.33 A out of the 5 V rail.
   - *Enable.* The enable pin is tied to the switch's input: the ring is on whenever the board is. The MCU's two
     free pins (GPIO27, GPIO48) have no way out of its fan-out: GPIO48 is boxed in between LED data, the VDD_HP_3
     capacitor C222 in its former gap and the core supply's track; GPIO27 between the RMII escapes and the backlight
@@ -787,8 +813,8 @@ contacts inside a metal connector shell.
 | Ethernet and PoE | inside the case; plug enclosed | coupling-plane only | jack magnetics 1500 V RMS (HanRun), PHY 12 kV contact (IP101G); D103 SMAJ58A and the isolated module; shield through C410 1 nF / 3 kV | isolated |
 | Display glass, face | 0.55 mm glass | 8 kV air | the arc stops on the glass | no gap |
 | Display edges, flex behind | 0.25 mm seam round the glass; flex at the lower edge | 8 kV air | touch lines (TP_INT, TP_RST, I2C0 SDA/SCL): U603, U604 USBLC6-2SC6 at the connector; metal back grounded on the four pads; tape over the flex ([installation manual](hardware/touch-p4/installation-manual.md)) | 15 kV air |
-| NFC area | solid 2.4 mm front wall | 8 kV air | no opening; loop shunted to ground by its matching | no gap |
-| LED windows, buzzer holes, lock screws, seams | diffusers, holes near the buzzer, two floating M3 screws | 8 kV air; 4 kV contact on screws | none on the board (SK6812MINI-E 2 kV HBM, buzzer and FET unrated) | not shown: [Known limitations](hardware/touch-p4/limitations.md) |
+| Tap tile, its seam | the tile, in a 45.2 mm square opening of faceplate and cap with a 0.2 mm seam all round: the most-touched spot | 8 kV air on the tile and all round the seam | no part. Behind the seam: 2.4 mm through faceplate and cap wall, 0.8 mm along the tile's flange (its edge 23.6 mm from the centre), 2.9 mm down to the board. The ring's 16 `+5V_LED` vias (tented) sit 24.0 mm from the centre, their edge at the flange's edge: about 6 mm of air from the seam, ground pour beside them as close. LEDs (SK6812MINI-E 2 kV HBM) under the tile's body. Loop shunted to ground by its matching | not shown: [Known limitations](hardware/touch-p4/limitations.md) |
+| Buzzer holes, lock screws, faceplate seams | holes near the buzzer, two floating M3 screws, the faceplate's edges | 8 kV air; 4 kV contact on screws | none on the board (buzzer and FET unrated) | not shown: [Known limitations](hardware/touch-p4/limitations.md) |
 | Wi-Fi antenna | inside the case behind the top wall | 8 kV air at the seam | no ESD part on the RF line (module leaves D2 unfitted, datasheet fig. 8-1); 1.8 mm behind the top wall, 4.7 mm behind the front, no conductive path out | not shown; pre-test at bring-up |
 | Buttons and test points | service only | left out as service | CHIP_PU 10 k + 1 uF + supervisor; BOOT behind 1 k | service |
 

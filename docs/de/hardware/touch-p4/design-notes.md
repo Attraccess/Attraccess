@@ -62,7 +62,7 @@ Das 3D-druckbare Gehäuse selbst ist unter [Gehäuse](hardware/touch-p4/case.md)
 | Tap-Kachel (am Gehäuse) | Mitte (43; 117), auf der Mittellinie des Gehäuses; Schleife, LED-Ring und Kachel haben diese Mitte gemeinsam |
 | NFC-Schleife | 35 x 37, Mitte (43; 117), auf der Displayseite |
 | LEDs | 16 auf einem quadratischen Ring, auf jeder Seite 21,4 von (43; 117) entfernt (x 21,6 und 64,4, y 95,6 und 138,4), vier je Seite bei 5,35 und 16,05 von der Seitenmitte, 10,7 voneinander entlang des Rings; jede in einem Fenster von 3,4 x 3,0 mit freigestellten Ecken, die lange Seite entlang des Rings |
-| LED-Versorgung | Schalter U705, Pegelwandler U701 und der 100-uF-Kondensator C725 in einer Reihe zwischen dem Flex-Schlitz und der Oberseite des Rings, x 36 bis 58, y 84 bis 93 |
+| LED-Versorgung | Schalter U705, Pegelwandler U701 und der 100-uF-Kondensator C725 in einer Reihe zwischen dem Flex-Schlitz und der Oberseite des Rings, x 36 bis 58, y 84 bis 93; der zweite 100-uF-Kondensator C726 zwischen dem DC-Ausschnitt und der linken Seite des Rings (x 12,6 bis 19,2, y 110 bis 117); das Trägerfilter der Datenleitung, R709 (in der Lücke um die Schleife) und C727 an LED 6 (D707) |
 | PN532-Block | unter dem Display, Chip bei (21,5; 80,1), Senderpins nach unten zu den Antennenzuleitungen |
 | Befestigungslöcher (3,2 mm) | (4; 3,5), (82; 3,5), (17,4; 140), (16; 122) |
 | DC-Buchse | x 0,2 bis 9,2, y 93,6 bis 108, öffnet nach unten in den DC-Ausschnitt |
@@ -196,7 +196,7 @@ Abstandsprüfungen von SolidCraft geprüft. Höhen sind die der Hersteller, wo s
 | J401 Pins | 1,45 aus der Displayseite, ungekürzt | LCD-Modul bei 1,7 mm | 0,25; 0,7 auf 1 mm gekürzt |
 | J101 USB-C | 3,25 | Seitenwand der Kappe | 0,63 |
 | C120 47 uF, 6,3 mm | 7,7 | Dock-Platte; Seitenwand der Kappe | 6,2; 13,9 |
-| C725 100 uF, 6,3 mm (LED-Versorgung) | 5,4 nominal; die Höhentoleranz des Herstellers nicht geprüft | Dock-Platte | etwa 8 |
+| C725, C726 100 uF, 6,3 mm (LED-Versorgung) | 5,4 nominal; die Höhentoleranz des Herstellers nicht geprüft | Dock-Platte | etwa 8; C726 (Platinenpunkt 15,9, 113,3, 0,6 mm vom DC-Ausschnitt) noch nicht im Gehäusemodell geprüft |
 | D106, D107, F102, U105, U106, U107, Q101, Q102, U204 | höchstens 2,4 | keines innerhalb von 3 mm | mehr als 3 |
 
 - Die Vertiefungen sind ringsum 1 mm breiter als jedes Bauteil; die Platte bleibt dort 2,2 mm dick und druckt ohne
@@ -255,32 +255,32 @@ Schiene des WLAN-Moduls (U302, dieselbe Schaltung):
 | U103 | 0,70 | 0,25 | oben |
 | U302 | 0,47 | 0,34 | oben |
 | Hintergrundbeleuchtung (4S2P, 39 mA, AP3032) | 0,13 | 0,13 | 13 V bei 39 mA, 85 % |
-| 16 SK6812MINI-E | 0,31 (Grenze des Schalters) | 0,20 (Firmware-Grenze) | 12 mA je Farbe, 0,58 A bei vollem Weiß; der Schalter U705 hält den Ring unter 232 bis 306 mA, die Firmware alle Kanäle zusammen bei 192 mA oder darunter |
+| 16 SK6812MINI-E | 0,33 (Grenze des Schalters) | 0,21 (Firmware-Grenze) | 12 mA je Farbe, 0,58 A bei vollem Weiß, je 1 mA in Ruhe; der Schalter U705 hält den Ring unter 255 bis 334 mA, die Firmware alle Kanäle zusammen bei 192 mA oder darunter (208 mA mit dem Ruhestrom) |
 | PN532 | 0,12 | 0,12 | Sender 100 mA (die Anpassung hält ihn unter 60 mA) plus 20 mA |
 | Summer | 0,10 | 0, solange das NFC-Feld an ist | MLT-8530 95 mA bei 5 Vo-p; die Firmware piept, nachdem das Feld aus ist |
 | Pegelwandler, LED-Schalter, Entladewiderstände | 0,003 | 0,003 | |
-| **Summe** | **1,83** | **1,04** | |
+| **Summe** | **1,85** | **1,05** | |
 
 | Quelle | Nennwert | Reserve beim Maximum | Reserve bei Auslegung |
 |---|---|---|---|
-| USB-C (eFuse-Grenze) | mindestens 1,8 A (R110 1,65 k) | 42 % | -2 % |
+| USB-C (eFuse-Grenze) | mindestens 1,8 A (R110 1,65 k) | 42 % | -3 % |
 | DC-Wandler AP63205 | 2 A | 48 % | 8 % |
-| PoE-Modul DP9900M-5V | 1,8 A bis 70 °C (9 W), 1,2 A bei 85 °C (6 W) | 42 % (13 % bei 85 °C) | -2 % |
+| PoE-Modul DP9900M-5V | 1,8 A bis 70 °C (9 W), 1,2 A bei 85 °C (6 W) | 42 % (13 % bei 85 °C) | -3 % |
 
 Vor dem LED-Schalter, mit den LEDs bei 0,10 A (Firmware) und 0,58 A (Auslegung): Summen 0,94 und 2,10 A, Reserve
 beim Maximum 48 % (USB), 53 % (DC), 48 % (PoE; 22 % bei 85 °C), bei Auslegung -17 %, -5 % und -17 %.
 
-- Jede 5-V-Quelle behält bei den Maximalwerten der Hersteller mit den Firmware-Grenzen mindestens 30 % (LEDs bei
-  192 mA oder darunter; Summer und NFC-Feld nicht gleichzeitig), außer dem PoE-Modul über 70 °C: 13 %, eine akzeptierte
-  Abweichung ([Bekannte Einschränkungen](hardware/touch-p4/limitations.md#reserve-des-poe-moduls-bei-hitze-review-punkt-24)).
-  Unter diesen Grenzen beträgt die Summe der Auslegungswerte 1,62 A, 10 % unter den Nennwerten von eFuse und
-  PoE-Modul.
+- Jede 5-V-Quelle behält bei den Maximalwerten der Hersteller mit den Firmware-Grenzen mindestens 30 % (LEDs bei 192
+  mA oder darunter, 0,21 A mit ihrem Ruhestrom; Summer und NFC-Feld nicht gleichzeitig), außer dem PoE-Modul über 70
+  °C: 13 %, eine akzeptierte Abweichung ([Bekannte
+  Einschränkungen](hardware/touch-p4/limitations.md#reserve-des-poe-moduls-bei-hitze-review-punkt-24)). Unter diesen
+  Grenzen beträgt die Summe der Auslegungswerte 1,63 A, 9 % unter den Nennwerten von eFuse und PoE-Modul.
 - Die LED-Grenze der Firmware liegt bei 192 mA, weil das eine Farbe auf allen 16 LEDs mit vollem Umfang ist: Jede LED
   treibt fest 12 mA je Farbe und dimmt nur per PWM, eine niedrigere Grenze würde also den Umfang einzelner Farben
   kürzen. Mischfarben und Weiß werden auf dieselbe Summe herunterskaliert
   ([Firmware-Regel 20](hardware/touch-p4/firmware-port.md)).
-- Die Auslegung zählt den Ring mit der höchsten Stromgrenze des Schalters, 0,31 A: Was die Firmware auch sendet, mehr
-  kann der Ring nicht ziehen (vor dem Schalter waren es 0,58 A bei vollem Weiß). Bei den vollen 1,83 A laufen eFuse und
+- Die Auslegung zählt den Ring mit der höchsten Stromgrenze des Schalters, 0,33 A: Was die Firmware auch sendet, mehr
+  kann der Ring nicht ziehen (vor dem Schalter waren es 0,58 A bei vollem Weiß). Bei den vollen 1,85 A laufen eFuse und
   PoE-Modul an ihrem Nennwert, und ihre eigenen Strombegrenzungen decken das ab, der DC-Wandler behält 8 %. Nichts wird
   beschädigt. Die Summe stapelt außerdem Werte, die nicht zusammenfallen (die 380 mA des P4 neben den 0,5 A seines
   Kerns, Emitterimpulse, die Auslegung des C5 von 0,6 A gegenüber seinen 426 mA).
@@ -488,18 +488,35 @@ Die Isolation an einem bestückten Gerät prüfen, bevor das Labor es tut, und d
 - **Schleife:** 4 Windungen, 35 x 37 mm, 0,5 mm Leiterbahn, 0,9 mm Raster, Displayseite. Simuliert aus dem Kupfer der
   Platine (`sim/nfc_loop.py`) bei 13,56 MHz: 1,27 uH / 1,20 ohm in freier Luft, 1,25 uH / 1,23 ohm auf der Platine an
   Holz oder Stein, 1,20 uH / 1,24 ohm mit einer Metallwand 18 mm dahinter. Eigenkapazität etwa 2,4 pF (wirkt wie 2,5 %
-  mehr Induktivität). Nicht modelliert: die DC-Klemme 6 mm entfernt, der Elektrolytkondensator C725 der LED-Versorgung
-  (ein Aluminiumbecher 6 mm über der Oberkante der Schleife, auf der Bauteilseite) und, bei der LAN-Version,
+  mehr Induktivität). Nicht modelliert: die DC-Klemme 6 mm entfernt, die Elektrolytkondensatoren C725 und C726 der
+  LED-Versorgung (Aluminiumbecher 6 mm über der Oberkante und 6 mm links der linken Kante der Schleife, auf der
+  Bauteilseite) und, bei der LAN-Version,
   Ethernet-Stecker und Kabel 8 mm neben der Schleife. Sie, und eine Karte oder ein Telefon, senken die Induktivität ein
   wenig.
 - **Kupfer um die Schleife** ist an einer Stelle offen: eine Lücke von 2,5 mm in allen Lagen zum Ethernet-Ausschnitt
   hin, auf Höhe der Schleifenmitte zwischen den LEDs 5 und 6 des Rings, damit es keine Kurzschlusswindung ist (Metall
   über der Lücke: 1,25 auf 1,08 uH). Die 5-V-Schiene des LED-Rings (`+5V_LED`) ist dort ebenfalls offen: Ihre 100-nF-Kondensatoren
-  verbinden sie bei 13,56 MHz mit Masse, eine geschlossene Schiene schlösse die Windung also auch. Nur die
-  LED-Datenleitung kreuzt die Lücke; sie endet im Eingang einer LED, keiner niedrigen Impedanz. In der Lücke steht
-  keine Schraube mehr. `simulate` prüft jedes Netz, und Masse, beide 5-V-Netze und 3,3 V zusammen, auf um die Schleife
-  geschlossenes Kupfer. Mit der Lücke nehmen die Kupferflächen 2 %; die Metallrückseite des Displays nimmt nichts, was
+  verbinden sie bei 13,56 MHz mit Masse, eine geschlossene Schiene schlösse die Windung also auch. In der Lücke steht
+  keine Schraube mehr. Mit der Lücke nehmen die Kupferflächen 2 %; die Metallrückseite des Displays nimmt nichts, was
   zählt.
+- **Die LED-Datenleitung** kreuzt die Lücke und schließt dort sehr wohl eine Windung: vom Ausgang der LED 5 (niedrige
+  Impedanz zu ihrer Versorgung) über die Lücke zum Eingang der LED 6, dessen Kapazität und Klemmdioden zu ihrer Masse
+  führen. Der Träger induziert in dieser Windung etwa 2,9 V Spitze (Gegeninduktivität 164 nH zur Schleife, 209 mA
+  Spitze in der Schleife; Neumann-Integral über das Quadrat des Rings), mehr als der Schritt von einem Low-Pegel zur
+  Schaltschwelle des Eingangs (etwa 2,4 V): Die LEDs 6 bis 15 könnten bei eingeschaltetem Feld falsche Bits
+  übernehmen, und die Klemmdioden richten den Träger gleich. Daher sitzt der Eingang der LED 6 hinter einem Tiefpass:
+  R709 2,2 k in der Leitung, in der Lücke, und C727 39 pF zur Masse der LED direkt neben ihrem Eingang, beides
+  Bauteile, die die Platine schon hat.
+  - Er lässt 0,14 des Trägers durch, 0,40 V Spitze, und die Windung bleibt bei 2,2 k: 0,09 Ohm in die Schleife
+    gespiegelt (Güte 25,2 auf 24,7, 0,14 nH), 1,3 mA in der Windung, 2 mW in R709. 1 k mit 100 pF ließe 0,34 V durch,
+    spiegelte aber 0,19 Ohm.
+  - Die Datenflanken kommen 31 bis 103 ns später an (Zeitkonstante 86 ns). Mit einer Schaltschwelle zwischen 30 und
+    70 % der Versorgung wird ein Puls um höchstens 73 ns länger oder kürzer, gegenüber der Toleranz der SK6812 von
+    150 ns auf T0H (0,3 us) und T1H (0,6 us) bei 800 kbit/s: 77 ns bleiben. LED 6 frischt das Signal für den Rest der
+    Kette auf.
+  - `simulate` prüft jedes Netz, und Masse, beide 5-V-Netze und 3,3 V zusammen, auf um die Schleife geschlossenes
+    Kupfer, und lässt Signalkupfer über die Lücke nur hinter einem solchen Filter zu (`shorted_turn.crossings`,
+    Bauteile in der Lücke gelten als leitend).
 - **Dämpfung:** 1,5 ohm je Zweig, Güte etwa 25. Je 20 bis 35 mW, höchstens 75 mW bei beliebiger Streuung der Bauteile
   für Schleifen bis 1,25 uH (ausgelegt für 0,1 W).
 - **EMV-Filter:** 560 nH und 220 pF je Seite, Eckfrequenz 14,3 MHz.
@@ -565,24 +582,26 @@ Rand der Kachel, 2 mm breit (20,4 bis 22,4 mm von der Mitte), genau über den Ri
   läuft in dieser Ansicht im Uhrzeigersinn, für den Benutzer vorn also gegen den Uhrzeigersinn, oben rechts
   beginnend. LED k ist D701 + k für k bis 7 und D702 + k ab 8 (D710 bis D717 kamen nach den Bauteilen der
   Manipulationserkennung ins Blatt), ihr Kondensator C703 + k bzw. C708 + k. Die Datenleitung kreuzt die Lücke im
-  Kupfer um die Schleife zwischen den LEDs 5 und 6.
+  Kupfer um die Schleife zwischen den LEDs 5 und 6, über das Trägerfilter R709 / C727 (siehe [NFC](#nfc)).
 - **5 V.** Der Ring hat eine eigene Versorgung, `+5V_LED`, hinter dem Schalter U705 (unten). Eine 0,6-mm-Schiene auf
   In2 außerhalb des Rings, ein Via und ein 100-nF-Kondensator in der Lücke nach jeder LED. Die Schiene ist dort offen,
   wo das Kupfer um die Schleife offen ist (zwischen den LEDs 5 und 6), sonst wäre sie eine Kurzschlusswindung (siehe
   [NFC](#nfc)). Der Kondensator der LED 5 sitzt außerhalb des Rings, nicht in der Lücke. Der Ausgang des Schalters
   erreicht die Schiene an der Oberseite des Rings zwischen den LEDs 1 und 2, über C725; der Pegelwandler nimmt seine
-  Versorgung an derselben Stelle.
+  Versorgung an derselben Stelle. Der zweite 100-uF-Kondensator, C726, schließt an der linken Seite des Rings neben
+  LED 14 an die Schiene an.
 - **Strom.** Jede LED treibt fest 12 mA je Farbkanal und dimmt nur per PWM: Eine Farbe auf allen 16 zieht 192 mA,
-  volles Weiß 0,58 A. Die Firmware hält alle Kanäle aller LEDs zusammen bei 192 mA oder darunter (Regel 20 in
-  [Pinbelegung und Firmware-Portierung](hardware/touch-p4/firmware-port.md)), sodass einzelne Farben ihren vollen
-  8-Bit-Umfang behalten und Mischfarben und Weiß herunterskaliert werden. Unter der alten Grenze von 100 mA hatten sie
-  52 % davon.
-- **Versorgungsschalter.** TPS2553DBVR (U705, TI, SLVS841G), ein strombegrenzter Schalter, hält den Ring unter dem, was
-  die 5-V-Quellen erübrigen können, falls die Firmware versagt. R708 (100 k, 1 %) setzt die Grenze. TI gibt Minimum,
-  typischen Wert und Maximum über Fertigung und Temperatur an (Gleichungen 1 bis 3, -40 bis 125 °C Sperrschicht): mit
-  dem 1 % des Widerstands sind das **232 / 266 / 306 mA**. Das Minimum bleibt 21 % über den 192 mA, die die Firmware
-  zulässt; 110 k (211 / 243 / 280 mA) senkte die Obergrenze um 26 mA, brächte aber eine Stücklistenzeile für nur 10 %
-  Abstand.
+  volles Weiß 0,58 A; dazu zieht jede LED 1 mA in Ruhe (Datenblatt IDD), zusammen 16 mA. Die Firmware hält alle Kanäle
+  aller LEDs zusammen bei 192 mA oder darunter (Regel 20 in [Pinbelegung und
+  Firmware-Portierung](hardware/touch-p4/firmware-port.md)), sodass einzelne Farben ihren vollen 8-Bit-Umfang behalten
+  und Mischfarben und Weiß herunterskaliert werden. Unter der alten Grenze von 100 mA hatten sie 52 % davon.
+- **Versorgungsschalter.** TPS2553DBVR (U705, TI, SLVS841G), ein strombegrenzter Schalter, hält den Ring unter dem,
+  was die 5-V-Quellen erübrigen können, falls die Firmware versagt. R708 (91 k, 1 %) setzt die Grenze. TI gibt
+  Minimum, typischen Wert und Maximum über Fertigung und Temperatur an (Gleichungen 1 bis 3, -40 bis 125 °C
+  Sperrschicht): mit dem 1 % des Widerstands sind das **255 / 292 / 334 mA**. Das Minimum bleibt 23 % über den 208 mA,
+  die der Ring an der Grenze der Firmware zieht (192 mA PWM-Strom und 16 mA Ruhestrom). Der erste Wert, 100 k (232 /
+  266 / 306 mA), ließ 11 %. 91 k ist der größte E24-Wert, dessen Minimum über 250 mA bleibt; er hält die Obergrenze
+  also so niedrig, wie das zulässt; 91,9 k (E96) senkte sie um 3 mA.
   - *Warum dieses Bauteil.* Sein Datenblatt gibt Minimum und Maximum der Grenze über die Temperatur als Gleichungen bis
     hinab zu 75 mA an. Andere Schalter mit Einstellwiderstand (Silergy SY6280, Diodes AP2255x und AP2265x) wurden
     nicht auf die Toleranz ihrer Grenze bei 0,2 bis 0,3 A geprüft; bei 0,11 bis 0,20 USD (LCSC C55266, ein Extended
@@ -593,16 +612,25 @@ Rand der Kachel, 2 mm breit (20,4 bis 22,4 mm von der Mitte), genau über den Ri
     Schalter (bis 1,5 W bei Kurzschluss, 182 °C/W) und schaltet bei 135 °C ab, 10 K kühler wieder ein, bis die Last
     sinkt. Nichts wird beschädigt; die LEDs sehen höchstens die Spannung der Schiene.
   - *PWM-Spitzen.* Die PWM-Perioden der LEDs (1,2 kHz) laufen in und aus dem Takt. Im Takt ziehen Mischfarben für einen
-    Teil jeder Periode bis zum Dreifachen ihres Mittelwerts, bis 0,58 A für 0,28 ms an der Grenze der Firmware mit
-    Weiß. C725 (100-uF-Elektrolytkondensator, das Bauteil, das schon am Ausgang des PoE-Moduls sitzt) trägt den Teil
-    über der Grenze des Schalters: Die Versorgung des Rings sinkt um etwa 0,9 V. Mit allen ungünstigsten Fällen
-    zugleich (Schiene bei 4,75 V, Schalter an seiner niedrigsten Grenze, Kondensator 20 % zu klein, alle 16 LEDs im
-    Takt) erreicht sie für einen Bruchteil einer Millisekunde etwa 3,5 V, unter dem Minimum der LED von 3,7 V: Blau und
-    Grün werden für diesen Moment dunkler. Ohne C725 (2 uF am Ring) bräche die Versorgung jedes Mal zusammen, wenn die
-    LEDs in den Takt kommen.
-  - *Einschaltstrom.* Etwa 102 uF am Ring (C725, C701 und die 100 nF der 16 LEDs). Der Sanftanlauf des Schalters
-    (1,1 ms) verlangte 0,46 A; stattdessen lädt er sie an seiner Grenze, in etwa 2 ms, mit 0,23 bis 0,31 A aus der
-    5-V-Schiene.
+    Teil jeder Periode bis zum Dreifachen ihres Mittelwerts: an der Grenze der Firmware mit Weiß 0,58 A für 0,28 ms,
+    dazu der Ruhestrom von 16 mA. C725 und C726 (zwei 100-uF-Elektrolytkondensatoren, das Bauteil, das schon am Ausgang
+    des PoE-Moduls sitzt) tragen den Teil über der Grenze des Schalters. Ungünstigster Fall (Schiene bei 4,75 V,
+    Schalter an seiner niedrigsten Grenze von 255 mA, beide Kondensatoren 20 % zu klein, alle 16 LEDs im Takt): 0,34 A
+    über der Grenze für 0,28 ms nehmen 160 uF 0,58 V, der ESR der Kondensatoren weitere 0,08 bis 0,17 V und der
+    Schalter 0,02 V. Der Ring bleibt bei 3,98 V oder mehr, über dem Minimum der LED von 3,7 V; typisch (5,0 V, 292 mA,
+    200 uF) sinkt er um 0,5 V. LCSC nennt keinen ESR für das Bauteil; angenommen sind je 0,5 bis 1 Ohm, üblich für
+    einen Standard-Elektrolytkondensator 6,3 x 5,4 mm bei einigen kHz.
+  - *Vor dem zweiten Kondensator.* C725 allein erreichte in diesem ungünstigsten Fall, mit seinem ESR und dem
+    Ruhestrom gerechnet, 3,1 bis 3,3 V (angegeben waren ohne sie 3,5 V): Blau und Grün wurden dunkler, sobald die
+    PWM-Perioden zusammenfielen.
+  - *Verbleibende Einschränkung.* Über 3,7 V bleibt der Einbruch nur an einer Schiene von 4,5 V oder mehr. Die Quellen
+    der Platine halten das, solange die LEDs an sein dürfen; USB allein (4,18 V an einem schwachen Port hinter
+    0,5 Ohm) läuft mit ausgeschalteten LEDs (Firmware-Regel). Darunter werden Blau und Grün für einen Bruchteil einer
+    Millisekunde dunkler, wenn die PWM-Perioden zusammenfallen; nichts wird beschädigt. Ohne die Kondensatoren (2 uF
+    am Ring) bräche die Versorgung jedes Mal zusammen, wenn die LEDs in den Takt kommen.
+  - *Einschaltstrom.* Etwa 202 uF am Ring (C725, C726, C701 und die 100 nF der 16 LEDs). Der Sanftanlauf des
+    Schalters (1,1 ms) verlangte 0,9 A; stattdessen lädt er sie an seiner Grenze, in 3 bis 4 ms, mit 0,26 bis 0,33 A
+    aus der 5-V-Schiene.
   - *Enable.* Der Enable-Pin liegt am Eingang des Schalters: Der Ring ist eingeschaltet, sobald die Platine es ist. Die
     beiden freien Pins der MCU (GPIO27, GPIO48) haben keinen Weg aus ihrem Fan-out: GPIO48 ist eingeschlossen zwischen
     der LED-Datenleitung, dem VDD_HP_3-Kondensator C222 in seiner früheren Lücke und der Leiterbahn der Kernversorgung;
@@ -839,8 +867,8 @@ erreicht werden, wenn das Handbuch ESD-Maßnahmen nennt, und Kontakte im Inneren
 | Ethernet und PoE | im Gehäuse; Stecker eingeschlossen | nur Koppelfläche | Magnetics der Buchse 1500 V RMS (HanRun), PHY 12 kV Kontakt (IP101G); D103 SMAJ58A und das isolierte Modul; Schirm über C410 1 nF / 3 kV | isoliert |
 | Displayglas, Vorderseite | 0,55 mm Glas | 8 kV Luft | der Lichtbogen endet am Glas | kein Spalt |
 | Displaykanten, Flexkabel dahinter | 0,25-mm-Fuge rund um das Glas; Flexkabel am unteren Rand | 8 kV Luft | Touch-Leitungen (TP_INT, TP_RST, I2C0 SDA/SCL): U603, U604 USBLC6-2SC6 am Anschluss; Metallrückseite auf den vier Pads geerdet; Klebeband über dem Flexkabel ([Installationsanleitung](hardware/touch-p4/installation-manual.md)) | 15 kV Luft |
-| NFC-Bereich | massive 2,4 mm starke Vorderwand | 8 kV Luft | keine Öffnung; Schleife durch ihre Anpassung an Masse nebengeschlossen | kein Spalt |
-| LED-Fenster, Summerlöcher, Haltschrauben, Fugen | Diffusoren, Löcher nahe dem Summer, zwei schwebende M3-Schrauben | 8 kV Luft; 4 kV Kontakt an den Schrauben | keiner auf der Platine (SK6812MINI-E 2 kV HBM, Summer und FET ohne Angabe) | nicht belegt: [Bekannte Einschränkungen](hardware/touch-p4/limitations.md) |
+| Tap-Kachel, ihre Fuge | die Kachel, in einer quadratischen Öffnung von 45,2 mm in Frontplatte und Kappe mit 0,2 mm Fuge ringsum: die meistberührte Stelle | 8 kV Luft auf die Kachel und rund um die Fuge | kein Bauteil. Hinter der Fuge: 2,4 mm durch Frontplatte und Kappenwand, 0,8 mm entlang dem Flansch der Kachel (seine Kante 23,6 mm von der Mitte), 2,9 mm hinab zur Platine. Die 16 `+5V_LED`-Vias des Rings (abgedeckt) sitzen 24,0 mm von der Mitte, ihr Rand an der Kante des Flansches: etwa 6 mm Luft von der Fuge, Massefläche ebenso nah daneben. LEDs (SK6812MINI-E 2 kV HBM) unter dem Körper der Kachel. Schleife durch ihre Anpassung an Masse nebengeschlossen | nicht belegt: [Bekannte Einschränkungen](hardware/touch-p4/limitations.md) |
+| Summerlöcher, Haltschrauben, Fugen der Frontplatte | Löcher nahe dem Summer, zwei schwebende M3-Schrauben, die Kanten der Frontplatte | 8 kV Luft; 4 kV Kontakt an den Schrauben | keiner auf der Platine (Summer und FET ohne Angabe) | nicht belegt: [Bekannte Einschränkungen](hardware/touch-p4/limitations.md) |
 | WLAN-Antenne | im Gehäuse hinter der oberen Wand | 8 kV Luft an der Fuge | kein ESD-Bauteil auf der HF-Leitung (das Modul lässt D2 unbestückt, Datenblatt Abb. 8-1); 1,8 mm hinter der oberen Wand, 4,7 mm hinter der Front, kein leitender Pfad nach außen | nicht belegt; Vortest bei der Inbetriebnahme |
 | Taster und Testpunkte | nur im Service | als Service ausgelassen | CHIP_PU 10 k + 1 uF + Supervisor; BOOT hinter 1 k | Service |
 

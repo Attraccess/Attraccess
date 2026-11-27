@@ -27,9 +27,9 @@ may be connected; the highest one feeds the board.
 | PoE (lan version) | IEEE 802.3af powered device, 37 to 57 V at the jack (isolated module DP9900M-5V) | typical 3.4 W; at the board's highest consumption about 6.5 W | the module's isolation (1500 V test), TVS and ferrite beads at its input, 3 mm creepage on the board |
 | USB-C (service) | 5 V, USB 2.0 port or Type-C source | at most 0.5 A when USB is the only source (firmware limit; estimated 0.43 A) | eFuse: soft start, 1.8 to 2.2 A limit, cut-off above 5.53 to 5.74 V and below 3.9 V, reverse blocking; ESD array |
 
-Highest consumption at the 5 V rail: 1.04 A by the makers' maximum figures, 1.62 A by their
+Highest consumption at the 5 V rail: 1.05 A by the makers' maximum figures, 1.63 A by their
 supply-sizing figures, with two firmware limits: the LEDs at 192 mA or less together, and no beep while
-the NFC field is on. A current-limited switch holds the LEDs below 0.31 A whatever the firmware does. Internal rails: 3.3 V (TLV62569, 2 A, 36 % headroom at the sizing figures),
+the NFC field is on. A current-limited switch holds the LEDs below 0.33 A whatever the firmware does. Internal rails: 3.3 V (TLV62569, 2 A, 36 % headroom at the sizing figures),
 1.1 V core (TLV62569, set by the MCU).
 
 ## Environment
@@ -61,7 +61,7 @@ and 17 (Wi-Fi), EN 55032 class B for emission, and EN 55035 for the Ethernet por
 
 | Test | Target | Where |
 |---|---|---|
-| Electrostatic discharge, IEC 61000-4-2 | 4 kV contact, 8 kV air, criterion B | everything that can be touched: glass and its edges, LED windows, seams, screws; the connectors' shells. per-port protection in the [design notes](hardware/touch-p4/design-notes.md) |
+| Electrostatic discharge, IEC 61000-4-2 | 4 kV contact, 8 kV air, criterion B | everything that can be touched: glass and its edges, the tap tile and its seam, seams, screws; the connectors' shells. per-port protection in the [design notes](hardware/touch-p4/design-notes.md) |
 | Radiated immunity | 3 V/m, 80 MHz to 6 GHz | whole reader |
 | Fast transients, RF common mode | 0.5 kV; 3 V | Ethernet; the DC input when its cable may be longer than 3 m |
 | Surge | 0.5 kV line to ground | Ethernet with indoor cables over 30 m. The DC input is built for EN 50130-4's line-to-earth surge through 42 ohm (simulated: 39.6 V at most at the converter, limit 40 V) |

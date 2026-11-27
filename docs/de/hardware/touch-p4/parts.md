@@ -170,10 +170,15 @@ Display-Panel, das JLCPCB nicht bestückt.
   und JLCPCBs Bestückung je Lötstelle sind das etwa 0,8 USD je Platine bei 5 bis 10 Platinen und 0,4 bei 1000; das
   nächste Angebot bestätigt es.
 - **Ebenfalls nach diesem Angebot** der LED-Versorgungsschalter: TPS2553DBVR (U705, C55266, LCSC 0,20 je Stück ab 5,
-  0,11 ab 3000, November 2026), ein 100-uF-Elektrolytkondensator (C725) des Bauteils, das schon am Ausgang des
-  PoE-Moduls sitzt, ein 100 nF und ein 100 k. Eine neue Extended-Zeile: etwa 3,30 mehr Feeder-Gebühr je Bestellung,
-  und bei der Version wifi eine zweite, da der Elektrolytkondensator eine Zeile nur der Version lan war. Etwa 0,9 USD je
-  Platine bei 5 Platinen, 0,6 bei 10, 0,2 bei 1000.
+  0,11 ab 3000, November 2026), zwei 100-uF-Elektrolytkondensatoren (C725, C726) des Bauteils, das schon am Ausgang
+  des PoE-Moduls sitzt, ein 100 nF und ein 91 k (R708, UNI-ROYAL 0402WGF9102TCE, C4147). Neue Zeilen: der Schalter
+  (Extended: etwa 3,30 mehr Feeder-Gebühr je Bestellung), der 91 k (ob JLCPCB ihn als Basic Part führt, ist nicht
+  geprüft; wenn nicht, weitere 3,30 je Bestellung) und bei der Version wifi der Elektrolytkondensator, der eine Zeile
+  nur der Version lan war. Etwa 1,0 USD je Platine bei 5 Platinen, 0,6 bei 10, 0,2 bei 1000 (der zweite
+  Elektrolytkondensator und die Zeile des 91 k brachten etwa 0,1 bei 5 Platinen); das nächste Angebot bestätigt es.
+- **Ebenfalls nach diesem Angebot** das Trägerfilter in der LED-Datenleitung, wo sie die Lücke um die NFC-Schleife
+  kreuzt: ein 2,2 k (R709) und ein 39 pF (C727), Teilenummern, die die Platine schon hat: keine neue Zeile, zwei
+  Bestückungen. Fällt beim Abstimmen der NFC-Anpassung ihr 39 pF weg, behält C727 diese Zeile.
 
 ### Lagen, Vias und Oberfläche
 
@@ -221,8 +226,8 @@ NFC-Anpassung, die 3,9 k des Empfangsteilers). Die Ausnahmen:
   (SMBJ28A, SMBJ28CA), der 47-uF-Elektrolytkondensator, die drei 0,1-%-Dünnschichtwiderstände des
   eFuse-Teilers sowie 1,65 k, 22,1 k und 2,2 nF. Ob für die letzten drei ein Basic-Bauteil existiert,
   wurde nicht geprüft.
-- Der LED-Versorgungsschalter TPS2553DBVR und sein 100-uF-Elektrolytkondensator, dasselbe Bauteil wie der
-  Ausgangskondensator des PoE-Moduls.
+- Der LED-Versorgungsschalter TPS2553DBVR und seine zwei 100-uF-Elektrolytkondensatoren, dasselbe Bauteil wie der
+  Ausgangskondensator des PoE-Moduls. Sein Grenzwiderstand, 91 k (C4147), wurde nicht gegen die Basic-Liste geprüft.
 
 ## Beschaffungsrisiken
 

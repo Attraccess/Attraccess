@@ -203,7 +203,7 @@ Nothing below has been checked on real parts. Each item can change a step or a p
 
 - [ ] **Printed fits.** Glass in its window (0.25 mm gap per side), tongue in its slot (0.4 mm), hook on the cleat (0.1 mm). Tune on the first print.
 - [ ] **Display dimensions.** The total thickness, 3.5 mm, is measured on one sample panel; the cover lens (0.55 mm) is taken from the drawing on the display's product page, a corner radius of at least 1 mm is assumed. They decide whether the screen sits flush. Measure the panel before printing.
-- [ ] **Inserts in the PCB bosses.** Their holes reach into the front wall and leave 2.1 mm of it. Check on the first print that the front shows no marks after the inserts are pressed in.
+- [ ] **Inserts in the PCB bosses.** Their holes reach into the front wall and leave 1.1 mm of it. Check on the first print that the front shows no marks after the inserts are pressed in.
 - [ ] **Display distance and flex.** The frame holds the display 1.7 mm off the PCB; the folded flex with its chip lies in that gap (see the [case](hardware/touch-p4/case.md#not-yet-verified)). Check with the real panel that the part with the chip lies flat on the display's back and that the flex reaches its connector through the slot.
 - [ ] **Dock magnet.** With the reader hung on the dock the board must report "on the dock", and "off" once it is lifted away. The figures do not show the magnet's ring yet.
 - [ ] **Dock plate and proximity sensor.** The board also measures the infrared light that the dock's plate reflects. What it reads on the dock, with every dock colour in use, and whether light on the case changes it, is not measured yet (see the board's bring-up notes).

@@ -226,7 +226,7 @@ From EN 301 489-1 V2.2.3:
 
 | Test | Level | On this reader |
 |---|---|---|
-| Electrostatic discharge | 4 kV contact, 8 kV air, all exposed surfaces [EN 301 489-1 §9.3.2] | display glass and edges, LED windows, buzzer opening, screws, housing seams |
+| Electrostatic discharge | 4 kV contact, 8 kV air, all exposed surfaces [EN 301 489-1 §9.3.2] | display glass and edges, tap tile and its seam, buzzer opening, screws, housing seams |
 | Radiated immunity | 3 V/m, 80 MHz to 6 GHz [EN 301 489-1 §9.2.2] | always |
 | Fast transients; RF common mode | 0.5 kV; 3 V [EN 301 489-1 §9.4.2, §9.5.2] | Ethernet port and DC input, each if its cable may be longer than 3 m [EN 301 489-1 §9.4.1, §9.5.1] |
 | Surge | 0.5 kV line to ground [EN 301 489-1 §9.8.2.2] | Ethernet port with indoor cables over 30 m. Outdoor cables: 1 kV, 10/700 µs [EN 301 489-1 §9.8.2.1]; exclude outdoor cabling in the manual. Where the coupling network would disturb a high-speed port, 1.2/50 µs may replace 10/700 µs [EN 301 489-17 table 6]. |
@@ -269,7 +269,7 @@ Measure these before the lab does, most important first. Engineering judgement e
 | # | Risk | What to do |
 |---|---|---|
 | 1 | **NFC harmonics on the cables.** One filter stage, unshielded coils, both cables leave the housing beside the loop. | Measure the harmonics with the cables attached, with the PN532 that will be sold (second source or NXP's), and keep to it. |
-| 2 | **Discharges on the user's side.** Display or touch controller loses its settings, PN532 hangs, MCU resets. Failed if the reader does not recover by itself [EN 301 489-17 §6.4, table 2; part 1's clause 6 "shall not apply", EN 301 489-17 §6.1], and by the test plan's objective criteria (see [Standards a lab applies](#standards-a-lab-applies)), among them no loss of settings it names as critical. | Housing: LED windows closed with a diffuser that overlaps the housing; metal screws covered or grounded (the mounting holes are not connected to ground); display's metal back grounded via the four bare ground pads on the display side (conductive tape or foam). Firmware: watchdog, and a periodic check that restarts display, touch and NFC. |
+| 2 | **Discharges on the user's side.** Display or touch controller loses its settings, PN532 hangs, MCU resets. Failed if the reader does not recover by itself [EN 301 489-17 §6.4, table 2; part 1's clause 6 "shall not apply", EN 301 489-17 §6.1], and by the test plan's objective criteria (see [Standards a lab applies](#standards-a-lab-applies)), among them no loss of settings it names as critical. | Housing: the tap tile's flange overlaps its opening behind the front wall, the LEDs' 5 V vias kept off the path from its seam; metal screws covered or grounded (the mounting holes are not connected to ground); display's metal back grounded via the four bare ground pads on the display side (conductive tape or foam). Firmware: watchdog, and a periodic check that restarts display, touch and NFC. |
 | 3 | **The display flex.** About twenty fast lines in an unshielded flex. | Lowest drive strength and pixel clock that work. |
 | 4 | **Common-mode noise on the cables.** The DC filter works between the two wires only; the PoE input has beads but no common-mode choke. | Clip-on ferrite on the cable first; a choke needs a new board. |
 | 5 | **Radiated Wi-Fi power.** The certificate's 19.85 dBm at 2.4 GHz is 0.15 dB below the limit, on Espressif's board; the module stands elsewhere here. | Measure e.i.r.p. on both bands in the closed case and set the firmware's cap from it. |

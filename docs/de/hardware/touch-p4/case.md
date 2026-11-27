@@ -175,8 +175,9 @@ schreiben Step-Dateien dafür und nutzen `rsvg-convert` für Beschriftungen.
     der Kachel.
 - **Einschmelzmuttern nahe der Frontfläche.** Nur 2,9 mm liegen zwischen Platine und Frontwand. Die Löcher
   für die Einschmelzmuttern der vier Platinen-Schraubdome sind 3,2 mm tief (`pcb_ins_depth`), reichen also
-  0,3 mm in die 2,4 mm dicke Frontwand und lassen 2,1 mm stehen. Prüfen Sie beim ersten Druck, dass das
-  Einpressen der Einschmelzmuttern die Front nicht markiert.
+  0,3 mm in die 1,4 mm dicke Frontwand der Kappe (2,4 mm, bevor die Frontplatte ihren äußeren Millimeter
+  übernahm) und lassen 1,1 mm stehen. Prüfen Sie beim ersten Druck, dass das Einpressen der Einschmelzmuttern
+  die Front nicht markiert und die Frontplatte nicht anhebt.
 - **Dock-Magnet.** Der Ring liegt bei X 30,5, Y 10,95 (Platinenpunkt 12,5, 38,2); die Fläche des Magneten
   ist 10,3 mm vom Hall-Schalter entfernt, was rechnerisch 22 mT ergibt, das Vierfache dessen, was der
   Schalter braucht. Prüfen Sie an der ersten Platine, dass der Schalter bei eingehängtem Leser „am Dock“ und

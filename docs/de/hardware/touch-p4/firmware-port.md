@@ -44,7 +44,7 @@ ihrer Bauteile. Mit **Harte Anforderung** markierte Regeln sind Pflicht, keine E
 Was die Platine selbst erledigt: Widerstände halten die LEDs, die Hintergrundbeleuchtung, den Buzzer und
 den PN532 ausgeschaltet, bis die Firmware ihre Pins treibt, und der Spannungswächter U204 hält die MCU
 nach dem Hochlaufen der 3,3-V-Schiene 120 bis 280 ms im Reset (der Chip verlangt 50 us). Ein strombegrenzter
-Schalter (U705) hält den LED-Ring unter 232 bis 306 mA, was die Firmware auch sendet; er ist immer eingeschaltet.
+Schalter (U705) hält den LED-Ring unter 255 bis 334 mA, was die Firmware auch sendet; er ist immer eingeschaltet.
 
 ## ESP32-P4-GPIO-Belegung
 
@@ -322,12 +322,13 @@ Start setzen:
   - für weiche Übergänge zeitliches Dithering verwenden (von Bild zu Bild zwischen benachbarten Werten
     wechseln): Mit der Grenze liegen gedimmte Farben tief im 8-Bit-Bereich, wo einzelne Stufen sichtbar sind.
 
-  Über der Grenze begrenzt der Schalter U705 den Ring auf 232 bis 306 mA und lässt dessen Versorgung
+  Dazu ziehen die LEDs in Ruhe je 1 mA, der Ring also 208 mA an der Grenze, 23 % unter der niedrigsten Grenze des
+  Schalters. Über der Grenze begrenzt der Schalter U705 den Ring auf 255 bis 334 mA und lässt dessen Versorgung
   einbrechen: Der Ring wird dunkler und verschiebt die Farbe (Blau und Grün zuerst), und der Schalter erwärmt
   sich und schaltet sich zum Abkühlen eventuell aus und wieder ein. Nichts wird beschädigt, aber es ist ein
   Firmwarefehler. Die PWM-Perioden der LEDs laufen in und aus dem Takt; laufen sie gleich, zieht eine
-  Mischfarbe für einen Teil jeder 0,8-ms-Periode bis zum Dreifachen ihres Mittelwerts, was der 100-uF-
-  Kondensator C725 trägt, solange der Mittelwert in der Grenze bleibt.
+  Mischfarbe für einen Teil jeder 0,8-ms-Periode bis zum Dreifachen ihres Mittelwerts, was die zwei
+  100-uF-Kondensatoren C725 und C726 tragen, solange der Mittelwert in der Grenze bleibt.
 
 ### Secure Boot und Chip-Revision
 
