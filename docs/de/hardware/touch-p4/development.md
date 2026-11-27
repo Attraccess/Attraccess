@@ -40,7 +40,7 @@ Das Stammblatt ist ein Blockdiagramm mit der Revisionshistorie. Jeder Block ist 
 | Ethernet | PHY, Quarz, Strap-Beschaltung, Buchse (nur LAN-Version) |
 | NFC | PN532, Versorgung, Anpassnetzwerk, Antenne |
 | Display | Panel-Anschluss, RGB-Serienwiderstände, Hintergrundbeleuchtung, IO-Expander |
-| UI | LEDs, Pegelwandler, Summer |
+| UI | LEDs, Pegelwandler, LED-Versorgungsschalter, Summer, Manipulationssensoren |
 | Mechanical | Befestigungslöcher, Passmarken |
 
 Jedes Blatt hat das kleinste Papierformat, das es fasst (A4 oder A3), mit Datum und Revision in seinem
@@ -303,6 +303,7 @@ datierten Stände ihres Designs.
 | A | 2026-11-25 | Industry review: layout rework (ESP32-P4 land pattern, decoupling, USB pair, impedance), 2.0 x 1.6 mm crystal, designators on the silkscreen, assembly drawing |
 | A | 2026-11-25 | Wi-Fi module ESP32-C5-MINI-1 (2.4 and 5 GHz, PCB antenna) instead of the ESP32-C6-MINI-1U, with a 3.3 V converter of its own |
 | A | 2026-11-27 | Tap tile: 16 LEDs in a ring round the NFC loop, the loop on the case centre line, the PN532 below the display, the fourth mounting hole left of the tile |
+| A | 2026-11-27 | LED ring behind a current-limited switch (TPS2553, 232 to 306 mA) |
 
 ### Vor einer Bestellung
 

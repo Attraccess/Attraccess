@@ -257,7 +257,7 @@ NETCLASSES = [
     ('Power', 0.127, 0.25, 0.6, 0.3, ['+3V3', 'VDD_HP', 'VDD_HP_1', 'VDD_BAT', 'VDD_USBPHY', 'VDD_FLASH', 'VDD_PSRAM',
                                      'DCDC_SW', 'PHY_3V3', 'PHY_REG', 'NFC_VBAT', 'NFC_TVDD', 'NFC_AVDD', 'NFC_DVDD',
                                      'BL_SW', 'BL_A', 'BL_K', 'BUZ_P', 'BUZ_N']),
-    ('Power5V', 0.15, 0.5, 0.8, 0.4, ['+5V', '+5V_USB', '+5V_POE', '+5V_DC', 'VBUS_F', 'BUCK_SW', 'WIFI_BUCK_SW',
+    ('Power5V', 0.15, 0.5, 0.8, 0.4, ['+5V', '+5V_LED', '+5V_USB', '+5V_POE', '+5V_DC', 'VBUS_F', 'BUCK_SW', 'WIFI_BUCK_SW',
                                       '+3V3_WIFI']),
     # DC input, up to 28 V
     ('DCIN', 0.25, 0.6, 0.8, 0.4, ['VDC_IN', 'VDC_F', 'VDC_R', 'VDC', 'DC_SW']),

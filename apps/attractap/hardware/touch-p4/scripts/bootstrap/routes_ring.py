@@ -54,11 +54,11 @@ def led_ring(B):
         via = f(*(LED_VIA_OUT if k == gap else LED_VIA))
         vias.append(via)
         if k == gap:
-            B.track(dog(p3, c1), '+5V', 0.4)
+            B.track(dog(p3, c1), '+5V_LED', 0.4)
         else:                                       # along the pad's outer edge, clear of the capacitor's ground
-            B.track([p3, f(2.775, -1.08), c1], '+5V', 0.3)
-        B.track([c1, via], '+5V', 0.4)
-        B.via(*via, '+5V', size=0.8, drill=0.4)
+            B.track([p3, f(2.775, -1.08), c1], '+5V_LED', 0.3)
+        B.track([c1, via], '+5V_LED', 0.4)
+        B.via(*via, '+5V_LED', size=0.8, drill=0.4)
         if k + 1 == n:
             break
         net = B.d.parts[ref].nets['4']
@@ -92,4 +92,4 @@ def led_ring(B):
             pts.append((corner[0] + vx / lb * ch, corner[1] + vy / lb * ch))
         pts.append(v)
     for a, b in zip(pts, pts[1:]):                  # one segment each, so every junction is an end point
-        B.track([a, b], '+5V', 0.6, layer=IN2)
+        B.track([a, b], '+5V_LED', 0.6, layer=IN2)

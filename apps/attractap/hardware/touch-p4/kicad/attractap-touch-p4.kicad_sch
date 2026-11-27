@@ -16,107 +16,107 @@
 	)
 	(lib_symbols)
 	(wire
-		(pts (xy 34.29 85.09) (xy 31.75 85.09))
-		(stroke (width 0) (type default))
-		(uuid "3b18b8c5-ef61-5e28-ad4e-7ae0206ca446")
-	)
-	(label "+5V_DC"
-		(at 31.75 85.09 180)
-		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "0b4ca900-1a3e-57a6-9c74-98be1c901ded")
-	)
-	(wire
 		(pts (xy 34.29 87.63) (xy 31.75 87.63))
 		(stroke (width 0) (type default))
 		(uuid "a5e9c3d9-4645-56f2-a72a-616b747c9109")
 	)
-	(label "+5V_POE"
+	(label "+5V_DC"
 		(at 31.75 87.63 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "21c47320-d5df-56e8-897b-12afdbe4e20f")
+		(uuid "845ce9fd-1b96-5153-87cf-238625d6ef71")
 	)
 	(wire
 		(pts (xy 34.29 90.17) (xy 31.75 90.17))
 		(stroke (width 0) (type default))
 		(uuid "c8736ca1-9e69-5944-bb41-66f582201c7b")
 	)
-	(label "+5V_USB"
+	(label "+5V_POE"
 		(at 31.75 90.17 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "3d4d77f2-2cee-580f-b7fb-2e20e416b989")
+		(uuid "814baabe-1469-503f-8986-118ee808a02b")
 	)
 	(wire
 		(pts (xy 34.29 92.71) (xy 31.75 92.71))
 		(stroke (width 0) (type default))
 		(uuid "baa98598-3b61-5818-b621-344faaf1b951")
 	)
-	(label "DC_PRESENT"
+	(label "+5V_USB"
 		(at 31.75 92.71 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "c109d4e9-2d0c-510a-82f6-0c008a0d760c")
+		(uuid "f73322da-786d-58cb-bdd7-418b114d10eb")
 	)
 	(wire
 		(pts (xy 34.29 95.25) (xy 31.75 95.25))
 		(stroke (width 0) (type default))
 		(uuid "c3da55af-f7ff-5b0e-b777-5b50996c601a")
 	)
-	(label "POE_PRESENT"
+	(label "DC_PRESENT"
 		(at 31.75 95.25 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "b55fefd2-aa2f-56b9-a4ab-7a9e972d5cae")
+		(uuid "ccad9354-8b96-528d-aa1d-378a0120bdd0")
 	)
 	(wire
-		(pts (xy 110.49 85.09) (xy 113.03 85.09))
+		(pts (xy 34.29 97.79) (xy 31.75 97.79))
 		(stroke (width 0) (type default))
-		(uuid "0c2feca8-062d-54ac-965c-ad4b6786f477")
+		(uuid "d3efdf91-dbea-53fd-8211-752e6c88911f")
 	)
-	(label "POE_VN"
-		(at 113.03 85.09 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "b3b6efe5-a422-5f07-ba5f-20150f85629d")
+	(label "POE_PRESENT"
+		(at 31.75 97.79 180)
+		(effects (font (size 1.27 1.27)) (justify right bottom))
+		(uuid "d3b82e7d-bc4b-512d-a7f5-f90574e4c48d")
 	)
 	(wire
 		(pts (xy 110.49 87.63) (xy 113.03 87.63))
 		(stroke (width 0) (type default))
 		(uuid "c239e44f-bedd-5c6a-8345-782a7316997b")
 	)
-	(label "POE_VP"
+	(label "POE_VN"
 		(at 113.03 87.63 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "988cb81f-98c1-5bbf-970a-0c2c9424bd21")
+		(uuid "c1ee9ad6-9db1-5785-a69e-ad3ffb1ed9e9")
 	)
 	(wire
 		(pts (xy 110.49 90.17) (xy 113.03 90.17))
 		(stroke (width 0) (type default))
 		(uuid "e4de2ad8-833c-536f-8f35-2ff28e171fef")
 	)
-	(label "USB_DN"
+	(label "POE_VP"
 		(at 113.03 90.17 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "f988faab-9946-5a7c-b0d3-8ddf4c517c87")
+		(uuid "a789aaa1-3727-5b31-bd66-14e931a2cd61")
 	)
 	(wire
 		(pts (xy 110.49 92.71) (xy 113.03 92.71))
 		(stroke (width 0) (type default))
 		(uuid "52cc1834-10e1-526d-9027-033ebe2f39c1")
 	)
-	(label "USB_DP"
+	(label "USB_DN"
 		(at 113.03 92.71 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "d6810dfb-ffd0-5ddc-9805-f727d84139d6")
+		(uuid "d7bb7f70-ba68-55f1-9889-7e1ce02820b7")
 	)
 	(wire
 		(pts (xy 110.49 95.25) (xy 113.03 95.25))
 		(stroke (width 0) (type default))
 		(uuid "a5a871a4-5cd1-5f97-823e-4e6622e17161")
 	)
-	(label "VDC"
+	(label "USB_DP"
 		(at 113.03 95.25 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "2d36e098-20cd-54f7-8a1d-e11a305f772d")
+		(uuid "0b193efc-d4ce-54a8-a91c-6874c6b80617")
+	)
+	(wire
+		(pts (xy 110.49 97.79) (xy 113.03 97.79))
+		(stroke (width 0) (type default))
+		(uuid "fab95ae4-351a-56ef-a1a2-c7e153729113")
+	)
+	(label "VDC"
+		(at 113.03 97.79 0)
+		(effects (font (size 1.27 1.27)) (justify left bottom))
+		(uuid "3a48b644-a35b-5837-a25d-701a74eb7fff")
 	)
 	(sheet
-		(at 34.29 80.01)
+		(at 34.29 82.55)
 		(size 76.2 20.32)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -125,58 +125,58 @@
 		(stroke (width 0.1524) (type solid))
 		(fill (color 255 255 194 1))
 		(uuid "171e73d6-f310-5ee1-9cac-7bcb35e91478")
-		(property "Sheetname" "Power" (at 34.29 79.31 0) (effects (font (size 2 2)) (justify left bottom)))
+		(property "Sheetname" "Power" (at 34.29 81.85 0) (effects (font (size 2 2)) (justify left bottom)))
 		(property "Sheetfile" "attractap-touch-p4-power.kicad_sch"
-			(at 34.29 100.93 0)
+			(at 34.29 103.47 0)
 			(effects (font (size 1.27 1.27)) (justify left top))
 		)
 		(pin "+5V_DC" passive
-			(at 34.29 85.09 180)
+			(at 34.29 87.63 180)
 			(uuid "4911f2d5-3a71-51ed-867e-3f8039b21725")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "+5V_POE" passive
-			(at 34.29 87.63 180)
+			(at 34.29 90.17 180)
 			(uuid "db7d9772-4c11-5beb-a6ca-22288a03a290")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "+5V_USB" passive
-			(at 34.29 90.17 180)
+			(at 34.29 92.71 180)
 			(uuid "cbef268f-4744-585f-8eb1-d0ff2a5e7f17")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "DC_PRESENT" passive
-			(at 34.29 92.71 180)
+			(at 34.29 95.25 180)
 			(uuid "1f3dddae-1406-5efe-838b-eea0a44eb1f1")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "POE_PRESENT" passive
-			(at 34.29 95.25 180)
+			(at 34.29 97.79 180)
 			(uuid "8ff48d4e-e398-5710-926c-09e79fded01f")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "POE_VN" passive
-			(at 110.49 85.09 0)
+			(at 110.49 87.63 0)
 			(uuid "e314d72f-2eac-583e-b43b-163c2d910905")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "POE_VP" passive
-			(at 110.49 87.63 0)
+			(at 110.49 90.17 0)
 			(uuid "7ff6f304-2df6-5ab4-b9ff-4d45077b54af")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "USB_DN" passive
-			(at 110.49 90.17 0)
+			(at 110.49 92.71 0)
 			(uuid "a968d0c7-4086-5d96-99fb-1d1210232534")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "USB_DP" passive
-			(at 110.49 92.71 0)
+			(at 110.49 95.25 0)
 			(uuid "dc1cc14c-611e-53d7-b637-895a0ad43eb9")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "VDC" passive
-			(at 110.49 95.25 0)
+			(at 110.49 97.79 0)
 			(uuid "f4d0cbe5-5f48-562c-a6b4-f610fbb6c231")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
@@ -184,512 +184,512 @@
 	)
 	(text "USB-C, DC and PoE inputs, supply OR-ing, 3.3 V buck converter"
 		(exclude_from_sim no)
-		(at 34.29 105.53 0)
+		(at 34.29 108.07 0)
 		(effects (font (size 1 1)) (justify left bottom))
-		(uuid "11073ab0-de4a-5224-ac5c-5f22a36cddbf")
-	)
-	(wire
-		(pts (xy 34.29 119.38) (xy 31.75 119.38))
-		(stroke (width 0) (type default))
-		(uuid "119d580e-2806-5983-a193-6d91bfa111b4")
-	)
-	(label "BL_PWM"
-		(at 31.75 119.38 180)
-		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "0e906ff8-2a15-55b5-8ab0-28df9d00a887")
+		(uuid "8b100265-2f69-593d-8653-3ab15e2f8667")
 	)
 	(wire
 		(pts (xy 34.29 121.92) (xy 31.75 121.92))
 		(stroke (width 0) (type default))
 		(uuid "9ef4d47d-fd53-567b-8ffd-d4a032fc1a81")
 	)
-	(label "BUZZER"
+	(label "BL_PWM"
 		(at 31.75 121.92 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "e3a33edf-a502-5220-bc4c-485c46e70580")
+		(uuid "f2442e26-315f-5b8f-a82a-936ddba3e8a0")
 	)
 	(wire
 		(pts (xy 34.29 124.46) (xy 31.75 124.46))
 		(stroke (width 0) (type default))
 		(uuid "3d5301dd-a3b1-523a-8d26-188e6f9274d9")
 	)
-	(label "C5_EN_M"
+	(label "BUZZER"
 		(at 31.75 124.46 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "d1a61542-561c-5682-98f7-0d2638123164")
+		(uuid "602c2678-39b7-5e8b-bf05-263fe711d6ff")
 	)
 	(wire
 		(pts (xy 34.29 127) (xy 31.75 127))
 		(stroke (width 0) (type default))
 		(uuid "1873af46-beef-5528-b607-dab55f843466")
 	)
-	(label "ETH_MDC"
+	(label "C5_EN_M"
 		(at 31.75 127 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "d706d934-ba05-5c16-ad2c-105514ca9fdd")
+		(uuid "e7be0a11-cb90-5cfd-8fcf-a8da3d777580")
 	)
 	(wire
 		(pts (xy 34.29 129.54) (xy 31.75 129.54))
 		(stroke (width 0) (type default))
 		(uuid "9d949630-8ce8-54be-8fad-51355d7b0bdc")
 	)
-	(label "ETH_MDIO"
+	(label "ETH_MDC"
 		(at 31.75 129.54 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "8c277082-53e2-5654-9f7c-4be3012c3dc5")
+		(uuid "0a125a64-be76-5738-bf59-9acca8fcefd7")
 	)
 	(wire
 		(pts (xy 34.29 132.08) (xy 31.75 132.08))
 		(stroke (width 0) (type default))
 		(uuid "910b885d-b0da-5be4-b571-acf75a562d6e")
 	)
-	(label "I2C0_SCL"
+	(label "ETH_MDIO"
 		(at 31.75 132.08 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "2c81769c-53de-5907-a546-5c65a5fe3e5b")
+		(uuid "ac9dcc4c-108f-5a6e-96ce-6085d19e411a")
 	)
 	(wire
 		(pts (xy 34.29 134.62) (xy 31.75 134.62))
 		(stroke (width 0) (type default))
 		(uuid "2c405917-4768-5724-bb92-00033f51b622")
 	)
-	(label "I2C0_SDA"
+	(label "I2C0_SCL"
 		(at 31.75 134.62 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "d5d78b1e-1ea5-5e46-b4ed-ea7dfffd8f01")
+		(uuid "19a3c2fd-1067-5222-ba1c-574ac4f5b242")
 	)
 	(wire
 		(pts (xy 34.29 137.16) (xy 31.75 137.16))
 		(stroke (width 0) (type default))
 		(uuid "2f0370cf-9166-55bf-8ab0-facddbe1cffd")
 	)
-	(label "LCD_B1_M"
+	(label "I2C0_SDA"
 		(at 31.75 137.16 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "143813f3-7bb7-514b-9bde-6506e6200ba8")
+		(uuid "fa7f7b4e-5dca-5ee5-8d6b-3a0864eeab06")
 	)
 	(wire
 		(pts (xy 34.29 139.7) (xy 31.75 139.7))
 		(stroke (width 0) (type default))
 		(uuid "269750e8-298b-58db-bc83-167f9d585dcb")
 	)
-	(label "LCD_B2_M"
+	(label "LCD_B1_M"
 		(at 31.75 139.7 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "034c15b8-a5b0-5177-986d-d1d8d80f3170")
+		(uuid "738a3aef-17ce-5165-b162-49a709ef78d1")
 	)
 	(wire
 		(pts (xy 34.29 142.24) (xy 31.75 142.24))
 		(stroke (width 0) (type default))
 		(uuid "557fc980-b1ab-5d16-aa75-9b67e8950b26")
 	)
-	(label "LCD_B3_M"
+	(label "LCD_B2_M"
 		(at 31.75 142.24 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "26c08989-c4fe-5bfa-b55f-75caded03c03")
+		(uuid "61616b2b-b918-5d0e-a8ce-7e80266aeb57")
 	)
 	(wire
 		(pts (xy 34.29 144.78) (xy 31.75 144.78))
 		(stroke (width 0) (type default))
 		(uuid "2a52e31b-d2b7-5085-8b7c-f354b4b78dd9")
 	)
-	(label "LCD_B4_M"
+	(label "LCD_B3_M"
 		(at 31.75 144.78 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "ab07ed5d-0185-58b3-8236-83d892731fcb")
+		(uuid "2f68cc3e-963f-586d-9333-4bf2d5926d2c")
 	)
 	(wire
 		(pts (xy 34.29 147.32) (xy 31.75 147.32))
 		(stroke (width 0) (type default))
 		(uuid "d03e1a8f-b1d4-53f7-a8ac-104a4e39c757")
 	)
-	(label "LCD_B5_M"
+	(label "LCD_B4_M"
 		(at 31.75 147.32 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "f548d2c0-85e7-557b-a6c3-b168dfb46be3")
+		(uuid "d8101864-6b96-5dd8-b708-984d3f55e536")
 	)
 	(wire
 		(pts (xy 34.29 149.86) (xy 31.75 149.86))
 		(stroke (width 0) (type default))
 		(uuid "18575574-c57e-5cb9-84c0-e4404207ddad")
 	)
-	(label "LCD_DE_M"
+	(label "LCD_B5_M"
 		(at 31.75 149.86 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "851ce76e-6b98-54f7-b838-ca912f7245f9")
+		(uuid "27c80391-4134-5de3-bb75-9057f4d3e083")
 	)
 	(wire
 		(pts (xy 34.29 152.4) (xy 31.75 152.4))
 		(stroke (width 0) (type default))
 		(uuid "613796b8-da02-56e3-87ea-2879055604b3")
 	)
-	(label "LCD_G0_M"
+	(label "LCD_DE_M"
 		(at 31.75 152.4 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "09d30223-f4c7-52ad-90b2-9f6791502ebb")
+		(uuid "b98eb3e8-0c21-5ea0-9cc4-d475c6338ce4")
 	)
 	(wire
 		(pts (xy 34.29 154.94) (xy 31.75 154.94))
 		(stroke (width 0) (type default))
 		(uuid "b12351ff-410a-5547-9f5c-232d27b3c30b")
 	)
-	(label "LCD_G1_M"
+	(label "LCD_G0_M"
 		(at 31.75 154.94 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "193054cb-8b35-57aa-9c33-b0620d4b09e9")
+		(uuid "90e8d845-9fb0-5e4c-add1-3b28491ed186")
 	)
 	(wire
 		(pts (xy 34.29 157.48) (xy 31.75 157.48))
 		(stroke (width 0) (type default))
 		(uuid "07d49a27-864a-5a96-be86-47a10dd44f31")
 	)
-	(label "LCD_G2_M"
+	(label "LCD_G1_M"
 		(at 31.75 157.48 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "622d8c05-c480-5568-a38a-f9fa9cdce233")
+		(uuid "c77d15f0-5ee5-58ac-89f6-0ff9f05d3d20")
 	)
 	(wire
 		(pts (xy 34.29 160.02) (xy 31.75 160.02))
 		(stroke (width 0) (type default))
 		(uuid "faf4d349-1076-59f6-81f1-e364a7066784")
 	)
-	(label "LCD_G3_M"
+	(label "LCD_G2_M"
 		(at 31.75 160.02 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "cf3a9569-707a-5857-9d6d-acee0b195687")
+		(uuid "3e128b0d-2090-5519-a970-0e924dd458e2")
 	)
 	(wire
 		(pts (xy 34.29 162.56) (xy 31.75 162.56))
 		(stroke (width 0) (type default))
 		(uuid "9cf4e677-0974-5bcb-b4e4-8bfb39f6d2d2")
 	)
-	(label "LCD_G4_M"
+	(label "LCD_G3_M"
 		(at 31.75 162.56 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "a8580734-b4ee-5fe7-84ff-9f3a93125540")
+		(uuid "ef87028b-edff-5d18-8547-a2c6b07ef81d")
 	)
 	(wire
 		(pts (xy 34.29 165.1) (xy 31.75 165.1))
 		(stroke (width 0) (type default))
 		(uuid "6d7927b2-3ee0-5b41-a2d5-1af1607a6d13")
 	)
-	(label "LCD_G5_M"
+	(label "LCD_G4_M"
 		(at 31.75 165.1 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "50fd73e6-bc57-51bb-9e70-1f1f4d3af0a2")
+		(uuid "3ef9e721-110e-5836-b2a9-1b259db62469")
 	)
 	(wire
 		(pts (xy 34.29 167.64) (xy 31.75 167.64))
 		(stroke (width 0) (type default))
 		(uuid "7caa358b-07d0-5536-9fc4-9b427c63a9a7")
 	)
-	(label "LCD_HSYNC_M"
+	(label "LCD_G5_M"
 		(at 31.75 167.64 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "0a1fd4d4-119c-55bc-8dbf-84a8b6eecd1b")
+		(uuid "ee72f407-c997-5064-be86-a2e73e0e1207")
 	)
 	(wire
 		(pts (xy 34.29 170.18) (xy 31.75 170.18))
 		(stroke (width 0) (type default))
 		(uuid "99d5da73-9eb1-53b8-9030-a2d7f4e6ba2e")
 	)
-	(label "LCD_PCLK_M"
+	(label "LCD_HSYNC_M"
 		(at 31.75 170.18 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "8ca97e0e-d333-5e89-bacf-5908847e6ac6")
+		(uuid "293a7305-35f1-5ffe-905f-9ac455b8e758")
 	)
 	(wire
 		(pts (xy 34.29 172.72) (xy 31.75 172.72))
 		(stroke (width 0) (type default))
 		(uuid "d0a3e500-870e-5785-ab3c-395b77dc8f68")
 	)
-	(label "LCD_R1_M"
+	(label "LCD_PCLK_M"
 		(at 31.75 172.72 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "08d0a01d-e23a-59fa-835f-62edae57ef51")
+		(uuid "60f86246-0516-5232-ae4d-266d36119f8c")
 	)
 	(wire
 		(pts (xy 34.29 175.26) (xy 31.75 175.26))
 		(stroke (width 0) (type default))
 		(uuid "812d89c4-811d-5dbc-b1c9-c76cfe423bfe")
 	)
-	(label "LCD_R2_M"
+	(label "LCD_R1_M"
 		(at 31.75 175.26 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "c00c8c3c-f32d-591c-ac61-b6ddf4e55a52")
+		(uuid "4dfa002e-f1c0-5368-bf17-9cd9f75f87ea")
 	)
 	(wire
 		(pts (xy 34.29 177.8) (xy 31.75 177.8))
 		(stroke (width 0) (type default))
 		(uuid "71c90572-e765-5586-8dbd-a7da707c4254")
 	)
-	(label "LCD_R3_M"
+	(label "LCD_R2_M"
 		(at 31.75 177.8 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "20c98f1d-2e2f-5a67-aee1-50c17e22be73")
+		(uuid "d1c35dfe-ad8c-50b5-ad00-68077716f354")
 	)
 	(wire
 		(pts (xy 34.29 180.34) (xy 31.75 180.34))
 		(stroke (width 0) (type default))
 		(uuid "ce8b13f3-c78a-5951-94e7-1c491899b9da")
 	)
-	(label "LCD_R4_M"
+	(label "LCD_R3_M"
 		(at 31.75 180.34 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "6031e030-03d3-58b7-b1d5-af98f7c90888")
+		(uuid "59c3473e-092c-5aa7-aa83-a3561608b240")
 	)
 	(wire
-		(pts (xy 110.49 119.38) (xy 113.03 119.38))
+		(pts (xy 34.29 182.88) (xy 31.75 182.88))
 		(stroke (width 0) (type default))
-		(uuid "59251a85-602e-5a42-9c6c-1832e51296f6")
+		(uuid "11967b13-713b-5d67-8935-c468d6323107")
 	)
-	(label "LCD_R5_M"
-		(at 113.03 119.38 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "03570f4b-49a8-5b0d-9302-cd4d265a47a7")
+	(label "LCD_R4_M"
+		(at 31.75 182.88 180)
+		(effects (font (size 1.27 1.27)) (justify right bottom))
+		(uuid "b82465a7-0a21-5a52-aefb-3460282a14ee")
 	)
 	(wire
 		(pts (xy 110.49 121.92) (xy 113.03 121.92))
 		(stroke (width 0) (type default))
 		(uuid "f53e081d-f1cb-550c-a6ee-cc4f6cd588cf")
 	)
-	(label "LCD_VSYNC_M"
+	(label "LCD_R5_M"
 		(at 113.03 121.92 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "f8f5836b-44c6-54cb-b979-80e3a50a8e8d")
+		(uuid "9c4c98d2-b349-5add-a1a4-97d5ac6e7763")
 	)
 	(wire
 		(pts (xy 110.49 124.46) (xy 113.03 124.46))
 		(stroke (width 0) (type default))
 		(uuid "56b7922b-4eba-5adb-8d1f-1ba3e1dc29af")
 	)
-	(label "LED_DATA"
+	(label "LCD_VSYNC_M"
 		(at 113.03 124.46 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "a36bd2c6-4aa8-59de-8ca8-f900f622384f")
+		(uuid "568fa346-165d-534a-ac68-e47223bce44f")
 	)
 	(wire
 		(pts (xy 110.49 127) (xy 113.03 127))
 		(stroke (width 0) (type default))
 		(uuid "51a4e5a8-4850-5142-adb3-7dad36aa36f7")
 	)
-	(label "NFC_IRQ"
+	(label "LED_DATA"
 		(at 113.03 127 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "798c5a0c-9bc6-5ff0-922a-83e11f93cb67")
+		(uuid "989af73b-9303-54dc-afeb-613c71934ea4")
 	)
 	(wire
 		(pts (xy 110.49 129.54) (xy 113.03 129.54))
 		(stroke (width 0) (type default))
 		(uuid "4f3dcc4b-acb0-5006-b523-1922693b1516")
 	)
-	(label "NFC_RST"
+	(label "NFC_IRQ"
 		(at 113.03 129.54 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "e076ec69-38fa-56a4-a543-f0b9df8d084b")
+		(uuid "00919a31-6883-5cd3-9aad-80a7d00e3ed2")
 	)
 	(wire
 		(pts (xy 110.49 132.08) (xy 113.03 132.08))
 		(stroke (width 0) (type default))
 		(uuid "b0f2b8a5-e5f6-5bd2-bf30-a007f206bef9")
 	)
-	(label "NFC_SCL"
+	(label "NFC_RST"
 		(at 113.03 132.08 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "5a1e4079-58ec-53d1-b77b-a19e3b6ea9d9")
+		(uuid "2a3a3d38-0f35-5eeb-9aaa-031b1409b603")
 	)
 	(wire
 		(pts (xy 110.49 134.62) (xy 113.03 134.62))
 		(stroke (width 0) (type default))
 		(uuid "6e056078-173b-545a-85da-0a6c45fa86ab")
 	)
-	(label "NFC_SDA"
+	(label "NFC_SCL"
 		(at 113.03 134.62 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "e81c78de-5ced-5260-a061-e673d9dcef2b")
+		(uuid "e1022f7f-d8b8-57da-b4eb-516f1cf85fe2")
 	)
 	(wire
 		(pts (xy 110.49 137.16) (xy 113.03 137.16))
 		(stroke (width 0) (type default))
 		(uuid "364e66a8-89c7-5f48-9cd3-a121b448ac1b")
 	)
-	(label "RMII_CRS_DV"
+	(label "NFC_SDA"
 		(at 113.03 137.16 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "6cd6380e-7a9c-56b1-bd65-4c86c225d799")
+		(uuid "e9bc3bc3-98bb-5d98-bce9-7e232999e860")
 	)
 	(wire
 		(pts (xy 110.49 139.7) (xy 113.03 139.7))
 		(stroke (width 0) (type default))
 		(uuid "24302a88-8024-5e05-8731-b6c7a7484d1d")
 	)
-	(label "RMII_REF_CLK"
+	(label "RMII_CRS_DV"
 		(at 113.03 139.7 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "2d3e4d61-e053-5a44-b42e-6a63551c8c76")
+		(uuid "452f0f7f-36e8-5201-8b66-27dbac9c7b25")
 	)
 	(wire
 		(pts (xy 110.49 142.24) (xy 113.03 142.24))
 		(stroke (width 0) (type default))
 		(uuid "c02ea55e-0177-5919-907f-8ed982082ef9")
 	)
-	(label "RMII_RXD0"
+	(label "RMII_REF_CLK"
 		(at 113.03 142.24 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "962c3a7a-9fc3-5085-a1f4-331f94fb8bb0")
+		(uuid "49b5a463-865e-5497-bb75-cc43b8a8618f")
 	)
 	(wire
 		(pts (xy 110.49 144.78) (xy 113.03 144.78))
 		(stroke (width 0) (type default))
 		(uuid "a1c3690e-c95b-5dd4-9216-ea9a41f86f7d")
 	)
-	(label "RMII_RXD1"
+	(label "RMII_RXD0"
 		(at 113.03 144.78 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "9bdfc69a-b8a1-5ab2-bd3c-c38bd1c80127")
+		(uuid "5119f4b5-1f1e-57a8-8264-9e323728db54")
 	)
 	(wire
 		(pts (xy 110.49 147.32) (xy 113.03 147.32))
 		(stroke (width 0) (type default))
 		(uuid "13f1191c-1c09-5727-9b72-84adeca42e41")
 	)
-	(label "RMII_TXD0"
+	(label "RMII_RXD1"
 		(at 113.03 147.32 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "e67e1fb3-8d04-5c3e-ba5d-2af8568131dd")
+		(uuid "1ca274ca-2e39-5985-8430-c76e44e53bd8")
 	)
 	(wire
 		(pts (xy 110.49 149.86) (xy 113.03 149.86))
 		(stroke (width 0) (type default))
 		(uuid "a10ecc14-78bf-57f4-9df0-38821854ae7a")
 	)
-	(label "RMII_TXD1"
+	(label "RMII_TXD0"
 		(at 113.03 149.86 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "719521ea-ce6d-56c5-9637-f993040bae9c")
+		(uuid "9d27eeaf-6d04-5ce2-9577-d380b479ddc5")
 	)
 	(wire
 		(pts (xy 110.49 152.4) (xy 113.03 152.4))
 		(stroke (width 0) (type default))
 		(uuid "1c507a2e-ee2a-5983-afdb-9f7b9828a9ba")
 	)
-	(label "RMII_TX_EN"
+	(label "RMII_TXD1"
 		(at 113.03 152.4 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "c876766f-7024-526f-8e61-d0504be37f9c")
+		(uuid "378a4f02-986f-5c86-b1dd-d7accb0d4620")
 	)
 	(wire
 		(pts (xy 110.49 154.94) (xy 113.03 154.94))
 		(stroke (width 0) (type default))
 		(uuid "20e911ce-ab7b-5a1b-b934-1e5b352e941e")
 	)
-	(label "SDIO_CLK_M"
+	(label "RMII_TX_EN"
 		(at 113.03 154.94 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "238eadea-1f67-50dc-ba41-719980f66b19")
+		(uuid "2eb69ee9-63aa-533b-b17e-b96b6039c504")
 	)
 	(wire
 		(pts (xy 110.49 157.48) (xy 113.03 157.48))
 		(stroke (width 0) (type default))
 		(uuid "23931271-cd76-52b8-9014-c8f7512d81a0")
 	)
-	(label "SDIO_CMD"
+	(label "SDIO_CLK_M"
 		(at 113.03 157.48 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "a137a614-6268-5f74-b8a9-ddc4d31b524c")
+		(uuid "1efbbe3e-7bae-5f82-aede-ea5fa2d2fb9e")
 	)
 	(wire
 		(pts (xy 110.49 160.02) (xy 113.03 160.02))
 		(stroke (width 0) (type default))
 		(uuid "48422f19-f192-5fd2-8ca8-45d9af347c5d")
 	)
-	(label "SDIO_D0"
+	(label "SDIO_CMD"
 		(at 113.03 160.02 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "01d8df46-9d31-5a1d-9acf-0dafde14eb2b")
+		(uuid "7d85f9aa-b560-59c3-88aa-57cdf492cdce")
 	)
 	(wire
 		(pts (xy 110.49 162.56) (xy 113.03 162.56))
 		(stroke (width 0) (type default))
 		(uuid "b621c3d9-cdbe-55aa-af51-f070104b2f53")
 	)
-	(label "SDIO_D1"
+	(label "SDIO_D0"
 		(at 113.03 162.56 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "910adf68-a501-5cf5-ba53-2cd8b24d3dea")
+		(uuid "179df51c-83e6-5875-8312-cd32391d5995")
 	)
 	(wire
 		(pts (xy 110.49 165.1) (xy 113.03 165.1))
 		(stroke (width 0) (type default))
 		(uuid "e1fa890f-fa14-50f7-9d02-25788386eac5")
 	)
-	(label "SDIO_D2"
+	(label "SDIO_D1"
 		(at 113.03 165.1 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "31635068-4caa-54ac-8d3c-1c51fbc01451")
+		(uuid "9b2466aa-7616-594a-9fba-87a14185da68")
 	)
 	(wire
 		(pts (xy 110.49 167.64) (xy 113.03 167.64))
 		(stroke (width 0) (type default))
 		(uuid "c371462f-4f51-5104-b6b3-b8ab0e596b55")
 	)
-	(label "SDIO_D3"
+	(label "SDIO_D2"
 		(at 113.03 167.64 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "302c2969-8bd2-54ad-8778-6179589aa54c")
+		(uuid "2d7c365e-7d2e-5ca3-92cc-966bbd551e55")
 	)
 	(wire
 		(pts (xy 110.49 170.18) (xy 113.03 170.18))
 		(stroke (width 0) (type default))
 		(uuid "fe741a54-1a39-59f1-957c-78a6eaaa548c")
 	)
-	(label "TP_INT"
+	(label "SDIO_D3"
 		(at 113.03 170.18 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "b984faa5-4b55-5e85-98d8-67b3d9a581fd")
+		(uuid "72180d67-b9d8-5cfa-abf6-8922a5f693e7")
 	)
 	(wire
 		(pts (xy 110.49 172.72) (xy 113.03 172.72))
 		(stroke (width 0) (type default))
 		(uuid "8a61e51d-5ca7-5a18-950d-37911f36af2f")
 	)
-	(label "TP_RST"
+	(label "TP_INT"
 		(at 113.03 172.72 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "b72a5f2e-06c1-5f18-b430-c1e234aebefa")
+		(uuid "66aa7ebd-909f-57b4-9815-ad356a00247d")
 	)
 	(wire
 		(pts (xy 110.49 175.26) (xy 113.03 175.26))
 		(stroke (width 0) (type default))
 		(uuid "20191274-6fea-5f63-af27-2eacb549e60c")
 	)
-	(label "USB_DN"
+	(label "TP_RST"
 		(at 113.03 175.26 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "14842296-66b0-557a-b58e-db27aa1c9763")
+		(uuid "469239c4-8d95-5934-a1f5-a943ae9ad004")
 	)
 	(wire
 		(pts (xy 110.49 177.8) (xy 113.03 177.8))
 		(stroke (width 0) (type default))
 		(uuid "a2a75114-4dac-53b2-b2ee-31ed2ef06d1b")
 	)
-	(label "USB_DP"
+	(label "USB_DN"
 		(at 113.03 177.8 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "14fa11be-20d0-5ffe-8f9f-cd64a19250ea")
+		(uuid "ffa04533-3d90-542f-bc8d-b79fbd8249ca")
 	)
 	(wire
 		(pts (xy 110.49 180.34) (xy 113.03 180.34))
 		(stroke (width 0) (type default))
 		(uuid "cc414f6c-60a6-5761-9360-db56e53d3f44")
 	)
-	(label "VDD_FLASH"
+	(label "USB_DP"
 		(at 113.03 180.34 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "e97f7e9d-26a3-5c1e-9bb4-070658bce262")
+		(uuid "1bb43466-9859-55fb-887f-f8d819f89436")
+	)
+	(wire
+		(pts (xy 110.49 182.88) (xy 113.03 182.88))
+		(stroke (width 0) (type default))
+		(uuid "84ddd951-af52-5c5b-babc-5b80506bc1a8")
+	)
+	(label "VDD_FLASH"
+		(at 113.03 182.88 0)
+		(effects (font (size 1.27 1.27)) (justify left bottom))
+		(uuid "47f57ccb-511c-5618-a4b7-7fe2c3a9cbe4")
 	)
 	(sheet
-		(at 34.29 114.3)
+		(at 34.29 116.84)
 		(size 76.2 71.12)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -698,258 +698,258 @@
 		(stroke (width 0.1524) (type solid))
 		(fill (color 255 255 194 1))
 		(uuid "90a249f1-f9d7-5739-a08a-eb8a2aa739fc")
-		(property "Sheetname" "MCU" (at 34.29 113.6 0) (effects (font (size 2 2)) (justify left bottom)))
+		(property "Sheetname" "MCU" (at 34.29 116.14 0) (effects (font (size 2 2)) (justify left bottom)))
 		(property "Sheetfile" "attractap-touch-p4-mcu.kicad_sch"
-			(at 34.29 186.02 0)
+			(at 34.29 188.56 0)
 			(effects (font (size 1.27 1.27)) (justify left top))
 		)
 		(pin "BL_PWM" passive
-			(at 34.29 119.38 180)
+			(at 34.29 121.92 180)
 			(uuid "dec9e77b-c375-5a78-ae41-87bac8e30021")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "BUZZER" passive
-			(at 34.29 121.92 180)
+			(at 34.29 124.46 180)
 			(uuid "113cfbe7-e3cb-5e0d-a006-cf524d964c6c")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "C5_EN_M" passive
-			(at 34.29 124.46 180)
+			(at 34.29 127 180)
 			(uuid "fc3d5b83-8649-5601-9897-728c3ed7bc22")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "ETH_MDC" passive
-			(at 34.29 127 180)
+			(at 34.29 129.54 180)
 			(uuid "e6912893-d2cb-5dac-b6bd-3bcb4fa28360")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "ETH_MDIO" passive
-			(at 34.29 129.54 180)
+			(at 34.29 132.08 180)
 			(uuid "dee6db05-9b73-55ee-92de-9b8391216432")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "I2C0_SCL" passive
-			(at 34.29 132.08 180)
+			(at 34.29 134.62 180)
 			(uuid "73e30fb0-1634-5bb0-bb32-fa5996c82abb")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "I2C0_SDA" passive
-			(at 34.29 134.62 180)
+			(at 34.29 137.16 180)
 			(uuid "9b48a772-4a36-5fbf-95b3-e5e4ec6add9c")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B1_M" passive
-			(at 34.29 137.16 180)
+			(at 34.29 139.7 180)
 			(uuid "34f1bf32-9502-5e9c-bb65-864764c89d9f")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B2_M" passive
-			(at 34.29 139.7 180)
+			(at 34.29 142.24 180)
 			(uuid "c65bc15b-efa3-50b0-b6af-d6b57a74d0b7")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B3_M" passive
-			(at 34.29 142.24 180)
+			(at 34.29 144.78 180)
 			(uuid "0296c5d2-d316-5d8b-bca2-867f053b4971")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B4_M" passive
-			(at 34.29 144.78 180)
+			(at 34.29 147.32 180)
 			(uuid "add83b42-6215-516f-86e6-aa7288e91ba2")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B5_M" passive
-			(at 34.29 147.32 180)
+			(at 34.29 149.86 180)
 			(uuid "9144ce26-6808-56b6-ab95-97f04475794e")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_DE_M" passive
-			(at 34.29 149.86 180)
+			(at 34.29 152.4 180)
 			(uuid "2dd80cea-f6ec-57c1-b933-0e6094f5b192")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_G0_M" passive
-			(at 34.29 152.4 180)
+			(at 34.29 154.94 180)
 			(uuid "014f651e-1f9d-52db-b245-426e5262465b")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_G1_M" passive
-			(at 34.29 154.94 180)
+			(at 34.29 157.48 180)
 			(uuid "b0d22430-7f15-54d2-a9f1-5fd916b06f60")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_G2_M" passive
-			(at 34.29 157.48 180)
+			(at 34.29 160.02 180)
 			(uuid "7bbc5016-3b99-57f5-9bde-5a5ded5ccb96")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_G3_M" passive
-			(at 34.29 160.02 180)
+			(at 34.29 162.56 180)
 			(uuid "c980f01b-5a05-5599-8865-27424865c88e")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_G4_M" passive
-			(at 34.29 162.56 180)
+			(at 34.29 165.1 180)
 			(uuid "d373af45-d1e6-581b-82fa-bf97714e5638")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_G5_M" passive
-			(at 34.29 165.1 180)
+			(at 34.29 167.64 180)
 			(uuid "c54f5b98-efe5-5391-abbd-d19fc0a789dc")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_HSYNC_M" passive
-			(at 34.29 167.64 180)
+			(at 34.29 170.18 180)
 			(uuid "5f5d7fa6-5a3e-5cc6-877b-f949dbcbcb12")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_PCLK_M" passive
-			(at 34.29 170.18 180)
+			(at 34.29 172.72 180)
 			(uuid "69b45f5e-3936-5421-9a73-30bcc2529952")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_R1_M" passive
-			(at 34.29 172.72 180)
+			(at 34.29 175.26 180)
 			(uuid "d1970598-46cf-5e14-a03d-26f2d6903cac")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_R2_M" passive
-			(at 34.29 175.26 180)
+			(at 34.29 177.8 180)
 			(uuid "e92047ba-6099-5b8e-b4a2-043f1c5dd117")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_R3_M" passive
-			(at 34.29 177.8 180)
+			(at 34.29 180.34 180)
 			(uuid "c0b93bcb-d2bc-5fda-b053-b367bff521a6")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_R4_M" passive
-			(at 34.29 180.34 180)
+			(at 34.29 182.88 180)
 			(uuid "4b8fb7c2-5236-57ac-8c7d-cf20262ff9d2")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_R5_M" passive
-			(at 110.49 119.38 0)
+			(at 110.49 121.92 0)
 			(uuid "5998c363-b6cf-5c5c-8a2b-9954b6f83309")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "LCD_VSYNC_M" passive
-			(at 110.49 121.92 0)
+			(at 110.49 124.46 0)
 			(uuid "5e74aafe-78f8-5c33-91db-65662db014f5")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "LED_DATA" passive
-			(at 110.49 124.46 0)
+			(at 110.49 127 0)
 			(uuid "52e0a2bd-ef0e-5af9-b4d2-786c9bd9ba74")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "NFC_IRQ" passive
-			(at 110.49 127 0)
+			(at 110.49 129.54 0)
 			(uuid "e1c14e4b-9095-5bee-ab1b-18ea19bb2b53")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "NFC_RST" passive
-			(at 110.49 129.54 0)
+			(at 110.49 132.08 0)
 			(uuid "f1f2ae78-b73d-5e2b-aa9d-a000d5833164")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "NFC_SCL" passive
-			(at 110.49 132.08 0)
+			(at 110.49 134.62 0)
 			(uuid "d6ed18fb-f51c-501e-99d9-fa19473b81c0")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "NFC_SDA" passive
-			(at 110.49 134.62 0)
+			(at 110.49 137.16 0)
 			(uuid "5e8176c9-2aa0-5211-a6de-9508c15506aa")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "RMII_CRS_DV" passive
-			(at 110.49 137.16 0)
+			(at 110.49 139.7 0)
 			(uuid "467b452b-15b8-546c-b016-6b50a8a60889")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "RMII_REF_CLK" passive
-			(at 110.49 139.7 0)
+			(at 110.49 142.24 0)
 			(uuid "c4587150-268e-55c5-85ad-dfb3d3001db7")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "RMII_RXD0" passive
-			(at 110.49 142.24 0)
+			(at 110.49 144.78 0)
 			(uuid "2828c4cc-f7c6-5e16-8571-be35ecbd38e5")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "RMII_RXD1" passive
-			(at 110.49 144.78 0)
+			(at 110.49 147.32 0)
 			(uuid "d78a0b8c-c1df-517a-9b5d-6bbc5d827d48")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "RMII_TXD0" passive
-			(at 110.49 147.32 0)
+			(at 110.49 149.86 0)
 			(uuid "9d528992-a9f1-5372-a790-a578448219f0")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "RMII_TXD1" passive
-			(at 110.49 149.86 0)
+			(at 110.49 152.4 0)
 			(uuid "6641e140-0935-5359-858a-6ae0df418d12")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "RMII_TX_EN" passive
-			(at 110.49 152.4 0)
+			(at 110.49 154.94 0)
 			(uuid "d189b6fd-0d45-5c83-83f2-b218708a46fb")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "SDIO_CLK_M" passive
-			(at 110.49 154.94 0)
+			(at 110.49 157.48 0)
 			(uuid "0cd97f54-c7b3-50d4-a271-0a1294772a67")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "SDIO_CMD" passive
-			(at 110.49 157.48 0)
+			(at 110.49 160.02 0)
 			(uuid "a9b128cd-76a8-5990-a51e-43f6d0498197")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "SDIO_D0" passive
-			(at 110.49 160.02 0)
+			(at 110.49 162.56 0)
 			(uuid "c0889aa7-3ab0-5fbd-bdd2-8988386a6d7e")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "SDIO_D1" passive
-			(at 110.49 162.56 0)
+			(at 110.49 165.1 0)
 			(uuid "465db4e4-742c-5f01-a5a6-8a3c581b61f0")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "SDIO_D2" passive
-			(at 110.49 165.1 0)
+			(at 110.49 167.64 0)
 			(uuid "b443f1d9-57d8-53f9-8440-757cb9795fe8")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "SDIO_D3" passive
-			(at 110.49 167.64 0)
+			(at 110.49 170.18 0)
 			(uuid "da22891e-7790-5916-9bdb-d33f26e714df")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "TP_INT" passive
-			(at 110.49 170.18 0)
+			(at 110.49 172.72 0)
 			(uuid "339cb0e5-66db-5b0d-9a0e-8c013960ba2a")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "TP_RST" passive
-			(at 110.49 172.72 0)
+			(at 110.49 175.26 0)
 			(uuid "d2653f5c-12dc-592d-aece-35be5a02cbf9")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "USB_DN" passive
-			(at 110.49 175.26 0)
+			(at 110.49 177.8 0)
 			(uuid "bafda5b0-ebd3-581d-801d-ae097904b493")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "USB_DP" passive
-			(at 110.49 177.8 0)
+			(at 110.49 180.34 0)
 			(uuid "41ec4cf9-b855-59d6-b938-54c4ada36e81")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "VDD_FLASH" passive
-			(at 110.49 180.34 0)
+			(at 110.49 182.88 0)
 			(uuid "dfa4b7ff-48a7-59f9-ac98-d94658e9022f")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
@@ -957,22 +957,22 @@
 	)
 	(text "ESP32-P4 GPIO map, flash, crystal, reset and boot straps, USB"
 		(exclude_from_sim no)
-		(at 34.29 190.62 0)
+		(at 34.29 193.16 0)
 		(effects (font (size 1 1)) (justify left bottom))
-		(uuid "6f5ddddf-b0da-5f52-88ad-59fb9c226028")
+		(uuid "a66380dc-7939-5f50-a4e5-bce0fae5fcbc")
 	)
 	(wire
-		(pts (xy 34.29 204.47) (xy 31.75 204.47))
+		(pts (xy 34.29 207.01) (xy 31.75 207.01))
 		(stroke (width 0) (type default))
-		(uuid "8014f20b-9686-5890-8ffb-805ce1269905")
+		(uuid "8c398307-f786-5b97-9ffa-a6d177e56bf5")
 	)
 	(label "VDD_FLASH"
-		(at 31.75 204.47 180)
+		(at 31.75 207.01 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "bf34bd3e-b999-53f4-9482-b3aeb5ba480a")
+		(uuid "98204fed-dba2-563b-a785-36eed6958a98")
 	)
 	(sheet
-		(at 34.29 199.39)
+		(at 34.29 201.93)
 		(size 76.2 15.24)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -982,15 +982,15 @@
 		(fill (color 255 255 194 1))
 		(uuid "2a4299d2-53ff-5712-a8c4-a56075cace0c")
 		(property "Sheetname" "MCU_Power"
-			(at 34.29 198.69 0)
+			(at 34.29 201.23 0)
 			(effects (font (size 2 2)) (justify left bottom))
 		)
 		(property "Sheetfile" "attractap-touch-p4-mcu_power.kicad_sch"
-			(at 34.29 215.23 0)
+			(at 34.29 217.77 0)
 			(effects (font (size 1.27 1.27)) (justify left top))
 		)
 		(pin "VDD_FLASH" passive
-			(at 34.29 204.47 180)
+			(at 34.29 207.01 180)
 			(uuid "3a415a77-dd31-568f-bfd3-a9ff258cb90d")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
@@ -998,92 +998,92 @@
 	)
 	(text "ESP32-P4 supply pins, decoupling, 1.1 V core converter"
 		(exclude_from_sim no)
-		(at 34.29 219.83 0)
+		(at 34.29 222.37 0)
 		(effects (font (size 1 1)) (justify left bottom))
-		(uuid "c9ca4f1b-29a3-5fb5-9a91-edb83bc817f6")
-	)
-	(wire
-		(pts (xy 34.29 233.68) (xy 31.75 233.68))
-		(stroke (width 0) (type default))
-		(uuid "44a56728-20b6-5ffc-978e-909686c52251")
-	)
-	(label "+3V3_WIFI"
-		(at 31.75 233.68 180)
-		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "57ef6dfe-98d6-540f-97fb-cdf455d09050")
+		(uuid "be35bace-8780-50b0-8652-fb71ee1722fe")
 	)
 	(wire
 		(pts (xy 34.29 236.22) (xy 31.75 236.22))
 		(stroke (width 0) (type default))
 		(uuid "b8089776-cc53-58b5-9053-c4b7f36ec72e")
 	)
-	(label "C5_EN_M"
+	(label "+3V3_WIFI"
 		(at 31.75 236.22 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "cf9f377b-f7b2-59ca-b72e-0cc149fb3faf")
+		(uuid "ac078bca-021a-5529-adf5-f29c1d63ecf5")
 	)
 	(wire
 		(pts (xy 34.29 238.76) (xy 31.75 238.76))
 		(stroke (width 0) (type default))
 		(uuid "e737fb56-21b6-5053-8adc-dc7817c84301")
 	)
-	(label "SDIO_CLK_M"
+	(label "C5_EN_M"
 		(at 31.75 238.76 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "51aec635-c6fe-5b26-901b-7a8ce2d373d9")
+		(uuid "2d5f1d5b-d318-5e97-9201-36193d4bf9cc")
 	)
 	(wire
 		(pts (xy 34.29 241.3) (xy 31.75 241.3))
 		(stroke (width 0) (type default))
 		(uuid "aa6a870b-2041-5c99-9a4e-2ac5431335dd")
 	)
-	(label "SDIO_CMD"
+	(label "SDIO_CLK_M"
 		(at 31.75 241.3 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "37db67aa-ef00-573b-ad9d-18608faf0473")
+		(uuid "fcab639f-bce0-5436-9fa6-fed31f506e9a")
 	)
 	(wire
-		(pts (xy 110.49 233.68) (xy 113.03 233.68))
+		(pts (xy 34.29 243.84) (xy 31.75 243.84))
 		(stroke (width 0) (type default))
-		(uuid "0d172bfd-364d-5205-9a9c-fda8af5875db")
+		(uuid "f0951e21-1abd-58c5-a43b-7d4d5e4988ed")
 	)
-	(label "SDIO_D0"
-		(at 113.03 233.68 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "e972245c-8b6c-5ad0-8a90-166c748f9887")
+	(label "SDIO_CMD"
+		(at 31.75 243.84 180)
+		(effects (font (size 1.27 1.27)) (justify right bottom))
+		(uuid "493e1988-18a5-53fb-9b8f-bfd9be915d25")
 	)
 	(wire
 		(pts (xy 110.49 236.22) (xy 113.03 236.22))
 		(stroke (width 0) (type default))
 		(uuid "6b61b0d0-20bb-59e2-a18d-20b459327b2a")
 	)
-	(label "SDIO_D1"
+	(label "SDIO_D0"
 		(at 113.03 236.22 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "825cdb8a-f18e-52da-aaa3-147557196d71")
+		(uuid "26652020-f29c-577f-b54c-a826822643ef")
 	)
 	(wire
 		(pts (xy 110.49 238.76) (xy 113.03 238.76))
 		(stroke (width 0) (type default))
 		(uuid "4f7645a7-e603-5d0f-9db7-b27a40656b73")
 	)
-	(label "SDIO_D2"
+	(label "SDIO_D1"
 		(at 113.03 238.76 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "da7b756a-2a5b-5184-a18c-08d43823f7f7")
+		(uuid "2ecc595b-d93e-58eb-a2bc-9a4b7059bcc5")
 	)
 	(wire
 		(pts (xy 110.49 241.3) (xy 113.03 241.3))
 		(stroke (width 0) (type default))
 		(uuid "2b41a52b-e665-5432-b58b-b53eaa647695")
 	)
-	(label "SDIO_D3"
+	(label "SDIO_D2"
 		(at 113.03 241.3 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "ff3c973e-f4e5-5482-aa7d-8cdd9bdcd023")
+		(uuid "d9a6c3a0-32fb-52d3-a9fd-57f5648cdbf3")
+	)
+	(wire
+		(pts (xy 110.49 243.84) (xy 113.03 243.84))
+		(stroke (width 0) (type default))
+		(uuid "d2b41503-1332-5d15-9377-5b89f701504b")
+	)
+	(label "SDIO_D3"
+		(at 113.03 243.84 0)
+		(effects (font (size 1.27 1.27)) (justify left bottom))
+		(uuid "5e06f5f0-e176-537c-870d-22e6577c3834")
 	)
 	(sheet
-		(at 34.29 228.6)
+		(at 34.29 231.14)
 		(size 76.2 17.78)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -1092,48 +1092,48 @@
 		(stroke (width 0.1524) (type solid))
 		(fill (color 255 255 194 1))
 		(uuid "686c59c1-6445-55cb-ae7b-a77de7bee36a")
-		(property "Sheetname" "WiFi" (at 34.29 227.9 0) (effects (font (size 2 2)) (justify left bottom)))
+		(property "Sheetname" "WiFi" (at 34.29 230.44 0) (effects (font (size 2 2)) (justify left bottom)))
 		(property "Sheetfile" "attractap-touch-p4-wifi.kicad_sch"
-			(at 34.29 246.98 0)
+			(at 34.29 249.52 0)
 			(effects (font (size 1.27 1.27)) (justify left top))
 		)
 		(pin "+3V3_WIFI" passive
-			(at 34.29 233.68 180)
+			(at 34.29 236.22 180)
 			(uuid "6fb211a0-db31-59a3-b31f-402dd92f3356")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "C5_EN_M" passive
-			(at 34.29 236.22 180)
+			(at 34.29 238.76 180)
 			(uuid "1675315e-03a8-5328-a336-db09c7fa20a7")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "SDIO_CLK_M" passive
-			(at 34.29 238.76 180)
+			(at 34.29 241.3 180)
 			(uuid "448c9eac-071a-556c-9c60-62f42e64c4b1")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "SDIO_CMD" passive
-			(at 34.29 241.3 180)
+			(at 34.29 243.84 180)
 			(uuid "42855c28-761e-5f21-a53f-92db7442769c")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "SDIO_D0" passive
-			(at 110.49 233.68 0)
+			(at 110.49 236.22 0)
 			(uuid "1eda06cb-8d7e-57eb-9d12-bd236446235d")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "SDIO_D1" passive
-			(at 110.49 236.22 0)
+			(at 110.49 238.76 0)
 			(uuid "f02b6c24-c53f-5fc3-b984-b5d40c1a862c")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "SDIO_D2" passive
-			(at 110.49 238.76 0)
+			(at 110.49 241.3 0)
 			(uuid "cfbec66d-22d9-5aab-a28a-d582d8888b1e")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "SDIO_D3" passive
-			(at 110.49 241.3 0)
+			(at 110.49 243.84 0)
 			(uuid "830ef79c-f41e-55a9-80cb-58393c46c51e")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
@@ -1141,142 +1141,142 @@
 	)
 	(text "ESP32-C5-MINI-1 co-processor (esp-hosted over SDIO) and its 3.3 V converter"
 		(exclude_from_sim no)
-		(at 34.29 251.58 0)
+		(at 34.29 254.12 0)
 		(effects (font (size 1 1)) (justify left bottom))
-		(uuid "5f738885-2449-5ce4-8209-e8b50d0efa69")
-	)
-	(wire
-		(pts (xy 170.18 85.09) (xy 167.64 85.09))
-		(stroke (width 0) (type default))
-		(uuid "131eff4c-6891-528f-aecb-49250494a6eb")
-	)
-	(label "ETH_MDC"
-		(at 167.64 85.09 180)
-		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "d9128fc2-7aaa-5159-b20d-fd49f8377aef")
+		(uuid "87f081c0-0f41-5e3d-8001-f37d46e5b04e")
 	)
 	(wire
 		(pts (xy 170.18 87.63) (xy 167.64 87.63))
 		(stroke (width 0) (type default))
 		(uuid "f308b3c2-36f8-56e5-bbff-850096d89e10")
 	)
-	(label "ETH_MDIO"
+	(label "ETH_MDC"
 		(at 167.64 87.63 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "ac331bfa-39f0-56f8-949e-c22ac68dba9d")
+		(uuid "74e8948d-8b7b-5d85-919a-348c70ba84a4")
 	)
 	(wire
 		(pts (xy 170.18 90.17) (xy 167.64 90.17))
 		(stroke (width 0) (type default))
 		(uuid "7057144d-42c8-525a-b73c-022af5a298cb")
 	)
-	(label "ETH_RST_N"
+	(label "ETH_MDIO"
 		(at 167.64 90.17 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "b4d0212b-9f77-5968-89a2-0a0771afdcb2")
+		(uuid "10af8e8b-6009-52a2-a084-67de406e8a9f")
 	)
 	(wire
 		(pts (xy 170.18 92.71) (xy 167.64 92.71))
 		(stroke (width 0) (type default))
 		(uuid "831f1c7b-fd6f-5e38-b562-635f7124ffae")
 	)
-	(label "PHY_3V3"
+	(label "ETH_RST_N"
 		(at 167.64 92.71 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "abaa4a2d-3f8b-59ff-8750-81609221d7b1")
+		(uuid "809956ab-0280-58ba-ad70-f99e46c9a2bb")
 	)
 	(wire
 		(pts (xy 170.18 95.25) (xy 167.64 95.25))
 		(stroke (width 0) (type default))
 		(uuid "596e7723-68ef-5cb7-8278-6d35b69b7a9e")
 	)
-	(label "POE_VN"
+	(label "PHY_3V3"
 		(at 167.64 95.25 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "5fe16e0e-75bf-59a9-9081-7dc2d60a3f6a")
+		(uuid "61ec25f3-b666-557e-acf7-fcd1fd4e2c4f")
 	)
 	(wire
 		(pts (xy 170.18 97.79) (xy 167.64 97.79))
 		(stroke (width 0) (type default))
 		(uuid "cc44d333-faed-5141-9ad8-51b1ffd84853")
 	)
-	(label "POE_VP"
+	(label "POE_VN"
 		(at 167.64 97.79 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "6246811b-6603-57dc-bc42-7a4e94079577")
+		(uuid "b75f72f5-b52b-5cb2-9edc-e8fe99683209")
 	)
 	(wire
 		(pts (xy 170.18 100.33) (xy 167.64 100.33))
 		(stroke (width 0) (type default))
 		(uuid "63db3e34-9f3e-5704-823b-a3d023f1f025")
 	)
-	(label "RMII_CRS_DV"
+	(label "POE_VP"
 		(at 167.64 100.33 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "b396c9fc-c49d-5ce1-95a9-c3c60409b675")
+		(uuid "8080a485-95e4-57e3-b666-037e653124fd")
 	)
 	(wire
-		(pts (xy 246.38 85.09) (xy 248.92 85.09))
+		(pts (xy 170.18 102.87) (xy 167.64 102.87))
 		(stroke (width 0) (type default))
-		(uuid "5fcd9288-105a-5345-93a2-9b3906796ce3")
+		(uuid "508a23fa-9ca4-5604-93b0-22f985a953ad")
 	)
-	(label "RMII_REF_CLK"
-		(at 248.92 85.09 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "038bec93-d419-5d78-a16d-a5eb64c66f86")
+	(label "RMII_CRS_DV"
+		(at 167.64 102.87 180)
+		(effects (font (size 1.27 1.27)) (justify right bottom))
+		(uuid "e95a8e0d-9293-5001-a520-b16d92c14172")
 	)
 	(wire
 		(pts (xy 246.38 87.63) (xy 248.92 87.63))
 		(stroke (width 0) (type default))
 		(uuid "d82708b1-7ef6-5f17-be5f-68c27bd75b7a")
 	)
-	(label "RMII_RXD0"
+	(label "RMII_REF_CLK"
 		(at 248.92 87.63 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "38e85f46-acc0-503b-bc76-d2275f399d92")
+		(uuid "c984d038-0bf6-56ed-98e0-9067027044ee")
 	)
 	(wire
 		(pts (xy 246.38 90.17) (xy 248.92 90.17))
 		(stroke (width 0) (type default))
 		(uuid "05821bc5-10e9-5bed-b302-b5fda5d18dfb")
 	)
-	(label "RMII_RXD1"
+	(label "RMII_RXD0"
 		(at 248.92 90.17 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "e9dc106f-448f-5331-9a20-ad1bd691b856")
+		(uuid "a86c6a81-18bd-5d8b-a179-ee6892377636")
 	)
 	(wire
 		(pts (xy 246.38 92.71) (xy 248.92 92.71))
 		(stroke (width 0) (type default))
 		(uuid "f27c293c-6585-5b78-9dcb-062788761ab2")
 	)
-	(label "RMII_TXD0"
+	(label "RMII_RXD1"
 		(at 248.92 92.71 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "cbea3580-f172-5793-9345-56408d8225d7")
+		(uuid "2972082d-c162-52a1-ba42-a51d10ad64c3")
 	)
 	(wire
 		(pts (xy 246.38 95.25) (xy 248.92 95.25))
 		(stroke (width 0) (type default))
 		(uuid "9cbddc40-47a4-5821-979b-7b85718fd730")
 	)
-	(label "RMII_TXD1"
+	(label "RMII_TXD0"
 		(at 248.92 95.25 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "c6fcb9a6-8297-547f-ad37-a317339ab655")
+		(uuid "6ef4a31c-8f07-5f75-bb3a-a42bd7046ff4")
 	)
 	(wire
 		(pts (xy 246.38 97.79) (xy 248.92 97.79))
 		(stroke (width 0) (type default))
 		(uuid "6ca60ef8-a502-55e3-b8ea-a1ca9a463938")
 	)
-	(label "RMII_TX_EN"
+	(label "RMII_TXD1"
 		(at 248.92 97.79 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "13ce835a-0c0e-5a78-9b12-231d8451671a")
+		(uuid "43dd6813-e468-533c-92a8-629aaa1c7928")
+	)
+	(wire
+		(pts (xy 246.38 100.33) (xy 248.92 100.33))
+		(stroke (width 0) (type default))
+		(uuid "aca6e03b-d97e-5db1-b09e-89cff81abecd")
+	)
+	(label "RMII_TX_EN"
+		(at 248.92 100.33 0)
+		(effects (font (size 1.27 1.27)) (justify left bottom))
+		(uuid "4c5a82a1-02de-5da1-ac2c-6949e0e4f978")
 	)
 	(sheet
-		(at 170.18 80.01)
+		(at 170.18 82.55)
 		(size 76.2 25.4)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -1286,75 +1286,75 @@
 		(fill (color 255 255 194 1))
 		(uuid "181e8b05-45f8-5d8e-81d2-e41e365c3f2c")
 		(property "Sheetname" "Ethernet"
-			(at 170.18 79.31 0)
+			(at 170.18 81.85 0)
 			(effects (font (size 2 2)) (justify left bottom))
 		)
 		(property "Sheetfile" "attractap-touch-p4-eth.kicad_sch"
-			(at 170.18 106.01 0)
+			(at 170.18 108.55 0)
 			(effects (font (size 1.27 1.27)) (justify left top))
 		)
 		(pin "ETH_MDC" passive
-			(at 170.18 85.09 180)
+			(at 170.18 87.63 180)
 			(uuid "dc3de336-4ec8-51da-aa99-2c7b06fbd9a9")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "ETH_MDIO" passive
-			(at 170.18 87.63 180)
+			(at 170.18 90.17 180)
 			(uuid "9f659802-09d0-5c87-8f54-f907246efd85")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "ETH_RST_N" passive
-			(at 170.18 90.17 180)
+			(at 170.18 92.71 180)
 			(uuid "912a4971-2125-5240-9ecd-439e4c59d23c")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "PHY_3V3" passive
-			(at 170.18 92.71 180)
+			(at 170.18 95.25 180)
 			(uuid "7342b759-0fd2-55ee-a4c1-0dac39f85a7c")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "POE_VN" passive
-			(at 170.18 95.25 180)
+			(at 170.18 97.79 180)
 			(uuid "1a6b5b85-3b00-572c-997b-d3ecb6a1ea09")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "POE_VP" passive
-			(at 170.18 97.79 180)
+			(at 170.18 100.33 180)
 			(uuid "a094b06e-0c19-5a69-9446-782008c12946")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "RMII_CRS_DV" passive
-			(at 170.18 100.33 180)
+			(at 170.18 102.87 180)
 			(uuid "5552d6bc-c6cb-5037-88f5-3c3ce833a294")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "RMII_REF_CLK" passive
-			(at 246.38 85.09 0)
+			(at 246.38 87.63 0)
 			(uuid "46e496ac-d182-56a8-b530-705da05d9cbd")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "RMII_RXD0" passive
-			(at 246.38 87.63 0)
+			(at 246.38 90.17 0)
 			(uuid "fdd00a6a-37ee-575e-9ba1-d6770b1ab49d")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "RMII_RXD1" passive
-			(at 246.38 90.17 0)
+			(at 246.38 92.71 0)
 			(uuid "ed318339-3c10-58a4-abf6-d9764f81f60e")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "RMII_TXD0" passive
-			(at 246.38 92.71 0)
+			(at 246.38 95.25 0)
 			(uuid "5dd026f9-eb39-540f-bf10-aa1a54368a15")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "RMII_TXD1" passive
-			(at 246.38 95.25 0)
+			(at 246.38 97.79 0)
 			(uuid "c61ed80f-9c55-5f73-a06f-d32b238831d0")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "RMII_TX_EN" passive
-			(at 246.38 97.79 0)
+			(at 246.38 100.33 0)
 			(uuid "89c1966d-82ce-554a-897b-6e0936f7559c")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
@@ -1362,82 +1362,82 @@
 	)
 	(text "IP101GRI RMII PHY, RJ45 with magnetics and PoE rectifiers (LAN version only)"
 		(exclude_from_sim no)
-		(at 170.18 110.61 0)
+		(at 170.18 113.15 0)
 		(effects (font (size 1 1)) (justify left bottom))
-		(uuid "78cc4bc4-c0d3-509c-81be-903aef1d1c73")
-	)
-	(wire
-		(pts (xy 170.18 124.46) (xy 167.64 124.46))
-		(stroke (width 0) (type default))
-		(uuid "a0c998c2-817a-5512-9e5c-466f30f670f6")
-	)
-	(label "NFC_AVDD"
-		(at 167.64 124.46 180)
-		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "fd21a4f9-0ae2-55aa-9463-2649d2907e6d")
+		(uuid "c3a6262f-d1ed-5505-8970-cfad9073f752")
 	)
 	(wire
 		(pts (xy 170.18 127) (xy 167.64 127))
 		(stroke (width 0) (type default))
 		(uuid "e6115d91-1e5c-5d88-a5cf-02c457522d19")
 	)
-	(label "NFC_DVDD"
+	(label "NFC_AVDD"
 		(at 167.64 127 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "ea8338af-2f5c-571e-aadc-34d88e11b744")
+		(uuid "a25b3684-cb59-565e-8ac3-8eb8f10344b1")
 	)
 	(wire
 		(pts (xy 170.18 129.54) (xy 167.64 129.54))
 		(stroke (width 0) (type default))
 		(uuid "14060829-0adc-505f-be44-833ff79df329")
 	)
-	(label "NFC_IRQ"
+	(label "NFC_DVDD"
 		(at 167.64 129.54 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "cbdc09d3-a9cd-5b5f-b29b-c1fb4c9b8b5b")
+		(uuid "134a80ed-ca56-5f52-b549-025eebfaabaa")
 	)
 	(wire
 		(pts (xy 170.18 132.08) (xy 167.64 132.08))
 		(stroke (width 0) (type default))
 		(uuid "49365498-ef81-5624-a471-3dd418a18627")
 	)
-	(label "NFC_RST"
+	(label "NFC_IRQ"
 		(at 167.64 132.08 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "3c4bfaa5-7c8e-5730-9509-990886d5c8b0")
+		(uuid "fa8760e9-eb34-5dcc-9386-d733cc6a78ac")
 	)
 	(wire
-		(pts (xy 246.38 124.46) (xy 248.92 124.46))
+		(pts (xy 170.18 134.62) (xy 167.64 134.62))
 		(stroke (width 0) (type default))
-		(uuid "f205cdb6-5529-5a71-922e-85a3b3edc057")
+		(uuid "a9d81454-2444-5d47-b532-7b5ff3790374")
 	)
-	(label "NFC_SCL"
-		(at 248.92 124.46 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "a9651f62-1a84-5fc5-b391-619edf340755")
+	(label "NFC_RST"
+		(at 167.64 134.62 180)
+		(effects (font (size 1.27 1.27)) (justify right bottom))
+		(uuid "b63f9483-7d37-56f3-b375-ce983e260acf")
 	)
 	(wire
 		(pts (xy 246.38 127) (xy 248.92 127))
 		(stroke (width 0) (type default))
 		(uuid "d572b037-1e2a-545b-abac-b44a9fe0bc5a")
 	)
-	(label "NFC_SDA"
+	(label "NFC_SCL"
 		(at 248.92 127 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "d0d16746-8c40-525a-93a9-b7e832805b0d")
+		(uuid "b599f634-7eba-5068-9e0d-5ce12bdc86e7")
 	)
 	(wire
 		(pts (xy 246.38 129.54) (xy 248.92 129.54))
 		(stroke (width 0) (type default))
 		(uuid "698589d8-0a58-58c5-bbb0-cf413d0c4872")
 	)
-	(label "NFC_TVDD"
+	(label "NFC_SDA"
 		(at 248.92 129.54 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "a3e4452f-155a-51d0-805b-ab15ab3d8018")
+		(uuid "88749f44-99e4-58c3-8f30-dc54fc41f1f7")
+	)
+	(wire
+		(pts (xy 246.38 132.08) (xy 248.92 132.08))
+		(stroke (width 0) (type default))
+		(uuid "9f9c82cd-3949-5f5b-8a61-d2ff29d13c3f")
+	)
+	(label "NFC_TVDD"
+		(at 248.92 132.08 0)
+		(effects (font (size 1.27 1.27)) (justify left bottom))
+		(uuid "5b04318f-7e74-5297-8a18-a72085b2cd8c")
 	)
 	(sheet
-		(at 170.18 119.38)
+		(at 170.18 121.92)
 		(size 76.2 17.78)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -1446,43 +1446,43 @@
 		(stroke (width 0.1524) (type solid))
 		(fill (color 255 255 194 1))
 		(uuid "5f568554-305e-5b95-aa71-7bcbf15a03b3")
-		(property "Sheetname" "NFC" (at 170.18 118.68 0) (effects (font (size 2 2)) (justify left bottom)))
+		(property "Sheetname" "NFC" (at 170.18 121.22 0) (effects (font (size 2 2)) (justify left bottom)))
 		(property "Sheetfile" "attractap-touch-p4-nfc.kicad_sch"
-			(at 170.18 137.76 0)
+			(at 170.18 140.3 0)
 			(effects (font (size 1.27 1.27)) (justify left top))
 		)
 		(pin "NFC_AVDD" passive
-			(at 170.18 124.46 180)
+			(at 170.18 127 180)
 			(uuid "f267f92d-acc7-5c1b-912b-56acca32c242")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "NFC_DVDD" passive
-			(at 170.18 127 180)
+			(at 170.18 129.54 180)
 			(uuid "90a0ce65-6953-5db1-8fe8-233de7e3f990")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "NFC_IRQ" passive
-			(at 170.18 129.54 180)
+			(at 170.18 132.08 180)
 			(uuid "b23625c9-5c51-5fb0-93a7-7a02376e2ae0")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "NFC_RST" passive
-			(at 170.18 132.08 180)
+			(at 170.18 134.62 180)
 			(uuid "002ebfeb-a65d-5043-830f-7bae40f74f69")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "NFC_SCL" passive
-			(at 246.38 124.46 0)
+			(at 246.38 127 0)
 			(uuid "12d6af2b-1b9f-5eb3-8f06-89af3cb5efd7")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "NFC_SDA" passive
-			(at 246.38 127 0)
+			(at 246.38 129.54 0)
 			(uuid "4f5b9805-7486-5710-95a1-131108d2f6d6")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "NFC_TVDD" passive
-			(at 246.38 129.54 0)
+			(at 246.38 132.08 0)
 			(uuid "36d648bd-1cf2-5aa1-8b8e-2dbca1c215f7")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
@@ -1490,312 +1490,312 @@
 	)
 	(text "PN532 reader, EMC filter, antenna matching, PCB loop antenna"
 		(exclude_from_sim no)
-		(at 170.18 142.36 0)
+		(at 170.18 144.9 0)
 		(effects (font (size 1 1)) (justify left bottom))
-		(uuid "a5579c1c-aa44-5381-b7e2-73e06ff19c95")
-	)
-	(wire
-		(pts (xy 170.18 156.21) (xy 167.64 156.21))
-		(stroke (width 0) (type default))
-		(uuid "316c1c0e-2533-58ba-ab66-e898b14f35ba")
-	)
-	(label "BL_A"
-		(at 167.64 156.21 180)
-		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "1529a13b-9457-5faa-9700-074c674e5a62")
+		(uuid "c13d3869-1dd6-5642-9c2a-d40b43c72825")
 	)
 	(wire
 		(pts (xy 170.18 158.75) (xy 167.64 158.75))
 		(stroke (width 0) (type default))
 		(uuid "742d962c-16bd-5ba4-b5e0-1281ff19922f")
 	)
-	(label "BL_PWM"
+	(label "BL_A"
 		(at 167.64 158.75 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "bdec9afb-adac-5aa0-9c2a-6a9fe3621180")
+		(uuid "2c3c4eec-fd9d-5245-974c-931e26de8244")
 	)
 	(wire
 		(pts (xy 170.18 161.29) (xy 167.64 161.29))
 		(stroke (width 0) (type default))
 		(uuid "1e40139a-ee42-57dc-b2a9-aca6a4ef8c01")
 	)
-	(label "DC_PRESENT"
+	(label "BL_PWM"
 		(at 167.64 161.29 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "eb0169ee-be9e-59d7-a95a-c15b51c75f6b")
+		(uuid "181819bd-7f55-5f09-9920-4457a210528d")
 	)
 	(wire
 		(pts (xy 170.18 163.83) (xy 167.64 163.83))
 		(stroke (width 0) (type default))
 		(uuid "e6416bf1-3a43-5595-956d-850b03602f3d")
 	)
-	(label "DOCK_N"
+	(label "DC_PRESENT"
 		(at 167.64 163.83 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "f0d8a75a-adec-5ecc-a7fb-df2e16d6a014")
+		(uuid "6c41de14-c4aa-5e92-add6-a7ab3283364e")
 	)
 	(wire
 		(pts (xy 170.18 166.37) (xy 167.64 166.37))
 		(stroke (width 0) (type default))
 		(uuid "3b7fc9fc-5bda-5942-aa94-3fd9f85305f4")
 	)
-	(label "ETH_RST_N"
+	(label "DOCK_N"
 		(at 167.64 166.37 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "d41813c7-5c44-5763-98e2-0a0bc5958bba")
+		(uuid "a05c7aee-4749-5f4b-a595-56ebbbb5c173")
 	)
 	(wire
 		(pts (xy 170.18 168.91) (xy 167.64 168.91))
 		(stroke (width 0) (type default))
 		(uuid "46ce70bb-ce6b-5eb3-b16a-357f2ee0c006")
 	)
-	(label "I2C0_SCL"
+	(label "ETH_RST_N"
 		(at 167.64 168.91 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "50195b2b-73d8-5d56-9250-c90ee1672984")
+		(uuid "faa01253-3460-583a-b34d-01fb14e59c4c")
 	)
 	(wire
 		(pts (xy 170.18 171.45) (xy 167.64 171.45))
 		(stroke (width 0) (type default))
 		(uuid "e9c15bca-de8f-5f8f-97fd-69908484ddf2")
 	)
-	(label "I2C0_SDA"
+	(label "I2C0_SCL"
 		(at 167.64 171.45 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "8b04ee3f-0d02-5a35-9f7f-16ceadd0f42a")
+		(uuid "07c2c5e0-cd8d-53c6-af92-c7b360afa50b")
 	)
 	(wire
 		(pts (xy 170.18 173.99) (xy 167.64 173.99))
 		(stroke (width 0) (type default))
 		(uuid "6df58ed3-24f5-59b1-9623-3aa32320cbed")
 	)
-	(label "LCD_B1_M"
+	(label "I2C0_SDA"
 		(at 167.64 173.99 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "acd6110b-7c72-5f1c-9aff-42f66256c23b")
+		(uuid "b0652e07-20df-5f18-8a9a-5b31ebf70bca")
 	)
 	(wire
 		(pts (xy 170.18 176.53) (xy 167.64 176.53))
 		(stroke (width 0) (type default))
 		(uuid "d563337e-cd88-5a51-9a03-69d472df3482")
 	)
-	(label "LCD_B2_M"
+	(label "LCD_B1_M"
 		(at 167.64 176.53 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "3be412b7-37cb-58dc-9d9b-b96f955fdd3d")
+		(uuid "f8a85052-01d8-5888-a515-48ada0e14d27")
 	)
 	(wire
 		(pts (xy 170.18 179.07) (xy 167.64 179.07))
 		(stroke (width 0) (type default))
 		(uuid "42d2b992-5358-50fe-a594-d0d59af9dbc3")
 	)
-	(label "LCD_B3_M"
+	(label "LCD_B2_M"
 		(at 167.64 179.07 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "c7344109-e2f4-5cb4-a64f-f85c38e0ace7")
+		(uuid "5413d4d8-284f-547d-86f5-9e54da0a4a4b")
 	)
 	(wire
 		(pts (xy 170.18 181.61) (xy 167.64 181.61))
 		(stroke (width 0) (type default))
 		(uuid "1ea0aa9c-80ee-504e-a0b0-5cde9c240931")
 	)
-	(label "LCD_B4_M"
+	(label "LCD_B3_M"
 		(at 167.64 181.61 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "14de3030-ead4-5683-9f33-9fd97ca710bd")
+		(uuid "b551572c-3f0a-5a67-acf9-88c1ec79a8db")
 	)
 	(wire
 		(pts (xy 170.18 184.15) (xy 167.64 184.15))
 		(stroke (width 0) (type default))
 		(uuid "e80eee7f-59dd-57fb-a605-07ce06278d13")
 	)
-	(label "LCD_B5_M"
+	(label "LCD_B4_M"
 		(at 167.64 184.15 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "41561411-be63-5eb9-932c-d578d47ceeb9")
+		(uuid "a8be5ac9-7e85-5420-ac29-af7a5cf01814")
 	)
 	(wire
 		(pts (xy 170.18 186.69) (xy 167.64 186.69))
 		(stroke (width 0) (type default))
 		(uuid "1e898338-4f6f-5e30-8ec4-87cd8c7c08ee")
 	)
-	(label "LCD_DE_M"
+	(label "LCD_B5_M"
 		(at 167.64 186.69 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "1c58e167-23e7-5317-a8dc-5086f0a77e78")
+		(uuid "7388696d-66ed-5f5e-97e0-b6c1ebffe915")
 	)
 	(wire
 		(pts (xy 170.18 189.23) (xy 167.64 189.23))
 		(stroke (width 0) (type default))
 		(uuid "93446c79-5792-53aa-9464-ba6d8aa5e075")
 	)
-	(label "LCD_G0_M"
+	(label "LCD_DE_M"
 		(at 167.64 189.23 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "26514a41-359d-50d3-b83b-aae90761dec7")
+		(uuid "89cb0461-4319-5a52-b4d5-d5c78986fac7")
 	)
 	(wire
 		(pts (xy 170.18 191.77) (xy 167.64 191.77))
 		(stroke (width 0) (type default))
 		(uuid "bcc721e1-f59f-5ecb-864e-a41883ed348f")
 	)
-	(label "LCD_G1_M"
+	(label "LCD_G0_M"
 		(at 167.64 191.77 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "b1be4dd3-e77a-569a-b271-ed5e0d833525")
+		(uuid "ceeb6cda-8d43-5f20-9af2-695c0a25b2ca")
 	)
 	(wire
-		(pts (xy 246.38 156.21) (xy 248.92 156.21))
+		(pts (xy 170.18 194.31) (xy 167.64 194.31))
 		(stroke (width 0) (type default))
-		(uuid "cfb8e88e-0f1e-5322-811f-8f77c0ec7289")
+		(uuid "f27e570c-6e57-5ec0-900f-b52dab670491")
 	)
-	(label "LCD_G2_M"
-		(at 248.92 156.21 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "9d16dc16-1838-5a9a-a45d-938760c1d6e7")
+	(label "LCD_G1_M"
+		(at 167.64 194.31 180)
+		(effects (font (size 1.27 1.27)) (justify right bottom))
+		(uuid "bfb8711d-1f16-59e4-926a-319dfc5bc421")
 	)
 	(wire
 		(pts (xy 246.38 158.75) (xy 248.92 158.75))
 		(stroke (width 0) (type default))
 		(uuid "5ffa8c2e-5c91-59a0-83aa-5385a29297ef")
 	)
-	(label "LCD_G3_M"
+	(label "LCD_G2_M"
 		(at 248.92 158.75 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "a4ee2791-5cc5-5b36-b5c7-4ed496e1150f")
+		(uuid "8edced38-642d-55b7-83f3-df3e0dda9c5d")
 	)
 	(wire
 		(pts (xy 246.38 161.29) (xy 248.92 161.29))
 		(stroke (width 0) (type default))
 		(uuid "016426d6-4f56-5173-9033-b8f9f81d37e0")
 	)
-	(label "LCD_G4_M"
+	(label "LCD_G3_M"
 		(at 248.92 161.29 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "708dd217-fc1a-54db-a52c-5b75b89c4edd")
+		(uuid "4f193da0-d119-5cb6-8fb3-07aac3367937")
 	)
 	(wire
 		(pts (xy 246.38 163.83) (xy 248.92 163.83))
 		(stroke (width 0) (type default))
 		(uuid "ab634672-7a5f-56b9-8099-fca03cb7afec")
 	)
-	(label "LCD_G5_M"
+	(label "LCD_G4_M"
 		(at 248.92 163.83 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "4feca8ec-61cc-540d-bfdc-3a80e51f5790")
+		(uuid "cb540341-5055-533e-8e3c-7f4e48a74ee9")
 	)
 	(wire
 		(pts (xy 246.38 166.37) (xy 248.92 166.37))
 		(stroke (width 0) (type default))
 		(uuid "fb66be69-4da3-56bf-918d-4500ba2e8c17")
 	)
-	(label "LCD_HSYNC_M"
+	(label "LCD_G5_M"
 		(at 248.92 166.37 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "f4655599-faa5-5c76-b72a-680defed702a")
+		(uuid "ece27b07-72b4-5343-bd7c-60ded24e84f6")
 	)
 	(wire
 		(pts (xy 246.38 168.91) (xy 248.92 168.91))
 		(stroke (width 0) (type default))
 		(uuid "cce1694e-1979-58f9-89d3-a1d0aa953c8d")
 	)
-	(label "LCD_PCLK_M"
+	(label "LCD_HSYNC_M"
 		(at 248.92 168.91 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "65af10d3-5e95-5bf6-be5a-c2c676ce2134")
+		(uuid "03e0d523-54f0-574b-b544-27f9f68bd7eb")
 	)
 	(wire
 		(pts (xy 246.38 171.45) (xy 248.92 171.45))
 		(stroke (width 0) (type default))
 		(uuid "b910e0bf-9629-559c-ae6e-ad495aaa274e")
 	)
-	(label "LCD_R1_M"
+	(label "LCD_PCLK_M"
 		(at 248.92 171.45 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "73b2cbc4-7f5e-5c9d-a04a-48784fa59657")
+		(uuid "16e1316e-9c5a-5d56-8125-cb7dd6d699c2")
 	)
 	(wire
 		(pts (xy 246.38 173.99) (xy 248.92 173.99))
 		(stroke (width 0) (type default))
 		(uuid "8488de79-a2d9-5e59-a3d3-9634b070be30")
 	)
-	(label "LCD_R2_M"
+	(label "LCD_R1_M"
 		(at 248.92 173.99 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "9320c593-db07-5e14-a75c-d0713681a120")
+		(uuid "47002e8a-2886-561b-aac8-b7ac025795b8")
 	)
 	(wire
 		(pts (xy 246.38 176.53) (xy 248.92 176.53))
 		(stroke (width 0) (type default))
 		(uuid "f7c97f6c-2aca-546e-a6fa-bc1b2527987b")
 	)
-	(label "LCD_R3_M"
+	(label "LCD_R2_M"
 		(at 248.92 176.53 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "3758218b-5638-5d51-b25f-6481b409727e")
+		(uuid "6f995879-06b6-5779-99ff-a5c280c4e333")
 	)
 	(wire
 		(pts (xy 246.38 179.07) (xy 248.92 179.07))
 		(stroke (width 0) (type default))
 		(uuid "6d01edf7-458e-51b3-ac02-ed08331c00a7")
 	)
-	(label "LCD_R4_M"
+	(label "LCD_R3_M"
 		(at 248.92 179.07 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "325bc416-6050-5a31-8f13-089dc2535d8b")
+		(uuid "bfed6e66-9cef-5dcc-a715-7e53314d5b7c")
 	)
 	(wire
 		(pts (xy 246.38 181.61) (xy 248.92 181.61))
 		(stroke (width 0) (type default))
 		(uuid "a9919d0c-e524-5765-ba37-9c478bdfc658")
 	)
-	(label "LCD_R5_M"
+	(label "LCD_R4_M"
 		(at 248.92 181.61 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "29e19350-67d7-578b-b38e-3f1878880638")
+		(uuid "14bf3ca1-23a2-5a8b-9857-b14482b34c47")
 	)
 	(wire
 		(pts (xy 246.38 184.15) (xy 248.92 184.15))
 		(stroke (width 0) (type default))
 		(uuid "8f72b99e-7c52-5572-97c0-416fe6b6a8ed")
 	)
-	(label "LCD_VSYNC_M"
+	(label "LCD_R5_M"
 		(at 248.92 184.15 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "48eb4e64-6548-5f67-a7dd-cce363a9744b")
+		(uuid "ff3339f7-f9f3-5a78-b13f-1f6657d41d84")
 	)
 	(wire
 		(pts (xy 246.38 186.69) (xy 248.92 186.69))
 		(stroke (width 0) (type default))
 		(uuid "2834844f-69b7-548d-af07-7ec19c888297")
 	)
-	(label "POE_PRESENT"
+	(label "LCD_VSYNC_M"
 		(at 248.92 186.69 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "c4a2a59c-96a1-5a1a-923e-7b476d29a25e")
+		(uuid "0ae4945e-d636-5347-a76c-dd6865b692fd")
 	)
 	(wire
 		(pts (xy 246.38 189.23) (xy 248.92 189.23))
 		(stroke (width 0) (type default))
 		(uuid "9b34acef-2ac3-54d3-a3cf-dada4be8f7e1")
 	)
-	(label "TP_INT"
+	(label "POE_PRESENT"
 		(at 248.92 189.23 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "af227991-e40d-57cf-8693-e9c00dd81ab7")
+		(uuid "688df68b-df1b-5f57-9219-eb383e8192b8")
 	)
 	(wire
 		(pts (xy 246.38 191.77) (xy 248.92 191.77))
 		(stroke (width 0) (type default))
 		(uuid "c5063c0a-7682-5548-8dbe-3e9ed8bbbd62")
 	)
-	(label "TP_RST"
+	(label "TP_INT"
 		(at 248.92 191.77 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "089d34f9-5f72-540f-863f-cc45c270bb45")
+		(uuid "5f8cbef1-7cc0-5743-ac02-e6e0365281ce")
+	)
+	(wire
+		(pts (xy 246.38 194.31) (xy 248.92 194.31))
+		(stroke (width 0) (type default))
+		(uuid "f783bd15-ee74-54c2-ae1a-d2c5bb241004")
+	)
+	(label "TP_RST"
+		(at 248.92 194.31 0)
+		(effects (font (size 1.27 1.27)) (justify left bottom))
+		(uuid "338e2717-5a5a-5687-a465-8fe8830dedf8")
 	)
 	(sheet
-		(at 170.18 151.13)
+		(at 170.18 153.67)
 		(size 76.2 45.72)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -1805,160 +1805,160 @@
 		(fill (color 255 255 194 1))
 		(uuid "f76afce5-f35a-5f37-b8c4-adbe47540baf")
 		(property "Sheetname" "Display"
-			(at 170.18 150.43 0)
+			(at 170.18 152.97 0)
 			(effects (font (size 2 2)) (justify left bottom))
 		)
 		(property "Sheetfile" "attractap-touch-p4-display.kicad_sch"
-			(at 170.18 197.45 0)
+			(at 170.18 199.99 0)
 			(effects (font (size 1.27 1.27)) (justify left top))
 		)
 		(pin "BL_A" passive
-			(at 170.18 156.21 180)
+			(at 170.18 158.75 180)
 			(uuid "ed14c0df-91e1-5107-a09c-767d960b9635")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "BL_PWM" passive
-			(at 170.18 158.75 180)
+			(at 170.18 161.29 180)
 			(uuid "c258b11f-180f-599d-ac32-f1ea0d8f18d8")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "DC_PRESENT" passive
-			(at 170.18 161.29 180)
+			(at 170.18 163.83 180)
 			(uuid "ec62080b-1516-5cfb-93e4-67185870096e")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "DOCK_N" passive
-			(at 170.18 163.83 180)
+			(at 170.18 166.37 180)
 			(uuid "4a0c5d5b-e185-55e2-a881-b7fb5d8c732a")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "ETH_RST_N" passive
-			(at 170.18 166.37 180)
+			(at 170.18 168.91 180)
 			(uuid "3a97ea9e-70f4-5f3d-ac1e-f68f24f41b2d")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "I2C0_SCL" passive
-			(at 170.18 168.91 180)
+			(at 170.18 171.45 180)
 			(uuid "59bcfffe-898d-5028-9c27-af3c62659347")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "I2C0_SDA" passive
-			(at 170.18 171.45 180)
+			(at 170.18 173.99 180)
 			(uuid "0b027a98-3162-5073-8058-16ff391619c5")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B1_M" passive
-			(at 170.18 173.99 180)
+			(at 170.18 176.53 180)
 			(uuid "85083405-6f95-5f26-820c-31772a77e777")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B2_M" passive
-			(at 170.18 176.53 180)
+			(at 170.18 179.07 180)
 			(uuid "de05b17c-9bb6-562e-8cda-79473d61e890")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B3_M" passive
-			(at 170.18 179.07 180)
+			(at 170.18 181.61 180)
 			(uuid "4f1aa315-30b3-596c-a968-1149b585020e")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B4_M" passive
-			(at 170.18 181.61 180)
+			(at 170.18 184.15 180)
 			(uuid "06293819-394f-53c4-80b0-734339dc5572")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_B5_M" passive
-			(at 170.18 184.15 180)
+			(at 170.18 186.69 180)
 			(uuid "4f8303f8-39a4-5482-ab08-b249f77fc4cd")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_DE_M" passive
-			(at 170.18 186.69 180)
+			(at 170.18 189.23 180)
 			(uuid "3f5cf34c-4e41-5b5f-a483-c90e82f55013")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_G0_M" passive
-			(at 170.18 189.23 180)
+			(at 170.18 191.77 180)
 			(uuid "24aa3b71-2c3a-5bf0-a87c-47645ec6b762")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_G1_M" passive
-			(at 170.18 191.77 180)
+			(at 170.18 194.31 180)
 			(uuid "3f47c5a3-988b-5ddd-9f33-70695a8d0fb7")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "LCD_G2_M" passive
-			(at 246.38 156.21 0)
+			(at 246.38 158.75 0)
 			(uuid "d1fd7f40-186f-562b-b3d3-58b7ed13fe17")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "LCD_G3_M" passive
-			(at 246.38 158.75 0)
+			(at 246.38 161.29 0)
 			(uuid "75a2766b-34c4-5bd6-a343-ace4b65fea0b")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "LCD_G4_M" passive
-			(at 246.38 161.29 0)
+			(at 246.38 163.83 0)
 			(uuid "2504ac25-5ce5-5dbd-94a0-6b9398a6eb53")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "LCD_G5_M" passive
-			(at 246.38 163.83 0)
+			(at 246.38 166.37 0)
 			(uuid "69375240-40d1-5b58-96ec-dca7f4601f0f")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "LCD_HSYNC_M" passive
-			(at 246.38 166.37 0)
+			(at 246.38 168.91 0)
 			(uuid "98ee76ae-48cd-5128-98ec-26336bd430d0")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "LCD_PCLK_M" passive
-			(at 246.38 168.91 0)
+			(at 246.38 171.45 0)
 			(uuid "a02b66db-247a-521f-ab27-b704bbf2bff0")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "LCD_R1_M" passive
-			(at 246.38 171.45 0)
+			(at 246.38 173.99 0)
 			(uuid "4ef8b0bb-6ecd-58ee-90b6-c43e317b25d2")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "LCD_R2_M" passive
-			(at 246.38 173.99 0)
+			(at 246.38 176.53 0)
 			(uuid "0abdf0ac-7560-522d-9d58-f9f03208242a")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "LCD_R3_M" passive
-			(at 246.38 176.53 0)
+			(at 246.38 179.07 0)
 			(uuid "215566bd-46f0-54f4-b10e-0fe79f0b060d")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "LCD_R4_M" passive
-			(at 246.38 179.07 0)
+			(at 246.38 181.61 0)
 			(uuid "be3a207c-419f-5470-b8cc-16f7a0797d69")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "LCD_R5_M" passive
-			(at 246.38 181.61 0)
+			(at 246.38 184.15 0)
 			(uuid "9ba08fd0-875e-553e-b0bb-dfd644d181ea")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "LCD_VSYNC_M" passive
-			(at 246.38 184.15 0)
+			(at 246.38 186.69 0)
 			(uuid "20d8f066-f8c9-5aab-9b72-b944aff2cdba")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "POE_PRESENT" passive
-			(at 246.38 186.69 0)
+			(at 246.38 189.23 0)
 			(uuid "0e0fc438-4f14-54a3-9c52-24f1bf3f90ec")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "TP_INT" passive
-			(at 246.38 189.23 0)
+			(at 246.38 191.77 0)
 			(uuid "1e73a7c8-1cd4-57f8-b8b9-2d2ecef3791d")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "TP_RST" passive
-			(at 246.38 191.77 0)
+			(at 246.38 194.31 0)
 			(uuid "19f614d4-9133-5d62-b3ec-d13f09a4bfda")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
@@ -1966,62 +1966,62 @@
 	)
 	(text "40-pin panel connector, backlight driver, IO expander"
 		(exclude_from_sim no)
-		(at 170.18 202.05 0)
+		(at 170.18 204.59 0)
 		(effects (font (size 1 1)) (justify left bottom))
-		(uuid "cb6d4893-2757-51a4-b1f2-254fa6bfeb8d")
-	)
-	(wire
-		(pts (xy 170.18 215.9) (xy 167.64 215.9))
-		(stroke (width 0) (type default))
-		(uuid "ca376d99-7495-516a-aeb6-d6a8a486631a")
-	)
-	(label "BUZZER"
-		(at 167.64 215.9 180)
-		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "5d0dc0d3-0d1e-59ad-bab1-c55a86d40cb5")
+		(uuid "b99558c5-e3b8-55e3-b3c7-ab8aa1e0a7bf")
 	)
 	(wire
 		(pts (xy 170.18 218.44) (xy 167.64 218.44))
 		(stroke (width 0) (type default))
 		(uuid "604160e8-0c51-55c1-9dc6-a50bbd9e981a")
 	)
-	(label "DOCK_N"
+	(label "BUZZER"
 		(at 167.64 218.44 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "e1d4e922-396a-567c-9101-f5573e4b9df2")
+		(uuid "7ed56e81-9d34-5f3c-b492-20a823467b53")
 	)
 	(wire
 		(pts (xy 170.18 220.98) (xy 167.64 220.98))
 		(stroke (width 0) (type default))
 		(uuid "f7182799-81e0-54ea-b1a3-04a5a5b5116c")
 	)
-	(label "I2C0_SCL"
+	(label "DOCK_N"
 		(at 167.64 220.98 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "37df6074-94b0-56f0-b009-ff1b98d5af96")
+		(uuid "96e72f84-ea22-5aef-8e73-863eaf491698")
 	)
 	(wire
-		(pts (xy 246.38 215.9) (xy 248.92 215.9))
+		(pts (xy 170.18 223.52) (xy 167.64 223.52))
 		(stroke (width 0) (type default))
-		(uuid "647a2bbb-43b0-5969-97ae-35551e73d15d")
+		(uuid "02d04dd3-3698-58d2-b258-1d0fcdb1b821")
 	)
-	(label "I2C0_SDA"
-		(at 248.92 215.9 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "abc5404e-af52-5dd5-a672-2213dd391571")
+	(label "I2C0_SCL"
+		(at 167.64 223.52 180)
+		(effects (font (size 1.27 1.27)) (justify right bottom))
+		(uuid "21277f64-e23c-5da7-b297-814f56708b0d")
 	)
 	(wire
 		(pts (xy 246.38 218.44) (xy 248.92 218.44))
 		(stroke (width 0) (type default))
 		(uuid "9c7710b9-02e4-52a4-9c48-7a9b0f9d7aec")
 	)
-	(label "LED_DATA"
+	(label "I2C0_SDA"
 		(at 248.92 218.44 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "b9fd5673-62a7-5b0c-a83a-243fb14539a4")
+		(uuid "382b259d-a49a-53db-b36e-69f26671276b")
+	)
+	(wire
+		(pts (xy 246.38 220.98) (xy 248.92 220.98))
+		(stroke (width 0) (type default))
+		(uuid "92a1bdeb-adac-50bc-b061-466c00075f48")
+	)
+	(label "LED_DATA"
+		(at 248.92 220.98 0)
+		(effects (font (size 1.27 1.27)) (justify left bottom))
+		(uuid "9469f5e9-4f42-5a7c-8b4d-3c6b1102ab8c")
 	)
 	(sheet
-		(at 170.18 210.82)
+		(at 170.18 213.36)
 		(size 76.2 15.24)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -2030,33 +2030,33 @@
 		(stroke (width 0.1524) (type solid))
 		(fill (color 255 255 194 1))
 		(uuid "4900b572-2212-5fdb-acc3-3028c13c8b5e")
-		(property "Sheetname" "UI" (at 170.18 210.12 0) (effects (font (size 2 2)) (justify left bottom)))
+		(property "Sheetname" "UI" (at 170.18 212.66 0) (effects (font (size 2 2)) (justify left bottom)))
 		(property "Sheetfile" "attractap-touch-p4-ui.kicad_sch"
-			(at 170.18 226.66 0)
+			(at 170.18 229.2 0)
 			(effects (font (size 1.27 1.27)) (justify left top))
 		)
 		(pin "BUZZER" passive
-			(at 170.18 215.9 180)
+			(at 170.18 218.44 180)
 			(uuid "80d68238-9514-574c-b140-49193c78e6f0")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "DOCK_N" passive
-			(at 170.18 218.44 180)
+			(at 170.18 220.98 180)
 			(uuid "9ea9c18d-2646-5ce9-aa09-59d2c8fa059d")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "I2C0_SCL" passive
-			(at 170.18 220.98 180)
+			(at 170.18 223.52 180)
 			(uuid "3521630f-7c08-5e5d-a8c1-0707e157457a")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "I2C0_SDA" passive
-			(at 246.38 215.9 0)
+			(at 246.38 218.44 0)
 			(uuid "6a337699-4981-5ab4-bec8-6074278925f1")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "LED_DATA" passive
-			(at 246.38 218.44 0)
+			(at 246.38 220.98 0)
 			(uuid "d2b38c60-9093-52e9-bd30-cdf0b8db2220")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
@@ -2064,172 +2064,172 @@
 	)
 	(text "Addressable RGB LEDs, level shifter, buzzer driver, tamper sensors"
 		(exclude_from_sim no)
-		(at 170.18 231.26 0)
+		(at 170.18 233.8 0)
 		(effects (font (size 1 1)) (justify left bottom))
-		(uuid "e2f09262-f0d0-5cec-91c2-293d580df0dd")
-	)
-	(wire
-		(pts (xy 306.07 85.09) (xy 303.53 85.09))
-		(stroke (width 0) (type default))
-		(uuid "085057fa-e08f-523c-b14c-ed8135d6893d")
-	)
-	(label "+3V3_WIFI"
-		(at 303.53 85.09 180)
-		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "fe4a9e79-83e6-56a4-b35e-f5c0d160710f")
+		(uuid "5ce95621-565d-51be-95e6-70be3e7caff5")
 	)
 	(wire
 		(pts (xy 306.07 87.63) (xy 303.53 87.63))
 		(stroke (width 0) (type default))
 		(uuid "0ec46420-1a79-540d-a92a-84a63bc3a1b2")
 	)
-	(label "+5V_DC"
+	(label "+3V3_WIFI"
 		(at 303.53 87.63 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "cf75e5bb-1eba-5e72-a657-7eb39d21e38b")
+		(uuid "b3beab53-363c-5c74-835c-e42fba2da1f3")
 	)
 	(wire
 		(pts (xy 306.07 90.17) (xy 303.53 90.17))
 		(stroke (width 0) (type default))
 		(uuid "5c5052db-3e9b-54e8-82e3-2de2424471f1")
 	)
-	(label "+5V_POE"
+	(label "+5V_DC"
 		(at 303.53 90.17 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "37f6873e-95a4-5bd0-a15e-176cf8828ba0")
+		(uuid "c8b8de41-04b1-5beb-9dbf-b6f41d70f248")
 	)
 	(wire
 		(pts (xy 306.07 92.71) (xy 303.53 92.71))
 		(stroke (width 0) (type default))
 		(uuid "207af1aa-8b4c-5657-8922-44de14b1476d")
 	)
-	(label "+5V_USB"
+	(label "+5V_POE"
 		(at 303.53 92.71 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "98639c72-31ea-594c-b171-087f47f4bf1e")
+		(uuid "9ed05940-fabb-5d5f-bc66-11bdad3c7b61")
 	)
 	(wire
 		(pts (xy 306.07 95.25) (xy 303.53 95.25))
 		(stroke (width 0) (type default))
 		(uuid "f5ed3560-02f4-5662-99e4-46f4150a11b3")
 	)
-	(label "BL_A"
+	(label "+5V_USB"
 		(at 303.53 95.25 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "9c530fe8-99f3-5e7e-9b6d-66be373e7c47")
+		(uuid "bbcdae6b-52aa-5726-89f1-5f93dec9a625")
 	)
 	(wire
 		(pts (xy 306.07 97.79) (xy 303.53 97.79))
 		(stroke (width 0) (type default))
 		(uuid "bf262b0c-9a5b-5425-bbcb-9def37deb210")
 	)
-	(label "I2C0_SCL"
+	(label "BL_A"
 		(at 303.53 97.79 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "7705637e-22ae-5167-8df2-e2e45b45b17d")
+		(uuid "e2bca12e-3f49-5e8b-a9e9-b46721fe3969")
 	)
 	(wire
 		(pts (xy 306.07 100.33) (xy 303.53 100.33))
 		(stroke (width 0) (type default))
 		(uuid "7934f4bb-a4e4-50ad-b23e-5f7076691a7e")
 	)
-	(label "I2C0_SDA"
+	(label "I2C0_SCL"
 		(at 303.53 100.33 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "42db23ea-b2f1-51db-9cb0-101cc9622bb4")
+		(uuid "b291e547-ed18-5e3b-95ad-7ae9313d5a06")
 	)
 	(wire
 		(pts (xy 306.07 102.87) (xy 303.53 102.87))
 		(stroke (width 0) (type default))
 		(uuid "fb0ee95d-6c79-5fe4-8494-8607f64bb37a")
 	)
-	(label "NFC_AVDD"
+	(label "I2C0_SDA"
 		(at 303.53 102.87 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "1cb73472-a7c8-5e04-a92e-295fe874e27e")
+		(uuid "515956bd-3984-5549-a4ed-5c83c2ab182b")
 	)
 	(wire
-		(pts (xy 382.27 85.09) (xy 384.81 85.09))
+		(pts (xy 306.07 105.41) (xy 303.53 105.41))
 		(stroke (width 0) (type default))
-		(uuid "2e4a461e-5340-53cd-980b-d63f740b44bb")
+		(uuid "9694f690-a03a-5fca-b5ba-a60e5a23bf86")
 	)
-	(label "NFC_DVDD"
-		(at 384.81 85.09 0)
-		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "8043efb6-5ee9-5f19-bc49-89729bdf2ca6")
+	(label "NFC_AVDD"
+		(at 303.53 105.41 180)
+		(effects (font (size 1.27 1.27)) (justify right bottom))
+		(uuid "b67b6176-ed3e-58c2-a474-4930206a88fd")
 	)
 	(wire
 		(pts (xy 382.27 87.63) (xy 384.81 87.63))
 		(stroke (width 0) (type default))
 		(uuid "9da464fc-1cc1-5500-9652-dfd4a09bd890")
 	)
-	(label "NFC_SCL"
+	(label "NFC_DVDD"
 		(at 384.81 87.63 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "91d87497-b895-5a54-9108-c6a2c6d75e68")
+		(uuid "865ff7f6-0593-53fe-bbad-a0fc5d8a0a01")
 	)
 	(wire
 		(pts (xy 382.27 90.17) (xy 384.81 90.17))
 		(stroke (width 0) (type default))
 		(uuid "e0592656-d018-56a7-acda-15c87c5c3b88")
 	)
-	(label "NFC_SDA"
+	(label "NFC_SCL"
 		(at 384.81 90.17 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "82fa775c-80cf-5d05-9bc6-877cbe379ad8")
+		(uuid "9a5dfc84-3513-5a9d-9cb6-b904acdca48f")
 	)
 	(wire
 		(pts (xy 382.27 92.71) (xy 384.81 92.71))
 		(stroke (width 0) (type default))
 		(uuid "a971998f-e969-57b9-aed5-c3e6ce91d85b")
 	)
-	(label "NFC_TVDD"
+	(label "NFC_SDA"
 		(at 384.81 92.71 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "0970ecf9-9a4c-56ba-a19d-0a6754ea7a69")
+		(uuid "99bfda8c-420c-5b27-b539-d07e2deace67")
 	)
 	(wire
 		(pts (xy 382.27 95.25) (xy 384.81 95.25))
 		(stroke (width 0) (type default))
 		(uuid "af966191-e162-5b29-9f33-56026882b8e1")
 	)
-	(label "PHY_3V3"
+	(label "NFC_TVDD"
 		(at 384.81 95.25 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "2d246c8c-0002-583d-b513-41fb41dad607")
+		(uuid "d4d172d0-6ed5-5475-a2c8-9163a189ffb1")
 	)
 	(wire
 		(pts (xy 382.27 97.79) (xy 384.81 97.79))
 		(stroke (width 0) (type default))
 		(uuid "256c8d68-ebf1-5825-b7cd-f14ec1e2a5b2")
 	)
-	(label "RMII_REF_CLK"
+	(label "PHY_3V3"
 		(at 384.81 97.79 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "6091ed20-9340-5d51-b898-4d1bfdd0daa1")
+		(uuid "993fce31-da3e-5bdd-beb9-e4ed950b42ad")
 	)
 	(wire
 		(pts (xy 382.27 100.33) (xy 384.81 100.33))
 		(stroke (width 0) (type default))
 		(uuid "19687b0d-4362-5e47-9664-a5b5795feb41")
 	)
-	(label "VDC"
+	(label "RMII_REF_CLK"
 		(at 384.81 100.33 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "8892f287-808d-5290-96a9-7858b6da93c6")
+		(uuid "51ead8e0-246e-517a-99ff-d58518d2de92")
 	)
 	(wire
 		(pts (xy 382.27 102.87) (xy 384.81 102.87))
 		(stroke (width 0) (type default))
 		(uuid "f278cbf8-942b-58a6-abf1-dc2335cf5095")
 	)
-	(label "VDD_FLASH"
+	(label "VDC"
 		(at 384.81 102.87 0)
 		(effects (font (size 1.27 1.27)) (justify left bottom))
-		(uuid "a79c50f3-27d3-5bc9-a9b9-69dced8d884d")
+		(uuid "39e92eb8-fd4f-5b90-9572-d1a1f6c15250")
+	)
+	(wire
+		(pts (xy 382.27 105.41) (xy 384.81 105.41))
+		(stroke (width 0) (type default))
+		(uuid "7dbf60e7-7904-5934-8df5-a24adb26df09")
+	)
+	(label "VDD_FLASH"
+		(at 384.81 105.41 0)
+		(effects (font (size 1.27 1.27)) (justify left bottom))
+		(uuid "2907a459-97c0-52b2-baab-0226b2bccaca")
 	)
 	(sheet
-		(at 306.07 80.01)
+		(at 306.07 82.55)
 		(size 76.2 27.94)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -2239,90 +2239,90 @@
 		(fill (color 255 255 194 1))
 		(uuid "7a51f2ad-2d48-5a47-9b66-64864065023d")
 		(property "Sheetname" "Mechanical"
-			(at 306.07 79.31 0)
+			(at 306.07 81.85 0)
 			(effects (font (size 2 2)) (justify left bottom))
 		)
 		(property "Sheetfile" "attractap-touch-p4-mech.kicad_sch"
-			(at 306.07 108.55 0)
+			(at 306.07 111.09 0)
 			(effects (font (size 1.27 1.27)) (justify left top))
 		)
 		(pin "+3V3_WIFI" passive
-			(at 306.07 85.09 180)
+			(at 306.07 87.63 180)
 			(uuid "18c57852-0071-5ae0-ad4d-9aae09e28a76")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "+5V_DC" passive
-			(at 306.07 87.63 180)
+			(at 306.07 90.17 180)
 			(uuid "f8b001fa-869d-53e7-8492-2cb67a6ea739")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "+5V_POE" passive
-			(at 306.07 90.17 180)
+			(at 306.07 92.71 180)
 			(uuid "76b4850f-4d54-5abe-9bf6-5d83162d5727")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "+5V_USB" passive
-			(at 306.07 92.71 180)
+			(at 306.07 95.25 180)
 			(uuid "0a0a1e7c-af98-513f-b438-cd5d424c71ea")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "BL_A" passive
-			(at 306.07 95.25 180)
+			(at 306.07 97.79 180)
 			(uuid "36a4adf2-7a8b-52d4-ac47-cf2b631a2d1d")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "I2C0_SCL" passive
-			(at 306.07 97.79 180)
+			(at 306.07 100.33 180)
 			(uuid "f003c11a-6ff5-5fa7-892e-dd4d2050382e")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "I2C0_SDA" passive
-			(at 306.07 100.33 180)
+			(at 306.07 102.87 180)
 			(uuid "97dcc21e-0f36-5153-8a95-b4f35100a9d6")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "NFC_AVDD" passive
-			(at 306.07 102.87 180)
+			(at 306.07 105.41 180)
 			(uuid "fc793349-0a39-579f-8a6a-96d40193d8ec")
 			(effects (font (size 1.27 1.27)) (justify left))
 		)
 		(pin "NFC_DVDD" passive
-			(at 382.27 85.09 0)
+			(at 382.27 87.63 0)
 			(uuid "f9b9b999-e656-5ff9-abc7-d0f5249e0ada")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "NFC_SCL" passive
-			(at 382.27 87.63 0)
+			(at 382.27 90.17 0)
 			(uuid "cdb5d677-ce23-5791-a989-39515133620a")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "NFC_SDA" passive
-			(at 382.27 90.17 0)
+			(at 382.27 92.71 0)
 			(uuid "71029d27-543b-5b3a-b268-b31ee4952113")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "NFC_TVDD" passive
-			(at 382.27 92.71 0)
+			(at 382.27 95.25 0)
 			(uuid "4763eebc-7e89-5c57-812c-19ecc88aab8c")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "PHY_3V3" passive
-			(at 382.27 95.25 0)
+			(at 382.27 97.79 0)
 			(uuid "2f80f1a8-af0f-5da6-aaea-fff1a8066b82")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "RMII_REF_CLK" passive
-			(at 382.27 97.79 0)
+			(at 382.27 100.33 0)
 			(uuid "09d4c6b0-ac4b-554d-b069-4763fd8efa53")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "VDC" passive
-			(at 382.27 100.33 0)
+			(at 382.27 102.87 0)
 			(uuid "107fae02-6858-5e71-bc8a-f6856e7533ee")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
 		(pin "VDD_FLASH" passive
-			(at 382.27 102.87 0)
+			(at 382.27 105.41 0)
 			(uuid "08ed8fba-cd78-59e4-866c-73198534eecb")
 			(effects (font (size 1.27 1.27)) (justify right))
 		)
@@ -2332,9 +2332,9 @@
 	)
 	(text "Mounting holes, fiducials and test points"
 		(exclude_from_sim no)
-		(at 306.07 113.15 0)
+		(at 306.07 115.69 0)
 		(effects (font (size 1 1)) (justify left bottom))
-		(uuid "4e2aea38-00f2-5cee-8b08-7972a31460be")
+		(uuid "03d39fa7-db54-5aee-9f18-ad960b19c4a5")
 	)
 	(text "Attractap Touch P4"
 		(exclude_from_sim no)
@@ -2425,6 +2425,12 @@
 		(at 15 72.6 0)
 		(effects (font (size 1.4 1.4)) (justify left bottom))
 		(uuid "375f87db-0f20-5f8a-8a9c-e45fb6b28b81")
+	)
+	(text "A   2026-11-27   LED ring behind a current-limited switch (TPS2553, 232 to 306 mA)"
+		(exclude_from_sim no)
+		(at 15 75 0)
+		(effects (font (size 1.4 1.4)) (justify left bottom))
+		(uuid "b9d55bfd-56b4-5f08-80ab-798f87e5b2d7")
 	)
 	(sheet_instances (path "/" (page "1")))
 	(embedded_fonts no)

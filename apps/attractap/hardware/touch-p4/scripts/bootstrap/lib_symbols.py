@@ -219,6 +219,13 @@ def derived_symbols(lib):
             right=[('6', 'OUT'), None, None, None, ('3', 'AUXOFF'), None, None, ('4', '~{FLT}'), None, None, None],
             bottom=[('7', 'DVDT'), None, ('9', 'ILM'), None, ('10', 'ITIMER'), None, ('8', 'GND')], width=25.4,
             datasheet='https://www.ti.com/lit/ds/symlink/tps25947.pdf'),
+        # current-limited switch: power path left to right, enable on the left, limit on the right
+        'TPS2553DBVR': box_symbol(
+            'TPS2553DBVR', 'U', fp + 'SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL',
+            'Current-limited power switch 2.5 to 6.5 V, limit 75 mA to 1.7 A set by a resistor, enable active high',
+            left=[('1', 'IN'), ('3', 'EN'), None, None], right=[('6', 'OUT'), ('4', '~{FAULT}'), None, ('5', 'ILIM')],
+            bottom=[('2', 'GND')], width=17.78,
+            datasheet='https://www.ti.com/lit/ds/symlink/tps2553.pdf'),
         'TLV803SDBZR': box_symbol(
             'TLV803SDBZR', 'U', 'Package_TO_SOT_SMD:SOT-23', 'Voltage supervisor 2.93 V, 200 ms, open-drain reset',
             left=[('3', 'VDD'), None, None], right=[('2', '~{RESET}'), None, None], bottom=[('1', 'GND')], width=22.86,

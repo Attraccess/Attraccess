@@ -3992,6 +3992,73 @@
 		)
 		(embedded_fonts no)
 	)
+	(symbol "TPS2553DBVR"
+		(pin_names (offset 1.016))
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(property "Reference" "U" (at -8.89 8.89 0) (effects (font (size 1.27 1.27)) (justify left)))
+		(property "Value" "TPS2553DBVR" (at -8.89 -6.35 0) (effects (font (size 1.27 1.27)) (justify left)))
+		(property "Footprint" "attractap:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "Datasheet" "https://www.ti.com/lit/ds/symlink/tps2553.pdf"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(property "Description" "Current-limited power switch 2.5 to 6.5 V, limit 75 mA to 1.7 A set by a resistor, enable active high"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)) (hide yes))
+		)
+		(symbol "TPS2553DBVR_0_1"
+			(rectangle
+				(start -8.89 7.62)
+				(end 8.89 -5.08)
+				(stroke (width 0.254) (type default))
+				(fill (type background))
+			)
+		)
+		(symbol "TPS2553DBVR_1_1"
+			(pin passive line
+				(at -13.97 5.08 0)
+				(length 5.08)
+				(name "IN" (effects (font (size 1.27 1.27))))
+				(number "1" (effects (font (size 1 1))))
+			)
+			(pin passive line
+				(at -13.97 2.54 0)
+				(length 5.08)
+				(name "EN" (effects (font (size 1.27 1.27))))
+				(number "3" (effects (font (size 1 1))))
+			)
+			(pin passive line
+				(at 13.97 5.08 180)
+				(length 5.08)
+				(name "OUT" (effects (font (size 1.27 1.27))))
+				(number "6" (effects (font (size 1 1))))
+			)
+			(pin passive line
+				(at 13.97 2.54 180)
+				(length 5.08)
+				(name "~{FAULT}" (effects (font (size 1.27 1.27))))
+				(number "4" (effects (font (size 1 1))))
+			)
+			(pin passive line
+				(at 13.97 -2.54 180)
+				(length 5.08)
+				(name "ILIM" (effects (font (size 1.27 1.27))))
+				(number "5" (effects (font (size 1 1))))
+			)
+			(pin passive line
+				(at 0 -10.16 90)
+				(length 5.08)
+				(name "GND" (effects (font (size 1.27 1.27))))
+				(number "2" (effects (font (size 1 1))))
+			)
+		)
+		(embedded_fonts no)
+	)
 	(symbol "TPS259470ARPWR"
 		(pin_names (offset 1.016))
 		(exclude_from_sim no)

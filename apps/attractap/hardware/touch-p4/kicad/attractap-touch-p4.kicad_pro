@@ -551,6 +551,10 @@
       },
       {
         "netclass": "Power5V",
+        "pattern": "/UI/+5V_LED"
+      },
+      {
+        "netclass": "Power5V",
         "pattern": "/+5V_USB"
       },
       {

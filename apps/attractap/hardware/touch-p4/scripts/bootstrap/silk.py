@@ -191,7 +191,7 @@ def gpio_map(S, x, y, pitch=1.75):
         ('TOUCH', 'INT %d' % g('TP_INT'), 'RST %d' % g('TP_RST'), '0x5D / 0x14'),
         ('I2C1', 'SCL %d' % g('NFC_SCL'), 'SDA %d' % g('NFC_SDA'), '0x24 PN532'),
         ('NFC', 'IRQ %d' % g('NFC_IRQ'), 'RST %d' % g('NFC_RST'), ''),
-        ('LED', 'DIN %d' % g('LED_DATA'), '8x SK6812', ''),
+        ('LED', 'DIN %d' % g('LED_DATA'), '16x SK6812', ''),
         ('BUZZER', 'IO %d' % g('BUZZER'), '2.7 KHZ', ''),
         ('BACKLIGHT', '', 'PWM %d' % g('BL_PWM'), ''),
         ('C5', 'EN %d' % g('C5_EN'), 'SDIO %d-%d' % (g('SDIO_D0'), g('SDIO_CMD')), ''),

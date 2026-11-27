@@ -73,6 +73,8 @@ JLC_ROTATION = {
     ('attractap:QFN-40_L6.0-W6.0-P0.50-BL-EP', 'C53457895'): 90,
     # the same for the level shifter: footprint of the 74AHCT1G125 (C7484), part 74LV1T125
     ('attractap:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR', 'C473338'): 90,
+    # the LED supply switch: the library draws the TPS2553's land a quarter turn back from the footprint
+    ('attractap:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL', 'C55266'): 270,
     # D105, the SS310: its library entry numbers the anode 1 and the cathode 2, KiCad's diode the other
     # way round. Without the half turn the cathode band lands on VDC_F and the diode blocks the supply.
     ('attractap:SMA_L4.3-W2.6-LS5.2-RD', 'C7420364'): 180,

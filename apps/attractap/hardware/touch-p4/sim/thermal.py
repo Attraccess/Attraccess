@@ -25,12 +25,13 @@ DISPLAY_W = 0.6             # backlight and panel logic
 # 5 GHz (110 mA) with little sending, 0.40 W; at most what the firmware's transmit limit lets through on
 # average: sending 40 % of the time at 5 GHz (426 mA, 1.36 W lost) and receiving the rest, 0.78 W, here
 # rounded up to 0.80 W. Its own converter U302 at about 88 to 90 %.
-# The 16 LEDs of the ring (scripts/bootstrap/placement.led_refs). Together they lose what the eight of the
-# two rows lost: the firmware's limit is on the sum of all LED currents, not on each LED.
+# The 16 LEDs of the ring (scripts/bootstrap/placement.led_refs). The firmware's limit is on the sum of all LED
+# currents, not on each LED: everything on is the ring at that limit, 0.2 A from 5 V (the light that leaves is
+# not taken off).
 LEDS = ['D%d' % (701 + k) if k < 8 else 'D%d' % (702 + k) for k in range(16)]
 COMMON = {'U201': (0.60, 1.00), 'U202': (0.05, 0.08), 'U301': (0.40, 0.80), 'U501': (0.30, 0.35), 'U601': (0.10, 0.10),
           'U103': (0.10, 0.18), 'L101': (0.04, 0.07), 'U302': (0.05, 0.09), 'L301': (0.01, 0.02), 'R702': (0.00, 0.10),
-          **{ref: (0.24 / 16, 0.88 / 16) for ref in LEDS}}
+          **{ref: (0.24 / 16, 1.00 / 16) for ref in LEDS}}
 # The eFuse (28 mOhm) and the ideal diodes' MOSFETs (45 mOhm hot) at 0.9 and 1.65 A; D105 is a 100 V
 # Schottky, 0.1 to 0.15 V above a 40 V one at the same current.
 SUPPLY = {

@@ -209,11 +209,13 @@ def ui(d):
     # 74LV1T125: same pinout as the 74AHCT1G125, but specified from 1.6 V supply. The 5 V rail sits one
     # diode drop below its source and can be under the 4.5 V an AHCT part asks for.
     d.add('U', '74LV1T125', 'attractap:SN74LV1T125DBVR', 'attractap:SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR', {
-        '1': 'GND', '2': 'LED_DATA', '3': 'GND', '4': 'LED_DATA_5V', '5': '+5V',
+        '1': 'GND', '2': 'LED_DATA', '3': 'GND', '4': 'LED_DATA_5V', '5': '+5V_LED',
     }, lcsc='C473338', mpn='SN74LV1T125DBVR', desc='3.3 V to 5 V level shifter for the LED data line')
-    d.C('100n', '+5V', desc='level shifter')
+    # The level shifter runs from the switched LED supply: with the LEDs off it is off too and cannot feed
+    # them through their data input. Its input has no clamp diode to its supply, so GPIO47 does not feed it.
+    d.C('100n', '+5V_LED', desc='level shifter')
     d.R('100R', 'LED_DATA_5V', 'LED_D0')
-    d.C('22u', '+5V', size='0805', desc='LED supply')
+    d.C('22u', '+5V', size='0805', desc='5 V rail at the buzzer')
     d.group('Addressable LEDs')
     # A ring of 16 round the NFC loop (geometry.LEDS), the data line from one to the next. The first eight
     # keep their numbers from the two rows of the earlier layout; the other eight come at the end of the sheet.
@@ -275,6 +277,21 @@ def ui(d):
     d.group('Addressable LEDs, second half of the ring')
     for i in range(8, N_LED):
         led(d, i)
+    # The LED ring's supply through a current-limited switch. Each LED drives 12 mA per colour, so the ring
+    # draws 192 mA in one colour and 0.58 A in full white. The switch holds the ring below 232 to 306 mA
+    # (R ILIM 100 k, TI's equations 1 to 3 in SLVS841G with the resistor's 1 %), above the 192 mA the
+    # firmware allows. Its enable is tied on: the MCU's two free pins (GPIO27, GPIO48) have no way out of
+    # its fan-out. Constant-current version, not the latch-off -1: a firmware fault dims the ring instead of
+    # switching it off for good. The electrolytic carries the PWM peaks: the LEDs' PWM periods can line up,
+    # and then mixed colours draw up to three times their average for a part of each period.
+    d.group('LED supply switch')
+    d.add('U', 'TPS2553DBVR', 'attractap:TPS2553DBVR', 'attractap:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL', {
+        '1': '+5V', '2': 'GND', '3': '+5V', '5': 'LED_ILIM', '6': '+5V_LED',
+    }, nc=('4',), lcsc='C55266', mpn='TPS2553DBVR', desc='Current-limited switch for the LED supply')
+    d.C('100n', '+5V', desc='LED switch input')
+    d.R('100k', 'LED_ILIM', 'GND', desc='LED switch current limit: 232 to 306 mA')
+    d.add('C', '100u/16V', 'Device:C_Polarized', 'Capacitor_SMD:CP_Elec_6.3x5.4', {'1': '+5V_LED', '2': 'GND'},
+          lcsc='C7469977', mpn='FVH016ADA101M0654', desc='LED supply: the PWM peaks above the switch limit')
 
 
 N_LED = 16
@@ -282,13 +299,13 @@ N_LED = 16
 
 def led(d, i):
     """LED i of the chain (from 0) and its capacitor."""
-    nets = {'1': 'GND', '2': 'LED_D%d' % i, '3': '+5V'}
+    nets = {'1': 'GND', '2': 'LED_D%d' % i, '3': '+5V_LED'}
     if i + 1 < N_LED:
         nets['4'] = 'LED_D%d' % (i + 1)
     d.add('D', 'SK6812MINI-E', 'attractap:SK6812MINI-E',
           'attractap:LED_SK6812MINI-E_ReverseMount_Clear', nets, nc=() if i + 1 < N_LED else ('4',),
           lcsc='C5149201', mpn='SK6812MINI-E', desc='RGB LED, reverse mount')
-    d.C('100n', '+5V', desc='LED %d' % (i + 1))
+    d.C('100n', '+5V_LED', desc='LED %d' % (i + 1))
 
 
 def mech(d):

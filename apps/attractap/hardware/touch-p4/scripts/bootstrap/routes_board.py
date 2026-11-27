@@ -247,8 +247,8 @@ def small_links(B):
     p = B.pad
     B.track([p('C101', '1'), p('R104', '1')], '+5V_USB', 0.3)
     B.track([p('C116', '1'), p('R105', '1')], '+5V_DC', 0.3)
-    u, r = p('U701', '2'), p('R705', '1')
-    B.track([u, (r[0], u[1]), r], 'LED_DATA', 0.15)
+    u, r = p('U701', '2'), p('R705', '1')                 # straight above the level shifter's input
+    B.track([u, r], 'LED_DATA', 0.15)
 
 
 def tamper_routes(B):

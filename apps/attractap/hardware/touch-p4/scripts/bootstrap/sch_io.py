@@ -190,6 +190,7 @@ def expander(cv, P_, x, y):
 # ---- UI ----------------------------------------------------------------------------------------------
 def ui(cv, P_, top):
     leds(cv, P_, 30.48, top + 45.72)
+    led_supply(cv, P_, 414.02, top + 45.72)
     buzzer(cv, P_, 337.82, top + 165.1)
     tamper(cv, P_, 50.8, top + 170.18)
 
@@ -208,7 +209,7 @@ def leds(cv, P_, x, y):
     yc = vcc[1] - 10.16
     cv.wire(vcc, (vcc[0] + P, vcc[1]), (vcc[0] + P, yc), (vcc[0] + 15.24, yc))
     cv.hang(P_['C701'], vcc[0] + 10.16, yc, gap=0)
-    cv.power('+5V', vcc[0] + 15.24, yc)
+    cv.label('+5V_LED', vcc[0] + 15.24, yc, 'R')
     cv.inline(P_['R701'], yo[0] + 20.32, yo[1])
     cv.wire(yo, 'R701.1')
     pitch = 35.56
@@ -217,9 +218,6 @@ def leds(cv, P_, x, y):
     for row in range(len(refs) // per_row):
         yy = yo[1] + 58.42 * row
         rail = yy - 25.4
-        cv.power('+5V', x0 - 30.48, rail)
-        if row == 0:
-            cv.hang(P_['C702'], x0 - 22.86, rail, note=True)
         for k in range(per_row):
             i = per_row * row + k
             ref, cref = refs[i]
@@ -229,7 +227,9 @@ def leds(cv, P_, x, y):
             cv.hang(P_[cref], vdd[0] + 12.7, rail, note=True)
             if k:
                 cv.wire('%s.4' % refs[i - 1][0], '%s.2' % ref)
-        cv.wire((x0 - 30.48, rail), (x0 + pitch * (per_row - 1) + 12.7, rail))
+        xe = x0 + pitch * (per_row - 1) + 17.78
+        cv.wire((x0, rail), (xe, rail))
+        cv.label('+5V_LED', xe, rail, 'R')
     cv.wire('R701.2', '%s.2' % refs[0][0])
     out = cv.at('%s.4' % refs[per_row - 1][0])
     yw = out[1] + 25.4
@@ -237,10 +237,31 @@ def leds(cv, P_, x, y):
             (x0 - 35.56, out[1] + 58.42), '%s.2' % refs[per_row][0])
 
 
+def led_supply(cv, P_, x, y):
+    """Current-limited switch from +5V to the LED ring's +5V_LED: input capacitor above, enable tied to the
+    input on the left, the limit resistor and the bulk capacitor on the right."""
+    cv.begin('LED supply switch')
+    u = cv.put(P_['U705'], x + 30.48, y + 10.16)
+    vin, en, out, ilim = (u.pin(n) for n in ('1', '3', '6', '5'))
+    yc = vin[1] - 10.16
+    cv.wire(vin, (vin[0] - P, vin[1]), (vin[0] - P, yc), (vin[0] - 15.24, yc))
+    cv.hang(P_['C724'], vin[0] - 10.16, yc, gap=0, fields='l')
+    cv.power('+5V', vin[0] - 15.24, yc)
+    cv.wire(en, (vin[0] - P, en[1]), (vin[0] - P, vin[1]))
+    cv.wire(ilim, (ilim[0] + 12.7, ilim[1]))
+    cv.hang(P_['R708'], ilim[0] + 12.7, ilim[1], gap=0, fields='r')
+    cv.wire(out, (out[0] + 30.48, out[1]))
+    cv.hang(P_['C725'], out[0] + 25.4, out[1], gap=0, fields='r')
+    cv.label('+5V_LED', out[0] + 30.48, out[1], 'R')
+
+
 def buzzer(cv, P_, x, y):
-    """Low-side switch: the coil between +5V (through R702) and the transistor, flyback diode across it."""
+    """Low-side switch: the coil between +5V (through R702) and the transistor, flyback diode across it;
+    the 5 V rail's capacitor C702 beside it."""
     cv.begin('Buzzer')
     cv.power('+5V', x, y)
+    cv.wire((x, y), (x - 10.16, y))
+    cv.hang(P_['C702'], x - 10.16, y, gap=0, fields='l')
     r = cv.put(P_['R702'], x, y + 6.35)
     cv.wire((x, y), r.pin('1'))
     yp = y + 15.24

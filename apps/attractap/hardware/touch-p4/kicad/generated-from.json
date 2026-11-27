@@ -1,9 +1,9 @@
 {
  "board": {
   "files": {
-   "attractap-touch-p4.kicad_pcb": "4c8fe2e33fdde53249c7dd4f2b09be9ae695be50e41d8069575e73dfadb7a3c0"
+   "attractap-touch-p4.kicad_pcb": "b4edee253773d54e8971d42add37162d7ab3494adb8f0f6dcb6c1646162e4d20"
   },
-  "generator": "155ab46c4ece55637c1579ab340d9d6b81c03e859a78dc35e8a7b4330443bebf"
+  "generator": "8c47727578c330c758584a3f95cf5747a7e8a604e92c9b68bd822084a3991052"
  },
  "schematic": {
   "files": {
@@ -14,10 +14,10 @@
    "attractap-touch-p4-mech.kicad_sch": "bb24b4023a63caa26249820578000ab5d9d73620d218ff85147a8cb29c77efdd",
    "attractap-touch-p4-nfc.kicad_sch": "b8faae9602ae88ad384a19ddbf0c7e86a28c22ff88ed6938041740b18ac593cb",
    "attractap-touch-p4-power.kicad_sch": "f58479eff86988ef76f8dc947d6cbea92c4be0552746c21486d4ba1513f237d0",
-   "attractap-touch-p4-ui.kicad_sch": "31731cb46af8dba45f9a31e8957213c443104e522e539ac3132595c69a6ec770",
+   "attractap-touch-p4-ui.kicad_sch": "732a8b43803a73f4978fdd7b93eb485c1cb16a243189fab788ee2d075d242509",
    "attractap-touch-p4-wifi.kicad_sch": "e7bcda86736fb9d6eaa1230fee20ab8cde4561786d979bb696b153721201bbe0",
-   "attractap-touch-p4.kicad_sch": "db79bf4fa3848958ad72c7b1edc8d1a911094af75f3e96f807da746dcfe5efb8"
+   "attractap-touch-p4.kicad_sch": "a1d619f9478fec3bd4c1e1cac78fdcbb87b8639e410b4a0aef1c6384f299a562"
   },
-  "generator": "8fdddcde93d52df44c96a478ec959b5f0cb607d35913bc348d3c5cc88c4155a9"
+  "generator": "9a44e7abf3afb236ce4e9e446c8ea66c82c33a495f9a46fa956d85bf1e176e64"
  }
 }

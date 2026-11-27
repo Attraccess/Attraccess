@@ -383,11 +383,21 @@ def place(B):
     n('FB501', -7.9, 8.3, 90)
 
     # ========================================================= LEDs and buzzer
-    # level shifter for the LED data line, in the left column behind the display
-    put('U701', 9.0, 61.2, 180)
-    put('C701', 6.0, 61.6, 90)
-    put('R701', 12.0, 60.2, 0)
-    put('C702', 3.0, 61.2, 0)
+    # The LED supply: level shifter and current-limited switch in a row in the strip between the display's flex
+    # slot and the ring's top side, the bulk capacitor right above the ring's 5 V vias there. The level shifter
+    # (pins up: input; down: output and supply) on the left, towards LED 0's data input, right of the labels of
+    # the NFC supplies' test points.
+    put('U701', 37.6, 88.0, 90)
+    put('C701', 38.55, 90.85, 270)  # supply pad straight below the supply pin
+    put('R701', 36.65, 90.85, 270)  # series resistor below the output, on to LED 0
+    put('R705', 37.6, 85.15, 90)   # LED data pull-down above the input
+    # switch turned so its input faces left and its output right: input capacitor beside the input (the enable
+    # pin, two below, is tied to it), the limit resistor beside ILIM
+    put('U705', 43.4, 88.6, 270)
+    put('C724', 40.4, 87.65, 180)
+    put('R708', 46.4, 88.6, 0)
+    put('C725', 52.6, 89.2, 0)     # 100 uF, + on the left towards the switch's output
+    put('C702', 3.0, 61.2, 0)      # 5 V rail at the buzzer
     # the ring (geometry.LEDS) in the data line's order, each capacitor in the gap after its LED, across the
     # ring, its 5 V pad outside; the LED before the gap in the copper round the loop has it outside the ring
     gap = led_gap_index()
@@ -403,7 +413,6 @@ def place(B):
     put('Q701', 13.2, 56.6, 0)
     put('R703', 16.6, 55.6, 0)
     put('R704', 16.6, 57.6, 0)
-    put('R705', 8.85, 63.75, 270)  # LED data pull-down, signal on top, below the level shifter
 
     # ================================== tamper detection, in the free area left of the MCU
     hx, hy = G.HALL
@@ -433,8 +442,8 @@ def place(B):
         # 1 mm pads on every rail, both I2C buses and the RMII clock, each next to its circuit
         'TP816': (13.0, 75.5), 'TP817': (16.0, 75.5), 'TP818': (66.5, 11.0), 'TP819': (66.5, 26.2),
         'TP820': (59.0, 46.5), 'TP821': (30.2, 86.0), 'TP822': (30.2, 88.6), 'TP823': (30.2, 83.4),
-        'TP824': (61.0, 78.0), 'TP825': (26.5, 63.0), 'TP826': (26.5, 65.5), 'TP827': (52.5, 87.6),
-        'TP828': (52.5, 90.2), 'TP829': (57.0, 84.5), 'TP830': (61.2, 80.8),
+        'TP824': (61.0, 78.0), 'TP825': (26.5, 63.0), 'TP826': (26.5, 65.5), 'TP827': (58.6, 87.6),
+        'TP828': (58.6, 90.2), 'TP829': (57.0, 84.5), 'TP830': (61.2, 80.8),
         'TP831': (G.WIFI_MODULE[0] - 17.2, 9.0),          # the Wi-Fi module's rail, left of its inductor
     }
     for ref, (x, y) in tps.items():

@@ -166,7 +166,11 @@ STALE_PARTS |= {'TP%d' % n for n in range(816, 833)} | {'C%d' % n for n in range
 STALE_NETS |= {'NFC_' + n for n in ('TX1', 'TX2', 'F1', 'F2', 'M1', 'M2', 'ANT1', 'ANT2', 'VMID', 'RX', 'RXC', 'X1', 'X2',
                                     'TVDD', 'AVDD', 'DVDD', 'VBAT', 'IRQ', 'RST', 'SCL', 'SDA')} | \
     {'LED_D%d' % n for n in range(16)}
-STALE_AREAS = [(0.0, 89.5, G.NOTCH_X, G.BOARD_H), (11.5, 76.0, 33.0, 89.5)]
+# The LED supply switch: the level shifter moved from the left column to the strip below the display, with the
+# switch beside it; the ring's supply became +5V_LED.
+STALE_NETS |= {'LED_DATA', 'LED_DATA_5V', 'LED_ILIM', '+5V_LED'}
+STALE_PARTS |= {'U701', 'C701', 'R701', 'R705', 'U705', 'C724', 'R708', 'C725', 'TP827', 'TP828'}
+STALE_AREAS = [(0.0, 89.5, G.NOTCH_X, G.BOARD_H), (11.5, 76.0, 33.0, 89.5), (33.0, 84.0, 56.0, 89.5)]
 
 
 def routes_of_session(path):

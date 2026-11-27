@@ -16,7 +16,7 @@ from board import OX, OY, geometry, short
 
 CELL = 0.1
 LOOP_NETS = ('NFC_ANT1', 'NFC_ANT2')
-SUPPLY = ('GND', '+5V', '+3V3')
+SUPPLY = ('GND', '+5V', '+5V_LED', '+3V3')
 
 
 def _raster(board, nets, box):

@@ -68,7 +68,7 @@ class DesignTest(unittest.TestCase):
     def test_new_ics_follow_their_makers_pin_tables(self):
         """Symbol pins and connections of the power-path ICs and the Wi-Fi module against the datasheets' pin
         tables: TI TPS25947 (SLVSFC9C) table 5-1, LM74700-Q1 (SNOSD17G) table 5-1 (DBV), TLV803 (SBVS157) DBZ
-        pinout, ESP32-C5-MINI-1 (datasheet v1.4) table 3-1."""
+        pinout, TPS2553 (SLVS841G) table 5-1 (DBV), ESP32-C5-MINI-1 (datasheet v1.4) table 3-1."""
         from sexpr import find, first, loads
         lib = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'kicad', 'lib', 'attractap.kicad_sym')
         with open(lib, encoding='utf-8') as f:
@@ -78,6 +78,8 @@ class DesignTest(unittest.TestCase):
                                '7': 'DVDT', '8': 'GND', '9': 'ILM', '10': 'ITIMER'},
             'LM74700QDBVRQ1': {'1': 'VCAP', '2': 'GND', '3': 'EN', '4': 'CATHODE', '5': 'GATE', '6': 'ANODE'},
             'TLV803SDBZR': {'1': 'GND', '2': '~{RESET}', '3': 'VDD'},
+            # TPS2553 (SLVS841G) table 5-1, DBV
+            'TPS2553DBVR': {'1': 'IN', '2': 'GND', '3': 'EN', '4': '~{FAULT}', '5': 'ILIM', '6': 'OUT'},
             # ESP32-C5-MINI-1 datasheet v1.4, table 3-1
             'ESP32-C5-MINI-1-N4-V1.2': dict(
                 [(str(n), 'GND') for n in (1, 2, 42, 43, 46, 47, 48) + tuple(range(50, 66))]

@@ -44,6 +44,9 @@ PARTS = {
     'C3662799': ('Texas Instruments', 'eFuse 2.7 to 23 V 5.5 A, 28 mOhm, true reverse current blocking, adjustable '
                  'UVLO and OVLO, VQFN-10 2 x 2 mm', TI,
                  'none stocked (TPS259470LRPWR, latch-off, has the same pins: no stock)'),
+    'C55266': ('Texas Instruments', 'Current-limited power switch 2.5 to 6.5 V, 85 mOhm, limit 75 mA to 1.7 A set '
+               'by a resistor, constant current, enable active high, SOT-23-6', TI,
+               'none (TPS2553DBVR-1, C111738, has the same pins but latches off)'),
     'C132016': ('Texas Instruments', 'Voltage supervisor 2.93 V, 200 ms, open-drain active-low reset, SOT-23', TI,
                 '3PEAK TPV803S-3STR (C2842356): 2.85 to 3.00 V, 140 to 280 ms'),
     'C67272': ('Infineon', 'N-channel MOSFET 30 V 5.3 A, 27 mOhm at 10 V, 40 mOhm at 4.5 V, +-20 V gate, SOT-23',
