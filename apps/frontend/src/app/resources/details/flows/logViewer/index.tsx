@@ -5,7 +5,6 @@ import {
   AccordionTrigger,
   AccordionPanel,
   AccordionBody,
-  Button,
   Chip,
   Separator,
   DrawerBody,
@@ -14,8 +13,7 @@ import {
   ToggleButton,
   useOverlayState,
 } from '@heroui/react';
-import { Select } from '../../../../../components/select/index';
-import { CircleStopIcon, CircleDotIcon, PartyPopperIcon } from 'lucide-react';
+import { CircleDotIcon, CircleIcon, PartyPopperIcon } from 'lucide-react';
 import {
   EmptyState,
   PageHeader,
@@ -29,8 +27,8 @@ import de from './de.json';
 import en from './en.json';
 import nodeTranslationsDe from '../node/de.json';
 import nodeTranslationsEn from '../node/en.json';
-import { useFlowContext } from '../context/index';
-import { useCountdown } from './useCountdown';
+import { useFlowContext, useFlowLogsContext } from '../context/index';
+import { newestUniqueLogs } from './newestUniqueLogs';
 import { DownloadLogsMenu } from './DownloadLogsMenu';
 import { prettyPayload } from './prettyPayload';
 import { triggerNodeOfRun } from './triggerNodeOfRun';
@@ -41,17 +39,6 @@ export interface Props {
   confettiEnabled: boolean;
   onConfettiEnabledChange: (enabled: boolean) => void;
 }
-
-export const DEFAULT_DURATION_MINUTES = '15';
-
-export const DURATION_OPTIONS = [
-  { minutes: 15, labelKey: 'duration.m15' },
-  { minutes: 30, labelKey: 'duration.m30' },
-  { minutes: 60, labelKey: 'duration.h1' },
-  { minutes: 240, labelKey: 'duration.h4' },
-  { minutes: 480, labelKey: 'duration.h8' },
-  { minutes: 1440, labelKey: 'duration.h24' },
-];
 
 export function LogViewer(props: Props) {
   const { isOpen, setOpen, open } = useOverlayState();
@@ -67,9 +54,8 @@ export function LogViewer(props: Props) {
     },
   });
 
-  const [durationMinutes, setDurationMinutes] = useState(DEFAULT_DURATION_MINUTES);
-
-  const { liveLogs: sseLogs, owner } = useFlowContext();
+  const { owner } = useFlowContext();
+  const { liveLogs: sseLogs, isPausedForInactivity } = useFlowLogsContext();
 
   const { data: flowData } = useFlowCanvasQuery(owner);
   const { data: nodeSchemas } = useFlowNodeSchemasQuery(owner);
@@ -87,20 +73,15 @@ export function LogViewer(props: Props) {
     [nodeSchemas, t, tExists],
   );
 
-  // Recording expires on its own; the status is polled while the drawer is open to notice. Status only —
-  // polling the logs endpoint would re-ship the whole buffer every tick.
-  const { recording, isRecording, logs, startRecording, stopRecording, isStarting, isStopping } = useFlowLogRecording(
-    owner,
-    { isOpen },
-  );
-
-  const countdown = useCountdown(isRecording ? recording?.expiresAt : null);
+  // The editor keeps the recording alive (FlowLogsProvider); the status is polled while the drawer is open to
+  // notice when it expires. Status only — polling the logs endpoint would re-ship the whole buffer every tick.
+  const { recording, isRecording, logs } = useFlowLogRecording(owner, { isOpen });
 
   const [recordedLogs, setRecordedLogs] = useState<ResourceFlowLog[]>([]);
   const fetchedLogs = logs;
   const recordingStartedAt = recording?.startedAt;
 
-  // The server discards its buffer on stop. Keep downloaded entries for this page visit;
+  // The server discards its buffer when the recording expires. Keep downloaded entries for this page visit;
   // the SSE buffer already lasts for the lifetime of the flow page.
   useEffect(() => {
     if (!isRecording || !recordingStartedAt || !fetchedLogs?.length) return;
@@ -109,27 +90,23 @@ export function LogViewer(props: Props) {
     const currentLogs = fetchedLogs.filter((log) => new Date(log.createdAt).getTime() >= recordingStart);
     if (!currentLogs.length) return;
 
-    setRecordedLogs((previous) => [...new Map([...previous, ...currentLogs].map((log) => [log.id, log])).values()]);
+    setRecordedLogs((previous) => newestUniqueLogs([...previous, ...currentLogs]));
   }, [fetchedLogs, isRecording, recordingStartedAt]);
 
-  const logsWithNodes = useMemo(() => {
-    const allLogs = [...recordedLogs, ...(sseLogs ?? [])];
-    const uniqueLogs = [...new Map(allLogs.map((log) => [log.id, log])).values()];
-
-    return uniqueLogs.map((log) => {
-      const nodeOfLog = flowData?.nodes.find((node) => node.id === log.nodeId);
-
-      return {
-        ...log,
-        node: nodeOfLog,
-        title: `${nodeTitle(nodeOfLog)} -> ${log.type}`,
-      };
-    });
-  }, [flowData, recordedLogs, sseLogs, nodeTitle]);
-
+  // Newest first.
   const logsOrdered = useMemo(() => {
-    return [...logsWithNodes].sort((a, b) => b.id - a.id);
-  }, [logsWithNodes]);
+    const nodesById = new Map((flowData?.nodes ?? []).map((node) => [node.id, node]));
+    return newestUniqueLogs([...recordedLogs, ...sseLogs])
+      .reverse()
+      .map((log) => {
+        const nodeOfLog = log.nodeId ? nodesById.get(log.nodeId) : undefined;
+        return {
+          ...log,
+          node: nodeOfLog,
+          title: `${nodeTitle(nodeOfLog)} -> ${log.type}`,
+        };
+      });
+  }, [flowData, recordedLogs, sseLogs, nodeTitle]);
 
   const logsByRunId = useMemo(() => {
     return (logsOrdered ?? []).reduce(
@@ -155,10 +132,11 @@ export function LogViewer(props: Props) {
     [nodeTitle, formatDateTime],
   );
 
-  const durationItems = useMemo(
-    () => DURATION_OPTIONS.map(({ minutes, labelKey }) => ({ key: String(minutes), label: t(labelKey) })),
-    [t],
-  );
+  const emptyMessage = isPausedForInactivity
+    ? t('recording.paused')
+    : isRecording
+      ? t('recording.waiting')
+      : t('recording.starting');
 
   return (
     <>
@@ -170,43 +148,17 @@ export function LogViewer(props: Props) {
 
         <DrawerBody>
           <div className="flex flex-col gap-4">
-            <div className="flex flex-row flex-wrap items-end gap-2">
+            <div className="flex flex-row flex-wrap items-center gap-2">
               {isRecording ? (
-                <>
-                  <Chip color="danger" variant="soft" data-cy="flow-log-recording-chip">
-                    <CircleDotIcon className="w-4 h-4" />
-                    {t('recording.active', { countdown: countdown ?? '' })}
-                  </Chip>
-                  <Button
-                    variant="danger"
-                    isPending={isStopping}
-                    onPress={() => stopRecording()}
-                    data-cy="flow-log-stop-recording"
-                  >
-                    <CircleStopIcon className="w-4 h-4" />
-                    {t('recording.stop')}
-                  </Button>
-                </>
+                <Chip color="danger" variant="soft" data-cy="flow-log-recording-chip">
+                  <CircleDotIcon className="w-4 h-4" />
+                  {t('recording.on')}
+                </Chip>
               ) : (
-                <>
-                  <Select
-                    label={t('recording.duration')}
-                    items={durationItems}
-                    value={durationMinutes}
-                    onChange={setDurationMinutes}
-                    className="min-w-40"
-                    data-cy="flow-log-duration-select"
-                  />
-                  <Button
-                    variant="primary"
-                    isPending={isStarting}
-                    onPress={() => startRecording(Number(durationMinutes))}
-                    data-cy="flow-log-start-recording"
-                  >
-                    <CircleDotIcon className="w-4 h-4" />
-                    {t('recording.start')}
-                  </Button>
-                </>
+                <Chip variant="soft" data-cy="flow-log-not-recording-chip">
+                  <CircleIcon className="w-4 h-4" />
+                  {t('recording.off')}
+                </Chip>
               )}
               {/* Keyed by the recording state: the row changes height then, and an open menu would cover its button. */}
               <DownloadLogsMenu key={String(isRecording)} owner={owner} logs={logsOrdered} nodeTitle={nodeTitle} />
@@ -221,8 +173,7 @@ export function LogViewer(props: Props) {
               {t('confetti')}
             </ToggleButton>
 
-            {!isRecording && logsOrdered.length === 0 && <EmptyState message={t('recording.hint')} />}
-            {isRecording && logsOrdered.length === 0 && <EmptyState message={t('recording.waiting')} />}
+            {logsOrdered.length === 0 && <EmptyState message={emptyMessage} />}
 
             {Object.entries(logsByRunId).map(([runId, logsOfRun], index, self) => (
               <div key={`${runId}-logs`}>

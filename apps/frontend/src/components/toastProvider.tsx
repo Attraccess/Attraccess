@@ -7,10 +7,15 @@ import { useAppTheme } from '@attraccess/ui';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
+export type ToastId = string | number;
+
 interface ToastOptions {
+  /** Showing a toast with the id of an open one replaces it. */
+  id?: ToastId;
   title: string;
   description?: string;
   type?: ToastType;
+  /** Milliseconds; `Infinity` keeps the toast until it is dismissed. */
   duration?: number;
   action?: {
     label: string;
@@ -53,7 +58,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
 }
 
 export function useToastMessage() {
-  const showToast = useCallback(({ title, description, type = 'info', duration = 5000, action }: ToastOptions) => {
+  const showToast = useCallback(({ id, title, description, type = 'info', duration = 5000, action }: ToastOptions) => {
     const toastFn =
       type === 'error'
         ? toast.error
@@ -63,7 +68,8 @@ export function useToastMessage() {
             ? toast.warning
             : toast.info;
 
-    toastFn(title, {
+    return toastFn(title, {
+      id,
       description,
       icon: toastIcons[type],
       duration,
@@ -87,15 +93,20 @@ export function useToastMessage() {
     [showToast],
   );
 
+  const dismiss = useCallback((id: ToastId) => {
+    toast.dismiss(id);
+  }, []);
+
   return useMemo(
     () => ({
       showToast,
+      dismiss,
       success: (options: Omit<ToastOptions, 'type'>) => showToast({ ...options, type: 'success' }),
       error: (options: Omit<ToastOptions, 'type'>) => showToast({ ...options, type: 'error' }),
       warning: (options: Omit<ToastOptions, 'type'>) => showToast({ ...options, type: 'warning' }),
       info: (options: Omit<ToastOptions, 'type'>) => showToast({ ...options, type: 'info' }),
       apiError: showApiErrorToast,
     }),
-    [showToast, showApiErrorToast],
+    [showToast, dismiss, showApiErrorToast],
   );
 }

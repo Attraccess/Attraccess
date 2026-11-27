@@ -6,8 +6,8 @@ import {
   ResourceFlowResponseDto,
   ResourceFlowSaveDto,
   UseGetGlobalFlowCanvasKeyFn,
-  useGetGlobalFlowLogRecordingStatusKey,
-  useGetFlowLogRecordingStatusKey,
+  UseGetGlobalFlowLogRecordingStatusKeyFn,
+  UseGetFlowLogRecordingStatusKeyFn,
   UseGetResourceFlowKeyFn,
   useGetGlobalFlowCanvas,
   useGetGlobalFlowLogRecordingStatus,
@@ -15,16 +15,14 @@ import {
   useGetGlobalFlowNodeSchemas,
   useResolveGlobalFlowNodeSchema,
   useSaveGlobalFlowCanvas,
-  useStartGlobalFlowLogRecording,
-  useStopGlobalFlowLogRecording,
+  useKeepGlobalFlowLogRecordingAlive,
   useGetFlowLogRecordingStatus,
   useGetNodeSchemas,
   useGetResourceFlow,
   useGetResourceFlowLogs,
   useResolveNodeSchema,
   useSaveResourceFlow,
-  useStartFlowLogRecording,
-  useStopFlowLogRecording,
+  useKeepFlowLogRecordingAlive,
   ResourceFlowNodeSchemaDto,
   resolveGlobalFlowNodePreview,
   resolveNodePreview,
@@ -160,9 +158,8 @@ export function resolveFlowNodePreview(owner: FlowOwner, nodeType: string, confi
       }).then(({ data }) => data);
 }
 
-/** Recording status, buffered logs and start/stop of the log viewer. */
+/** Recording status and buffered logs of the log viewer. Reading them never starts or extends a recording. */
 export function useFlowLogRecording(owner: FlowOwner, opts: { isOpen: boolean }) {
-  const queryClient = useQueryClient();
   const refetchInterval = opts.isOpen ? 10_000 : false;
   const resourceStatus = useGetFlowLogRecordingStatus({ path: { resourceId: resourceIdOf(owner) } }, undefined, {
     enabled: owner.kind === 'resource',
@@ -190,42 +187,34 @@ export function useFlowLogRecording(owner: FlowOwner, opts: { isOpen: boolean })
   );
   const logs = (owner.kind === 'resource' ? resourceLogs.data : globalLogs.data)?.logs;
 
-  // Only the status needs invalidating: starting changes startedAt, which is part of the
-  // logs query key, and stopping disables that query altogether.
-  const invalidateStatus = useCallback(
-    () =>
-      queryClient.invalidateQueries({
-        queryKey: [owner.kind === 'resource' ? useGetFlowLogRecordingStatusKey : useGetGlobalFlowLogRecordingStatusKey],
-      }),
+  return { recording, isRecording, logs };
+}
+
+/**
+ * Starts or extends the owner's flow log recording. The response goes straight into the recording status
+ * cache, so the log viewer shows the new state without another request. Failures are silent: the caller
+ * simply tries again on its next renewal.
+ */
+export function useKeepFlowLogRecordingAliveRequest(owner: FlowOwner): () => void {
+  const queryClient = useQueryClient();
+  const onSuccess = useCallback(
+    (status: FlowLogRecordingDto) => {
+      queryClient.setQueryData(
+        owner.kind === 'resource'
+          ? UseGetFlowLogRecordingStatusKeyFn({ path: { resourceId: owner.resourceId } })
+          : UseGetGlobalFlowLogRecordingStatusKeyFn({ path: { flowId: owner.flowId } }),
+        status,
+      );
+    },
     [owner, queryClient],
   );
+  const resource = useKeepFlowLogRecordingAlive<FlowLogRecordingDto>(undefined, { onSuccess });
+  const global = useKeepGlobalFlowLogRecordingAlive<FlowLogRecordingDto>(undefined, { onSuccess });
+  const resourceMutate = resource.mutate;
+  const globalMutate = global.mutate;
 
-  const resourceStart = useStartFlowLogRecording(undefined, { onSuccess: invalidateStatus });
-  const resourceStop = useStopFlowLogRecording(undefined, { onSuccess: invalidateStatus });
-  const globalStart = useStartGlobalFlowLogRecording(undefined, { onSuccess: invalidateStatus });
-  const globalStop = useStopGlobalFlowLogRecording(undefined, { onSuccess: invalidateStatus });
-
-  const startRecording = useCallback(
-    (durationMinutes: number) => {
-      const requestBody = { durationMinutes };
-      if (owner.kind === 'resource')
-        resourceStart.mutate({ path: { resourceId: owner.resourceId }, body: requestBody });
-      else globalStart.mutate({ path: { flowId: owner.flowId }, body: requestBody });
-    },
-    [owner, resourceStart, globalStart],
-  );
-  const stopRecording = useCallback(() => {
-    if (owner.kind === 'resource') resourceStop.mutate({ path: { resourceId: owner.resourceId } });
-    else globalStop.mutate({ path: { flowId: owner.flowId } });
-  }, [owner, resourceStop, globalStop]);
-
-  return {
-    recording,
-    isRecording,
-    logs,
-    startRecording,
-    stopRecording,
-    isStarting: owner.kind === 'resource' ? resourceStart.isPending : globalStart.isPending,
-    isStopping: owner.kind === 'resource' ? resourceStop.isPending : globalStop.isPending,
-  };
+  return useCallback(() => {
+    if (owner.kind === 'resource') resourceMutate({ path: { resourceId: owner.resourceId } });
+    else globalMutate({ path: { flowId: owner.flowId } });
+  }, [owner, resourceMutate, globalMutate]);
 }

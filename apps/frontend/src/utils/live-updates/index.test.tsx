@@ -3,7 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LiveUpdatesProvider, resumeLiveUpdates, stopLiveUpdates, useLiveUpdates } from '.';
-import { useLiveLogs } from '../../app/resources/details/flows/liveLogs';
+import { LIVE_LOG_FLUSH_MS, useLiveLogs } from '../../app/resources/details/flows/liveLogs';
 import { usePluginLiveUpdates } from '@attraccess/plugins-frontend-sdk';
 
 const state = vi.hoisted(() => ({
@@ -35,6 +35,7 @@ beforeEach(() => resumeLiveUpdates());
 afterEach(() => {
   act(() => stopLiveUpdates());
   state.clients.length = 0;
+  vi.useRealTimers();
 });
 
 describe('MQTT message topic', () => {
@@ -91,6 +92,13 @@ describe('live topic React lifecycle', () => {
   it.each(['resource', 'user', 'login', 'logout'] as const)(
     'flow logs reset immediately on %s changes and ignore obsolete delivery',
     (change) => {
+      vi.useFakeTimers();
+      // Live log entries reach state in batches.
+      const deliver = (subscription: { onUpdate: (data: unknown) => void } | undefined, data: object) =>
+        act(() => {
+          subscription?.onUpdate(data);
+          vi.advanceTimersByTime(LIVE_LOG_FLUSH_MS);
+        });
       const queryClient = new QueryClient();
       let userId = 1;
       const onUpdate = vi.fn();
@@ -113,7 +121,7 @@ describe('live topic React lifecycle', () => {
         },
       );
       const old = state.clients[0].subscriptions[0];
-      act(() => old.onUpdate({ id: 1, resourceId: 1 }));
+      deliver(old, { id: 1, resourceId: 1 });
       expect(hook.result.current.liveLogs.map((log) => log.id)).toEqual([1]);
       committedLogs.length = 0;
       if (change === 'resource') hook.rerender({ resourceId: 2 });
@@ -125,19 +133,19 @@ describe('live topic React lifecycle', () => {
       if (change === 'logout') act(() => stopLiveUpdates());
       expect(committedLogs.every((logs) => logs.length === 0)).toBe(true);
       expect(hook.result.current.liveLogs).toEqual([]);
-      act(() => old.onUpdate({ id: 99, resourceId: 1 }));
+      deliver(old, { id: 99, resourceId: 1 });
       expect(hook.result.current.liveLogs).toEqual([]);
       expect(onUpdate).toHaveBeenCalledTimes(1);
       if (change === 'logout') act(() => resumeLiveUpdates());
       const current = state.clients.at(-1)?.subscriptions.at(-1);
-      act(() => current?.onUpdate({ id: 2, resourceId: change === 'resource' ? 2 : 1 }));
+      deliver(current, { id: 2, resourceId: change === 'resource' ? 2 : 1 });
       expect(hook.result.current.liveLogs.map((log) => log.id)).toEqual([2]);
       if (change === 'resource') {
         hook.rerender({ resourceId: 1 });
         expect(hook.result.current.liveLogs).toEqual([]);
       }
       hook.result.current.abort();
-      act(() => current?.onUpdate({ id: 3 }));
+      deliver(current, { id: 3 });
       expect(onUpdate).toHaveBeenCalledTimes(2);
       hook.unmount();
     },

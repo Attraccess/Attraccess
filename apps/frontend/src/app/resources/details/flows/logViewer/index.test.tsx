@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { useState } from 'react';
@@ -8,36 +8,25 @@ const state = vi.hoisted(() => ({
   recording: undefined as undefined | { isRecording: boolean; startedAt: string | null; expiresAt: string | null },
   logs: [] as Log[],
   live: [] as Log[],
-  start: vi.fn(),
-  stop: vi.fn(),
-  invalidate: vi.fn(),
-  startOptions: {} as { onSuccess: () => void },
-  stopOptions: {} as { onSuccess: () => void },
+  paused: false,
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({
-    useTranslations: () => ({
-      t: (key: string, params?: { countdown?: string }) => (params?.countdown ? `${key}:${params.countdown}` : key),
-      tExists: () => true,
-    }),
+    useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
     useDateTimeFormatter: () => (date: string) => date,
   }))()),
 }));
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('../context/index', () => ({
-  useFlowContext: () => ({ liveLogs: state.live, owner: { kind: 'resource', resourceId: 7 } }),
+  useFlowContext: () => ({ owner: { kind: 'resource', resourceId: 7 } }),
+  useFlowLogsContext: () => ({ liveLogs: state.live, isPausedForInactivity: state.paused }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useGetGlobalFlowCanvas: () => ({ data: undefined }),
   useGetGlobalFlowNodeSchemas: () => ({ data: undefined }),
   useGetGlobalFlowLogRecordingStatus: () => ({ data: undefined }),
-  useGetGlobalFlowLogRecordingStatusKey: 'global-recording',
   useGetGlobalFlowLogs: () => ({ data: undefined }),
-  useStartGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
-  useStopGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
   useGetNodeSchemas: () => ({ data: undefined }),
-  useGetFlowLogRecordingStatusKey: 'recording',
   useGetResourceFlow: () => ({
     data: {
       nodes: [
@@ -48,20 +37,13 @@ vi.mock('@attraccess/react-query-client', () => ({
   }),
   useGetFlowLogRecordingStatus: () => ({ data: state.recording }),
   useGetResourceFlowLogs: () => ({ data: { logs: state.logs } }),
-  useStartFlowLogRecording: (_mutationKey: unknown, options: typeof state.startOptions) => {
-    state.startOptions = options;
-    return { mutate: state.start };
-  },
-  useStopFlowLogRecording: (_mutationKey: unknown, options: typeof state.stopOptions) => {
-    state.stopOptions = options;
-    return { mutate: state.stop };
-  },
 }));
 beforeEach(() => {
   vi.clearAllMocks();
   state.recording = undefined;
   state.logs = [];
   state.live = [];
+  state.paused = false;
   vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-01T12:00:00Z'));
 });
 afterEach(() => {
@@ -91,7 +73,7 @@ async function open() {
   await screen.findByText('subtitle');
   return view;
 }
-it('starts a recording using the selected duration and refreshes its status', async () => {
+it('has no recording controls, only the status, download and the confetti toggle', async () => {
   await open();
   const confetti = screen.getByRole('button', { name: 'confetti' });
   expect(confetti).toHaveAttribute('aria-pressed', 'false');
@@ -99,25 +81,35 @@ it('starts a recording using the selected duration and refreshes its status', as
   expect(confetti).toHaveAttribute('aria-pressed', 'true');
   fireEvent.click(confetti);
   expect(confetti).toHaveAttribute('aria-pressed', 'false');
-  expect(state.start).not.toHaveBeenCalled();
-  expect(screen.getByText('recording.hint')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: /recording.duration$/ }));
-  fireEvent.click(await screen.findByRole('option', { name: 'duration.h1' }));
-  fireEvent.click(screen.getByRole('button', { name: 'recording.start' }));
-  expect(state.start).toHaveBeenCalledWith({ path: { resourceId: 7 }, body: { durationMinutes: 60 } });
-  act(() => state.startOptions.onSuccess());
-  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['recording'] });
+  expect(screen.queryByText(/^recording\.(start|stop|duration|active|hint)$/)).toBeNull();
+  expect(screen.queryByRole('button', { name: /recording\./ })).toBeNull();
+  expect(screen.getByRole('button', { name: /download.label/ })).toBeTruthy();
 });
-it('shows the remaining recording duration and stops recording', async () => {
-  state.recording = { isRecording: true, startedAt: '2026-09-01T11:00:00Z', expiresAt: '2026-09-01T13:02:03Z' };
+it('shows "Starting logging…" while the first keep-alive is pending', async () => {
   await open();
-  expect(screen.getByText('recording.active:1:02:03')).toBeTruthy();
-  expect(screen.getByText('recording.waiting')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'recording.stop' }));
-  expect(state.stop).toHaveBeenCalledWith({ path: { resourceId: 7 } });
-  act(() => state.stopOptions.onSuccess());
-  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['recording'] });
+  expect(screen.getByText('recording.off')).toBeTruthy();
+  expect(screen.getByText('recording.starting')).toBeTruthy();
 });
+it('shows the recording chip and waits for a run while recording', async () => {
+  state.recording = { isRecording: true, startedAt: '2026-09-01T11:00:00Z', expiresAt: '2026-09-01T12:05:00Z' };
+  await open();
+  expect(screen.getByText('recording.on').closest('[data-cy="flow-log-recording-chip"]')).toBeTruthy();
+  expect(screen.getByText('recording.waiting')).toBeTruthy();
+});
+it.each([
+  { isRecording: false, chip: 'recording.off' },
+  { isRecording: true, chip: 'recording.on' },
+])(
+  'says logging is paused once this page timed out (server recording: $isRecording)',
+  async ({ isRecording, chip }) => {
+    state.paused = true;
+    state.recording = { isRecording, startedAt: isRecording ? '2026-09-01T11:00:00Z' : null, expiresAt: null };
+    await open();
+    expect(screen.getByText(chip)).toBeTruthy();
+    expect(screen.getByText('recording.paused')).toBeTruthy();
+    expect(screen.queryByText('recording.waiting')).toBeNull();
+  },
+);
 it('merges recorded and live logs once, removes stale runs and exposes formatted payloads', async () => {
   state.recording = { isRecording: true, startedAt: '2026-09-01T11:00:00Z', expiresAt: '2026-09-01T12:05:00Z' };
   const first: Log = {
@@ -142,7 +134,6 @@ it('merges recorded and live logs once, removes stale runs and exposes formatted
   ];
   state.live = [first, { id: 3, flowRunId: 'run-b', type: 'flow.start', createdAt: '2026-09-01T11:40:00Z' }];
   await open();
-  expect(screen.getByText('recording.active:05:00')).toBeTruthy();
   expect(screen.queryByText(/OLD/)).toBeNull();
   expect(screen.getAllByRole('button', { name: 'nodes.timer.title -> node.processing.started' })).toHaveLength(1);
   fireEvent.click(screen.getByRole('button', { name: 'nodes.timer.title -> node.processing.started' }));
@@ -151,49 +142,42 @@ it('merges recorded and live logs once, removes stale runs and exposes formatted
   expect(await screen.findByDisplayValue('truncated {')).toBeTruthy();
 });
 
-it.each(['stop', 'expiry'])(
-  'keeps fetched and live logs visible after %s until the page is unmounted',
-  async (reason) => {
-    state.recording = { isRecording: true, startedAt: '2026-09-01T11:00:00Z', expiresAt: '2026-09-01T12:05:00Z' };
-    state.logs = [
-      {
-        id: 1,
-        flowRunId: 'run-a',
-        nodeId: 'trigger',
-        type: 'FETCHED',
-        createdAt: '2026-09-01T11:30:00Z',
-        payload: '{"ok":true}',
-      },
-    ];
-    state.live = [{ id: 2, flowRunId: 'run-a', nodeId: 'action', type: 'LIVE', createdAt: '2026-09-01T11:31:00Z' }];
-    const view = await open();
-    expect(screen.getByRole('button', { name: 'nodes.timer.title -> FETCHED' })).toBeTruthy();
-    if (reason === 'stop') {
-      fireEvent.click(screen.getByRole('button', { name: 'recording.stop' }));
-      act(() => state.stopOptions.onSuccess());
-    }
-    state.recording = { isRecording: false, startedAt: null, expiresAt: null };
-    state.logs = [];
-    view.rerender(
-      <MemoryRouter>
-        <Viewer version={1} />
-      </MemoryRouter>,
-    );
-    expect(screen.getByRole('button', { name: 'recording.start' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'nodes.timer.title -> FETCHED' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'nodes.http.title -> LIVE' })).toBeTruthy();
-    expect(screen.queryByText('recording.hint')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'nodes.timer.title -> FETCHED' }));
-    expect(await screen.findByRole('textbox')).toHaveValue('{\n  "ok": true\n}');
+it('keeps fetched and live logs visible after the recording expired until the page is unmounted', async () => {
+  state.recording = { isRecording: true, startedAt: '2026-09-01T11:00:00Z', expiresAt: '2026-09-01T12:05:00Z' };
+  state.logs = [
+    {
+      id: 1,
+      flowRunId: 'run-a',
+      nodeId: 'trigger',
+      type: 'FETCHED',
+      createdAt: '2026-09-01T11:30:00Z',
+      payload: '{"ok":true}',
+    },
+  ];
+  state.live = [{ id: 2, flowRunId: 'run-a', nodeId: 'action', type: 'LIVE', createdAt: '2026-09-01T11:31:00Z' }];
+  const view = await open();
+  expect(screen.getByRole('button', { name: 'nodes.timer.title -> FETCHED' })).toBeTruthy();
+  state.recording = { isRecording: false, startedAt: null, expiresAt: null };
+  state.logs = [];
+  view.rerender(
+    <MemoryRouter>
+      <Viewer version={1} />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText('recording.off')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'nodes.timer.title -> FETCHED' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'nodes.http.title -> LIVE' })).toBeTruthy();
+  expect(screen.queryByText('recording.starting')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'nodes.timer.title -> FETCHED' }));
+  expect(await screen.findByRole('textbox')).toHaveValue('{\n  "ok": true\n}');
 
-    view.unmount();
-    state.live = [];
-    await open();
-    expect(screen.queryByRole('button', { name: 'nodes.timer.title -> FETCHED' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'nodes.http.title -> LIVE' })).toBeNull();
-    expect(screen.getByText('recording.hint')).toBeTruthy();
-  },
-);
+  view.unmount();
+  state.live = [];
+  await open();
+  expect(screen.queryByRole('button', { name: 'nodes.timer.title -> FETCHED' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'nodes.http.title -> LIVE' })).toBeNull();
+  expect(screen.getByText('recording.starting')).toBeTruthy();
+});
 
 it('keeps previous recordings and deduplicates logs when recording starts again on the same page', async () => {
   state.recording = { isRecording: true, startedAt: '2026-09-01T11:00:00Z', expiresAt: '2026-09-01T12:05:00Z' };
