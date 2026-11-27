@@ -42,11 +42,12 @@ export function DownloadLogsMenu({ owner, logs, nodeTitle }: Readonly<DownloadLo
         {t('download.label')}
       </Button>
       <DropdownPopover>
+        {/* onAction, not onPress: a held key or press-drag-release closes the menu before a press completes. */}
         <DropdownMenu aria-label={t('download.label')}>
-          <DropdownItem id="ndjson" onPress={downloadNdjson} data-cy="flow-log-download-ndjson">
+          <DropdownItem id="ndjson" onAction={downloadNdjson} data-cy="flow-log-download-ndjson">
             {t('download.ndjson')}
           </DropdownItem>
-          <DropdownItem id="text" onPress={downloadText} data-cy="flow-log-download-text">
+          <DropdownItem id="text" onAction={downloadText} data-cy="flow-log-download-text">
             {t('download.text')}
           </DropdownItem>
         </DropdownMenu>

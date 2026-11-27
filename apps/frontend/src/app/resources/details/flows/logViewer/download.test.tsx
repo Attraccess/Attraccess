@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -127,6 +127,30 @@ describe('flow log download', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     // the drawer keeps showing what it showed
     expect(screen.getAllByRole('button', { name: 'Button -> node.processing.started' })).toHaveLength(3);
+  });
+
+  // React Aria selects and closes the menu on keydown or drag release, so the item never sees a full press.
+  it.each(['Enter', ' '])('saves the file while the selecting key (%j) is still held down', async (key) => {
+    state.live = [entry(1)];
+    const user = await open();
+    await user.click(await downloadButton());
+    (await screen.findByRole('menuitem', { name: 'NDJSON (.ndjson)' })).focus();
+    await user.keyboard(`{${key}>}`);
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    await user.keyboard(`{/${key}}`);
+
+    expect(fileNames).toEqual([expect.stringMatching(/\.ndjson$/)]);
+  });
+
+  it('saves the file when the pointer is dragged from the button and released on an item', async () => {
+    state.live = [entry(1)];
+    const user = await open();
+    const trigger = await downloadButton();
+    await user.pointer({ keys: '[MouseLeft>]', target: trigger });
+    const item = await screen.findByRole('menuitem', { name: 'Plain text (.txt)' });
+    await user.pointer([{ target: item }, { keys: '[/MouseLeft]', target: item }]);
+
+    expect(fileNames).toEqual([expect.stringMatching(/\.txt$/)]);
   });
 
   it('saves a global flow as plain text', async () => {
