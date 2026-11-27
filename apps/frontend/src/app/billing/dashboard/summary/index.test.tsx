@@ -24,7 +24,6 @@ const state = vi.hoisted(() => ({
   balanceQuery: vi.fn(),
   transactionsQuery: vi.fn(),
   refund: vi.fn(),
-  reloadOnUpdates: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -79,9 +78,6 @@ vi.mock('./transactionDetailsModal', () => ({
     onClose: () => void;
   }) => (isOpen ? <button onClick={onClose}>Details #{transactionId}</button> : null),
 }));
-vi.mock('./useReloadOnTransactionUpdates', () => ({
-  useReloadOnTransactionUpdates: (...args: unknown[]) => state.reloadOnUpdates(...args),
-}));
 vi.mock('./transactionDetailsModal/refund', () => ({
   RefundModal: ({ children }: { children: (open: () => void) => ReactNode }) => children(state.refund),
 }));
@@ -129,11 +125,6 @@ it('disables fetching without a user or when the card is disabled', () => {
       enabled: false,
     },
   );
-  expect(state.reloadOnUpdates).toHaveBeenLastCalledWith(9, false);
-});
-it('reloads the shown user’s transactions on live billing updates', () => {
-  open({ userId: 9 });
-  expect(state.reloadOnUpdates).toHaveBeenLastCalledWith(9, true);
 });
 it('renders configuration and balance loading states', () => {
   state.configuration = undefined;

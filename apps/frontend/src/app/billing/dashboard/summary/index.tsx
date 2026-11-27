@@ -3,6 +3,7 @@ import {
   EmptyState,
   PageHeader,
   TableActionsColumnHeader,
+  TableDataLoadingIndicator,
   TableRowActions,
   useTranslations,
 } from '@attraccess/plugins-frontend-ui';
@@ -23,7 +24,6 @@ import {
 import { CreditCardIcon, RotateCcwIcon } from 'lucide-react';
 import { TransactionDetailsModal } from './transactionDetailsModal/index';
 import { RefundModal } from './transactionDetailsModal/refund/index';
-import { useReloadOnTransactionUpdates } from './useReloadOnTransactionUpdates';
 import { useCreditsFormatter } from '../../../../hooks/useCreditsFormatter';
 import de from './de.json';
 import en from './en.json';
@@ -66,8 +66,6 @@ export function SummaryCard(props: Props) {
       enabled: !!userId && !isDisabled,
     },
   );
-
-  useReloadOnTransactionUpdates(userId, !isDisabled);
 
   const [transactionsPage] = useState(1);
 
@@ -205,9 +203,7 @@ export function SummaryCard(props: Props) {
               items={transactions?.data ?? []}
               renderEmptyState={() =>
                 isLoadingTransactions ? (
-                  <div className="flex justify-center py-12">
-                    <Spinner aria-label={t('transactions.table.loading') as string} />
-                  </div>
+                  <TableDataLoadingIndicator label={t('transactions.table.loading') as string} />
                 ) : (
                   <EmptyState message={t('transactions.table.empty') as string} />
                 )
