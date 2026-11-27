@@ -213,4 +213,15 @@ describe('removing meters', () => {
     rerender(<MeterSelector resourceId={7} value={1} onChange={vi.fn()} />);
     expect(screen.queryByText(en.missing)).not.toBeInTheDocument();
   });
+
+  it('reloads the archived meters when someone else changes the active ones', () => {
+    state.meters = [meter(1, 'Energy'), archivedMeter()];
+    const { rerender } = render(<MetersCard resourceId={7} />);
+    rerender(<MetersCard resourceId={7} />);
+    expect(state.invalidate).not.toHaveBeenCalled();
+
+    state.meters = [archivedMeter(), meter(1, 'Energy', { archivedAt: '2026-11-02T10:00:00Z' })];
+    rerender(<MetersCard resourceId={7} />);
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['meters'] });
+  });
 });

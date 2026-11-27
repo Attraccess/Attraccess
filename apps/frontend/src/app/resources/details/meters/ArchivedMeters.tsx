@@ -1,14 +1,13 @@
 import { Button, Disclosure } from '@heroui/react';
+import { ResourceMeterDto } from '@attraccess/react-query-client';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useMeterValueFormatter } from '../../../../hooks/useMeterValueFormatter';
 import { MeterActions } from './MeterActions';
-import { useArchivedMeters } from './useArchivedMeters';
 import en from './en.json';
 import de from './de.json';
 
 /** The collapsed list of archived meters, for people who may edit the resource. */
-export function ArchivedMeters({ resourceId }: { resourceId: number }) {
-  const meters = useArchivedMeters(resourceId);
+export function ArchivedMeters({ resourceId, meters }: { resourceId: number; meters: ResourceMeterDto[] }) {
   const formatDateTime = useDateTimeFormatter();
   const { t } = useTranslations({ en, de });
   const format = useMeterValueFormatter();

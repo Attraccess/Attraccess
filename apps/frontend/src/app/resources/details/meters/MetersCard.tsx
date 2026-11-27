@@ -23,7 +23,7 @@ export function MetersCard({ resourceId, className }: { resourceId: number; clas
     isLoading,
     isError,
   } = useListResourceMeters({ path: { resourceId } }, undefined, { refetchInterval: 10_000 });
-  const hasArchived = useArchivedMeters(resourceId, manage).length > 0;
+  const archived = useArchivedMeters(resourceId, manage);
   if (!meters.length && !manage && !isLoading && !isError) return null;
   return (
     <FlatSection className={className} icon={<Gauge className="size-4" />} title={t('title')}>
@@ -32,7 +32,7 @@ export function MetersCard({ resourceId, className }: { resourceId: number; clas
         {isLoading && <Spinner size="sm" />}
         {isError && <p role="alert">{t('loadError')}</p>}
         {!isLoading && !isError && !meters.length && (
-          <p className="text-sm">{t(hasArchived ? 'emptyActive' : 'empty')}</p>
+          <p className="text-sm">{t(archived.length ? 'emptyActive' : 'empty')}</p>
         )}
         {meters.map((meter) => (
           <div key={meter.id} className="flex flex-col gap-2">
@@ -66,7 +66,7 @@ export function MetersCard({ resourceId, className }: { resourceId: number; clas
           </div>
         ))}
         {manage && <MeterNameEditor resourceId={resourceId} />}
-        {manage && <ArchivedMeters resourceId={resourceId} />}
+        {manage && <ArchivedMeters resourceId={resourceId} meters={archived} />}
       </div>
     </FlatSection>
   );

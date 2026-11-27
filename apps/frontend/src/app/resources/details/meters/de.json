@@ -16,7 +16,7 @@
   "unavailable": "Messwert nicht verfügbar",
   "idle": "Keine aktive Sitzung",
   "asOf": "Letzter Messwert: {{time}}",
-  "error": "Zähler konnte nicht gespeichert werden. Prüfe, dass kein aktiver Zähler diesen Namen trägt, und versuche es erneut.",
+  "error": "Zähler konnte nicht gespeichert werden. Prüfe, ob bereits ein aktiver Zähler diesen Namen trägt, und versuche es erneut.",
   "loadError": "Zähler konnten nicht geladen werden.",
   "rate": "{{name}} — {{currency}} pro Messwert",
   "rateHint": "0 deaktiviert die Abrechnung. Der Preis wird beim Sitzungsstart gespeichert.",
@@ -38,8 +38,8 @@
   "errorNotFound": "Diesen Zähler gibt es nicht mehr.",
   "emptyActive": "Keine aktiven Zähler. Erstelle einen Zähler oder stelle einen archivierten wieder her.",
   "missing": "Der gewählte Zähler wurde archiviert oder entfernt. Wähle einen anderen aus.",
-  "renameLabel": "{{name}} umbenennen",
-  "archiveLabel": "{{name}} archivieren",
-  "restoreLabel": "{{name}} wiederherstellen",
-  "deleteLabel": "{{name}} löschen"
+  "renameLabel": "Umbenennen: {{name}}",
+  "archiveLabel": "Archivieren: {{name}}",
+  "restoreLabel": "Wiederherstellen: {{name}}",
+  "deleteLabel": "Löschen: {{name}}"
 }

@@ -18,7 +18,7 @@ Wer die Ressource bearbeiten darf, kann einen Zähler in der Karte **Zähler** a
 
 Solange eine laufende Sitzung (auch eine, die gerade beginnt oder endet) einen Zähler verwendet, kannst du ihn weder archivieren noch löschen. Versuche es nach dem Ende der Sitzung erneut.
 
-Ausstehende und fehlgeschlagene Kosten verhindern das Archivieren nicht. Sie bleiben in der Liste der offenen Zählerkosten, wo du weiterhin **Zähler erneut abfragen** oder **Zählerkosten erlassen** kannst. Ein erneuter Versuch führt wie bisher den Zweig **Messwert abfragen** des Zählers aus. Wenn du diesen Zweig entfernt hast, schlägt der Versuch fehl, und du kannst die Kosten mit **Zählerkosten erlassen** erlassen.
+Ausstehende und fehlgeschlagene Kosten verhindern das Archivieren nicht. Sie bleiben in der Liste der offenen Zählerkosten, wo du weiterhin **Zähler erneut abfragen** oder **Zählerkosten erlassen** kannst. Ein erneuter Versuch führt wie bisher den Zweig **Messwert abfragen** des Zählers aus. Wenn du diesen Zweig entfernt hast, schlägt der Versuch fehl, und du kannst stattdessen **Zählerkosten erlassen** verwenden.
 
 Flow-Knoten verhindern weder das Archivieren noch das Löschen, und Attraccess ändert sie nicht. Ein Knoten, der einen solchen Zähler noch auswählt, zeigt **Zähler archiviert oder entfernt** und wird mit der englischen Meldung „Choose a meter belonging to this resource“ markiert (wähle einen Zähler dieser Ressource). Du kannst den Flow trotzdem speichern, der Knoten bleibt aber markiert. Bis du einen anderen Zähler wählst oder den Knoten entfernst, schlägt jede Ausführung eines Knotens **Zähler melden** für einen archivierten Zähler mit dem Flow-Fehler `METER_ARCHIVED` fehl und erfasst nichts. Passe diese Flows an, um wiederholte Fehler zu vermeiden.
 
