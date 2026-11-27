@@ -40,7 +40,7 @@ with other values for its `.param` lines; the decks also run as they are with `n
 | Part of the report | Files | Model | Limits checked |
 |---|---|---|---|
 | Field solvers | `test_solvers.py` | Both solvers against closed-form results: a loop of track, the same inside a shorted ring and above a copper plate, a stripline | within 2 to 4 % |
-| NFC loop | `nfc_loop.py`, `peec.py` | Inductance and resistance at 13.56 MHz from the antenna footprint, with eddy currents in the pours around it (all layers, one sheet); also on a metal wall and with metal across the gap in the copper around the loop | no copper closed round the loop on any layer, for any net or for ground, 5 V and 3.3 V together; no screw in the gap |
+| NFC loop | `nfc_loop.py`, `peec.py` | Inductance and resistance at 13.56 MHz from the antenna footprint, with eddy currents in the pours around it (all layers, one sheet); also on a metal wall and with metal across the gap in the copper around the loop | no copper closed round the loop on any layer, for any net or for ground, both 5 V nets and 3.3 V together; no screw in the gap |
 | NFC field | `nfc_loop.py`, `peec.py` | Field in front of the reader from the loop and its eddy currents, averaged over a 72 x 42 mm card held parallel, from the case outwards; on wood or stone and on metal | at most 7.5 A/m at a card on the case; 1.5 A/m (ISO/IEC 14443 minimum) at least 10 mm in front |
 | NFC matching | `nfc_match.py`, `nfc_tx.cir` | Load between TX1 and TX2, transmitter current, receiver input voltage and loop current, on wood or stone and on metal. 20 000 boards with capacitors and filter inductors spread over 5 %, driver resistance 2 to 5 ohm, supply 2.7 to 3.4 V; one time-domain run with the bridge's square wave | transmitter 100 mA (150 mA limiting value), receiver input 4 Vpp, damping resistors 0.1 W |
 | DC input | `dc_hotplug.cir` | A live supply plugged in through four cables: cable inductance, fuse, ceramic capacitors with their capacitance loss over voltage, filter inductor, TVS at the top of its breakdown range | converter input 40 V at 24 V supply |
@@ -72,9 +72,9 @@ Results on the routed board:
 
 - **NFC**: 1.25 uH on the board, 1.20 uH on a metal wall; the open pours around the loop take 2 %. Metal
   across the gap (a screw or a supply track) would take it to 1.08 uH; no copper closes round the loop, for
-  any net or for ground, 5 V and 3.3 V together. With the fitted matching: 41 mA and 1.9 Vpp at
-  1.25 uH, 35 mA and 1.2 Vpp at 1.20 uH, no board in a hundred outside either limit. Field: 4.1 A/m at a
-  card on the case, 3.3 A/m on a metal wall; it falls to 1.5 A/m 19 mm in front (15 mm on metal). The
+  any net or for ground, both 5 V nets and 3.3 V together. With the fitted matching: 41 mA and 1.9 Vpp at
+  1.25 uH, 35 mA and 1.2 Vpp at 1.20 uH, no board in a hundred outside either limit. Field: 4.2 A/m at a
+  card on the case, 3.4 A/m on a metal wall; it falls to 1.5 A/m 19 mm in front (15 mm on metal). The
   transmitter uses 41 of its 100 mA, so the matching has room for more range.
 - **DC input**: 35 to 38 V at the converter for a live 24 V plug-in (38.1 V and 8.6 A in the TVS with 5 m
   of 1.5 mm2), 39.9 V from 26.4 V. C117 sees up to 43 V; it is a 100 V part.
@@ -92,7 +92,7 @@ Results on the routed board:
 - **SDIO link**: all six lines 40.3 mm. Clock arrives after 0.59 ns, data after 0.41 to 0.42 ns (within
   0.18 ns); round trip 1.01 ns. With a module answering within the SD standard's 14 ns, the MCU keeps
   10.0 ns at 40 MHz and 5.0 ns at 50 MHz: the board does not limit this link.
-- **Supply tracks**: 0.07 V lost at most (1.9 A on the 5 V rail, the 16 LEDs at full white). The USB input's 1.5 A runs
+- **Supply tracks**: 0.09 V lost at most (1.65 A on the 5 V rail, the LED ring at its switch's highest limit, 0.31 A; 0.04 V more from the switch to the ring). The USB input's 1.5 A runs
   through 13 mm of 0.62 mm inner track, more than the rule for a free inner track allows; it lies 0.1 mm
   from a plane that takes its 70 mW.
 - **Supply impedance**: above 30 MHz the core rail looks like 1.1 nH (2.4 nH for one pin), a 3.3 V pin
@@ -105,9 +105,9 @@ Results on the routed board:
 
   | Supply | Typical use | Board | Warmest spot | Display | Wi-Fi module: board under it, cavity | Everything on: board, LED ring, under Wi-Fi module, cavity |
   |---|---|---|---|---|---|---|
-  | USB | 2.5 W | +23 K | +30 K | +18 K | +29 K, +17 K | +39 K, +50 K, +50 K, +29 K |
-  | DC, 12 V | 2.9 W | +26 K | +35 K | +21 K | +32 K, +19 K | +47 K, +59 K, +56 K, +34 K |
-  | PoE | 3.5 W | +31 K | +39 K | +24 K | +37 K, +23 K | +53 K, +63 K, +63 K, +39 K |
+  | USB | 2.5 W | +23 K | +30 K | +18 K | +29 K, +17 K | +41 K, +55 K, +51 K, +30 K |
+  | DC, 12 V | 2.9 W | +26 K | +35 K | +21 K | +32 K, +19 K | +48 K, +62 K, +57 K, +35 K |
+  | PoE | 3.5 W | +31 K | +39 K | +24 K | +37 K, +23 K | +54 K, +68 K, +63 K, +40 K |
 
   In a 40 °C room on PoE: display 64 °C (limit 70 °C), air at the PoE module 71 °C (85 °C), air outside
   the Wi-Fi module 63 to 77 °C (85 °C), DC fuse holding 0.65 A against 0.28 A drawn. Everything on for a

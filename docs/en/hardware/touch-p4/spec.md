@@ -23,13 +23,13 @@ may be connected; the highest one feeds the board.
 
 | Source | Range | Current drawn | Protection |
 |---|---|---|---|
-| DC, barrel jack 5.5/2.1 mm or WAGO terminal | 12 V or 24 V supplies: the converter starts between 8.5 and 9.4 V (R103/R113), so 12 V - 10 % runs it; up to 28 V continuously; the converter stands 35 V, 40 V for 0.4 s | typical 0.23 A at 12 V (2.8 W); at the board's highest consumption 0.45 A at 12 V, 0.23 A at 24 V | PTC fuse 1.1 A hold, bidirectional TVS at the connector, 100 V reverse-polarity diode, damped filter, TVS at the converter |
-| PoE (lan version) | IEEE 802.3af powered device, 37 to 57 V at the jack (isolated module DP9900M-5V) | typical 3.4 W; at the board's highest consumption about 5.6 W | the module's isolation (1500 V test), TVS and ferrite beads at its input, 3 mm creepage on the board |
+| DC, barrel jack 5.5/2.1 mm or WAGO terminal | 12 V or 24 V supplies: the converter starts between 8.5 and 9.4 V (R103/R113), so 12 V - 10 % runs it; up to 28 V continuously; the converter stands 35 V, 40 V for 0.4 s | typical 0.23 A at 12 V (2.8 W); at the board's highest consumption 0.52 A at 12 V, 0.26 A at 24 V | PTC fuse 1.1 A hold, bidirectional TVS at the connector, 100 V reverse-polarity diode, damped filter, TVS at the converter |
+| PoE (lan version) | IEEE 802.3af powered device, 37 to 57 V at the jack (isolated module DP9900M-5V) | typical 3.4 W; at the board's highest consumption about 6.5 W | the module's isolation (1500 V test), TVS and ferrite beads at its input, 3 mm creepage on the board |
 | USB-C (service) | 5 V, USB 2.0 port or Type-C source | at most 0.5 A when USB is the only source (firmware limit; estimated 0.43 A) | eFuse: soft start, 1.8 to 2.2 A limit, cut-off above 5.53 to 5.74 V and below 3.9 V, reverse blocking; ESD array |
 
-Highest consumption at the 5 V rail: 0.90 A by the makers' maximum figures, 1.65 A by their
-supply-sizing figures, with two firmware limits: the LEDs below 100 mA together, and no beep while
-the NFC field is on. Internal rails: 3.3 V (TLV62569, 2 A, 36 % headroom at the sizing figures),
+Highest consumption at the 5 V rail: 1.04 A by the makers' maximum figures, 1.62 A by their
+supply-sizing figures, with two firmware limits: the LEDs at 192 mA or less together, and no beep while
+the NFC field is on. A current-limited switch holds the LEDs below 0.31 A whatever the firmware does. Internal rails: 3.3 V (TLV62569, 2 A, 36 % headroom at the sizing figures),
 1.1 V core (TLV62569, set by the MCU).
 
 ## Environment

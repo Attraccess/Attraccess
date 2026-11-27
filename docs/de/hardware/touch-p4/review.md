@@ -294,7 +294,8 @@ Punkte unter A−, jeweils mit ihrem Eintrag unter [Bekannte Einschränkungen](h
 | 5.5 Quarz-Leiterbahnen | B+ | 6,5 / 6,8 mm |
 | 9.3 Funk | B | Für die externe Antenne des C6 benotet; für die Leiterplattenantenne des C5 neu benoten |
 
-Punkte bei A−, die auch einen Abweichungseintrag haben: 2.4 (reine USB-Versorgung auf 500 mA begrenzt),
+Punkte bei A−, die auch einen Abweichungseintrag haben: 2.4 (reine USB-Versorgung auf 500 mA begrenzt;
+die Reserve des PoE-Moduls bei 85 °C, nach der Benotung hinzugekommen),
 6.2 (fünf Merkmale an der Grenze der Fertigung), 7.6 (kleine Passivbauteile nur in der
 Bestückungszeichnung) und 9.1 (LED-Fenster, Summer, Verschlussschrauben). Punkt 5.2 hat eine Abweichung
 für den SDIO-Bus (zwei Lagenwechsel je Leitung), nach der Benotung hinzugekommen.

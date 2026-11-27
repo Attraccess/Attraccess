@@ -97,7 +97,7 @@ Die Schätzung setzt die Platine im typischen Betrieb je nach Versorgung 23 bis 
 | # | Schritt | Bestanden |
 |---|---|---|
 | 1 | Geschlossenes Gehäuse an der Wand, Firmware im Normalzustand (Display an, WLAN verbunden, NFC-Polling, LEDs auf Ruhepegel), jede Versorgung nacheinander. Nach einer Stunde: Temperatursensor des Chips, Vorderseite des Displays, Luft im Inneren durch die untere Aussparung. | Chip 30 bis 40 K über dem Raum, Displayvorderseite 15 bis 25 K |
-| 2 | Alle LEDs auf ihrem hellsten Dauerpegel, Hintergrundbeleuchtung voll; Thermoelement neben D701 und D710 (der LED-Ring ist dann die wärmste Stelle) | die LED-Grenze der Firmware daraus festlegen; die Leistungsbilanz hält alle LEDs zusammen in jedem Fall unter 100 mA |
+| 2 | Alle LEDs auf ihrem hellsten Dauerpegel, Hintergrundbeleuchtung voll; Thermoelement neben D701 und D710 (der LED-Ring ist dann die wärmste Stelle) | die LED-Grenze der Firmware daraus festlegen; die Leistungsbilanz hält alle LEDs zusammen in jedem Fall bei 192 mA oder darunter |
 | 3 | Am PoE: das Modul U102 nach einer Stunde (es steht in Luft, die so warm ist wie die Platine) | Wert notieren |
 | 4 | Luft neben dem WLAN-Modul (darauf bezieht sich seine 85-°C-Angabe): feines Thermoelement in der Lücke zwischen der rechten Kante des Moduls und den Pull-ups, ohne Kupfer zu berühren, geschlossenes Gehäuse am PoE. Einmal im Normalzustand, einmal mit dem Modul, das 40 % der Zeit sendet (ein Upload in Stufen, die Grenze der Firmware). | Erwartet in einem Raum von 40 °C: 63 bis 77 °C und 65 bis 84 °C (mit der Raumtemperatur im Test skalieren; [design-notes.md](hardware/touch-p4/design-notes.md#wärme)). Weniger als 5 K bis 85 °C bei 40 °C im zweiten Fall: die Sendegrenze der Firmware senken. |
 | 5 | Für Räume über 30 °C: Schritt 1 in einem Wärmeschrank bei dieser Temperatur wiederholen | Display bis 70 °C spezifiziert |
@@ -127,9 +127,10 @@ Die Schätzung setzt die Platine im typischen Betrieb je nach Versorgung 23 bis 
 | # | Schritt | Bestanden |
 |---|---|---|
 | 1 | MCU im Reset gehalten; dann jede LED der Reihe nach einschalten. Nie alle 16 mit vollem Weiß (das Datenblatt der LED erlaubt 70 % für Weiß). | dunkel im Reset; Reihenfolge und Farben richtig |
-| 2 | Hellstes Muster, das die Firmware erlaubt, 5-V-Strom gegenüber allen LEDs dunkel (alle Kanäle aller 16 LEDs zählen; [design-notes.md](hardware/touch-p4/design-notes.md#stromversorgung)) | Anstieg unter 100 mA |
-| 3 | Piepton mit 2,7 kHz. Der Schall verlässt den Buzzer an der Seite, die zum unteren Platinenrand zeigt. Den Buzzer-Pin nie auf High lassen: Spule und Widerstand sind für einen Ton gemacht, nicht für Gleichstrom. | in einer Werkstatt laut genug; kein hörbares Rauschen, keine Störung auf dem Display |
-| 4 | Einen Piepton anfordern, während der Leser nach Karten fragt (die Leistungsbilanz verlässt sich darauf, dass nur bei ausgeschaltetem Feld gepiept wird) | NFC-Senderstrom (NFC, Schritt 3) weg, solange der Buzzer ertönt |
+| 2 | Hellstes Muster, das die Firmware erlaubt, 5-V-Strom gegenüber allen LEDs dunkel (alle Kanäle aller 16 LEDs zählen; [design-notes.md](hardware/touch-p4/design-notes.md#stromversorgung)). Dann alle 16 in einer Farbe mit 255, und Weiß auf allen 16 mit dem skalierten Pegel der Firmware | Anstieg höchstens 192 mA; eine Farbe etwa 190 mA (12 mA je LED), Weiß nicht darüber |
+| 3 | Die Grenze des Schalters: ein Test-Build ohne die LED-Grenze, alle 16 weiß mit 255 für höchstens 10 s, Strom über ein USB-Messgerät oder ein Netzteil; Spannung am +-Pad von C725 | der Ring wird dunkler, statt voll zu leuchten; der Anstieg bleibt bei 232 bis 306 mA; C725 deutlich unter der Schiene. Zurück zur normalen Firmware: wieder volle Helligkeit, ohne Neustart |
+| 4 | Piepton mit 2,7 kHz. Der Schall verlässt den Buzzer an der Seite, die zum unteren Platinenrand zeigt. Den Buzzer-Pin nie auf High lassen: Spule und Widerstand sind für einen Ton gemacht, nicht für Gleichstrom. | in einer Werkstatt laut genug; kein hörbares Rauschen, keine Störung auf dem Display |
+| 5 | Einen Piepton anfordern, während der Leser nach Karten fragt (die Leistungsbilanz verlässt sich darauf, dass nur bei ausgeschaltetem Feld gepiept wird) | NFC-Senderstrom (NFC, Schritt 3) weg, solange der Buzzer ertönt |
 
 ## Manipulationssensoren
 

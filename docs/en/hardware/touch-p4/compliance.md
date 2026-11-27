@@ -218,7 +218,7 @@ Not done on the board: a fuse small enough to make the DC input PS1 by itself. B
 | BASF Ultrafuse PC/ABS FR Black | V-0 at 1.5 mm and 3.0 mm [BASF TDS] |
 | ROSA "ABS FR V0" | Sheet headed "ABS+", states HB at 1.5 and 3.0 mm [ROSA TDS]. Ask ROSA for evidence of V-0; do not rely on the product name. |
 
-ABS suits the reader otherwise: Filament Unger gives about 95 °C for theirs [Unger guide]. In typical use on PoE in a room of 40 °C the warmest spot reaches about 80 °C and the Wi-Fi module 79 °C (estimate). With everything on for a long time the LED ring would get 50 to 63 K warmer than the room; the firmware limits the LEDs ([simulations](hardware/touch-p4/simulations.md)).
+ABS suits the reader otherwise: Filament Unger gives about 95 °C for theirs [Unger guide]. In typical use on PoE in a room of 40 °C the warmest spot reaches about 80 °C and the Wi-Fi module 79 °C (estimate). With everything on for a long time the LED ring would get 55 to 68 K warmer than the room; the firmware limits the LEDs ([simulations](hardware/touch-p4/simulations.md)).
 
 ## Tests on the ports
 

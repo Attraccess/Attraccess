@@ -53,6 +53,19 @@ not reopened without a new reason.
   the current to 1.8 to 2.2 A, and a source that cannot deliver protects itself.
 - **Revision B.** CC1/CC2 to two ADC pins, so a 1.5 A or 3 A source runs the board at full brightness.
 
+### Headroom of the PoE module when hot (review item 2.4)
+
+- **Target.** At least 30 % headroom on each 5 V source at the makers' maximum figures.
+- **Reached.** 42 % on the PoE module up to 70 °C (1.8 A), 13 % at 85 °C, where it is rated 1.2 A
+  ([Power budget](hardware/touch-p4/design-notes.md#power-budget)). It was 22 % before the firmware's LED
+  limit rose from 100 to 192 mA, so it already fell short.
+- **Why.** The LED limit gives single colours their full 8-bit range (16 LEDs at 12 mA each). The reader
+  is an indoor product: 85 °C round the module means a room far above the 40 °C the heat estimate assumes.
+- **Mitigation.** The figures stack maximum values that do not coincide. The firmware's temperature rule
+  dims LEDs and backlight first above about 80 °C at the chip, which cuts the load before the module is that
+  hot. The module limits its own output; nothing is damaged if it does.
+- **Revision B.** No change planned.
+
 ### Features at JLCPCB's limits (review item 6.2)
 
 - **Target.** Nothing at the fab's limit unless a part's pitch forces it.
@@ -152,6 +165,6 @@ What only a built board can settle. Each is a step in the [Bring-up plan](hardwa
 | Surge levels | EN 50130-4:2011 surge levels for DC lines not yet read from the purchased standard | Read before the lab ([CE and market checklist](hardware/touch-p4/compliance.md)) |
 | USB port on a warm reader running from another supply | R104 holds the unplugged VBUS near 0 V against the eFuse's typical leakage | With the reader warm, check that a USB-C host still switches its supply on |
 | 3.3 V converter stability | U103's rail at 44.5 uF and U302's at 47.2 uF effective, against TI's 52.8 uF; loop crossover not published | Load step 0.1 to 1 A with and without C108 |
-| Power budget assumptions | 60 mA allowed for the panel's 3.3 V; LEDs below 100 mA together and buzzer only with the NFC field off are firmware rules | Measure the panel's current; test both firmware limits and the USB-only mode |
+| Power budget assumptions | 60 mA allowed for the panel's 3.3 V; LEDs at 192 mA or less together and buzzer only with the NFC field off are firmware rules | Measure the panel's current; test both firmware limits, the LED switch's limit and the USB-only mode |
 | DC terminal holes | 1.2 mm holes are 0.1 mm over the WAGO 250's maximum | Check the hole fill on the first boards |
 | Ethernet crystal in the cold | 25 MHz crystal rated to 50 ohm ESR, PHY asks 40 ohm; typical parts far below | Only if the Ethernet clock fails to start cold: look here first |

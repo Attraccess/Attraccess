@@ -30,6 +30,7 @@ last-time-buy notice from its maker.
 | Diodes AP3032KTR-G1 | U601 | Active | [DigiKey](https://www.digikey.com/en/products/result?keywords=AP3032KTR-G1) |
 | TI TCA9554PWR | U602 | ACTIVE | [ti.com](https://www.ti.com/product/TCA9554/part-details/TCA9554PWR) |
 | TI SN74LV1T125DBVR | U701 | ACTIVE | [ti.com](https://www.ti.com/product/SN74LV1T125/part-details/SN74LV1T125DBVR) |
+| TI TPS2553DBVR | U705 | ACTIVE | [ti.com](https://www.ti.com/product/TPS2553/part-details/TPS2553DBVR) |
 | ST LIS2DH12TR | U702 | Active | [DigiKey](https://www.digikey.com/en/products/result?keywords=LIS2DH12TR) |
 | TI DRV5032FADBZR | U703 | ACTIVE | [ti.com](https://www.ti.com/product/DRV5032/part-details/DRV5032FADBZR) |
 | Vishay VCNL4040M3OE | U704 | Active. The -H3 suffix is obsolete: do not order it | [DigiKey](https://www.digikey.com/en/products/detail/vishay-semiconductor-opto-division/VCNL4040M3OE/5171283) |
@@ -90,7 +91,9 @@ No alternate was found for:
 - the VCNL4040, the HY931147C (its PoE bridges are unusual), the FH12-40S (no identical land pattern)
   and the WAGO 250-202;
 - the eFuse TPS259470A: TI's TPS259470LRPWR has the same pins but latches off after a fault, and had no
-  stock.
+  stock;
+- the LED supply switch TPS2553DBVR: TI's TPS2553DBVR-1 (C111738) has the same pins but latches off after a
+  fault, so the ring would stay dark until the next power cycle.
 
 The parts lists name an alternate for the other small discretes (diodes, ferrites, crystals, fuses,
 inductors, electrolytic capacitors). Plain resistors and capacitors take any part of the same value,
@@ -157,6 +160,10 @@ not fit.
   capacitors (C716 to C723) of part numbers the board already has: no new parts line and no feeder fee. At
   LCSC's prices for the LED (0.093 each from 5, 0.048 from 2000, November 2026) and JLCPCB's placement per joint,
   that is about 0.8 USD per board at 5 to 10 boards and 0.4 at 1000, to be confirmed by the next quote.
+- **Also after this quote** the LED supply switch: TPS2553DBVR (U705, C55266, LCSC 0.20 each from 5, 0.11 from
+  3000, November 2026), a 100 uF electrolytic (C725) of the part the PoE module's output already uses, a 100 nF
+  and a 100 k. One new extended line: about 3.30 more feeder fee per order, and on the wifi version a second one,
+  since the electrolytic was a lan-only line. About 0.9 USD per board at 5 boards, 0.6 at 10, 0.2 at 1000.
 
 ### Layers, vias and finish
 
@@ -200,6 +207,8 @@ divider's 3.9 k). The exceptions:
 - The power path: eFuse, ideal-diode controller and its MOSFET, supervisor, the two TVS of the DC input
   (SMBJ28A, SMBJ28CA), the 47 uF electrolytic, the eFuse divider's three 0.1 % thin-film resistors, and
   1.65 k, 22.1 k and 2.2 nF. Whether a basic part exists for the last three has not been checked.
+- The LED supply switch TPS2553DBVR and its 100 uF electrolytic, the same part as the PoE module's output
+  capacitor.
 
 ## Sourcing risks
 

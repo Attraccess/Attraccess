@@ -33,7 +33,7 @@ ihrer Bauteile. Mit **Harte Anforderung** markierte Regeln sind Pflicht, keine E
 | 17 | Secure Boot mit RSA-3072. Die Chip-Revision prüfen, bevor der Secure Download Mode aktiviert wird | ECDSA-Secure-Boot hat einen Erratum-Eintrag; bei v3.1 ließ sich der Chip über sein ROM nicht mehr flashen | [Secure Boot und Chip-Revision](#secure-boot-und-chip-revision) |
 | 18 | Der Hall-Schalter zählt erst, nachdem er einmal 0 gelesen hat; den Beschleunigungssensor ignorieren, solange der Buzzer ertönt | Ein Leser ohne Dock-Magnet sieht aus wie ein abgenommener; der Buzzer lässt die Platine vibrieren | [Manipulationserkennung](#manipulationserkennung) |
 | 19 | **Harte Anforderung.** Wenn USB die einzige Quelle ist, innerhalb dessen bleiben, was die USB-Quelle bietet | Ein USB-2.0-Port liefert 500 mA, die Platine zieht bis zu 0,9 A: Der Port schaltet ab, oder das eFuse schaltet die Platine aus | [Leistungsgrenzen je Quelle](#leistungsgrenzen-je-quelle) |
-| 20 | **Harte Anforderung.** Alle LED-Kanäle zusammen unter 100 mA im Dauerbetrieb (Regel 2 hält sie dort) | Die 30 % Reserve der 5-V-Quellen setzen dies voraus ([Designnotizen](hardware/touch-p4/design-notes.md#leistungsbilanz)) | [NFC, Buzzer und LEDs](#nfc-buzzer-und-leds) |
+| 20 | **Harte Anforderung.** Alle LED-Kanäle zusammen höchstens 192 mA: eine Farbe auf allen 16 LEDs mit vollem Umfang, Mischfarben und Weiß auf diese Summe herunterskaliert | Die Reserve der 5-V-Quellen setzt dies voraus ([Designnotizen](hardware/touch-p4/design-notes.md#leistungsbilanz)). Darüber dimmt der strombegrenzte Schalter den Ring | [NFC, Buzzer und LEDs](#nfc-buzzer-und-leds) |
 | 21 | **Harte Anforderung.** Der Buzzer ertönt nur, solange das NFC-Feld aus ist | Die Leistungsbilanz zählt entweder den Buzzer oder den NFC-Sender, nicht beide | [NFC, Buzzer und LEDs](#nfc-buzzer-und-leds) |
 | 22 | **Harte Anforderung.** WLAN-Land fest auf die EU-Regeln: Country-Policy manuell, 802.11d aus, 5-GHz-Kanäle nur 36 bis 140; keine Benutzereinstellung für Land oder Band | Das Funkmodul würde das Land eines Access Points übernehmen, oder der Benutzer könnte eines wählen; beides verbieten die Regeln für 5 GHz | [EU-Funkregeln](#eu-funkregeln) |
 | 23 | **Harte Anforderung.** Kein SoftAP (Provisionierung) auf den Kanälen 52 bis 140: nur 2,4 GHz oder Kanäle 36 bis 48 | Der C5 hat keine eigene Radarerkennung | [EU-Funkregeln](#eu-funkregeln) |
@@ -43,7 +43,8 @@ ihrer Bauteile. Mit **Harte Anforderung** markierte Regeln sind Pflicht, keine E
 
 Was die Platine selbst erledigt: Widerstände halten die LEDs, die Hintergrundbeleuchtung, den Buzzer und
 den PN532 ausgeschaltet, bis die Firmware ihre Pins treibt, und der Spannungswächter U204 hält die MCU
-nach dem Hochlaufen der 3,3-V-Schiene 120 bis 280 ms im Reset (der Chip verlangt 50 us).
+nach dem Hochlaufen der 3,3-V-Schiene 120 bis 280 ms im Reset (der Chip verlangt 50 us). Ein strombegrenzter
+Schalter (U705) hält den LED-Ring unter 232 bis 306 mA, was die Firmware auch sendet; er ist immer eingeschaltet.
 
 ## ESP32-P4-GPIO-Belegung
 
@@ -308,8 +309,25 @@ Start setzen:
   nach rechts (LED 9 bis 12), die rechte Seite hinauf (LED 13 bis 16). Benachbarte LEDs stehen entlang
   des Rings 10,7 mm auseinander, auch um die Ecken, sodass eine Animation gleichmäßig nach dem Index
   fortschreitet. Weiß höchstens mit 70 % (die Grenze des LED-Datenblatts für alle drei Farben zusammen);
-  siehe Regeln 2 und 20: Die 100-mA-Grenze gilt für alle 16 zusammen. Ein Widerstand hält die
-  Datenleitung auf Low, daher bleiben die LEDs während des Resets dunkel.
+  siehe Regeln 2 und 20. Ein Widerstand hält die Datenleitung auf Low, daher bleiben die LEDs während des
+  Resets dunkel.
+- **LED-Strom (Regel 20)**: Jede LED treibt 12 mA je Farbkanal und stellt die Helligkeit nur per PWM ein;
+  ein Kanal mit dem Wert v zieht im Mittel v / 255 x 12 mA. Die Summe über alle 48 Kanäle bleibt bei
+  192 mA oder darunter, also R + G + B über die 16 LEDs summiert höchstens 4080:
+  - eine einzelne Farbe (Rot, Grün oder Blau) auf allen 16 LEDs darf ihren vollen Umfang nutzen, 0 bis 255;
+  - Mischfarben und Weiß werden so skaliert, dass die Summe in 4080 bleibt: Weiß auf allen 16 LEDs höchstens
+    85 je Kanal (33 %), zwei Farben höchstens je 127; weniger leuchtende LEDs lassen jeder mehr;
+  - das ganze Bild skalieren, nachdem die Animation es berechnet hat, damit ein Fehler in einem Effekt die
+    Grenze nicht überschreiten kann;
+  - für weiche Übergänge zeitliches Dithering verwenden (von Bild zu Bild zwischen benachbarten Werten
+    wechseln): Mit der Grenze liegen gedimmte Farben tief im 8-Bit-Bereich, wo einzelne Stufen sichtbar sind.
+
+  Über der Grenze begrenzt der Schalter U705 den Ring auf 232 bis 306 mA und lässt dessen Versorgung
+  einbrechen: Der Ring wird dunkler und verschiebt die Farbe (Blau und Grün zuerst), und der Schalter erwärmt
+  sich und schaltet sich zum Abkühlen eventuell aus und wieder ein. Nichts wird beschädigt, aber es ist ein
+  Firmwarefehler. Die PWM-Perioden der LEDs laufen in und aus dem Takt; laufen sie gleich, zieht eine
+  Mischfarbe für einen Teil jeder 0,8-ms-Periode bis zum Dreifachen ihres Mittelwerts, was der 100-uF-
+  Kondensator C725 trägt, solange der Mittelwert in der Grenze bleibt.
 
 ### Secure Boot und Chip-Revision
 
@@ -331,7 +349,7 @@ bis 40 K über dem Raum ansetzt.
 
 - Das geschlossene Gehäuse enthält 2,5 bis 3,5 W, daher bestimmen Raumtemperatur und LEDs, wie warm es
   wird. Geschätzter Anstieg der Platine über den Raum im typischen Betrieb: 23 K (USB), 26 K (DC), 31 K
-  (PoE); wenn lange alles an ist 39 bis 53 K, mit dem LED-Ring bei 50 bis 63 K.
+  (PoE); wenn lange alles an ist 41 bis 54 K, mit dem LED-Ring bei 55 bis 68 K.
 - In einem Raum von 40 °C am PoE setzt die Schätzung das Display auf 63 °C (Grenze 70 °C) und die Luft um
   das PoE-Modul auf 71 °C (Grenze 85 °C) an: knapper, als die Schätzung genau ist.
 - Über etwa 80 °C am Chip: erst die LEDs dimmen, dann die Hintergrundbeleuchtung, und das melden; reicht

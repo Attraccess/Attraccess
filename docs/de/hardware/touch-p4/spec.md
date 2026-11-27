@@ -24,13 +24,14 @@ dürfen beliebige Kombinationen angeschlossen sein, und die höchste Spannung sp
 
 | Quelle | Bereich | Stromaufnahme | Schutz |
 |---|---|---|---|
-| DC, Hohlstecker 5,5/2,1 mm oder WAGO-Klemme | 12-V- oder 24-V-Netzteile: Der Wandler startet zwischen 8,5 und 9,4 V (R103/R113), 12 V - 10 % lassen ihn also laufen; bis 28 V dauerhaft; der Wandler hält 35 V aus, 40 V für 0,4 s | typisch 0,23 A bei 12 V (2,8 W); bei der höchsten Leistungsaufnahme der Platine 0,45 A bei 12 V, 0,23 A bei 24 V | PTC-Sicherung 1,1 A Haltestrom, bidirektionale TVS-Diode am Anschluss, 100-V-Verpolschutzdiode, gedämpftes Filter, TVS-Diode am Wandler |
-| PoE (Version lan) | IEEE-802.3af-Endgerät (Powered Device), 37 bis 57 V an der Buchse (isoliertes Modul DP9900M-5V) | typisch 3,4 W; bei der höchsten Leistungsaufnahme der Platine etwa 5,6 W | Isolation des Moduls (1500-V-Prüfung), TVS-Diode und Ferritperlen an seinem Eingang, 3 mm Kriechstrecke auf der Platine |
+| DC, Hohlstecker 5,5/2,1 mm oder WAGO-Klemme | 12-V- oder 24-V-Netzteile: Der Wandler startet zwischen 8,5 und 9,4 V (R103/R113), 12 V - 10 % lassen ihn also laufen; bis 28 V dauerhaft; der Wandler hält 35 V aus, 40 V für 0,4 s | typisch 0,23 A bei 12 V (2,8 W); bei der höchsten Leistungsaufnahme der Platine 0,52 A bei 12 V, 0,26 A bei 24 V | PTC-Sicherung 1,1 A Haltestrom, bidirektionale TVS-Diode am Anschluss, 100-V-Verpolschutzdiode, gedämpftes Filter, TVS-Diode am Wandler |
+| PoE (Version lan) | IEEE-802.3af-Endgerät (Powered Device), 37 bis 57 V an der Buchse (isoliertes Modul DP9900M-5V) | typisch 3,4 W; bei der höchsten Leistungsaufnahme der Platine etwa 6,5 W | Isolation des Moduls (1500-V-Prüfung), TVS-Diode und Ferritperlen an seinem Eingang, 3 mm Kriechstrecke auf der Platine |
 | USB-C (Service) | 5 V, USB-2.0-Port oder Type-C-Quelle | höchstens 0,5 A, wenn USB die einzige Quelle ist (Firmware-Grenze; geschätzt 0,43 A) | eFuse: Sanftanlauf, Strombegrenzung 1,8 bis 2,2 A, Abschaltung über 5,53 bis 5,74 V und unter 3,9 V, Rückstromsperre; ESD-Array |
 
-Höchste Leistungsaufnahme an der 5-V-Schiene: 0,90 A nach den Maximalwerten der Hersteller,
-1,65 A nach deren Werten für die Auslegung der Versorgung, mit zwei Firmware-Grenzen: die
-LEDs zusammen unter 100 mA und kein Piepton, solange das NFC-Feld an ist. Interne
+Höchste Leistungsaufnahme an der 5-V-Schiene: 1,04 A nach den Maximalwerten der Hersteller,
+1,62 A nach deren Werten für die Auslegung der Versorgung, mit zwei Firmware-Grenzen: die
+LEDs zusammen bei 192 mA oder darunter und kein Piepton, solange das NFC-Feld an ist. Ein
+strombegrenzter Schalter hält die LEDs unter 0,31 A, was die Firmware auch sendet. Interne
 Schienen: 3,3 V (TLV62569, 2 A, 36 % Reserve bei den Auslegungswerten), 1,1-V-Kern
 (TLV62569, vom MCU gesetzt).
 

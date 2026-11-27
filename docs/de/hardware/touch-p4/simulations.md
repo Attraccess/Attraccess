@@ -44,7 +44,7 @@ ein Deck mit anderen Werten für seine `.param`-Zeilen aus; die Decks laufen auc
 | Teil des Berichts | Dateien | Modell | Geprüfte Grenzen |
 |---|---|---|---|
 | Feldlöser | `test_solvers.py` | Beide Löser gegen Ergebnisse in geschlossener Form: eine Leiterbahnschleife, dieselbe in einem kurzgeschlossenen Ring und über einer Kupferplatte, eine Streifenleitung | innerhalb von 2 bis 4 % |
-| NFC-Schleife | `nfc_loop.py`, `peec.py` | Induktivität und Widerstand bei 13,56 MHz aus dem Antennen-Footprint, mit Wirbelströmen in den Kupferflächen um sie herum (alle Lagen, eine Fläche); auch an einer Metallwand und mit Metall quer über der Lücke im Kupfer um die Schleife | kein um die Schleife geschlossenes Kupfer auf irgendeiner Lage, für kein Netz und nicht für Masse, 5 V und 3,3 V zusammen; keine Schraube in der Lücke |
+| NFC-Schleife | `nfc_loop.py`, `peec.py` | Induktivität und Widerstand bei 13,56 MHz aus dem Antennen-Footprint, mit Wirbelströmen in den Kupferflächen um sie herum (alle Lagen, eine Fläche); auch an einer Metallwand und mit Metall quer über der Lücke im Kupfer um die Schleife | kein um die Schleife geschlossenes Kupfer auf irgendeiner Lage, für kein Netz und nicht für Masse, beide 5-V-Netze und 3,3 V zusammen; keine Schraube in der Lücke |
 | NFC-Feld | `nfc_loop.py`, `peec.py` | Feld vor dem Leser aus der Schleife und ihren Wirbelströmen, gemittelt über eine parallel gehaltene Karte von 72 x 42 mm, vom Gehäuse nach außen; an Holz oder Stein und an Metall | höchstens 7,5 A/m an einer Karte auf dem Gehäuse; 1,5 A/m (Minimum nach ISO/IEC 14443) mindestens 10 mm davor |
 | NFC-Anpassung | `nfc_match.py`, `nfc_tx.cir` | Last zwischen TX1 und TX2, Senderstrom, Spannung am Empfängereingang und Schleifenstrom, an Holz oder Stein und an Metall. 20 000 Platinen mit Kondensatoren und Filterinduktivitäten über 5 % gestreut, Treiberwiderstand 2 bis 5 Ohm, Versorgung 2,7 bis 3,4 V; ein Lauf im Zeitbereich mit der Rechteckwelle der Brücke | Sender 100 mA (150 mA Grenzwert), Empfängereingang 4 Vss, Dämpfungswiderstände 0,1 W |
 | DC-Eingang | `dc_hotplug.cir` | Ein Netzteil unter Spannung, über vier Kabel eingesteckt: Kabelinduktivität, Sicherung, Keramikkondensatoren mit ihrem Kapazitätsverlust über der Spannung, Filterinduktivität, TVS am oberen Ende ihres Durchbruchbereichs | Wandlereingang 40 V bei 24 V Versorgung |
@@ -76,9 +76,9 @@ Ergebnisse auf der gerouteten Platine:
 
 - **NFC**: 1,25 uH auf der Platine, 1,20 uH an einer Metallwand; die offenen Kupferflächen um die Schleife
   nehmen 2 %. Metall quer über der Lücke (eine Schraube oder eine Versorgungsleiterbahn) brächte sie auf 1,08 uH;
-  kein Kupfer schließt sich um die Schleife, für kein Netz und nicht für Masse, 5 V und 3,3 V zusammen. Mit der bestückten
+  kein Kupfer schließt sich um die Schleife, für kein Netz und nicht für Masse, beide 5-V-Netze und 3,3 V zusammen. Mit der bestückten
   Anpassung: 41 mA und 1,9 Vss bei 1,25 uH, 35 mA und 1,2 Vss bei 1,20 uH, keine Platine von hundert
-  außerhalb einer der Grenzen. Feld: 4,1 A/m an einer Karte auf dem Gehäuse, 3,3 A/m an einer Metallwand;
+  außerhalb einer der Grenzen. Feld: 4,2 A/m an einer Karte auf dem Gehäuse, 3,4 A/m an einer Metallwand;
   es fällt 19 mm davor auf 1,5 A/m (15 mm an Metall). Der Sender nutzt 41 seiner 100 mA, die Anpassung hat
   also Spielraum für mehr Reichweite.
 - **DC-Eingang**: 35 bis 38 V am Wandler beim Einstecken eines 24-V-Netzteils unter Spannung (38,1 V und
@@ -102,7 +102,7 @@ Ergebnisse auf der gerouteten Platine:
   0,42 ns (innerhalb 0,18 ns); Umlaufzeit 1,01 ns. Mit einem Modul, das innerhalb der 14 ns des
   SD-Standards antwortet, behält der MCU 10,0 ns bei 40 MHz und 5,0 ns bei 50 MHz: Die Platine begrenzt
   diese Strecke nicht.
-- **Versorgungsleiterbahnen**: höchstens 0,07 V Verlust (1,9 A an der 5-V-Schiene, die 16 LEDs voll weiß). Die
+- **Versorgungsleiterbahnen**: höchstens 0,09 V Verlust (1,65 A an der 5-V-Schiene, der LED-Ring an der höchsten Grenze seines Schalters, 0,31 A; 0,04 V mehr vom Schalter zum Ring). Die
   1,5 A des USB-Eingangs laufen durch 13 mm Innenbahn von 0,62 mm, mehr als die Regel für eine freie
   Innenbahn erlaubt; sie liegt 0,1 mm neben einer Ebene, die ihre 70 mW aufnimmt.
 - **Versorgungsimpedanz**: Über 30 MHz sieht die Kernschiene wie 1,1 nH aus (2,4 nH für einen Pin), ein
@@ -115,9 +115,9 @@ Ergebnisse auf der gerouteten Platine:
 
   | Versorgung | Typischer Betrieb | Platine | Wärmste Stelle | Display | WLAN-Modul: Platine darunter, Hohlraum | Alles an: Platine, LED-Ring, unter dem WLAN-Modul, Hohlraum |
   |---|---|---|---|---|---|---|
-  | USB | 2,5 W | +23 K | +30 K | +18 K | +29 K, +17 K | +39 K, +50 K, +50 K, +29 K |
-  | DC, 12 V | 2,9 W | +26 K | +35 K | +21 K | +32 K, +19 K | +47 K, +59 K, +56 K, +34 K |
-  | PoE | 3,5 W | +31 K | +39 K | +24 K | +37 K, +23 K | +53 K, +63 K, +63 K, +39 K |
+  | USB | 2,5 W | +23 K | +30 K | +18 K | +29 K, +17 K | +41 K, +55 K, +51 K, +30 K |
+  | DC, 12 V | 2,9 W | +26 K | +35 K | +21 K | +32 K, +19 K | +48 K, +62 K, +57 K, +35 K |
+  | PoE | 3,5 W | +31 K | +39 K | +24 K | +37 K, +23 K | +54 K, +68 K, +63 K, +40 K |
 
   In einem Raum mit 40 °C am PoE: Display 64 °C (Grenze 70 °C), Luft am PoE-Modul 71 °C (85 °C), Luft
   außerhalb des WLAN-Moduls 63 bis 77 °C (85 °C), die DC-Sicherung hält 0,65 A gegenüber 0,28 A

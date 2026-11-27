@@ -32,7 +32,7 @@ marked **hard** are requirements, not advice.
 | 17 | Secure boot with RSA-3072. Check the chip revision before enabling Secure Download Mode | ECDSA secure boot has an erratum; on v3.1 the chip could no longer be flashed through its ROM | [Secure boot and chip revision](#secure-boot-and-chip-revision) |
 | 18 | The hall switch counts only after it has read 0 once; ignore the accelerometer while the buzzer sounds | A reader without a dock magnet looks removed; the buzzer shakes the board | [Tamper detection](#tamper-detection) |
 | 19 | **Hard.** On USB alone, keep within what the USB source offers | A USB 2.0 port gives 500 mA, the board draws up to 0.9 A: the port shuts down or the eFuse turns the board off | [Power limits per source](#power-limits-per-source) |
-| 20 | **Hard.** All LED channels together below 100 mA steady (rule 2 keeps them there) | The 5 V sources' 30 % headroom assumes it ([design notes](hardware/touch-p4/design-notes.md#power-budget)) | [NFC, buzzer and LEDs](#nfc-buzzer-and-leds) |
+| 20 | **Hard.** All LED channels together at most 192 mA: one colour on all 16 LEDs at full range, mixed colours and white scaled down to that sum | The 5 V sources' headroom assumes it ([design notes](hardware/touch-p4/design-notes.md#power-budget)). Above it the ring's current-limited switch dims the ring | [NFC, buzzer and LEDs](#nfc-buzzer-and-leds) |
 | 21 | **Hard.** The buzzer sounds only while the NFC field is off | The power budget counts either the buzzer or the NFC transmitter, not both | [NFC, buzzer and LEDs](#nfc-buzzer-and-leds) |
 | 22 | **Hard.** Wi-Fi country fixed to the EU rules: manual country policy, 802.11d off, 5 GHz channels 36 to 140 only; no user setting for country or band | The radio would adopt an access point's country, or the user could pick one, which the 5 GHz rules forbid | [EU radio rules](#eu-radio-rules) |
 | 23 | **Hard.** No SoftAP (provisioning) on channels 52 to 140: only 2.4 GHz or channels 36 to 48 | The C5 has no radar detection of its own | [EU radio rules](#eu-radio-rules) |
@@ -42,7 +42,8 @@ marked **hard** are requirements, not advice.
 
 What the board does itself: resistors hold the LEDs, backlight, buzzer and PN532 off until the firmware
 drives their pins, and the supervisor U204 holds the MCU in reset for 120 to 280 ms after the 3.3 V rail is up (the
-chip asks for 50 us).
+chip asks for 50 us). A current-limited switch (U705) holds the LED ring below 232 to 306 mA whatever the
+firmware sends; it is always on.
 
 ## ESP32-P4 GPIO map
 
@@ -292,8 +293,24 @@ start:
   the top (LED 1 to 4), down the left side (LED 5 to 8), left to right along the bottom (LED 9 to 12), up
   the right side (LED 13 to 16). Adjacent LEDs are 10.7 mm apart along the ring, also round the corners,
   so an animation steps evenly by index. White at 70 % at most (the LED datasheet's limit for all three
-  colours together); see rules 2 and 20: the 100 mA limit is for all 16 together. A resistor holds the
-  data line low, so the LEDs stay dark during reset.
+  colours together); see rules 2 and 20. A resistor holds the data line low, so the LEDs stay dark
+  during reset.
+- **LED current (rule 20)**: each LED drives 12 mA per colour channel and sets brightness by PWM only, so
+  a channel at value v draws v / 255 x 12 mA on average. Keep the sum over all 48 channels at 192 mA or
+  less, that is R + G + B summed over the 16 LEDs at most 4080:
+  - a single colour (red, green or blue) on all 16 LEDs may use its full range, 0 to 255;
+  - mixed colours and white are scaled so the sum stays within 4080: white on all 16 LEDs at most 85 per
+    channel (33 %), two colours at most 127 each; fewer LEDs lit leave more for each;
+  - scale the frame as a whole, after the animation has computed it, so a bug in one effect cannot pass
+    the limit;
+  - for smooth fades use temporal dithering (alternate between neighbouring values from frame to frame):
+    with the limit, dim colours sit low in the 8-bit range, where single steps show.
+
+  Above the limit the switch U705 limits the ring at 232 to 306 mA and lets its supply sag: the ring dims
+  and shifts colour (blue and green first), and the switch heats up and may turn off and on to cool. Nothing
+  is damaged, but it is a firmware fault. The LEDs' PWM periods drift in and out of step; when they line
+  up, a mixed colour draws up to three times its average for part of each 0.8 ms period, which the 100 uF
+  capacitor C725 carries as long as the average stays within the limit.
 
 ### Secure boot and chip revision
 
@@ -315,7 +332,7 @@ above the room in typical use.
 
 - The closed case holds 2.5 to 3.5 W, so room temperature and LEDs decide how warm it gets. Estimated
   board rise over the room in typical use: 23 K (USB), 26 K (DC), 31 K (PoE); with everything on for a
-  long time 39 to 53 K, with the LED ring at 50 to 63 K.
+  long time 41 to 54 K, with the LED ring at 55 to 68 K.
 - In a 40 °C room on PoE the estimate puts the display at 63 °C (limit 70 °C) and the air around the PoE
   module at 71 °C (limit 85 °C): closer than the estimate is exact.
 - Above about 80 °C at the chip: dim the LEDs first, then the backlight, and report it; if that is not

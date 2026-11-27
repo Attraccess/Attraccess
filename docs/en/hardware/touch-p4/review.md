@@ -282,7 +282,8 @@ Items below A−, each with its entry in [limitations](hardware/touch-p4/limitat
 | 5.5 Crystal tracks | B+ | 6.5 / 6.8 mm |
 | 9.3 Radio | B | Graded for the C6's external antenna; re-grade for the C5's PCB antenna |
 
-Items at A− that also have a deviation entry: 2.4 (USB-only supply held to 500 mA), 6.2 (five
+Items at A− that also have a deviation entry: 2.4 (USB-only supply held to 500 mA; the PoE module's
+headroom at 85 °C, added after grading), 6.2 (five
 features at the fab's limit), 7.6 (small passives on the assembly drawing only) and 9.1 (LED
 windows, buzzer, lock screws). Item 5.2 has a deviation for the SDIO bus (two layer changes per
 line), added after grading.

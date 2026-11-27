@@ -63,6 +63,20 @@ Abweichung; ohne neuen Grund wird es nicht wieder aufgerollt.
 - **Revision B.** CC1/CC2 an zwei ADC-Pins, sodass eine Quelle mit 1,5 A oder 3 A die Platine mit voller
   Helligkeit betreibt.
 
+### Reserve des PoE-Moduls bei Hitze (Review-Punkt 2.4)
+
+- **Ziel.** Mindestens 30 % Reserve an jeder 5-V-Quelle bei den Maximalwerten der Hersteller.
+- **Erreicht.** 42 % am PoE-Modul bis 70 °C (1,8 A), 13 % bei 85 °C, wo es für 1,2 A ausgelegt ist
+  ([Leistungsbilanz](hardware/touch-p4/design-notes.md#leistungsbilanz)). Vor der Anhebung der LED-Grenze der
+  Firmware von 100 auf 192 mA waren es 22 %, also schon zu wenig.
+- **Warum.** Die LED-Grenze gibt einzelnen Farben ihren vollen 8-Bit-Umfang (16 LEDs mit je 12 mA). Der Leser ist
+  ein Produkt für Innenräume: 85 °C um das Modul bedeuten einen Raum weit über den 40 °C, die die
+  Wärmeabschätzung annimmt.
+- **Abhilfe.** Die Werte stapeln Maximalwerte, die nicht zusammenfallen. Die Temperaturregel der Firmware dimmt
+  über etwa 80 °C am Chip zuerst LEDs und Hintergrundbeleuchtung, was die Last senkt, bevor das Modul so heiß ist.
+  Das Modul begrenzt seinen Ausgang selbst; nichts wird beschädigt, wenn es das tut.
+- **Revision B.** Keine Änderung geplant.
+
 ### Merkmale an den Grenzen von JLCPCB (Review-Punkt 6.2)
 
 - **Ziel.** Nichts an der Grenze der Fertigung, es sei denn, der Raster eines Bauteils erzwingt es.
@@ -169,6 +183,6 @@ Was nur eine aufgebaute Platine klären kann. Jeder Punkt ist ein Schritt im
 | Surge-Pegel | Die Surge-Pegel der EN 50130-4:2011 für DC-Leitungen noch nicht in der gekauften Norm gelesen | Vor dem Labor lesen ([CE- und Marktcheckliste](hardware/touch-p4/compliance.md)) |
 | USB-Port an einem warmen Leser, der aus einer anderen Quelle läuft | R104 hält VBUS des nicht angesteckten Ports nahe 0 V gegen den typischen Leckstrom der eFuse | Am warmen Leser prüfen, dass ein USB-C-Host seine Versorgung weiterhin einschaltet |
 | Stabilität der 3,3-V-Wandler | Die Schiene von U103 mit 44,5 uF und die von U302 mit 47,2 uF effektiv, gegen TIs 52,8 uF; Durchtrittsfrequenz der Regelschleife nicht veröffentlicht | Laststoß 0,1 bis 1 A mit und ohne C108 |
-| Annahmen des Leistungsbudgets | 60 mA für die 3,3-V-Versorgung des Panels angenommen; LEDs zusammen unter 100 mA und Summer nur bei ausgeschaltetem NFC-Feld sind Firmware-Regeln | Den Strom des Panels messen; beide Firmware-Grenzen und den reinen USB-Modus prüfen |
+| Annahmen des Leistungsbudgets | 60 mA für die 3,3-V-Versorgung des Panels angenommen; LEDs zusammen bei 192 mA oder darunter und Summer nur bei ausgeschaltetem NFC-Feld sind Firmware-Regeln | Den Strom des Panels messen; beide Firmware-Grenzen, die Grenze des LED-Schalters und den reinen USB-Modus prüfen |
 | Löcher der DC-Klemme | 1,2-mm-Löcher liegen 0,1 mm über dem Maximum der WAGO 250 | Die Lochfüllung an den ersten Platinen prüfen |
 | Ethernet-Quarz in der Kälte | 25-MHz-Quarz bis 50 Ohm ESR bemessen, der PHY verlangt 40 Ohm; typische Teile liegen weit darunter | Nur wenn der Ethernet-Takt kalt nicht anläuft: zuerst hier nachsehen |

@@ -32,6 +32,7 @@ seines Herstellers vor.
 | Diodes AP3032KTR-G1 | U601 | Aktiv | [DigiKey](https://www.digikey.com/en/products/result?keywords=AP3032KTR-G1) |
 | TI TCA9554PWR | U602 | ACTIVE | [ti.com](https://www.ti.com/product/TCA9554/part-details/TCA9554PWR) |
 | TI SN74LV1T125DBVR | U701 | ACTIVE | [ti.com](https://www.ti.com/product/SN74LV1T125/part-details/SN74LV1T125DBVR) |
+| TI TPS2553DBVR | U705 | ACTIVE | [ti.com](https://www.ti.com/product/TPS2553/part-details/TPS2553DBVR) |
 | ST LIS2DH12TR | U702 | Aktiv | [DigiKey](https://www.digikey.com/en/products/result?keywords=LIS2DH12TR) |
 | TI DRV5032FADBZR | U703 | ACTIVE | [ti.com](https://www.ti.com/product/DRV5032/part-details/DRV5032FADBZR) |
 | Vishay VCNL4040M3OE | U704 | Aktiv. Das Suffix -H3 ist abgekündigt: nicht bestellen | [DigiKey](https://www.digikey.com/en/products/detail/vishay-semiconductor-opto-division/VCNL4040M3OE/5171283) |
@@ -93,7 +94,9 @@ Keine Alternative gefunden für:
 - den VCNL4040, den HY931147C (seine PoE-Brücken sind ungewöhnlich), den FH12-40S (kein identisches Land
   Pattern) und den WAGO 250-202;
 - den eFuse TPS259470A: Der TPS259470LRPWR von TI hat die gleichen Pins, schaltet aber nach einem Fehler
-  dauerhaft ab und hatte keinen Bestand.
+  dauerhaft ab und hatte keinen Bestand;
+- den LED-Versorgungsschalter TPS2553DBVR: Der TPS2553DBVR-1 von TI (C111738) hat die gleichen Pins, schaltet
+  aber nach einem Fehler dauerhaft ab, sodass der Ring bis zum nächsten Einschalten dunkel bliebe.
 
 Die Stücklisten nennen eine Alternative für die anderen kleinen Diskreten (Dioden, Ferrite, Quarze,
 Sicherungen, Induktivitäten, Elektrolytkondensatoren). Einfache Widerstände und Kondensatoren nehmen jedes
@@ -166,6 +169,11 @@ Display-Panel, das JLCPCB nicht bestückt.
   keine Feeder-Gebühr. Mit den Preisen von LCSC für die LED (0,093 je Stück ab 5, 0,048 ab 2000, November 2026)
   und JLCPCBs Bestückung je Lötstelle sind das etwa 0,8 USD je Platine bei 5 bis 10 Platinen und 0,4 bei 1000; das
   nächste Angebot bestätigt es.
+- **Ebenfalls nach diesem Angebot** der LED-Versorgungsschalter: TPS2553DBVR (U705, C55266, LCSC 0,20 je Stück ab 5,
+  0,11 ab 3000, November 2026), ein 100-uF-Elektrolytkondensator (C725) des Bauteils, das schon am Ausgang des
+  PoE-Moduls sitzt, ein 100 nF und ein 100 k. Eine neue Extended-Zeile: etwa 3,30 mehr Feeder-Gebühr je Bestellung,
+  und bei der Version wifi eine zweite, da der Elektrolytkondensator eine Zeile nur der Version lan war. Etwa 0,9 USD je
+  Platine bei 5 Platinen, 0,6 bei 10, 0,2 bei 1000.
 
 ### Lagen, Vias und Oberfläche
 
@@ -213,6 +221,8 @@ NFC-Anpassung, die 3,9 k des Empfangsteilers). Die Ausnahmen:
   (SMBJ28A, SMBJ28CA), der 47-uF-Elektrolytkondensator, die drei 0,1-%-Dünnschichtwiderstände des
   eFuse-Teilers sowie 1,65 k, 22,1 k und 2,2 nF. Ob für die letzten drei ein Basic-Bauteil existiert,
   wurde nicht geprüft.
+- Der LED-Versorgungsschalter TPS2553DBVR und sein 100-uF-Elektrolytkondensator, dasselbe Bauteil wie der
+  Ausgangskondensator des PoE-Moduls.
 
 ## Beschaffungsrisiken
 
