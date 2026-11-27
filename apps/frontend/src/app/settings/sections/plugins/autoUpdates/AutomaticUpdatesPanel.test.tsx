@@ -187,6 +187,54 @@ describe('AutomaticUpdatesPanel', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
   });
 
+  it('changes the step limit while automatic updates are off, since it limits what is announced', async () => {
+    const user = await renderPanel();
+    await user.click(screen.getByRole('button', { name: /Largest update step/ }));
+    await user.click(await screen.findByRole('option', { name: 'Patch only' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(hoisted.setUpdatePolicyMock).toHaveBeenCalledWith({
+      body: expect.objectContaining({ automaticUpdates: false, mode: 'patch' }),
+    });
+  });
+
+  it('saves a time zone chosen from the list', async () => {
+    hoisted.updatePolicy = ENABLED_POLICY;
+    const user = await renderPanel();
+    const zone = screen.getByRole('combobox', { name: /Time zone/ });
+    await user.clear(zone);
+    await user.type(zone, 'Europe/Lis');
+    await user.click(await screen.findByRole('option', { name: 'Europe/Lisbon' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(hoisted.setUpdatePolicyMock).toHaveBeenCalledWith({
+      body: expect.objectContaining({ schedule: { ...ENABLED_POLICY.schedule, timeZone: 'Europe/Lisbon' } }),
+    });
+  });
+
+  it('has nothing to save after a switch is turned back', async () => {
+    hoisted.updatePolicy = ENABLED_POLICY;
+    const user = await renderPanel();
+    await user.click(master());
+    await user.click(master());
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Discard changes' })).not.toBeInTheDocument();
+  });
+
+  it('shows UTC, which the host uses, for automatic updates switched on without a zone', async () => {
+    hoisted.updatePolicy = { ...ENABLED_POLICY, schedule: { ...ENABLED_POLICY.schedule, timeZone: null } };
+    await renderPanel();
+    expect(screen.getByRole('combobox', { name: /Time zone/ })).toHaveValue('UTC');
+    expect(nextWindow()).toHaveTextContent('(UTC)');
+  });
+
+  it('does not offer to switch automatic updates on while the update check is off', async () => {
+    hoisted.updatePolicy = { ...DEFAULT_UPDATE_POLICY, checksEnabled: false };
+    const user = await renderPanel();
+    expect(screen.getByText(/neither looks for plugin updates nor installs them/)).toBeInTheDocument();
+    await user.click(master());
+    await user.click(weekday('Monday'));
+    expect(screen.getByRole('button', { name: 'Turn on automatic updates' })).toBeDisabled();
+  });
+
   it('reports a policy that cannot be loaded', async () => {
     hoisted.updatePolicy = new Error('offline');
     renderWithQuery(<AutomaticUpdatesPanel />);

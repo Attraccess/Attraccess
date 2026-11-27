@@ -12,6 +12,7 @@ import { usePluginsTranslations } from '../usePluginsTranslations';
 import { NextUpdateWindow } from './NextUpdateWindow';
 import { UpdateScheduleFields } from './UpdateScheduleFields';
 import {
+  changesUpdatePolicy,
   toUpdatePolicyBody,
   toUpdatePolicyForm,
   type UpdatePolicyForm,
@@ -33,9 +34,11 @@ export function AutomaticUpdatesForm({ policy }: Props) {
   const [draft, setDraft] = useState<UpdatePolicyForm | null>(null);
   const { mutateAsync: savePolicy, isPending } = usePluginControllerSetUpdatePolicy();
 
-  const form = draft ?? toUpdatePolicyForm(policy);
+  const saved = toUpdatePolicyForm(policy);
+  const form = draft ?? saved;
   const errors = updatePolicyFormErrors(form);
   const isValid = Object.keys(errors).length === 0;
+  const isChanged = changesUpdatePolicy(form, saved);
   const switchesOn = form.automaticUpdates && !policy.automaticUpdates;
   const change = (changes: Partial<UpdatePolicyForm>) => setDraft({ ...form, ...changes });
 
@@ -68,7 +71,7 @@ export function AutomaticUpdatesForm({ policy }: Props) {
           setDraft(
             automaticUpdates
               ? { ...form, automaticUpdates }
-              : withCompleteSchedule({ ...form, automaticUpdates }, toUpdatePolicyForm(policy)),
+              : withCompleteSchedule({ ...form, automaticUpdates }, saved),
           )
         }
         isDisabled={isPending}
@@ -76,24 +79,27 @@ export function AutomaticUpdatesForm({ policy }: Props) {
       >
         <span>{t('autoUpdates.enabled')}</span>
       </LabeledSwitch>
+      {/* Also while automatic updates are off: the step limits which updates are announced. */}
+      <Select
+        className="max-w-sm"
+        label={t('autoUpdates.step')}
+        description={t('autoUpdates.stepHint')}
+        value={form.mode}
+        onChange={(mode) => change({ mode: mode as UpdatePolicyForm['mode'] })}
+        items={STEPS.map((step) => ({ key: step, label: t(`autoUpdates.steps.${step}`) }))}
+        isDisabled={isPending}
+        data-cy="plugins-auto-updates-step"
+      />
       {form.automaticUpdates ? (
         <>
           {!form.checksEnabled ? <p className="text-sm text-warning">{t('autoUpdates.needsChecks')}</p> : null}
-          <Select
-            className="max-w-sm"
-            label={t('autoUpdates.step')}
-            description={t('autoUpdates.stepHint')}
-            value={form.mode}
-            onChange={(mode) => change({ mode: mode as UpdatePolicyForm['mode'] })}
-            items={STEPS.map((step) => ({ key: step, label: t(`autoUpdates.steps.${step}`) }))}
-            isDisabled={isPending}
-            data-cy="plugins-auto-updates-step"
-          />
           <UpdateScheduleFields form={form} errors={errors} onChange={change} isDisabled={isPending} />
           {isValid && form.checksEnabled ? <NextUpdateWindow schedule={toUpdatePolicyBody(form).schedule} /> : null}
         </>
       ) : (
-        <p className="text-sm text-muted">{t('autoUpdates.offHint')}</p>
+        <p className="text-sm text-muted">
+          {t(form.checksEnabled ? 'autoUpdates.offHint' : 'autoUpdates.checksOffHint')}
+        </p>
       )}
       {/* Wraps: the German labels do not fit side by side on a phone. */}
       <div className="flex flex-wrap gap-2">
@@ -110,7 +116,8 @@ export function AutomaticUpdatesForm({ policy }: Props) {
               confirmDataCy: 'plugins-auto-updates-confirm-button',
             }}
             onConfirm={save}
-            isDisabled={!isValid}
+            // With update checks off nothing would be installed, which the confirmation would claim.
+            isDisabled={!isValid || !form.checksEnabled}
             isPending={isPending}
             buttonProps={{ variant: 'primary', size: 'sm' }}
             data-cy="plugins-auto-updates-save-button"
@@ -120,14 +127,14 @@ export function AutomaticUpdatesForm({ policy }: Props) {
             variant="primary"
             size="sm"
             onPress={() => void save().catch(() => undefined)}
-            isDisabled={!draft || !isValid}
+            isDisabled={!isChanged || !isValid}
             isPending={isPending}
             data-cy="plugins-auto-updates-save-button"
           >
             {t('autoUpdates.save')}
           </Button>
         )}
-        {draft ? (
+        {isChanged ? (
           <Button variant="ghost" size="sm" onPress={() => setDraft(null)} isDisabled={isPending}>
             {t('autoUpdates.discard')}
           </Button>

@@ -13,15 +13,25 @@ export interface UpdatePolicyForm {
 
 export const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-/** The form for a stored policy. While no time zone was ever chosen, the browser's is filled in. */
+/**
+ * The form for a stored policy. While no time zone was ever chosen and automatic updates are off, the browser's is
+ * filled in; once they are on without one (set through the API), the host uses UTC, so the form shows that.
+ */
 export function toUpdatePolicyForm(policy: PluginUpdatePolicyDto): UpdatePolicyForm {
   return {
     checksEnabled: policy.checksEnabled,
     automaticUpdates: policy.automaticUpdates,
     mode: policy.mode,
     ...policy.schedule,
-    timeZone: policy.schedule.timeZone ?? browserTimeZone(),
+    timeZone: policy.schedule.timeZone ?? (policy.automaticUpdates ? 'UTC' : browserTimeZone()),
   };
+}
+
+/** Whether saving `form` would change anything compared with `saved`. */
+export function changesUpdatePolicy(form: UpdatePolicyForm, saved: UpdatePolicyForm): boolean {
+  return (Object.keys(saved) as (keyof UpdatePolicyForm)[]).some(
+    (field) => JSON.stringify(form[field]) !== JSON.stringify(saved[field]),
+  );
 }
 
 export type UpdatePolicyFormErrors = Partial<Record<'weekdays' | 'startMinute' | 'durationMinutes' | 'timeZone', true>>;

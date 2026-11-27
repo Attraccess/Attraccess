@@ -16,7 +16,7 @@ function listAvailableUpdate() {
 
 describe('UpdatesAvailableAlert', () => {
   it.each([
-    ['automatic updates are off, as by default', DEFAULT_UPDATE_POLICY, /nothing is installed on its own/],
+    ['automatic updates are off, as by default', DEFAULT_UPDATE_POLICY, /Automatic updates are off, so nothing is installed/],
     [
       'automatic updates are on',
       { ...DEFAULT_UPDATE_POLICY, automaticUpdates: true },

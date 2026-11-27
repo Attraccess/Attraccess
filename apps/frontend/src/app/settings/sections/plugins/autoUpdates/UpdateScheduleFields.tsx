@@ -2,6 +2,7 @@ import {
   Checkbox,
   CheckboxGroup,
   Description,
+  FieldError,
   Label,
   NumberField,
   NumberFieldGroup,
@@ -37,6 +38,7 @@ export function UpdateScheduleFields({ form, errors, onChange, isDisabled }: Pro
         onChange={(days) => onChange({ weekdays: days.map(Number).sort((left, right) => left - right) })}
         isDisabled={isDisabled}
         isInvalid={errors.weekdays}
+        isRequired
       >
         <Label>{t('autoUpdates.weekdays')}</Label>
         <div className="flex flex-wrap gap-4">
@@ -51,7 +53,7 @@ export function UpdateScheduleFields({ form, errors, onChange, isDisabled }: Pro
             </Checkbox>
           ))}
         </div>
-        {errors.weekdays ? <p className="text-sm text-danger">{t('autoUpdates.weekdaysRequired')}</p> : null}
+        {errors.weekdays ? <FieldError>{t('autoUpdates.weekdaysRequired')}</FieldError> : null}
       </CheckboxGroup>
       <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <TimeField
@@ -73,6 +75,7 @@ export function UpdateScheduleFields({ form, errors, onChange, isDisabled }: Pro
           <TimeField.Group>
             <TimeField.Input>{(segment) => <TimeField.Segment segment={segment} />}</TimeField.Input>
           </TimeField.Group>
+          {errors.startMinute ? <FieldError>{t('autoUpdates.startRequired')}</FieldError> : null}
         </TimeField>
         <NumberField
           // NaN is React Aria's empty field; `undefined` would make the field uncontrolled.
@@ -91,6 +94,7 @@ export function UpdateScheduleFields({ form, errors, onChange, isDisabled }: Pro
             <NumberFieldInput />
           </NumberFieldGroup>
           <Description>{t('autoUpdates.durationHint')}</Description>
+          {errors.durationMinutes ? <FieldError>{t('autoUpdates.durationInvalid')}</FieldError> : null}
         </NumberField>
         <TimeZoneField
           value={form.timeZone}

@@ -1,4 +1,4 @@
-import { ComboBox, Description, Input, Label, ListBox } from '@heroui/react';
+import { ComboBox, Description, FieldError, Input, Label, ListBox } from '@heroui/react';
 import { useMemo } from 'react';
 import { usePluginsTranslations } from '../usePluginsTranslations';
 
@@ -36,6 +36,7 @@ export function TimeZoneField({ value, onChange, isInvalid, isDisabled }: Props)
         <ComboBox.Trigger />
       </ComboBox.InputGroup>
       <Description>{t('autoUpdates.timeZoneHint')}</Description>
+      {isInvalid ? <FieldError>{t('autoUpdates.timeZoneRequired')}</FieldError> : null}
       <ComboBox.Popover>
         <ListBox>
           {(zone: { id: string }) => (

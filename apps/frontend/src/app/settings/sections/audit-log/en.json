@@ -342,7 +342,7 @@
     "registryName": "Registry name",
     "registryUrl": "Registry URL",
     "checksEnabled": "Update checks enabled",
-    "updateMode": "Update mode",
+    "updateMode": "Largest update step",
     "automaticUpdates": "Automatic updates enabled",
     "maintenanceWeekdays": "Update weekdays (1 = Monday)",
     "maintenanceTimeZone": "Update time zone",

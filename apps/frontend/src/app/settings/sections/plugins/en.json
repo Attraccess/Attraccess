@@ -148,8 +148,9 @@
     "enabled": "Install updates automatically",
     "offHint": "Off: Attraccess shows available updates but installs nothing and does not restart for them.",
     "needsChecks": "Update checks are off, so nothing will be installed.",
+    "checksOffHint": "Update checks are off: Attraccess neither looks for plugin updates nor installs them.",
     "step": "Largest update step",
-    "stepHint": "A plugin can have its own setting under Manage version.",
+    "stepHint": "Limits which updates are announced and, once automatic updates are on, installed. A plugin can have its own setting under Manage version.",
     "steps": {
       "patch": "Patch only",
       "minor": "Patch and minor",
@@ -167,10 +168,13 @@
       "7": "Sunday"
     },
     "start": "Start time",
+    "startRequired": "Enter a start time.",
     "duration": "Duration (minutes)",
     "durationHint": "1 to 1440. A window may run past midnight.",
+    "durationInvalid": "Enter a duration from 1 to 1440 minutes.",
     "timeZone": "Time zone",
     "timeZoneHint": "The start time is a clock time in this zone.",
+    "timeZoneRequired": "Choose a time zone.",
     "nextWindow": "Next update window: {{start}} to {{end}} ({{timeZone}})",
     "openWindow": "Update window open now: {{start}} to {{end}} ({{timeZone}})",
     "restartNote": "Attraccess restarts during this window if it installed an update.",
@@ -264,7 +268,7 @@
     "hideOlderIncompatible": "Hide older incompatible versions",
     "details": "Release details",
     "update": "Update",
-    "automaticUpdatesOff": "Automatic updates are off for this Attraccess. This setting installs nothing until they are turned on under Automatic updates."
+    "automaticUpdatesOff": "Automatic updates are off on this host. This setting installs nothing until they are turned on under Automatic updates."
   },
   "dependencies": {
     "title": "Plugin dependencies",
