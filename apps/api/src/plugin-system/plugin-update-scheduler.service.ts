@@ -118,7 +118,7 @@ export class PluginUpdateScheduler {
       // Audited like a plugin manager's restart: it also applies changes still waiting for one.
       await this.administration.restart(SYSTEM_AUDIT_ACTOR);
     } catch (error) {
-      // Not restarted (the audit could not be written): a later pass tries again, still only inside a window.
+      // The restart was not requested: a later pass tries again, still only inside a window.
       this.restartDue = true;
       this.restartRequested = false;
       throw error;
