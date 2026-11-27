@@ -7,7 +7,7 @@
   "cancel": "Abbrechen",
   "success": {
     "title": "Erfolg",
-    "description": "Plugin erfolgreich hochgeladen oder aktualisiert. Anwendung wird in 5 Sekunden neu gestartet."
+    "description": "Plugin hochgeladen. Es wird nach einem Neustart wirksam; nutzen Sie „Jetzt neu starten“ im Hinweisbanner."
   },
   "error": {
     "title": "Fehler",

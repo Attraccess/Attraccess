@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { NetworkRestrictionSettingsDto } from '@attraccess/react-query-client';
-import { buildRangeSuggestions } from './rangeSuggestions';
+import { buildRangeSuggestions } from './buildRangeSuggestions';
 
 const settings = (over: Partial<NetworkRestrictionSettingsDto> = {}) =>
   ({

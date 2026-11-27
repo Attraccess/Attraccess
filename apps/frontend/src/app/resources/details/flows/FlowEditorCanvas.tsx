@@ -166,6 +166,7 @@ export function FlowEditorCanvas() {
                   onPress={save}
                   isDisabled={!flowHasChanged}
                   variant={saveFailed ? 'danger-soft' : flowHasChanged ? 'primary' : 'secondary'}
+                  aria-label={t('actions.save')}
                 >
                   <SaveIcon />
                 </Button>
@@ -214,7 +215,7 @@ export function FlowEditorCanvas() {
                   </Button>
                 )}
 
-                <Button isIconOnly onPress={layout} isDisabled={isFlowLoading}>
+                <Button isIconOnly onPress={layout} aria-label={t('actions.layout')} isDisabled={isFlowLoading}>
                   <LayoutGridIcon />
                 </Button>
                 <Button

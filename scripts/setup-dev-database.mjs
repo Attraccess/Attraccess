@@ -11,7 +11,6 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import pg from 'pg';
 
 const MAX_DATABASE_NAME = 63;
@@ -132,7 +131,7 @@ export async function ensureDevDatabase({ repoRoot, env = process.env, log = con
   return { name, url: connection };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+if (import.meta.main) {
   const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
   ensureDevDatabase({ repoRoot }).catch((error) => {
     console.error(error.message);

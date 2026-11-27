@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-console -- Command-line tool: its output is the point. */
 // Writes summary.md for a run folder: per card step results, per-exchange PN532 failure rate per card
 // type, how long the person was needed, and the replay verdict per conversation.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';

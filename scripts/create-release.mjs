@@ -3,11 +3,11 @@
 // `nx release` does all of this in one step, so a PR merged while the release runs rejects its push. This script
 // re-creates the release commit on the moved branch with the same version and pushes again (ATT-1266).
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 export const DEFAULT_PUSH_ATTEMPTS = 5;
 
@@ -332,14 +332,6 @@ function fail(error) {
   process.exit(1);
 }
 
-function isEntryPoint() {
-  try {
-    return import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
-  } catch {
-    return false;
-  }
-}
-
-if (isEntryPoint()) {
+if (import.meta.main) {
   (process.argv[2] === '--prepare' ? runNxPrepare(process.env) : main()).catch(fail);
 }

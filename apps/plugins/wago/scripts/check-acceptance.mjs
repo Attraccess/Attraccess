@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
 
 export const requiredChecks = [
   'fresh-controller-commissioning',
@@ -87,7 +86,7 @@ function checkObservations(entries, errors) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.main) {
   try {
     if (process.argv.length !== 3) throw new Error('Usage: node apps/plugins/wago/scripts/check-acceptance.mjs <evidence.json>');
     const errors = checkWagoAcceptance(JSON.parse(readFileSync(process.argv[2], 'utf8')));

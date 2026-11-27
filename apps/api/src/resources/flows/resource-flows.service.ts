@@ -145,6 +145,25 @@ export class ResourceFlowsService {
     }
   }
 
+  /** Rejects a canvas with an edge whose source or target is not one of its nodes; the error names every such edge. */
+  public assertEdgesReferenceNodes(
+    nodes: { id: string }[],
+    edges: { id: string; source: string; target: string }[],
+  ): void {
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    const dangling = edges.filter((edge) => !nodeIds.has(edge.source) || !nodeIds.has(edge.target));
+    if (dangling.length > 0) {
+      throw new BadRequestException({
+        message: dangling.map(
+          (edge) => `Edge ${edge.id} connects ${edge.source} to ${edge.target}, but the flow has no such node`,
+        ),
+        error: 'Bad Request',
+        statusCode: 400,
+        edges: dangling.map((edge) => ({ edgeId: edge.id, source: edge.source, target: edge.target })),
+      });
+    }
+  }
+
   /** Subscribes to the topics of MQTT nodes that are new or changed compared to the stored ones. */
   public subscribeToChangedMqttNodes(
     oldNodes: { id: string; type: string; data: Record<string, unknown> }[],
@@ -210,6 +229,7 @@ export class ResourceFlowsService {
     }
 
     this.assertNodesSupportScope(flowData.nodes, 'resource');
+    this.assertEdgesReferenceNodes(flowData.nodes, flowData.edges);
 
     // Collect validation errors from all nodes
     const allValidationErrors: ValidationError[] = [];

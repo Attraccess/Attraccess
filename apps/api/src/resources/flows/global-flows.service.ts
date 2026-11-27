@@ -170,6 +170,7 @@ export class GlobalFlowsService {
   ): Promise<ResourceFlowResponseDto> {
     const flow = await this.get(flowId);
     this.resourceFlows.assertNodesSupportScope(flowData.nodes, 'global');
+    this.resourceFlows.assertEdgesReferenceNodes(flowData.nodes, flowData.edges);
 
     const validationContext = new Map<string, unknown>();
     const validationErrors: ValidationError[] = [];

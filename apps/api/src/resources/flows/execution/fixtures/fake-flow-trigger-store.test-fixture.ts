@@ -1,6 +1,6 @@
 import { ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
 import type { FlowEdgeRecord, FlowNodeRecord } from '@attraccess/application-models';
-import type { FlowTriggerStore } from '../../flow-trigger-store.port';
+import { DEFAULT_OUTPUT_HANDLE, type FlowTriggerStore } from '../../flow-trigger-store.port';
 
 /** A node as the specs build it: the enabled flag of its global flow rides along as `flow`. */
 export type FakeFlowNode = FlowNodeRecord & { flow?: { enabled: boolean } | null };
@@ -32,10 +32,15 @@ const isResourceNode = (node: FakeFlowNode) => (node.flowId ?? null) === null;
 export function createFakeFlowTriggerStore(world: FakeFlowWorld) {
   const byType = (type: string) => world.initialNodes.filter((node) => node.type === type);
   return {
-    findOutgoingEdges: jest.fn(async (node: FlowNodeRecord, outputHandle: string | undefined) => {
-      const key = `${node.id}|${outputHandle ?? ''}`;
+    findOutgoingEdges: jest.fn(async (node: FlowNodeRecord, outputHandle: string) => {
+      // Like the real store: null-handle edges (the `${id}|` bucket) are the default output.
+      const buckets = [
+        `${node.id}|${outputHandle}`,
+        ...(outputHandle === DEFAULT_OUTPUT_HANDLE ? [`${node.id}|`] : []),
+      ];
+      const edges = new Set(buckets.flatMap((key) => world.edgesBySourceAndHandle[key] ?? []));
       // Edges without owner fields belong to whatever canvas asks for them.
-      return (world.edgesBySourceAndHandle[key] ?? []).filter((edge) => sameOwner(edge, node)) as FlowEdgeRecord[];
+      return [...edges].filter((edge) => sameOwner(edge, node)) as FlowEdgeRecord[];
     }),
     findNodeOnCanvasOf: jest.fn(async (node: FlowNodeRecord, nodeId: string) => {
       const target = world.nodesById[nodeId];

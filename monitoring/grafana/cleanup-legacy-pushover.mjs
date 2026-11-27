@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { setTimeout as delay } from 'node:timers/promises';
-import { pathToFileURL } from 'node:url';
 
 const managedUid = 'pushover-attraccess';
 const log = (message) => process.stdout.write(`[grafana-cleanup] ${message}\n`);
@@ -94,7 +93,7 @@ export async function cleanupLegacyPushover({
   return legacyPoints.length;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.main) {
   cleanupLegacyPushover().catch((error) => {
     process.stderr.write(`[grafana-cleanup] ${error.message}\n`);
     process.exitCode = 1;
