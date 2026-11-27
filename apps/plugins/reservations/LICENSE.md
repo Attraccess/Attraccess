@@ -22,7 +22,11 @@ Attraccess lädt dieses Plugin nur, wenn die installierte Lizenz das Modul `rese
 
 Ohne ausdrückliche schriftliche Genehmigung des Autors ist es nicht gestattet, dieses Plugin zu verbreiten, zu verkaufen, unterzulizenzieren, zu verändern oder abgeleitete Werke weiterzugeben. Das Betrachten des Quelltexts ist erlaubt.
 
-## 5. Keine Garantie
+## 5. Fortführungsrecht und Hinterlegung des Quellcodes
+
+Abschnitt 6 der [Lizenz des Attraccess-Kerns](https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md) (Fortführungsrecht und Hinterlegung des Quellcodes) gilt auch für dieses Plugin. Inhaber einer zum Zeitpunkt des Fortführungsfalls gültigen Attraccess-Lizenz mit dem Lizenzmodul **`reservations`** haben für dieses Plugin dieselben Rechte wie nach Abschnitt 6.2 der Kern-Lizenz für den Kern. Insbesondere dürfen sie das Plugin ohne neue Lizenz weiter nutzen, für eigene interne Zwecke ändern und pflegen und die Lizenzprüfung aus Abschnitt 3 entfernen oder umgehen, soweit es für die weitere Nutzung nötig ist. Die Abschnitte 3 und 4 dieser Lizenz stehen dem im Fortführungsfall nicht entgegen. Die Weitergabe des Plugins oder geänderter Fassungen an Dritte bleibt verboten.
+
+## 6. Keine Garantie
 
 DIE SOFTWARE WIRD OHNE JEGLICHE GARANTIE ZUR VERFÜGUNG GESTELLT. DER AUTOR ÜBERNIMMT KEINE HAFTUNG FÜR DIREKTE ODER INDIREKTE SCHÄDEN ODER FOLGEKOSTEN. DIES GILT INSBESONDERE FÜR DIE DURCHSETZUNG VON RESERVIERUNGEN: DAS PLUGIN IST KEINE SICHERHEITS- ODER ZUGANGSKONTROLLFUNKTION UND GARANTIERT NICHT, DASS EINE RESSOURCE NUR VON BERECHTIGTEN GESTARTET WIRD.
 
