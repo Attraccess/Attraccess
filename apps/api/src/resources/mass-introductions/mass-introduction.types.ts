@@ -23,35 +23,24 @@ export interface MassIntroductionParticipant {
   joinedAt: Date;
 }
 
-export interface ActiveMassIntroduction {
-  id: string;
-  /** Identifies the session in the QR code. Not a secret: joining also needs the rotating code. */
-  publicId: string;
-  /** TOTP secret behind the rotating code shown next to the QR code. Never leaves the server. */
-  codeSecret: string;
-  /** Wrong codes per participant in the current minute; caps guessing per person. */
-  wrongCodes: Map<number, { windowStart: number; count: number }>;
-  target: MassIntroductionTarget;
-  introducer: {
-    id: number;
-    username: string;
-    displayName: string;
-    authenticationMethod: AuthenticationMethod | null;
-    apiTokenId: number | null;
-    /**
-     * Authorized through the `resources.access.manage` permission rather than an introducer role.
-     * Permissions cannot be re-resolved without the request, so only role-based sessions are
-     * re-checked when a participant joins.
-     */
-    viaPermission: boolean;
-  };
-  reader: { id: number; name: string; state: MassIntroductionReaderState } | null;
-  participants: Map<number, MassIntroductionParticipant>;
-  /** Joins still being granted, so a double scan cannot grant twice. */
-  joining: Map<number, Promise<MassIntroductionParticipant>>;
-  createdAt: Date;
-  expiresAt: Date;
-  timeout: ReturnType<typeof setTimeout>;
+export interface MassIntroductionIntroducer {
+  id: number;
+  username: string;
+  displayName: string;
+  authenticationMethod: AuthenticationMethod | null;
+  apiTokenId: number | null;
+  /**
+   * Authorized through the `resources.access.manage` permission rather than an introducer role.
+   * Permissions cannot be re-resolved without the request, so only role-based sessions are
+   * re-checked when a participant joins.
+   */
+  viaPermission: boolean;
+}
+
+export interface MassIntroductionReader {
+  id: number;
+  name: string;
+  state: MassIntroductionReaderState;
 }
 
 /**
