@@ -1,6 +1,5 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
 
 // The ancestry helpers live with the plugin publish plan; npm channels and nightly-latest follow the same rule.
 import { asCommit, isNewerPublished, localGit, refreshHistory } from '../apps/plugins/scripts/plugin-publish-plan.mjs';
@@ -77,4 +76,4 @@ function main() {
   );
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) main();
+if (import.meta.main) main();

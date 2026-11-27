@@ -1,8 +1,10 @@
 #!/usr/bin/env node
+/* eslint-disable no-console -- Command-line tool: its output is the point. */
 // Prints the card keys the API holds as JSON: [{label, uid, keyNo, hex, source}], decrypted with the
 // API's AUTH_SESSION_SECRET (same HKDF + AES-256-GCM as apps/api/src/encryption). Read-only.
 //   AUTH_SESSION_SECRET=... DATABASE_URL=postgres://... node dump-keys.mjs
 import { createDecipheriv, hkdfSync } from 'node:crypto';
+// eslint-disable-next-line @nx/enforce-module-boundaries -- Lab tooling runs the API's database provider script as is; nothing is bundled.
 import { postgresProvider } from '../../api/scripts/lib/database-provider.mjs';
 
 const secret = (process.env.AUTH_SESSION_SECRET ?? '').trim();

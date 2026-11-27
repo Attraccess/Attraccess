@@ -14,6 +14,7 @@ import {
   workspace,
 } from './run.mjs';
 import { nodeCoverage } from './node-test.mjs';
+import { fixtureGitEnv } from '../test-utils/git-env.mjs';
 
 // Analysis and coverage function maps for validateFunctionCompleteness.
 const analysis = (name) => ({
@@ -263,7 +264,7 @@ test('a controlled above-limit project fails with retained reports and passes af
 
 test('the CI affected command rejects and then accepts a controlled function', { timeout: 300000 }, () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'attraccess-crap-entrypoints-'));
-  const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+  const gitEnv = fixtureGitEnv();
   const git = (...args) => execFileSync('git', args, { cwd: directory, env: gitEnv, stdio: 'ignore' });
   const invoke = (command, args) =>
     spawnSync(command, args, {

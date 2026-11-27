@@ -1,7 +1,6 @@
 /* eslint-disable no-console -- CLI diagnostics are intentional. */
 // Paths that differ only by letter case are one file on case-insensitive file systems (macOS, Windows). Module
 // specifiers resolve without an extension, so `./Foo` can also pick `foo.ts` when the folder holds `Foo.tsx`.
-import { pathToFileURL } from 'node:url';
 import { git } from './lib/repo-files.mjs';
 
 const moduleExtension = /\.(?:[cm]?[jt]sx?|json)$/i;
@@ -53,7 +52,7 @@ function check() {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.main) {
   try {
     check();
   } catch (error) {
