@@ -68,7 +68,7 @@ Sie können Flows zwischen Ressourcen teilen oder sichern:
 
 ## Ausführungsprotokolle
 
-Öffnen Sie **Flow-Protokolle**, wählen Sie eine Aufzeichnungsdauer und klicken Sie vor dem Auslösen auf **Aufzeichnung starten**. Die Protokolle zeigen Eingang, Ausgang und Fehler jedes Knotens. Sie werden nur während der Aufzeichnung gesammelt und bleiben bis zum Verlassen oder Neuladen der Seite sichtbar. Um sie zu behalten, klicken Sie vor dem Verlassen der Seite auf **Herunterladen** und wählen Sie **NDJSON (.ndjson)** oder **Reiner Text (.txt)**. Die Datei enthält nur die Einträge, die das Seitenfenster gerade bereithält. Ihre Payloads können personenbezogene Daten enthalten; prüfen Sie die Datei deshalb vor dem Weitergeben. Beispiele finden Sie unter [Durchläufe prüfen und Fehler finden](flows/payloads-variables-templates.md#durchläufe-prüfen-und-fehler-finden).
+Öffnen Sie **Flow-Logs**, wählen Sie eine Aufzeichnungsdauer und klicken Sie vor dem Auslösen auf **Aufzeichnung starten**. Die Protokolle zeigen Eingang, Ausgang und Fehler jedes Knotens. Sie werden nur während der Aufzeichnung gesammelt und bleiben bis zum Verlassen oder Neuladen der Seite sichtbar. Um sie zu behalten, klicken Sie vor dem Verlassen der Seite auf **Herunterladen** und wählen Sie **NDJSON (.ndjson)** oder **Reiner Text (.txt)**. Die Datei enthält nur die Einträge, die das Seitenfenster gerade bereithält. Ihre Payloads können personenbezogene Daten enthalten; prüfen Sie die Datei deshalb vor dem Weitergeben. Beispiele finden Sie unter [Durchläufe prüfen und Fehler finden](flows/payloads-variables-templates.md#durchläufe-prüfen-und-fehler-finden).
 
 Die Knotenfarben zeigen den aktuellen Zustand an:
 
