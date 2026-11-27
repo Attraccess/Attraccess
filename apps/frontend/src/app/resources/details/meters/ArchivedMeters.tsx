@@ -21,10 +21,11 @@ export function ArchivedMeters({ resourceId, meters }: { resourceId: number; met
         </Button>
       </Disclosure.Heading>
       <Disclosure.Content>
-        <Disclosure.Body className="flex flex-col gap-4">
+        {/* No Disclosure.Body: its side padding would move the names and ⋮ menus out of line with the active meters. */}
+        <div className="flex flex-col gap-4 py-2">
           {meters.map((meter) => (
             <div key={meter.id} className="flex flex-wrap items-start justify-between gap-2">
-              <div className="text-sm">
+              <div className="min-w-0 flex-1 text-sm">
                 <h4 className="font-medium break-all">{meter.name}</h4>
                 <p className="break-all">
                   {t('lifetime')}: {format(meter.lifetimeValue)}
@@ -36,7 +37,7 @@ export function ArchivedMeters({ resourceId, meters }: { resourceId: number; met
               <MeterActions resourceId={resourceId} meter={meter} />
             </div>
           ))}
-        </Disclosure.Body>
+        </div>
       </Disclosure.Content>
     </Disclosure>
   );

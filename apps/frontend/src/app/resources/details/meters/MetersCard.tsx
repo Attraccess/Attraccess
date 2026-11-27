@@ -37,7 +37,7 @@ export function MetersCard({ resourceId, className }: { resourceId: number; clas
         {meters.map((meter) => (
           <div key={meter.id} className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-medium break-all">{meter.name}</h3>
+              <h3 className="min-w-0 flex-1 font-medium break-all">{meter.name}</h3>
               {manage && <MeterActions resourceId={resourceId} meter={meter} />}
             </div>
             <dl className="grid grid-cols-2 gap-2 text-sm">

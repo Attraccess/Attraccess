@@ -23,7 +23,11 @@ const ERROR_KEYS: Record<string, string> = {
   METER_NOT_FOUND: 'errorNotFound',
 };
 
-/** The ⋮ menu of one meter (rename, archive or restore, delete), for users who may edit the resource. */
+/**
+ * The ⋮ menu of one meter (rename, archive or restore, delete), for users who may edit the resource. It renders into
+ * the wrapping flex row of the meter's name: the menu stays beside the name, while the rename form and a refusal
+ * each take a line of their own.
+ */
 export function MeterActions({ resourceId, meter }: { resourceId: number; meter: ResourceMeterDto }) {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
@@ -63,57 +67,59 @@ export function MeterActions({ resourceId, meter }: { resourceId: number; meter:
 
   if (!hasPermission('resources.update')) return null;
   return (
-    <div ref={wrapper} className="flex flex-col items-end gap-2">
-      {renaming ? (
-        <MeterNameForm
-          resourceId={resourceId}
-          meter={meter}
-          // A new name settles a name clash, and an older message would no longer be true.
-          onSaved={() => setErrorKey(undefined)}
-          onClose={(hadFocus) => {
-            focusMenu.current = hadFocus;
-            setRenaming(false);
-          }}
-        />
-      ) : (
-        <TableRowActions
-          itemName={meter.name}
-          isPending={pending}
-          actions={[
-            { key: 'rename', label: t('rename'), icon: PencilIcon, onPress: () => setRenaming(true) },
-            {
-              key: 'restore',
-              label: t('restore'),
-              icon: ArchiveRestoreIcon,
-              isHidden: !meter.archivedAt,
-              onPress: () => run(() => restore.mutateAsync({ path })),
-            },
-            {
-              key: 'archive',
-              label: t('archive'),
-              icon: ArchiveIcon,
-              isHidden: !!meter.archivedAt,
-              confirm: { title: t('archiveTitle', { name: meter.name }), message: t('archiveMessage') },
-              onPress: () => run(() => archive.mutateAsync({ path })),
-            },
-            {
-              key: 'delete',
-              label: t('delete'),
-              icon: Trash2Icon,
-              tone: 'danger',
-              isHidden: !meter.deletable,
-              confirm: { title: t('deleteTitle', { name: meter.name }), message: t('deleteMessage') },
-              onPress: () => run(() => remove.mutateAsync({ path }), { METER_IN_USE: 'errorInUseDelete' }),
-            },
-          ]}
-        />
-      )}
+    <>
+      <div ref={wrapper} className={renaming ? 'w-full' : undefined}>
+        {renaming ? (
+          <MeterNameForm
+            resourceId={resourceId}
+            meter={meter}
+            // A new name settles a name clash, and an older message would no longer be true.
+            onSaved={() => setErrorKey(undefined)}
+            onClose={(hadFocus) => {
+              focusMenu.current = hadFocus;
+              setRenaming(false);
+            }}
+          />
+        ) : (
+          <TableRowActions
+            itemName={meter.name}
+            isPending={pending}
+            actions={[
+              { key: 'rename', label: t('rename'), icon: PencilIcon, onPress: () => setRenaming(true) },
+              {
+                key: 'restore',
+                label: t('restore'),
+                icon: ArchiveRestoreIcon,
+                isHidden: !meter.archivedAt,
+                onPress: () => run(() => restore.mutateAsync({ path })),
+              },
+              {
+                key: 'archive',
+                label: t('archive'),
+                icon: ArchiveIcon,
+                isHidden: !!meter.archivedAt,
+                confirm: { title: t('archiveTitle', { name: meter.name }), message: t('archiveMessage') },
+                onPress: () => run(() => archive.mutateAsync({ path })),
+              },
+              {
+                key: 'delete',
+                label: t('delete'),
+                icon: Trash2Icon,
+                tone: 'danger',
+                isHidden: !meter.deletable,
+                confirm: { title: t('deleteTitle', { name: meter.name }), message: t('deleteMessage') },
+                onPress: () => run(() => remove.mutateAsync({ path }), { METER_IN_USE: 'errorInUseDelete' }),
+              },
+            ]}
+          />
+        )}
+      </div>
       {errorKey && (
         // HeroUI's Alert is presentational: without the role, screen readers do not hear the refusal.
-        <div role="alert">
+        <div role="alert" className="w-full">
           <StatusAlert status="danger">{t(errorKey)}</StatusAlert>
         </div>
       )}
-    </div>
+    </>
   );
 }
