@@ -18,7 +18,7 @@ Everyone who may edit the resource can take a meter out of use in the **Meters**
 
 While a running session (including one that is just starting or ending) uses a meter, you cannot archive or delete it. Try again after the session has ended.
 
-Pending and failed charges do not prevent archiving. They stay in the list of unsettled meter charges, where you can still retry or waive them. A retry runs the meter's **Metering collection** branch as before. If you removed that branch, the retry fails and you can waive the charge.
+Pending and failed charges do not prevent archiving. They stay in the list of unsettled meter charges, where you can still use **Read meter again** or **Waive meter charge**. A retry runs the meter's **Metering collection** branch as before. If you removed that branch, the retry fails and you can use **Waive meter charge** instead.
 
 Flow nodes do not prevent archiving or deleting, and Attraccess does not change them. A node that still selects such a meter shows **Meter archived or removed** and is marked with "Choose a meter belonging to this resource". You can still save the flow, but the node stays marked. Until you choose another meter or remove the node, each run of a **Report meter** node for an archived meter fails with the flow error `METER_ARCHIVED` and records nothing. Update these flows to avoid repeated errors.
 
