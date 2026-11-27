@@ -83,6 +83,8 @@ const FORMERLY_DENIED = [
   'pushReplaceVapidKeys',
   'rebootHost',
   'refreshSession',
+  'startSecureConversion',
+  'retrySecureConversion',
   'renamePasskey',
   'requestDeleteAccount',
   'requestPasswordReset',
