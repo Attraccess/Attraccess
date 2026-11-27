@@ -9,6 +9,7 @@ import {
   ResourceUsage,
 } from '@attraccess/database-entities';
 import { ResourceMeteringSessionStatus, ResourceType, ResourceUsageAction } from '@attraccess/application-models';
+import { ConflictException } from '@nestjs/common';
 import { MeterRemoval } from '../../../resources/metering/meter-removal';
 import { EntityManagerResolver } from '../entity-manager-resolver';
 import { TypeOrmFlowResourceDirectory } from '../flows/typeorm-flow-resource-directory';
@@ -98,13 +99,17 @@ describe('Archiving, restoring and deleting meters', () => {
       const again = await archive();
       expect(again.archivedAt).toEqual(archived.archivedAt);
       expect(auditedActions()).toEqual(['meter.archived']);
-      expect(scope.audit.record).toHaveBeenCalledWith({
-        domain: 'resource',
-        action: 'meter.archived',
-        actor: { id: ADMIN, authenticationMethod: 'session' },
-        subject: { type: 'resource', id: 1 },
-        details: { meterId: 1, meterName: 'Energy (kWh)' },
-      });
+      // Written in the archive's own transaction.
+      expect(scope.audit.record).toHaveBeenCalledWith(
+        {
+          domain: 'resource',
+          action: 'meter.archived',
+          actor: { id: ADMIN, authenticationMethod: 'session' },
+          subject: { type: 'resource', id: 1 },
+          details: { meterId: 1, meterName: 'Energy (kWh)' },
+        },
+        expect.anything(),
+      );
     });
 
     it('is neither captured, initialized nor collected by later sessions and the cron', async () => {
@@ -159,6 +164,7 @@ describe('Archiving, restoring and deleting meters', () => {
         }
         await expect(archive()).rejects.toThrow('METER_IN_USE');
         await expect(remove()).rejects.toThrow('METER_IN_USE');
+        await expect(archive()).rejects.toBeInstanceOf(ConflictException);
         expect(await meterRow()).toMatchObject({ archivedAt: null });
         expect(await deletable()).toBe(false);
         expect(auditedActions()).toEqual([]);
@@ -254,6 +260,19 @@ describe('Archiving, restoring and deleting meters', () => {
       expect(await meterRow()).toMatchObject({ archivedAt: null });
     });
 
+    it('refuses a deletion that comes while a start is capturing the meter', async () => {
+      await scope.seedMeter();
+      const paused = pauseAfter(TypeOrmUsageSessionStore.prototype, 'findMeterRates');
+      const starting = start();
+      await paused.hasRun;
+      const refused = expect(remove()).rejects.toThrow('METER_IN_USE');
+      await settle();
+      paused.release();
+      expect((await starting).meterRates).toEqual([expect.objectContaining({ meterId: 1 })]);
+      await refused;
+      expect(await meterRow()).not.toBeNull();
+    });
+
     it('lets a start that comes while the meter is being archived run without it', async () => {
       await scope.seedMeter();
       const paused = pauseAfter(persistence.store, 'setMeterArchivedAt');
@@ -282,6 +301,18 @@ describe('Archiving, restoring and deleting meters', () => {
       expect((await meterRow())?.lifetimeValue).toBe('1500000000');
     });
 
+    it('keeps a failed charge listed and lets it be waived', async () => {
+      const { session } = await pendingCharge();
+      await scope.source
+        .getRepository(ResourceMeteringSession)
+        .update(session.id, { status: ResourceMeteringSessionStatus.Failed });
+      await archive();
+      expect((await scope.metering.getStatus(1)).unsettled).toEqual([
+        expect.objectContaining({ sessionId: session.id, status: ResourceMeteringSessionStatus.Failed }),
+      ]);
+      expect((await scope.metering.waive(1, session.id, ADMIN)).status).toBe(ResourceMeteringSessionStatus.Waived);
+    });
+
     it('lets a pending charge be waived, also after the collect branch is gone', async () => {
       const { session } = await pendingCharge();
       await archive();
@@ -303,6 +334,7 @@ describe('Archiving, restoring and deleting meters', () => {
       expect(auditedActions()).toEqual(['meter.archived', 'meter.restored']);
       expect(scope.audit.record).toHaveBeenLastCalledWith(
         expect.objectContaining({ actor: ACTOR, details: { meterId: 1, meterName: 'Energy (kWh)' } }),
+        expect.anything(),
       );
     });
 
@@ -310,6 +342,7 @@ describe('Archiving, restoring and deleting meters', () => {
       await archive();
       const replacement = await scope.metering.createMeter(1, 'Energy (kWh)');
       await expect(restore()).rejects.toThrow('METER_NAME_EXISTS');
+      await expect(restore()).rejects.toBeInstanceOf(ConflictException);
       expect((await meterRow())?.archivedAt).not.toBeNull();
       expect(auditedActions()).toEqual(['meter.archived']);
       await expect(scope.metering.createMeter(1, 'Energy (kWh)')).rejects.toThrow('METER_NAME_EXISTS');
@@ -331,13 +364,16 @@ describe('Archiving, restoring and deleting meters', () => {
       expect((await scope.metering.listMeters(1, { includeArchived: true }))[0].deletable).toBe(false);
       await remove();
       expect(await meterRow()).toBeNull();
-      expect(scope.audit.record).toHaveBeenLastCalledWith({
-        domain: 'resource',
-        action: 'meter.deleted',
-        actor: ACTOR,
-        subject: { type: 'resource', id: 1 },
-        details: { meterId: 1, meterName: 'Energy (kWh)' },
-      });
+      expect(scope.audit.record).toHaveBeenLastCalledWith(
+        {
+          domain: 'resource',
+          action: 'meter.deleted',
+          actor: ACTOR,
+          subject: { type: 'resource', id: 1 },
+          details: { meterId: 1, meterName: 'Energy (kWh)' },
+        },
+        expect.anything(),
+      );
     });
 
     it('removes a meter that flow nodes still select, and leaves the nodes', async () => {
@@ -357,7 +393,14 @@ describe('Archiving, restoring and deleting meters', () => {
       await removal.delete(1, 1, { id: ADMIN, authenticationMethod: 'api-token', apiTokenId: 4 });
       expect(scope.audit.record).toHaveBeenLastCalledWith(
         expect.objectContaining({ actor: { id: ADMIN, authenticationMethod: 'api-token', apiTokenId: 4 } }),
+        expect.anything(),
       );
+    });
+
+    it('is not deleted when its audit entry cannot be written', async () => {
+      scope.audit.record.mockRejectedValueOnce(new Error('audit storage down'));
+      await expect(remove()).rejects.toThrow('audit storage down');
+      expect(await meterRow()).not.toBeNull();
     });
 
     it.each([
@@ -409,6 +452,7 @@ describe('Archiving, restoring and deleting meters', () => {
       const before = await counts();
       expect(await deletable()).toBe(false);
       await expect(remove()).rejects.toThrow('METER_HAS_HISTORY');
+      await expect(remove()).rejects.toBeInstanceOf(ConflictException);
       expect(await meterRow()).not.toBeNull();
       expect(await counts()).toEqual(before);
       expect(auditedActions()).toEqual([]);

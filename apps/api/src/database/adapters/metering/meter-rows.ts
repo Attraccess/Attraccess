@@ -8,6 +8,9 @@ import { EntityManager, IsNull } from 'typeorm';
 import { MeterNameTakenError } from '../../../resources/metering/metering-store.port';
 import { isUniqueViolation } from '../../persistence-errors';
 
+/** The condition of an active meter: one that is not archived. Every query for active meters uses it. */
+export const ACTIVE_METER = { archivedAt: IsNull() } as const;
+
 /** The meters of a resource, oldest first; the active ones unless archived meters are asked for too. */
 export function meterRows(
   manager: EntityManager,
@@ -15,13 +18,13 @@ export function meterRows(
   includeArchived = false,
 ): Promise<ResourceMeter[]> {
   return manager.find(ResourceMeter, {
-    where: { resourceId, ...(includeArchived ? {} : { archivedAt: IsNull() }) },
+    where: { resourceId, ...(includeArchived ? {} : ACTIVE_METER) },
     order: { id: 'ASC' },
   });
 }
 
 export function activeMeterRows(manager: EntityManager): Promise<ResourceMeter[]> {
-  return manager.find(ResourceMeter, { where: { archivedAt: IsNull() } });
+  return manager.find(ResourceMeter, { where: ACTIVE_METER });
 }
 
 /** A write that would give two active meters of a resource one name violates the partial unique index. */

@@ -7,6 +7,7 @@ import {
   Patch,
   Param,
   ParseUUIDPipe,
+  ParseBoolPipe,
   ParseIntPipe,
   Post,
   Query,
@@ -82,11 +83,11 @@ export class ResourceMeteringController {
   async list(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
-    @Query('includeArchived') includeArchived?: string,
+    @Query('includeArchived', new ParseBoolPipe({ optional: true })) includeArchived?: boolean,
   ): Promise<ResourceMeterDto[]> {
     const manage = req.user.effectivePermissions?.has('resources.update') === true;
     const meters = await this.metering.listMeters(resourceId, {
-      includeArchived: includeArchived === 'true' && manage,
+      includeArchived: includeArchived === true && manage,
       withDeletable: manage,
     });
     return this.withVisibleSession(meters, resourceId, req);

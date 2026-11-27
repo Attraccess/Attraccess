@@ -154,6 +154,13 @@ describe('MCP tools of the real host OpenAPI document', () => {
     }
   });
 
+  it.each(['archiveResourceMeter', 'restoreResourceMeter', 'deleteResourceMeter'])(
+    'offers %s only to callers who may edit the resource, not to billing managers',
+    (operationId) => {
+      expect(tools.get(operationId)?.auth).toEqual({ all: ['resources.update'], any: [] });
+    },
+  );
+
   it('keeps an introducer operation open to any signed-in caller, and a permission-bound one bound', () => {
     expect(tools.get('resourceIntroducersIsIntroducer')?.auth).toEqual({ all: [], any: [] });
     expect(tools.get('resourceIntroducersGrant')?.auth).toEqual({ all: ['resources.access.manage'], any: [] });

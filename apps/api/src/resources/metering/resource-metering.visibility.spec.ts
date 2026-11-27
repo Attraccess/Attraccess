@@ -25,10 +25,10 @@ describe('ResourceMeteringController session visibility', () => {
   };
 
   it.each([
-    ['true', ['resources.update'], true],
-    ['true', ['resources.read', 'billing.manage'], false],
+    [true, ['resources.update'], true],
+    [true, ['resources.read', 'billing.manage'], false],
     [undefined, ['resources.update'], false],
-    ['false', ['resources.update'], false],
+    [false, ['resources.update'], false],
   ])('lists archived meters for includeArchived=%s with %j: %s', async (query, permissions, included) => {
     const listMeters = jest.fn(async () => []);
     const controller = new ResourceMeteringController({ listMeters } as never, {} as never, {} as never);

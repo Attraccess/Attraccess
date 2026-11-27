@@ -24,6 +24,16 @@ export async function requireMeter(
   return meter;
 }
 
+/** Runs a write that names a meter; a name an active meter of the resource already has is a 409. */
+export async function withMeterNameConflict<T>(write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    if (error instanceof MeterNameTakenError) throw new ConflictException('METER_NAME_EXISTS');
+    throw error;
+  }
+}
+
 /** Whether the meter ever accepted a reading. */
 export function hasObservations(meter: ResourceMeterRecord): boolean {
   return meter.lifetimeValue !== '0' || meter.counterValue !== null || meter.latestObservedAt !== null;
@@ -180,24 +190,13 @@ export class MeteringCatalog {
 
   async createMeter(resourceId: number, name: string) {
     if (!(await this.store.resourceExists(resourceId))) throw new BadRequestException('RESOURCE_NOT_FOUND');
-    let meter: ResourceMeterRecord;
-    try {
-      meter = await this.store.createMeter(resourceId, name.trim());
-    } catch (error) {
-      if (error instanceof MeterNameTakenError) throw new ConflictException('METER_NAME_EXISTS');
-      throw error;
-    }
+    const meter = await withMeterNameConflict(() => this.store.createMeter(resourceId, name.trim()));
     return this.getMeterDto(resourceId, meter.id);
   }
 
   async updateMeter(resourceId: number, meterId: number, name: string) {
     const meter = await requireMeter(this.store, resourceId, meterId);
-    try {
-      await this.store.renameMeter(resourceId, meter.id, name.trim());
-    } catch (error) {
-      if (error instanceof MeterNameTakenError) throw new ConflictException('METER_NAME_EXISTS');
-      throw error;
-    }
+    await withMeterNameConflict(() => this.store.renameMeter(resourceId, meter.id, name.trim()));
     return this.getMeterDto(resourceId, meterId);
   }
 

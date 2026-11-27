@@ -3,8 +3,8 @@ import type { MeteringUsageRecord, ResourceMeterRecord } from '@attraccess/appli
 import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../audit/recorder/audit-event';
 import type { TransactionContext } from '../../database/transaction-context';
 import { UNIT_OF_WORK, UnitOfWork } from '../../database/unit-of-work';
-import { capturedBy, MeteringCatalog, meterIsDeletable, requireMeter } from './metering-catalog';
-import { MeterNameTakenError, METERING_STORE, MeteringStore } from './metering-store.port';
+import { capturedBy, MeteringCatalog, meterIsDeletable, requireMeter, withMeterNameConflict } from './metering-catalog';
+import { METERING_STORE, MeteringStore } from './metering-store.port';
 
 /**
  * Takes meters out of use: archiving hides a meter and keeps its history, restoring brings it back, and deleting
@@ -27,38 +27,31 @@ export class MeterRemoval {
   }
 
   async archive(resourceId: number, meterId: number, actor: AuditActor) {
-    const archived = await this.unitOfWork.run(async (scope) => {
+    await this.unitOfWork.run(async (scope) => {
       const meter = await requireMeter(this.store, resourceId, meterId, scope);
-      if (meter.archivedAt) return null;
+      if (meter.archivedAt) return;
       await this.store.lockUsageLifecycle(resourceId, scope);
       const openUsages = await this.store.findOpenUsages(resourceId, scope);
       if (await this.isInUse(resourceId, meterId, openUsages, scope)) throw meterInUse();
       await this.store.setMeterArchivedAt(meterId, new Date(), scope);
-      return meter;
+      await this.record('meter.archived', meter, actor, scope);
     });
-    if (archived) await this.record('meter.archived', archived, actor);
     return this.catalog.getMeterDto(resourceId, meterId);
   }
 
   async restore(resourceId: number, meterId: number, actor: AuditActor) {
-    const restored = await this.unitOfWork.run(async (scope) => {
+    await this.unitOfWork.run(async (scope) => {
       const meter = await requireMeter(this.store, resourceId, meterId, scope);
-      if (!meter.archivedAt) return null;
-      try {
-        await this.store.setMeterArchivedAt(meterId, null, scope);
-      } catch (error) {
-        if (error instanceof MeterNameTakenError) throw new ConflictException('METER_NAME_EXISTS');
-        throw error;
-      }
-      return meter;
+      if (!meter.archivedAt) return;
+      await withMeterNameConflict(() => this.store.setMeterArchivedAt(meterId, null, scope));
+      await this.record('meter.restored', meter, actor, scope);
     });
-    if (restored) await this.record('meter.restored', restored, actor);
     return this.catalog.getMeterDto(resourceId, meterId);
   }
 
   /** Only a meter that passes the delete rule (`meterIsDeletable`) is deleted, so no history goes with it. */
   async delete(resourceId: number, meterId: number, actor: AuditActor): Promise<void> {
-    const deleted = await this.unitOfWork.run(async (scope) => {
+    await this.unitOfWork.run(async (scope) => {
       const meter = await this.store.lockMeterForDeletion(resourceId, meterId, scope);
       if (!meter) throw new BadRequestException('METER_NOT_FOUND');
       await this.store.lockUsageLifecycle(resourceId, scope);
@@ -69,9 +62,8 @@ export class MeterRemoval {
           description: 'The meter has recorded history. Archive it instead.',
         });
       await this.store.deleteMeter(meterId, scope);
-      return meter;
+      await this.record('meter.deleted', meter, actor, scope);
     });
-    await this.record('meter.deleted', deleted, actor);
   }
 
   /** A usage that has not ended captured the meter at its start, or holds an active metering session of it. */
@@ -91,14 +83,19 @@ export class MeterRemoval {
     action: 'meter.archived' | 'meter.restored' | 'meter.deleted',
     meter: ResourceMeterRecord,
     actor: AuditActor,
+    scope: TransactionContext,
   ): Promise<void> {
-    await this.audit.record({
-      domain: 'resource',
-      action,
-      actor,
-      subject: { type: 'resource', id: meter.resourceId },
-      details: { meterId: meter.id, meterName: meter.name },
-    });
+    // In the same transaction: a change without its audit entry, or the reverse, cannot happen.
+    await this.audit.record(
+      {
+        domain: 'resource',
+        action,
+        actor,
+        subject: { type: 'resource', id: meter.resourceId },
+        details: { meterId: meter.id, meterName: meter.name },
+      },
+      scope,
+    );
   }
 }
 
