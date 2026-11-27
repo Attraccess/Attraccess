@@ -28,6 +28,7 @@ export interface ResourceMeterRecord {
   lifetimeValue: string;
   counterValue: string | null;
   latestObservedAt: Date | null;
+  archivedAt: Date | null;
 }
 
 /** Logical metering session: one per usage and meter. */

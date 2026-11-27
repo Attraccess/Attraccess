@@ -6,7 +6,8 @@ export type ResourceMeterAllocation = 'shared' | 'per-session';
 
 /** A user-defined counter. Values use fixed-point billionths, with no physical unit. */
 @Entity()
-@Index('IDX_resource_meter_name', ['resourceId', 'name'], { unique: true })
+// A name is unique only among active meters, so a new meter can reuse the name of an archived one.
+@Index('IDX_resource_meter_name', ['resourceId', 'name'], { unique: true, where: '"archivedAt" IS NULL' })
 export class ResourceMeter {
   @PrimaryGeneratedColumn()
   id!: number;
@@ -36,4 +37,8 @@ export class ResourceMeter {
 
   @Column({ type: 'timestamptz', nullable: true })
   latestObservedAt!: Date | null;
+
+  /** Set while the meter is archived: it is hidden and neither measured nor billed; its history stays. */
+  @Column({ type: 'timestamptz', nullable: true })
+  archivedAt!: Date | null;
 }

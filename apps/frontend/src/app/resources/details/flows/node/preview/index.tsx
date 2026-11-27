@@ -85,11 +85,16 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
       resolvePreview ? resolved.data?.configSchema : schema.configSchema,
       locale,
     );
-    if (isMeterNode)
+    if (isMeterNode) {
+      const meterId = nodeData?.data.meterId;
+      const meter = meters?.find((candidate) => candidate.id === meterId);
+      // A selected meter the loaded list does not have is no longer an active meter of the resource.
+      const missing = meters && meterId != null && !meter;
       rows.unshift({
         label: t('nodes.' + schema.type + '.config.meterId.label'),
-        value: meters?.find((meter) => meter.id === nodeData?.data.meterId)?.name ?? '-',
+        value: meter?.name ?? (missing ? t('preview.meterMissing') : '-'),
       });
+    }
     return rows;
   }, [schema, t, nodeData, resolvePreview, resolved.data, resolved.isError, locale, isMeterNode, meters]);
 }

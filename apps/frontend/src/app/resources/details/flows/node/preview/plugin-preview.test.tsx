@@ -191,3 +191,18 @@ it('refreshes a visible summary after a delayed applied revision without a publi
   await act(async () => pending[1].resolve(response('New applied name')));
   await waitFor(() => expect(result.current[0]).toEqual({ label: 'Action', value: 'New applied name' }));
 });
+
+it.each([
+  [1, 'Energy'],
+  [2, 'preview.meterMissing'],
+  [undefined, '-'],
+])('shows the meter %s of a metering node as %s', async (meterId, shown) => {
+  node.data = { meterId };
+  vi.mocked(sdk.listResourceMeters).mockResolvedValue(
+    sdkResult([{ id: 1, name: 'Energy' }]) as Awaited<ReturnType<typeof sdk.listResourceMeters>>,
+  );
+  const type = 'output.resource.metering.report';
+  const { result } = mount({ ...schema, type, configSchema: { properties: {} } });
+  await waitFor(() => expect(client.isFetching()).toBe(0));
+  await waitFor(() => expect(result.current[0]).toEqual({ label: `nodes.${type}.config.meterId.label`, value: shown }));
+});

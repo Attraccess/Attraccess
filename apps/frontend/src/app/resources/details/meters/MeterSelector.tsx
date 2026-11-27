@@ -1,4 +1,4 @@
-import { Label, ListBox, Select } from '@heroui/react';
+import { Description, Label, ListBox, Select } from '@heroui/react';
 import { useListResourceMeters } from '@attraccess/react-query-client';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../../../hooks/useAuth';
@@ -17,7 +17,9 @@ export function MeterSelector({
 }) {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
-  const { data: meters = [], isError } = useListResourceMeters({ path: { resourceId } });
+  const { data: meters, isError } = useListResourceMeters({ path: { resourceId } });
+  // A node may still point at a meter that was archived or deleted since.
+  const missing = value != null && meters != null && !meters.some((meter) => meter.id === value);
   return (
     <div className="flex flex-col gap-2">
       <Select
@@ -35,7 +37,7 @@ export function MeterSelector({
         </Select.Trigger>
         <Select.Popover>
           <ListBox>
-            {meters.map((meter) => (
+            {(meters ?? []).map((meter) => (
               <ListBox.Item key={meter.id} id={meter.id} textValue={meter.name}>
                 {meter.name}
                 <ListBox.ItemIndicator />
@@ -43,6 +45,7 @@ export function MeterSelector({
             ))}
           </ListBox>
         </Select.Popover>
+        {missing && <Description>{t('missing')}</Description>}
       </Select>
       {isError && <p role="alert">{t('loadError')}</p>}
       {hasPermission('resources.update') && (
