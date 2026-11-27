@@ -22,7 +22,11 @@ export function ReaderSecured(props: Readonly<{ reader: Attractap }>) {
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">{t('secured.title')}</h3>
         <Chip color={reader.secured ? 'success' : 'default'} data-cy={`attractap-secured-${reader.secured}`}>
-          {reader.secured ? t('secured.secured') : t('secured.notSecured')}
+          {reader.secured
+            ? t('secured.secured')
+            : reader.firmwareProfile === 'secure-lab'
+              ? t('secured.labKey')
+              : t('secured.notSecured')}
         </Chip>
       </div>
       <p className="text-sm text-default-500">

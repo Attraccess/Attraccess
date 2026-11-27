@@ -8,6 +8,7 @@
 #include "../../settings/settings.hpp"
 #include "../../state/state.hpp"
 #include "session_certificates.hpp"
+#include "../conversion/conversion_link.hpp"
 
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
@@ -233,6 +234,7 @@ void ReaderLink::onSessionStatus(const Event &event)
         bootstrapUntrusted = 0;
         handshakeFailures = 0;
         State::setSessionProblem(State::SESSION_PROBLEM_NONE);
+        ConversionLink::onSessionOpened();
 #ifdef ESP_PLATFORM
         // The session's internal-heap cost is budgeted (mbedTLS itself allocates in PSRAM).
         logger.infof("Secure session established; heap internal: free=%u min=%u; main stack free=%u",
@@ -320,6 +322,11 @@ void ReaderLink::onSessionFrame(SessionFraming::FrameType type, std::string payl
         }
         return;
     case SessionFraming::FrameType::BINARY:
+        // Chunks of a running conversion transfer (ATT-1208); everything else is an OTA chunk.
+        if (ConversionLink::onBinary(reinterpret_cast<const uint8_t *>(payload.data()), payload.size()))
+        {
+            return;
+        }
 #ifdef ESP_PLATFORM
         if (appBinary)
         {
@@ -429,6 +436,13 @@ void ReaderLink::onControl(const std::string &payload)
     if (strcmp(type, "session.rejected") == 0)
     {
         onPairingRemoved(message["reason"] | "unknown");
+        return;
+    }
+
+    // "Secure this reader" (ATT-1208). Builds without a conversion client ignore these.
+    if (strncmp(type, "conversion.", strlen("conversion.")) == 0)
+    {
+        ConversionLink::onControl(type, message.as<JsonVariantConst>());
         return;
     }
 }

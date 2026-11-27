@@ -298,6 +298,8 @@ enum class Message {
     AutoEndLine, AutoEndLineAt, ErrorExtensionExceedsMaximum, ErrorExtensionNotPossible, ErrorEstimateExceedsMaximum,
     ErrorEstimateRequired,
     FormImageScanHint, FormImageCount,
+    SecureConversionTitle, SecureConversionTransfer, SecureConversionVerify, SecureConversionBurn,
+    SecureConversionBootloader, SecureConversionDontUnplug, SecureConversionRestartHint,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };

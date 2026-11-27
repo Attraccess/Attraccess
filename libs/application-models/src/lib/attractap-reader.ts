@@ -139,6 +139,10 @@ export interface AttractapReaderSecurityPatch {
   efuseSecureVersion?: number | null;
   securityReportCheckedAt?: Date | null;
   securityReportProblems?: AttractapSecurityProblem[] | null;
+  /** Written by the secure conversion before it asks the reader to burn them (ATT-1208), never by an edit. */
+  secureBootDigest0?: string | null;
+  secureBootDigest1?: string | null;
+  secureBootSignerDigest?: string | null;
 }
 
 /** A reader's security columns and recorded Secure Boot digests: what the security checks compare with. */

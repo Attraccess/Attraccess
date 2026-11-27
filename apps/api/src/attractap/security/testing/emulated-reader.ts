@@ -3,6 +3,7 @@ import { WebSocket } from 'ws';
 import { INSTALLATION_URI_PREFIX, uriSanValue, x509 } from '../pki';
 import { FrameDecoder, FrameType, SESSION_SUBPROTOCOL, encodeFrame, Frame } from '../session-framing';
 import { WsByteStream } from '../ws-byte-stream';
+import type { ConversionOutput, EmulatedConversionDevice } from './emulated-conversion';
 
 export interface EmulatedReaderIdentity {
   privateKeyPem: string;
@@ -40,6 +41,7 @@ export class EmulatedReader {
   private resolveClosed!: () => void;
   private readonly decoder = new FrameDecoder();
   private waiters: Array<() => void> = [];
+  private conversion: EmulatedConversionDevice | null = null;
 
   public constructor(private readonly options: EmulatedReaderOptions) {
     this.closed = new Promise((resolve) => (this.resolveClosed = resolve));
@@ -90,6 +92,7 @@ export class EmulatedReader {
     tls.on('error', () => undefined);
     tls.on('data', (chunk: Buffer) => {
       for (const frame of this.decoder.push(chunk)) {
+        if (this.conversion && this.playConversionFrame(frame)) continue;
         this.frames.push(frame);
         this.waiters.splice(0).forEach((resolve) => resolve());
       }
@@ -122,6 +125,31 @@ export class EmulatedReader {
         setTimeout(resolve, 50);
       });
     }
+  }
+
+  /**
+   * Lets `device` play the reader side of a secure conversion on this session: conversion CONTROL messages and
+   * binary chunk answers go to it (not to `frames`), and what it answers is sent back. Starts with its status.
+   */
+  public playConversion(device: EmulatedConversionDevice): void {
+    this.conversion = device;
+    this.send(FrameType.CONTROL, JSON.stringify(device.status()));
+  }
+
+  private playConversionFrame(frame: Frame): boolean {
+    const device = this.conversion as EmulatedConversionDevice;
+    let output: ConversionOutput;
+    if (frame.type === FrameType.BINARY) output = device.onChunk(frame.payload);
+    else if (frame.type === FrameType.CONTROL) {
+      const message = JSON.parse(frame.payload.toString('utf8')) as Record<string, unknown>;
+      if (typeof message['t'] !== 'string' || !message['t'].startsWith('conversion.')) return false;
+      output = device.onControl(message);
+    } else return false;
+    for (const control of output.control) this.send(FrameType.CONTROL, JSON.stringify(control));
+    for (const payload of output.chunkRequests) {
+      this.send(FrameType.JSON, JSON.stringify({ event: 'EVENT', data: { type: 'FIRMWARE_REQUEST_CHUNK', payload } }));
+    }
+    return true;
   }
 
   public close(): void {

@@ -1,6 +1,6 @@
 #include "efuse_snapshot.hpp"
 
-#if defined(ESP_PLATFORM) && defined(ATTRACTAP_SECURE_BUILD)
+#if defined(ESP_PLATFORM) && (defined(ATTRACTAP_SECURE_BUILD) || defined(ATTRACTAP_CONVERSION_CLIENT))
 
 #include <cstdio>
 

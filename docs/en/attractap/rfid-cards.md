@@ -89,7 +89,7 @@ How it works:
 
 ## Which Readers May Enroll and Reset Cards
 
-By default every reader with a display and firmware 2.0.0 or later can enroll and reset cards. Administrators can limit this under **Settings -> RFID card enrollment**: choose **Selected readers** and tick the readers that may write cards. The enrollment and reset screens then list only those readers. All readers still let members sign in with their cards.
+By default every reader with a display and firmware 2.0.0 or later can enroll and reset cards. Administrators can limit this under **Settings -> RFID card enrollment**: choose **Selected readers** and tick the readers that may write cards, or choose **Only secured readers** to allow every reader that is currently [secured](attractap/reader-security.md#secure-a-reader). The enrollment and reset screens then list only those readers, and the server refuses enrollment and reset on any other reader. With **Only secured readers**, a reader that loses its **Secured** status (for example after a failing security report) can no longer write cards until it is secured again. All readers still let members sign in with their cards.
 
 Readers whose pairing was removed appear only in the **Not paired** list on the readers page, where you pair them again. They are not shown in the reader list, in any picker, in the settings or in resource assignment, and they can never enroll or reset cards, supervise a start or run a mass introduction. Such a reader cannot connect until it is paired again, so it takes no card taps, doors, resources or flows.
 
@@ -97,7 +97,7 @@ Readers whose pairing was removed appear only in the **Not paired** list on the 
 > **Only allow paired readers you trust to enroll and reset cards.** A new card still has the public factory key, so the server writes the new card key under that factory key.
 >
 > - **The connection:** a [paired reader](attractap/pairing.md) talks to the server over an encrypted connection, so nobody listening on the network can read the key. A reader that is not paired cannot connect at all, so it can never enroll or reset cards.
-> - **The reader itself:** the reader that relays the write can still work out the new key. A reader that was tampered with could therefore copy cards enrolled or reset on it. Use **Settings -> RFID card enrollment** to keep this to readers in a place you control, for example the front desk. Secured reader firmware, planned for a later release, is meant to address tampered readers.
+> - **The reader itself:** the reader that relays the write can still work out the new key. A reader that was tampered with could therefore copy cards enrolled or reset on it. Use **Settings -> RFID card enrollment** to keep this to readers in a place you control, for example the front desk. [Secured readers](attractap/reader-security.md) address tampered readers within their [limits](attractap/reader-security.md#attacker-model-and-limits); choose **Only secured readers** to write cards only through them.
 >
 > Normal taps are not affected: when a card is used, the server checks it without the key ever passing through the reader.
 

@@ -127,6 +127,34 @@ if(ATTRACTAP_SECURE_PROFILE)
     endif()
 endif()
 
+# "Secure this reader" (ATT-1208): plain builds of a variant that has a secure profile build run the conversion client
+# (steps 1-6) and advertise `secureConversion`. Never secure, demo or bridge builds.
+if("${ATTRACTAP_SECURE_PROFILE_BUILD}" STREQUAL "true" AND NOT ATTRACTAP_SECURE_PROFILE
+   AND ATTRACTAP_IDF_TARGET STREQUAL "esp32s3" AND NOT "DEMO_MODE=1" IN_LIST ATTRACTAP_DEFINES)
+    set(ATTRACTAP_CONVERSION_CLIENT ON)
+    list(APPEND ATTRACTAP_DEFINES ATTRACTAP_CONVERSION_CLIENT=1)
+    # Step 6 writes the bootloader region: allowed in these builds only (sdkconfig.conversion).
+    if(NOT SDKCONFIG_DEFAULTS AND DEFINED ENV{SDKCONFIG_DEFAULTS})
+        set(SDKCONFIG_DEFAULTS "$ENV{SDKCONFIG_DEFAULTS}")
+    endif()
+    if(NOT SDKCONFIG_DEFAULTS)
+        set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults")
+    endif()
+    list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.conversion")
+else()
+    set(ATTRACTAP_CONVERSION_CLIENT OFF)
+endif()
+# Lab/HIL only: the conversion runs preflight, transfer, staging and verify, and the reader refuses every burn
+# command (reason `stop-before-burn`), so no lab unit ever gets a fuse burned. Every test-hooks build has it on;
+# build_firmwares.py forces it OFF and tools/check_release_build.py fails a release image that contains it.
+option(ATTRACTAP_CONVERSION_STOP_BEFORE_BURN "Refuse every conversion burn command (lab/HIL builds only)" OFF)
+if(ATTRACTAP_CONVERSION_STOP_BEFORE_BURN AND NOT ATTRACTAP_TEST_HOOKS)
+    message(FATAL_ERROR "ATTRACTAP_CONVERSION_STOP_BEFORE_BURN is a lab/HIL option: it needs ATTRACTAP_TEST_HOOKS=ON")
+endif()
+if(ATTRACTAP_TEST_HOOKS)
+    list(APPEND ATTRACTAP_DEFINES ATTRACTAP_CONVERSION_STOP_BEFORE_BURN=1)
+endif()
+
 # A release build reports `release: true` in READER_FIRMWARE_INFO (ATT-1207): not a lab-only variant
 # (ATTRACTAP_RELEASE OFF), no secure lab overlay, no test hooks, crash trigger, UI self-test or LVGL perf
 # monitor. The server still treats it as a claim.
@@ -181,6 +209,13 @@ elseif(NOT ATTRACTAP_SECURE_PROFILE AND (CONFIG_SECURE_BOOT OR CONFIG_SECURE_FLA
     message(FATAL_ERROR "${SDKCONFIG} enables a fuse-burning option (Secure Boot, flash encryption, NVS encryption "
                         "or anti-rollback), but ATTRACTAP_SECURE_PROFILE is OFF. If it comes from a secure build, "
                         "build in a clean directory with its own -DSDKCONFIG; otherwise remove the option.")
+elseif(ATTRACTAP_SECURE_PROFILE AND CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED)
+    # Only the plain app writes the bootloader region (the conversion, ATT-1208); a secure app never may.
+    message(FATAL_ERROR "${SDKCONFIG} allows dangerous flash writes, but ATTRACTAP_SECURE_PROFILE is ON. "
+                        "Build in a clean directory with its own -DSDKCONFIG.")
+elseif(ATTRACTAP_CONVERSION_CLIENT AND NOT CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED)
+    message(FATAL_ERROR "${SDKCONFIG} refuses writes to the bootloader region, which the conversion client "
+                        "(ATT-1208, step 6) needs. sdkconfig.defaults allows them; build in a clean directory.")
 elseif(ATTRACTAP_SECURE_LAB AND NOT CONFIG_SECURE_FLASH_ENCRYPTION_MODE_DEVELOPMENT)
     message(FATAL_ERROR "ATTRACTAP_SECURE_LAB=ON but ${SDKCONFIG} uses release-mode flash encryption. "
                         "Build in a clean directory with its own -DSDKCONFIG.")

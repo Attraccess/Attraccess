@@ -209,6 +209,7 @@ All entries in one **Set Payload** node read the same incoming payload. An entry
 | **HTTP Request**, acknowledged     | Response body directly; `{"energy_wh":1500}` is read as `{{energy_wh}}`       |
 | **HTTP Request**, dispatch         | Original payload; no response body                                            |
 | **Wait for MQTT Message**, success | `{ "topic": "…", "payload": … }`; no previous fields or `serverId`            |
+| **MQTT Send Message**, reply topic | Incoming fields plus `response: { "topic": "…", "payload": … }`               |
 | **Add Billing Item**               | The item: `name`, `description`, `externalReference`, `unitPrice`, `quantity` |
 | **Lock PC / Unlock PC**            | Incoming fields, with `companion` replaced by `{ "delivered": true/false }`   |
 

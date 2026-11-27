@@ -13,6 +13,10 @@
       "selected": {
         "label": "Ausgewählten Readern",
         "description": "Nur die unten gewählten Reader können RFID-Karten registrieren und zurücksetzen."
+      },
+      "secured": {
+        "label": "Nur gesicherten Readern",
+        "description": "Nur Reader, die gerade gesichert sind, können RFID-Karten registrieren und zurücksetzen. Ein Reader, der seinen Status „Gesichert“ verliert, kann erst wieder Karten beschreiben, wenn er wieder gesichert ist."
       }
     }
   },
