@@ -73,13 +73,16 @@ export class WallsService {
 
   /**
    * A manager selects only what they may see themselves: a hidden machine or group answers like a missing one, and
-   * "every resource" (which covers future ones too) needs a manager whose machine list is not narrowed. `stored` is
-   * the wall's current selection: what was deleted since stays accepted, so the wall can still be edited.
+   * "every resource" (which covers future ones too) needs a manager whose machine list is not narrowed. With "every
+   * resource" the lists show nothing, so they are not checked until it is switched off again. `stored` is the wall's
+   * current selection: what was deleted since stays accepted, so the wall can still be edited.
    */
   private async assertSelectable(viewer: PluginAccessPrincipal, selection: WallSelection, stored?: WallSelection) {
-    const access = this.context.resourceAccess;
-    if (selection.all && (await access.getResourceListScope(viewer)) !== 'all') {
-      throw new ForbiddenException('ResourceListNarrowed');
+    if (selection.all) {
+      if ((await this.context.resourceAccess.getResourceListScope(viewer)) !== 'all') {
+        throw new ForbiddenException('ResourceListNarrowed');
+      }
+      return;
     }
     const resource = await this.refusedResourceId(viewer, selection.resourceIds, stored?.resourceIds ?? []);
     if (resource !== undefined) throw new ResourceNotFoundException(resource);

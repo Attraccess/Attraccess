@@ -131,6 +131,24 @@ describe('WallsService selection and machine list visibility (ATT-1407)', () => 
     await expect(service.create(1, wallWith({ resourceIds: [1] }))).resolves.toBeDefined();
   });
 
+  it('ignores the lists while "all" is on, and checks them again once it is switched off', async () => {
+    const { service, state } = setup();
+    state.groups.set(7, [3]);
+    const lists = { resourceIds: [2], groupIds: [7] };
+    const wall = await service.create(1, wallWith(lists));
+    state.hiddenResources.add(2);
+    state.hiddenGroups.add(7);
+
+    await expect(service.update(1, wall.id, wallWith({ all: true, ...lists }))).resolves.toMatchObject({
+      selection: { all: true, ...lists },
+    });
+    await expect(service.create(1, wallWith({ all: true, ...lists }))).resolves.toBeDefined();
+
+    // Being stored with "all" does not make a hidden entry selectable.
+    await expect(service.update(1, wall.id, wallWith({ resourceIds: [2] }))).rejects.toMatchObject(hiddenMachine);
+    await expect(service.update(1, wall.id, wallWith({ groupIds: [7] }))).rejects.toMatchObject(hiddenGroup);
+  });
+
   it('follows the host group rule: a hidden group answers like a missing one', async () => {
     const { service, state } = setup();
     state.groups.set(7, [2]);

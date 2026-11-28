@@ -39,7 +39,8 @@ whether the wall shows 4 or 60 machines, and they keep their places (sorted by n
    or a group that you may no longer see, you cannot save it, not even to rename it, until you remove that
    entry. The dialog does not list it: for resources, choose **Clear selection** and select them again; for groups,
    choose **Remove them from the selection**. This changes what the wall shows. To keep it as it is, ask someone who
-   may see everything on it to edit the wall. Deleted resources and groups do not block saving.
+   may see everything on it to edit the wall. Deleted resources and groups do not block saving. While **all
+   resources** is on, the groups and resources selected earlier have no effect and are not checked.
 3. Save. The dialog shows the wall's link. Open it on the screen, or copy it to the screen's browser.
 
 You can set up as many walls as you like, for example one per hall. The **⋮** menu of a wall opens it, shows its link

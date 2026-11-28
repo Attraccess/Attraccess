@@ -41,7 +41,8 @@ auf den Bildschirm, ob die Wand 4 oder 60 Maschinen zeigt, und behalten ihren Pl
    speichern (auch nur zum Umbenennen), nachdem du den Eintrag entfernt hast. Der Dialog führt ihn nicht auf: Wähle bei Ressourcen
    **Auswahl leeren** und wähle sie neu aus, bei Gruppen **Aus der Auswahl entfernen**. Das ändert, was die Wand
    zeigt. Soll sie so bleiben, bitte jemanden, der alles darauf sehen darf, sie zu bearbeiten. Gelöschte Ressourcen
-   und Gruppen verhindern das Speichern nicht.
+   und Gruppen verhindern das Speichern nicht. Solange **alle Ressourcen** eingeschaltet ist, wirken früher gewählte
+   Gruppen und Ressourcen nicht und werden nicht geprüft.
 3. Speichere. Der Dialog zeigt den Link der Wand. Öffne ihn auf dem Bildschirm oder kopiere ihn in dessen Browser.
 
 Du kannst beliebig viele Wände einrichten, zum Beispiel eine je Halle. Das **⋮**-Menü einer Wand öffnet sie, zeigt
