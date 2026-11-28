@@ -79,10 +79,11 @@ http://localhost:3000
 
 Da noch kein Benutzerkonto existiert, werden Sie automatisch zum **Einrichtungsassistenten** weitergeleitet. Dort konfigurieren Sie:
 
-1. **Anwendungseinstellungen** – URL und Lizenzschlüssel
+1. **Anwendungseinstellungen** – URL, öffentliche URL und Standardsprache des Systems
 2. **E-Mail-Einstellungen** – SMTP-Server für E-Mail-Versand
-3. **Administrator-Konto** – Ihr erstes Benutzerkonto
-4. **E-Mail-Bestätigung** – Überprüfen Sie Ihr Postfach
+3. **Lizenz** – Community-/Non-Profit-Lizenz oder Ihr Lizenzschlüssel
+4. **Administrator-Konto** – Ihr erstes Benutzerkonto
+5. **Fertig** – E-Mail-Adresse bestätigen
 
 Details finden Sie unter [Ersteinrichtung](setup/first-time-setup.md).
 

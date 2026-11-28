@@ -70,7 +70,7 @@ The linked `LICENSE.md` contains the full terms in German and takes precedence o
 
 ### Activation
 
-Activating licensed features requires a license key, including for free installations. Enter it in the **License Key** field of the [Setup Wizard](setup/first-time-setup.md) or under **Settings → Application Settings**.
+Activating licensed features requires a license key, including for free installations. Enter it in the **License** step of the [Setup Wizard](setup/first-time-setup.md#step-3-license) or under **Settings → Application Settings**.
 
 For qualifying non-commercial use, copy the following special key exactly after reviewing the license terms:
 

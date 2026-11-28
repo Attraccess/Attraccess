@@ -79,10 +79,11 @@ http://localhost:3000
 
 Since no user account exists yet, you will be automatically redirected to the **Setup Wizard**. There you will configure:
 
-1. **Application Settings** – URL and license key
+1. **Application Settings** – URL, public URL and default system language
 2. **Email Settings** – SMTP server for email delivery
-3. **Administrator Account** – Your first user account
-4. **Email Verification** – Check your inbox
+3. **License** – Community / non-profit license or your license key
+4. **Administrator Account** – Your first user account
+5. **You're all set** – Verify your email address
 
 Details can be found at [First-Time Setup](setup/first-time-setup.md).
 
