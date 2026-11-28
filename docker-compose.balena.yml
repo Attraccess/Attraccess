@@ -82,17 +82,32 @@ services:
       - '3000'
     volumes:
       - attraccess-storage:/app/storage
+      - backup-status:/backup-status:ro
     environment:
       - VALKEY_URL=redis://valkey:6379
     env_file:
       - .env.docker-compose
+    # Attraccess only starts once the backup service reports its settings as present and valid (or BACKUP_DISABLED=true):
+    # a device without backups must not go unnoticed. The backup service writes /backup-status/status after checking its
+    # settings (not the target, so a boot without internet still starts) and removes it when it stops. Overriding the entrypoint drops the image's CMD, so the
+    # command is repeated here. (No `$` on purpose: balena does not interpolate.)
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - >
+        while [ ! -s /backup-status/status ]; do
+          echo 'attraccess: waiting for the backup service - backups are not set up. Configure BACKUP_REPOSITORY and BACKUP_PASSWORD, or set BACKUP_DISABLED=true (docs: installation/backup-restore).';
+          sleep 30;
+        done;
+        if grep -qx disabled /backup-status/status; then echo 'attraccess: WARNING - backups are disabled (BACKUP_DISABLED=true).'; fi;
+        exec /entrypoint.sh node dist/apps/api/main.js
     # Balena only supports the short-form depends_on (service_started); the
     # long-form `condition: service_healthy` is rejected (ATT-593-style). The app
     # retries the PostgreSQL and Valkey connections at startup, and
-    # restart: unless-stopped covers startup races.
+    # restart: unless-stopped covers startup races. The backup gate is the status file above.
     depends_on:
       - postgres
       - valkey
+      - backup
 
   monitoring-init:
     build:
@@ -227,6 +242,12 @@ services:
     restart: unless-stopped
     expose:
       - '9100'
+    # The backup service writes its metrics (backup.prom) into the backup-status volume; the textfile collector
+    # publishes them for the backup alerts (BackupNotConfigured, BackupFailed, BackupTooOld, BackupsDisabled).
+    command:
+      - '--collector.textfile.directory=/backup-status'
+    volumes:
+      - backup-status:/backup-status:ro
     # io.balena.features.procfs/sysfs bind-mount the host OS /proc and /sys into
     # the container, giving node-exporter access to host CPU/RAM/network metrics
     # without privileged mode. Balena disallows arbitrary host bind mounts (e.g. /:/host),
@@ -307,9 +328,11 @@ services:
       - grafana
 
   # Scheduled restic backups of the database (pg_dump) and of the volumes below (docker/backup/README.md).
-  # Without BACKUP_REPOSITORY it logs one warning and idles. Configure with balena device variables:
-  # BACKUP_REPOSITORY, BACKUP_PASSWORD, the target's credentials (e.g. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY),
-  # optionally BACKUP_SCHEDULE (cron, default '0 3 * * *') and BACKUP_KEEP_DAILY/WEEKLY/MONTHLY (7/4/6).
+  # Without its settings this service exits with an error and the attraccess service does not start: set
+  # BACKUP_REPOSITORY, BACKUP_PASSWORD and the target's credentials (e.g. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY) as
+  # balena device variables, or BACKUP_DISABLED=true to run without backups on purpose. Optional: BACKUP_SCHEDULE
+  # (cron, default '0 3 * * *'), BACKUP_KEEP_DAILY/WEEKLY/MONTHLY (7/4/6) and BACKUP_MAX_AGE_HOURS (30, BackupTooOld).
+  # It writes backup.prom (metrics) to the backup-status volume; node-exporter publishes it for the Grafana backup alerts.
   # One repository per device: BACKUP_REPOSITORY as a fleet variable would share it; then set BACKUP_HOST per device.
   # Restore (stop the other services first): `docker compose run --rm backup restore [snapshot]`, on a balena device
   # `balena-engine exec -it <backup container> attraccess-backup restore [snapshot]`.
@@ -321,6 +344,7 @@ services:
     restart: unless-stopped
     volumes:
       - backup-state:/var/lib/backup
+      - backup-status:/var/lib/backup-status
       # mount volumes of all services that should be backed up
       - proxy-data:/external-storage/proxy/data
       - proxy-letsencrypt:/external-storage/proxy/letsencrypt
@@ -339,6 +363,7 @@ services:
 volumes:
   postgres-data:
   backup-state:
+  backup-status:
   proxy-data:
   proxy-letsencrypt:
   attraccess-storage:

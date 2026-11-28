@@ -5,7 +5,39 @@ Each run dumps the PostgreSQL database (`pg_dump -Fc`), then uploads the dump an
 (proxy data and certificates, `attraccess-storage`, webhook-site, rabbitmq, zigbee2mqtt, prometheus, grafana,
 config-ui) to an encrypted restic repository and prunes old snapshots.
 
-Without `BACKUP_REPOSITORY` the container logs one warning and idles: nothing is backed up.
+On start (`run`) the container checks only its settings, not the repository, so it also starts while the target cannot
+be reached (internet down at boot). Then it writes `enabled` to `/var/lib/backup-status/status` (volume
+`backup-status`). The `attraccess` service of the balena stack mounts that volume read-only and only starts once the
+file exists. Without `BACKUP_REPOSITORY`, `BACKUP_PASSWORD` or `DATABASE_URL`, or with an invalid `BACKUP_SCHEDULE` or
+`BACKUP_MAX_AGE_HOURS`, the container exits with an error (and is restarted): a device without backups does not go
+unnoticed. `BACKUP_DISABLED=true` switches backups off on purpose: the container logs one warning, writes `disabled`
+and waits. The status file is removed when the container starts and when it stops.
+
+Problems with the target show up in the runs. The first run initialises the repository (`restic init`, also creates a
+missing bucket). A run fails when the repository cannot be opened (wrong password, address or credentials) or does not
+answer within `BACKUP_CONNECT_TIMEOUT_SECONDS`. Files that vanish while they are read (restic exit code 3, e.g. journals
+of running services) are skipped with a warning; the run still succeeds.
+
+## Metrics and alerts
+
+Every start and every run writes `backup.prom` next to the status file (Prometheus textfile format, readable by
+node-exporter's textfile collector, which the balena stack points at the `backup-status` volume). The values behind it
+live in `BACKUP_STATE_DIR`, so they survive restarts.
+
+| Metric                                     | Meaning                                                                      |
+| ------------------------------------------ | ---------------------------------------------------------------------------- |
+| `backup_configured`                        | 1 set up and scheduled, 0 refused to start (settings missing or invalid)     |
+| `backup_disabled`                          | 1 with `BACKUP_DISABLED=true` (then `backup_configured` is absent)           |
+| `backup_max_age_seconds`                   | `BACKUP_MAX_AGE_HOURS` in seconds                                            |
+| `backup_scheduler_start_timestamp_seconds` | start of the scheduler (the reference for `BackupTooOld` before any success) |
+| `backup_last_run_timestamp_seconds`        | end of the last run                                                          |
+| `backup_last_run_success`                  | 1 the last run succeeded, 0 it failed                                        |
+| `backup_last_success_timestamp_seconds`    | end of the last successful run                                               |
+
+The Grafana rules `BackupNotConfigured`, `BackupFailed`, `BackupTooOld` and `BackupsDisabled`
+(`monitoring/grafana/provisioning/alerting/rules.yaml`) read them; `apps/api/src/metrics/alerting/backup-alerts.alerting.spec.ts`
+tests them against real Prometheus and Grafana (`pnpm nx run api:test-alerting`; on rootless Docker set
+`ALERTING_HOST_GATEWAY` to the host's LAN address).
 
 ## Settings (environment, e.g. balena device variables)
 
@@ -14,28 +46,32 @@ own path in the repository), not as a fleet variable: a fleet variable gives eve
 repository. If several installations must share one repository, give each its own `BACKUP_HOST`; otherwise their
 retention (`forget --prune`) and `restore latest` mix up the snapshots of different installations.
 
-| Variable                                                 | Default             | Meaning                                                                     |
-| -------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------- |
-| `BACKUP_REPOSITORY`                                      | – (off)             | restic repository, e.g. `s3:s3.amazonaws.com/bucket/attraccess`, `sftp:…`   |
-| `BACKUP_PASSWORD`                                        | –                   | encrypts the repository. Required, and lost together with it if forgotten   |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …  | –                   | credentials of the target, passed to restic unchanged                       |
-| `BACKUP_SCHEDULE`                                        | `0 3 * * *`         | 5-field cron expression (container time zone, `TZ`)                         |
-| `BACKUP_KEEP_DAILY` / `BACKUP_KEEP_WEEKLY` / `…_MONTHLY` | `7`/`4`/`6`         | retention                                                                   |
-| `BACKUP_HOST`                                            | `attraccess`        | restic host name: backup, retention, `snapshots` and `restore` only use it  |
-| `DATABASE_URL` (or `BACKUP_DATABASE_URL`)                | from stack          | database to dump and restore (`BACKUP_DATABASE_URL` wins when both are set) |
-| `BACKUP_PG_WAIT_SECONDS`                                 | `120`               | how long a run waits for PostgreSQL before it fails                         |
-| `BACKUP_FORCE`                                           | –                   | `true` makes every `restore` behave as `restore --force`                    |
-| `BACKUP_STATE_DIR`                                       | `/var/lib/backup`   | scratch space: dump during a run, restic cache, lock, metric file           |
-| `BACKUP_DATA_DIR`                                        | `/external-storage` | the volumes to back up and restore (mounted below it)                       |
+| Variable                                                 | Default                  | Meaning                                                                     |
+| -------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------- |
+| `BACKUP_REPOSITORY`                                      | – (required)             | restic repository, e.g. `s3:s3.amazonaws.com/bucket/attraccess`, `sftp:…`   |
+| `BACKUP_PASSWORD`                                        | –                        | encrypts the repository. Required, and lost together with it if forgotten   |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …  | –                        | credentials of the target, passed to restic unchanged                       |
+| `BACKUP_SCHEDULE`                                        | `0 3 * * *`              | 5-field cron expression (container time zone, `TZ`)                         |
+| `BACKUP_KEEP_DAILY` / `BACKUP_KEEP_WEEKLY` / `…_MONTHLY` | `7`/`4`/`6`              | retention                                                                   |
+| `BACKUP_HOST`                                            | `attraccess`             | restic host name: backup, retention, `snapshots` and `restore` only use it  |
+| `DATABASE_URL` (or `BACKUP_DATABASE_URL`)                | from stack               | database to dump and restore (`BACKUP_DATABASE_URL` wins when both are set) |
+| `BACKUP_PG_WAIT_SECONDS`                                 | `120`                    | how long a run waits for PostgreSQL before it fails                         |
+| `BACKUP_DISABLED`                                        | –                        | `true`/`1`/`yes`: no backups on purpose; reports `disabled`, does not fail  |
+| `BACKUP_FORCE`                                           | –                        | `true` makes every `restore` behave as `restore --force`                    |
+| `BACKUP_STATE_DIR`                                       | `/var/lib/backup`        | scratch space: dump during a run, restic cache, lock, metric values         |
+| `BACKUP_DATA_DIR`                                        | `/external-storage`      | the volumes to back up and restore (mounted below it)                       |
+| `BACKUP_STATUS_DIR`                                      | `/var/lib/backup-status` | `status` file (`enabled`/`disabled`) the attraccess service waits for       |
+| `BACKUP_MAX_AGE_HOURS`                                   | `30`                     | `BackupTooOld` fires when the last success is older (whole hours)           |
+| `BACKUP_CONNECT_TIMEOUT_SECONDS`                         | `120`                    | a run fails when the target does not answer within this time                |
 
 The password in the database URL may be percent-encoded, in the user info (`user:password@host`) or as a `password=`
 query parameter. The tools get the URL without the password on their command line (visible in `ps`); the password goes
 to libpq through `PGPASSWORD`.
 
-A run logs `backup started`, then either `backup SUCCEEDED in …s` or `BACKUP FAILED`. After a success the file
-`/var/lib/backup/backup_last_success_timestamp_seconds.prom` holds `backup_last_success_timestamp_seconds <unix time>`
-(Prometheus textfile format). Nothing reads it by default: to alert on a missing backup, mount the `backup-state`
-volume read-only into a node-exporter with `--collector.textfile.directory` and add an alert rule.
+A run logs `backup started`, then either `backup SUCCEEDED in …s` or `BACKUP FAILED`, and updates `backup.prom` (see
+[Metrics and alerts](#metrics-and-alerts)). Earlier versions wrote only the last success, to
+`/var/lib/backup/backup_last_success_timestamp_seconds.prom`; the first start of this version carries that value over
+and removes the file.
 
 Files are created with `umask 077`. The plaintext dump exists only while a run is busy: it is deleted when the run
 ends (also when it fails); a restore deletes its copy of the dump as well.

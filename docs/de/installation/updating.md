@@ -38,9 +38,47 @@ Attraccess läuft jetzt ausschließlich auf PostgreSQL. Das ist ein Breaking Cha
 2. **Fügen Sie einen PostgreSQL-Dienst hinzu** und lassen Sie `DATABASE_URL` auf eine **leere** Datenbank zeigen. Die mitgelieferten Compose-Dateien (Docker Compose, Portainer, Coolify, balena) enthalten bereits einen (`postgres:18.6-alpine`, nicht Teil des Attraccess-Images); siehe [Docker Compose](installation/docker-compose.md) und [Portainer](installation/portainer.md). Haben Sie Attraccess mit einem einfachen `docker run` gestartet, müssen Sie einen PostgreSQL-Container starten und `DATABASE_URL` setzen, **bevor** Sie das neue Image laden, denn die neue Version startet ohne beides nicht.
 3. Planen Sie Speicherplatz ein: Die alte SQLite-Datei bleibt nach dem Import auf dem Datenträger (siehe unten), neben den neuen PostgreSQL-Daten. Der Storage-Ordner und die SQLite-Datei müssen für den Attraccess-Container beschreibbar sein, denn die Datei wird an Ort und Stelle migriert und danach verschoben. Braucht die Datei noch SQLite-Migrationen, beendet eine schreibgeschützte Datei den Start, bevor etwas importiert wird (`attempt to write a readonly database`); andernfalls läuft der Import durch und nur das Verschieben schlägt fehl (siehe [Fehler und Wiederholung](#fehler-und-wiederholung)).
 4. Notieren Sie, wie Ihre Plugins eingerichtet sind. Plugin-Daten werden nicht übernommen (siehe [Plugin-Daten werden nicht übernommen](#plugin-daten-werden-nicht-übernommen)).
-5. **balena:** Der Stack enthält kein Duplicati mehr; seine Backup-Jobs entfallen. Erstellen Sie vor dem Upgrade ein letztes Duplicati-Backup und setzen Sie danach die `BACKUP_*`-Variablen des neuen [restic-Sidecars](installation/backup-restore.md#balena-restic-sidecar).
+5. **balena:** Das Update entfernt Duplicati samt seinen Backup-Jobs, und Attraccess startet erst, wenn der neue [restic-Sidecar](installation/backup-restore.md#balena-restic-sidecar) eingerichtet ist. Übernehmen Sie die Duplicati-Einstellungen und setzen Sie die neuen Variablen **vor** dem Update, wie in [balena: von Duplicati zum restic-Sidecar](#balena-von-duplicati-zum-restic-sidecar) beschrieben.
 
 Setzen Sie nicht `DATABASE_TYPE=sqlite`: Der Start schlägt dann mit einer Meldung fehl, die auf diese Seite verweist.
+
+### balena: von Duplicati zum restic-Sidecar
+
+Frühere balena-Releases sicherten mit Duplicati, das Sie in seiner Weboberfläche eingerichtet haben. Das neue Release enthält kein Duplicati: Das Update entfernt den Dienst, seine Backup-Jobs und die dort eingegebenen Einstellungen. An seine Stelle tritt der neue Dienst `backup` (restic), den Sie über Gerätevariablen einrichten. Er **startet nicht ohne seine Einstellungen, und Attraccess wartet auf ihn**: Ein Gerät ohne Backup bleibt nicht unbemerkt. Lesen Sie die Duplicati-Einstellungen aus, solange Duplicati noch läuft, und setzen Sie die neuen Variablen vor dem Update.
+
+**1. Duplicati-Einstellungen auslesen (altes Release, vor dem Update).** Öffnen Sie die Duplicati-Weboberfläche wie bisher (Port `8200` des Dienstes `duplicati`, meist über einen Proxy-Host im Nginx Proxy Manager). Wählen Sie für jeden Backup-Job **Export**, dann **Als Kommandozeile**, und setzen Sie den Haken bei **Exportiere Passwörter**. Bewahren Sie das Ergebnis in einem Passwortmanager auf. Der Befehl enthält die Ziel-URL mit ihren Optionen, `--passphrase` und `--retention-policy`; der Zeitplan gehört nicht dazu, notieren Sie ihn daher zusätzlich von der Zeitplan-Seite des Jobs. Verwenden Sie die Werte so:
+
+| Im Duplicati-Export                                                                                                 | Für den Sidecar                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ziel-URL `s3://<bucket>/<ordner>?s3-server-name=<server>&…`                                                         | `BACKUP_REPOSITORY=s3:https://<server>/<bucket>/<neuer ordner>` (mit `use-ssl=false`: `s3:http://…`; Amazon S3: `s3:s3.amazonaws.com/<bucket>/<neuer ordner>`)      |
+| `auth-username` (oder `aws-access-key-id`)                                                                          | `AWS_ACCESS_KEY_ID`                                                                                                                                                 |
+| `auth-password` (oder `aws-secret-access-key`)                                                                      | `AWS_SECRET_ACCESS_KEY`                                                                                                                                             |
+| `s3-location-constraint` (Region), falls gesetzt                                                                    | `AWS_DEFAULT_REGION`                                                                                                                                                |
+| Ziel-URL `b2://<bucket>/<ordner>?auth-username=<key id>&auth-password=…` (oder `b2-accountid`, `b2-applicationkey`) | `BACKUP_REPOSITORY=b2:<bucket>:<neuer ordner>`, `B2_ACCOUNT_ID=<key id>`, `B2_ACCOUNT_KEY=<application key>`                                                        |
+| `--passphrase`                                                                                                      | Nicht übertragbar: restic legt ein neues Repository an. Wählen Sie ein neues `BACKUP_PASSWORD` und **behalten Sie die Duplicati-Passphrase** für die alten Backups. |
+| Zeitplan-Seite des Jobs (z. B. täglich um 03:00 Uhr; nicht im Export)                                               | `BACKUP_SCHEDULE` (Cron mit 5 Feldern, `0 3 * * *` ist der Standard)                                                                                                |
+| `--retention-policy` (z. B. „intelligent" = `1W:1D,4W:1W,12M:1M`)                                                   | `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` (für „intelligent": `7`, `4`, `12`)                                                                |
+
+Nutzen Sie für das restic-Repository einen **neuen Ordner**, nicht den Ordner der Duplicati-Dateien: Die beiden Formate dürfen sich nicht mischen, und die alten Duplicati-Backups bleiben daneben lesbar. Der Sidecar sichert dieselben Volumes wie der mitgelieferte Duplicati-Job und zusätzlich einen Dump der PostgreSQL-Datenbank; Quellordner, die Sie selbst zum Duplicati-Job hinzugefügt haben, werden nicht übernommen. Andere Duplicati-Ziele (SFTP, WebDAV, …) entsprechen [restic-Repositories](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html); prüfen Sie vor dem Update, dass der Sidecar sie erreicht.
+
+**2. Ein letztes Duplicati-Backup erstellen.** Stoppen Sie den Dienst `attraccess` im balena-Dashboard (Schritt 1 von [Vor dem Upgrade](#vor-dem-upgrade)), starten Sie den Job mit **Jetzt sichern** und warten Sie, bis er erfolgreich ist. Dieses Backup enthält die unveränderte `attraccess.sqlite`.
+
+**3. Die neuen Variablen setzen, noch auf dem alten Release.** Setzen Sie `BACKUP_REPOSITORY`, `BACKUP_PASSWORD`, die Zugangsdaten (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, …) und bei Bedarf `BACKUP_SCHEDULE` und `BACKUP_KEEP_*` als **Gerätevariablen** (nicht als Flottenvariablen, siehe [restic-Sidecar](installation/backup-restore.md#balena-restic-sidecar)). Den Dienst `backup` gibt es noch nicht, daher können es keine Dienstvariablen sein; balena startet die laufenden Dienste einmal neu, um sie zu übernehmen, was nicht schadet. Muss das Gerät vorerst ohne Backup laufen, setzen Sie stattdessen `BACKUP_DISABLED=true`: Attraccess startet dann und protokolliert eine Warnung.
+
+**4. Aktualisieren Sie das Gerät** auf das neue Release.
+
+**5. Den Sidecar prüfen.** Sein Log zeigt `backups enabled: schedule …`, und Attraccess startet. Der Start prüft nur, ob die Variablen vorhanden sind, nicht, ob das Ziel funktioniert; führen Sie daher gleich ein erstes Backup aus und listen Sie es auf:
+
+```bash
+balena-engine exec -it <backup-container> attraccess-backup backup
+balena-engine exec -it <backup-container> attraccess-backup snapshots
+```
+
+Protokolliert der Dienst `attraccess` stattdessen `waiting for the backup service`, nennt das Log des Dienstes `backup` die fehlende oder ungültige Einstellung. Korrigieren Sie die Variable; die Dienste starten neu, und Attraccess startet von selbst. Endet das Backup selbst mit `BACKUP FAILED`, nennen die Zeilen davor die Ursache (Adresse, Zugangsdaten, ein falsches Passwort für ein bestehendes Repository); bis zum nächsten erfolgreichen Lauf löst der Alarm [`BackupFailed`](monitoring/prometheus-grafana.md#backup-alarme) aus.
+
+**6. Behalten Sie die alten Duplicati-Backups**, bis die restic-Snapshots weit genug zurückreichen. Um eines davon später wiederherzustellen, installieren Sie Duplicati an beliebiger Stelle (zum Beispiel auf einem Laptop), öffnen **Wiederherstellungen** und wählen **Direkte Wiederherstellung aus Sicherungsdateien** und geben Ziel-URL und Passphrase aus Schritt 1 ein. Löschen Sie danach den Duplicati-Ordner im Bucket.
+
+Wurde das Gerät schon ohne Schritt 1 aktualisiert, sind die Duplicati-Einstellungen mit dem Dienst verschwunden; entnehmen Sie Adresse und Zugangsdaten des Ziels dann Ihrem Speicheranbieter.
 
 ### Was beim ersten Start passiert
 

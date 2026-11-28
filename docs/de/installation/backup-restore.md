@@ -101,10 +101,12 @@ docker compose start attraccess
 
 Der balena-Stack (`docker-compose.balena.yml`) enthält einen Dienst `backup`. Er sichert jede Nacht die PostgreSQL-Datenbank (`pg_dump -Fc`), lädt den Dump zusammen mit den Volumes des Stacks (Proxy-Daten und Zertifikate, `attraccess-storage`, webhook-site, RabbitMQ, zigbee2mqtt, Prometheus, Grafana, config-ui) in ein verschlüsseltes [restic](https://restic.net)-Repository hoch und entfernt alte Snapshots.
 
-Ohne `BACKUP_REPOSITORY` meldet der Dienst einmal eine Warnung und tut nichts: **Es wird kein Backup erstellt, bis Sie ein Repository konfigurieren.**
+**Attraccess startet nicht ohne Backup-Einstellungen.** Bei jedem Start prüft der Dienst, ob seine Einstellungen vorhanden und gültig sind (`BACKUP_REPOSITORY`, `BACKUP_PASSWORD`, `DATABASE_URL`, der Zeitplan). Erst dann lässt er den Dienst `attraccess` starten; bis dahin protokolliert dieser `waiting for the backup service`. Fehlt eine Einstellung oder ist sie ungültig, beendet sich der Dienst `backup` mit einem Fehler, der sie nennt, und wird neu gestartet, und der Alarm [`BackupNotConfigured`](monitoring/prometheus-grafana.md#backup-alarme) löst aus. Ein Gerät ohne Backup erscheint so als fehlerhafter Dienst, statt unbemerkt zu bleiben. Um bewusst ohne Backup zu arbeiten, setzen Sie `BACKUP_DISABLED=true`: Der Dienst protokolliert dann eine Warnung, Attraccess startet, und die Warnung `BackupsDisabled` löst aus.
+
+Der Start nimmt keinen Kontakt zum Backup-Ziel auf; Attraccess startet also auch, wenn das Internet gestört ist. Probleme mit dem Ziel (nicht erreichbar, falsche Adresse, Zugangsdaten oder falsches Passwort) zeigen sich in den geplanten Läufen: Das Log meldet `BACKUP FAILED` mit der Ursache, und der Alarm `BackupFailed` löst aus. Ein Lauf gibt ein Ziel, das nicht antwortet, nach `BACKUP_CONNECT_TIMEOUT_SECONDS` (Standard 120) auf. Führen Sie nach dem Einrichten oder Ändern der Variablen ein Backup von Hand aus (siehe unten), um sie sofort zu prüfen.
 
 > [!IMPORTANT]
-> Der Sidecar ersetzt Duplicati, das frühere balena-Releases enthielten. Das Update entfernt Duplicati und seine Backup-Jobs. Erstellen Sie vor dem Update ein letztes Duplicati-Backup und setzen Sie danach die Variablen unten.
+> Der Sidecar ersetzt Duplicati, das frühere balena-Releases enthielten. Das Update entfernt Duplicati und seine Backup-Jobs. Übernehmen Sie die Duplicati-Einstellungen und setzen Sie die Variablen unten **vor** dem Update: siehe [balena: von Duplicati zum restic-Sidecar](installation/updating.md#balena-von-duplicati-zum-restic-sidecar).
 
 Nutzen Sie **ein Repository pro Installation**. Setzen Sie `BACKUP_REPOSITORY` als **Gerätevariable** (oder geben Sie jedem Gerät einen eigenen Pfad), nicht als Flottenvariable: Eine Flottenvariable gibt allen Geräten der Flotte dasselbe Repository. Müssen sich Geräte ein Repository teilen, geben Sie jedem ein eigenes `BACKUP_HOST`. Sonst löscht die Aufbewahrung eines Geräts Snapshots der anderen, und `restore` ohne Snapshot-ID kann die Daten eines anderen Geräts wiederherstellen.
 
@@ -112,14 +114,17 @@ Setzen Sie diese Werte als balena-Gerätevariablen:
 
 | Variable                                                         | Standard      | Bedeutung                                                                                       |
 | ---------------------------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------------- |
-| `BACKUP_REPOSITORY`                                              | – (aus)       | restic-Repository, z. B. `s3:s3.amazonaws.com/bucket/attraccess` oder `sftp:…`                  |
+| `BACKUP_REPOSITORY`                                              | – (Pflicht)   | restic-Repository, z. B. `s3:s3.amazonaws.com/bucket/attraccess` oder `sftp:…`                  |
 | `BACKUP_PASSWORD`                                                | –             | Verschlüsselt das Repository. **Pflicht**; geht mit den Backups verloren, wenn Sie es vergessen |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …          | –             | Zugangsdaten des Ziels, unverändert an restic weitergereicht                                    |
 | `BACKUP_SCHEDULE`                                                | `0 3 * * *`   | Cron-Ausdruck mit 5 Feldern in der Zeitzone des Containers (`TZ`): täglich um 03:00 Uhr         |
 | `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6` | Aufbewahrung: Wie viele tägliche, wöchentliche und monatliche Snapshots bleiben                 |
 | `BACKUP_HOST`                                                    | `attraccess`  | Name dieser Installation im Repository; nur nötig, wenn sich Geräte eines teilen                |
+| `BACKUP_DISABLED`                                                | –             | `true`: bewusst kein Backup. Attraccess startet trotzdem und protokolliert eine Warnung         |
+| `BACKUP_MAX_AGE_HOURS`                                           | `30`          | `BackupTooOld` löst aus, wenn das letzte erfolgreiche Backup älter ist                          |
+| `BACKUP_CONNECT_TIMEOUT_SECONDS`                                 | `120`         | Wie lange ein Lauf auf das Backup-Ziel wartet, bevor er fehlschlägt                             |
 
-Ein Lauf protokolliert `backup started` und danach entweder `backup SUCCEEDED in …s` oder `BACKUP FAILED`. Nach einem Erfolg schreibt der Sidecar den Zeitpunkt des letzten Erfolgs in die Datei `backup_last_success_timestamp_seconds.prom` im Volume `backup-state` (Prometheus-Textfile-Format). Standardmäßig liest niemand diese Datei, und es ist kein Alarm eingerichtet: Um bei einem ausbleibenden Backup alarmiert zu werden, binden Sie das Volume in einen Textfile-Collector von node-exporter ein (`--collector.textfile.directory`) und legen selbst eine Alarmregel an.
+Ein Lauf protokolliert `backup started` und danach entweder `backup SUCCEEDED in …s` oder `BACKUP FAILED`. Dateien, die beim Lesen verschwinden (Journale laufender Dienste), werden mit einer Warnung übersprungen; der Lauf gilt trotzdem als erfolgreich. Das Ergebnis landet in `backup.prom` im Volume `backup-status`, das node-exporter für die [Backup-Alarme](monitoring/prometheus-grafana.md#backup-alarme) veröffentlicht (`BackupNotConfigured`, `BackupFailed`, `BackupTooOld`, `BackupsDisabled`). Sie benachrichtigen über den Grafana-Kontaktpunkt des Stacks (Pushover, wenn `PUSHOVER_API_TOKEN` und `PUSHOVER_USER_KEY` gesetzt sind).
 
 Der Datenbank-Dump liegt nur während eines laufenden Backups im Volume `backup-state`; am Ende des Laufs wird er gelöscht. Das Datenbankpasswort steht nicht in der Befehlszeile der PostgreSQL-Werkzeuge.
 

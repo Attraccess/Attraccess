@@ -11,5 +11,8 @@ RUN chmod 0755 /usr/local/lib/attraccess-backup/*.sh && \
 
 # Scratch space for dumps, the restic cache, the lock and the last-success metric. Mount a volume here.
 VOLUME ["/var/lib/backup"]
+# Status of the scheduler (`status`: enabled/disabled), shared read-only with the attraccess service, which waits for
+# it. World-readable so the volume created from it is too.
+RUN mkdir -p /var/lib/backup-status && chmod 0755 /var/lib/backup-status
 ENTRYPOINT ["/usr/local/lib/attraccess-backup/entrypoint.sh"]
 CMD ["run"]

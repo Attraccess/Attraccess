@@ -262,6 +262,11 @@ describe('Monitoring configuration consistency', () => {
       'HighAttraccessContainerMemoryUsage',
       // ATT-1212 audit persistence
       'AuditRecordsDropped',
+      // balena backup sidecar (docker/backup), metrics through the node-exporter textfile collector
+      'BackupNotConfigured',
+      'BackupFailed',
+      'BackupTooOld',
+      'BackupsDisabled',
     ];
 
     it('Grafana provisioned rules define all required alerts', () => {

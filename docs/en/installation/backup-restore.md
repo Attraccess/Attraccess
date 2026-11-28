@@ -101,10 +101,12 @@ docker compose start attraccess
 
 The balena stack (`docker-compose.balena.yml`) contains a `backup` service. Every night it dumps the PostgreSQL database (`pg_dump -Fc`), then uploads the dump together with the volumes of the stack (proxy data and certificates, `attraccess-storage`, webhook-site, RabbitMQ, zigbee2mqtt, Prometheus, Grafana, config-ui) to an encrypted [restic](https://restic.net) repository and removes old snapshots.
 
-Without `BACKUP_REPOSITORY` the service logs one warning and does nothing: **no backup is made until you configure a repository.**
+**Attraccess does not start without backup settings.** On every start the service checks that its settings are there and valid (`BACKUP_REPOSITORY`, `BACKUP_PASSWORD`, `DATABASE_URL`, the schedule). Only then does it let the `attraccess` service start; until then that service logs `waiting for the backup service`. If a setting is missing or invalid, the `backup` service exits with an error that names it and is restarted, and the [`BackupNotConfigured`](monitoring/prometheus-grafana.md#backup-alerts) alert fires. A device without backups thus shows up as a failing service instead of going unnoticed. To run without backups on purpose, set `BACKUP_DISABLED=true`: the service then logs a warning, Attraccess starts, and the `BackupsDisabled` warning fires.
+
+The start does not contact the backup target, so Attraccess also starts while the internet is down. Problems with the target (unreachable, wrong address, credentials or password) show up in the scheduled runs: the log says `BACKUP FAILED` with the cause, and the `BackupFailed` alert fires. A run gives up on a target that does not answer after `BACKUP_CONNECT_TIMEOUT_SECONDS` (default 120). After setting up or changing the variables, run a backup by hand (below) to check them right away.
 
 > [!IMPORTANT]
-> The sidecar replaces Duplicati, which earlier balena releases contained. Updating removes Duplicati and its backup jobs. Take a last Duplicati backup before you update, then set the variables below.
+> The sidecar replaces Duplicati, which earlier balena releases contained. Updating removes Duplicati and its backup jobs. Copy the Duplicati settings and set the variables below **before** you update: see [balena: from Duplicati to the restic sidecar](installation/updating.md#balena-from-duplicati-to-the-restic-sidecar).
 
 Use **one repository per installation**. Set `BACKUP_REPOSITORY` as a **device** variable (or give each device its own path), not as a fleet variable: a fleet variable gives every device of the fleet the same repository. If devices must share a repository, give each its own `BACKUP_HOST`. Otherwise the retention of one device deletes snapshots of the others, and `restore` without a snapshot id can restore another device's data.
 
@@ -112,14 +114,17 @@ Set these as balena device variables:
 
 | Variable                                                         | Default       | Meaning                                                                                |
 | ---------------------------------------------------------------- | ------------- | -------------------------------------------------------------------------------------- |
-| `BACKUP_REPOSITORY`                                              | – (off)       | restic repository, e.g. `s3:s3.amazonaws.com/bucket/attraccess` or `sftp:…`            |
+| `BACKUP_REPOSITORY`                                              | – (required)  | restic repository, e.g. `s3:s3.amazonaws.com/bucket/attraccess` or `sftp:…`            |
 | `BACKUP_PASSWORD`                                                | –             | Encrypts the repository. **Required**; lost together with the backups if you forget it |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `B2_*`, …          | –             | Credentials of the target, passed to restic unchanged                                  |
 | `BACKUP_SCHEDULE`                                                | `0 3 * * *`   | 5-field cron expression in the container time zone (`TZ`): daily at 03:00              |
 | `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` | `7`, `4`, `6` | Retention: how many daily, weekly and monthly snapshots are kept                       |
 | `BACKUP_HOST`                                                    | `attraccess`  | Name of this installation in the repository; only needed when devices share one        |
+| `BACKUP_DISABLED`                                                | –             | `true`: no backups, on purpose. Attraccess starts anyway and logs a warning            |
+| `BACKUP_MAX_AGE_HOURS`                                           | `30`          | `BackupTooOld` fires when the last successful backup is older than this                |
+| `BACKUP_CONNECT_TIMEOUT_SECONDS`                                 | `120`         | How long a run waits for the backup target before it fails                             |
 
-A run logs `backup started`, then either `backup SUCCEEDED in …s` or `BACKUP FAILED`. After a success the sidecar writes the time of the last success to `backup_last_success_timestamp_seconds.prom` in the `backup-state` volume (Prometheus textfile format). Nothing collects this file by default and no alert is set up: to alert on a missing backup, attach the volume to a node-exporter textfile collector (`--collector.textfile.directory`) and add an alert rule yourself.
+A run logs `backup started`, then either `backup SUCCEEDED in …s` or `BACKUP FAILED`. Files that vanish while they are read (journals of running services) are skipped with a warning; the run still counts as a success. The result goes to `backup.prom` in the `backup-status` volume, which node-exporter publishes for the [backup alerts](monitoring/prometheus-grafana.md#backup-alerts) (`BackupNotConfigured`, `BackupFailed`, `BackupTooOld`, `BackupsDisabled`). They notify through the Grafana contact point of the stack (Pushover when `PUSHOVER_API_TOKEN` and `PUSHOVER_USER_KEY` are set).
 
 The database dump only exists in the `backup-state` volume while a run is busy; it is deleted when the run ends. The database password is not passed on the command line of the PostgreSQL tools.
 
