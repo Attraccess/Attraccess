@@ -53,7 +53,7 @@ Jeder Wartungseintrag enthält:
 
 Wer ein Problem bemerkt, kann eine Wartung anfragen. Eine Anfrage benachrichtigt die Personen, die die Wartung der Ressource verwalten dürfen. Sie wandeln sie in eine Wartung um oder verwerfen sie. Wer die Wartung selbst verwalten darf, bekommt das Anfragen nicht angeboten.
 
-- **In der Web-App:** Öffnen Sie die Detailseite der Ressource, klicken Sie auf **Problem melden**, beschreiben Sie das Problem (mindestens 3 Zeichen) und senden Sie die Anfrage.
+- **In der Web-App:** Öffnen Sie die Detailseite der Ressource, klicken Sie auf **Problem melden**, beschreiben Sie das Problem (mindestens 3 Zeichen) und senden Sie die Anfrage. Während eine Wartung läuft, zeigt die Web-App diese Schaltfläche nicht.
 - **An einem Attractap-Touch-Reader:** Melden Sie sich mit Ihrer Karte an, öffnen Sie die Ressource und tippen Sie auf [Problem melden](attractap/using-the-reader.md#ein-problem-melden).
 
 ### „Ist die Maschine in Ordnung?“ beim Sitzungsende
@@ -66,9 +66,9 @@ Bevor Sie **Ihre eigene** Sitzung beenden, fragt Attraccess **Ist die Maschine i
 
 Die Frage kommt vor den Formularen zum Nutzungsende (und nach den Notizen, wenn Sie **Mit Notizen beenden** gewählt haben). Die Anfrage wird erst erstellt, wenn die Sitzung beendet ist: Brechen Sie ein Formular ab oder schlägt das Beenden fehl, wird nichts gesendet. Endet die Sitzung, aber die Anfrage kann nicht gesendet werden, erhalten Sie eine Warnung; nutzen Sie dann **Problem melden**.
 
-Die Web-App fragt, wenn Sie Ihre Sitzung über die Sitzungssteuerung einer Ressource beenden (auf ihrer Detailseite oder an einer angehefteten Ressource im Dashboard). Attractap-Touch-Reader fragen, wenn Sie Ihre Sitzung stoppen. Nicht gefragt wird beim Beenden oder Übernehmen einer fremden Sitzung, beim Banner der aktiven Sitzungen, im Dashboard-Widget **Meine Sitzungen**, beim Abmelden im Kiosk, bei automatischen Sitzungsenden und bei Flows. Die Abfrage ist nur Teil der Oberfläche: API-Clients und Reader mit älterer Firmware beenden Sitzungen ohne sie. Attractap-Lite-Reader haben keinen Bildschirm und fragen nie.
+Die Web-App fragt, wenn Sie Ihre Sitzung über die Sitzungssteuerung einer Ressource beenden (auf ihrer Detailseite, an einer angehefteten Ressource im Dashboard oder auf ihrer Kiosk-Seite). Attractap-Touch-Reader fragen, wenn Sie Ihre Sitzung stoppen. Nicht gefragt wird beim Beenden oder Übernehmen einer fremden Sitzung, beim Banner der aktiven Sitzungen, im Dashboard-Widget **Meine Sitzungen**, bei QR-Code-Links, die eine Sitzung beenden, beim Abmelden im Kiosk, bei automatischen Sitzungsenden und bei Flows. Die Abfrage ist nur Teil der Oberfläche: API-Clients und Reader mit älterer Firmware beenden Sitzungen ohne sie. Attractap-Lite-Reader haben keinen Bildschirm und fragen nie.
 
-Die Frage ist für jede Ressource **standardmäßig eingeschaltet**. Um sie für eine Ressource abzuschalten, öffnen Sie **Bearbeiten** → **Maschine** und deaktivieren **Beim Sitzungsende „Maschine in Ordnung?“ fragen**. Der Schalter erscheint nur mit dem Lizenzmodul maintenance.
+Die Frage ist für jede Ressource **standardmäßig eingeschaltet**. Um sie für eine Ressource abzuschalten, öffnen Sie ihre **Einstellungen** → **Ressourcentyp und Verhalten** (bei ausgewähltem Typ **Maschine**) und deaktivieren **Beim Sitzungsende „Maschine in Ordnung?“ fragen**. Der Schalter erscheint nur mit dem Lizenzmodul maintenance.
 
 ## Automatisierte Wartungspläne
 

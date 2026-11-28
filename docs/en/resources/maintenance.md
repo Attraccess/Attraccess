@@ -53,7 +53,7 @@ Each maintenance record contains:
 
 Anyone who notices a problem can ask for maintenance. A request notifies the people who can manage the resource's maintenance, who then turn it into a maintenance or dismiss it. People who can manage the maintenance themselves are not offered to file one.
 
-- **In the web app:** open the resource's detail page, click **Report a problem**, describe what is wrong (at least 3 characters) and send the request.
+- **In the web app:** open the resource's detail page, click **Report a problem**, describe what is wrong (at least 3 characters) and send the request. The web app does not show this button while a maintenance is active.
 - **On an Attractap Touch reader:** sign in with your card, open the resource and tap [Report a problem](attractap/using-the-reader.md#report-a-problem).
 
 ### “Is the machine OK?” when a session ends
@@ -64,11 +64,11 @@ Before you end **your own** session, Attraccess asks **Is the machine OK?**:
 - **Needs maintenance** asks **What's wrong?** (at least 3 characters). After **Continue**, the session ends and your maintenance request is filed.
 - **Cancel** keeps the session running.
 
-The question comes before any end-of-use forms (and after the notes, if you chose **End with notes**). The request is filed only once the session has ended: if you cancel a form, or ending fails, nothing is sent. If the session ends but the request cannot be sent, you get a warning; use **Report a problem** instead.
+The question comes before any end-of-use forms (and after the notes, if you chose **End with Notes**). The request is filed only once the session has ended: if you cancel a form, or ending fails, nothing is sent. If the session ends but the request cannot be sent, you get a warning; use **Report a problem** instead.
 
-The web app asks when you end your session with the session controls of a resource (on its detail page, or on a pinned resource on the dashboard). Attractap Touch readers ask when you stop your session. It is not asked when you end or take over someone else's session, and not by the active-sessions banner, the **My sessions** dashboard widget, kiosk sign-out, automatic session ends or flows. The check is part of the user interface only: API clients and readers with older firmware end sessions without it. Attractap Lite readers have no screen and never ask.
+The web app asks when you end your session with the session controls of a resource (on its detail page, on a pinned resource on the dashboard, or on its kiosk page). Attractap Touch readers ask when you stop your session. It is not asked when you end or take over someone else's session, and not by the active-sessions banner, the **My sessions** dashboard widget, QR code links that stop a session, kiosk sign-out, automatic session ends or flows. The check is part of the user interface only: API clients and readers with older firmware end sessions without it. Attractap Lite readers have no screen and never ask.
 
-The question is **on by default** for every resource. To turn it off for one resource, open **Edit** → **Machine** and switch off **Ask 'Machine OK?' when a session ends**. The switch is shown only with the maintenance license module.
+The question is **on by default** for every resource. To turn it off for one resource, open its **Settings** → **Resource type and behavior** (with **Machine** selected) and switch off **Ask 'Machine OK?' when a session ends**. The switch is shown only with the maintenance license module.
 
 ## Automated Maintenance Schedules
 

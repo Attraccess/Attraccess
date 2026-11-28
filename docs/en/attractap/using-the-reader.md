@@ -93,7 +93,7 @@ _The back arrow returns to the resource list. You remain signed in when you move
 > [!IMPORTANT]
 > **Abmelden** (Sign out) ends your sign-in on the reader. It does **not** stop machine usage. Use **Stop** or **Sitzung beenden** when you have finished using a machine.
 
-### "Is the machine OK?"
+### “Is the machine OK?”
 
 With the maintenance license module, the reader asks **Ist die Maschine in Ordnung?** (Is the machine OK?) before it ends your own session, unless your administrator turned the [question off for the resource](resources/maintenance.md#is-the-machine-ok-when-a-session-ends) or you can manage its maintenance yourself.
 
@@ -101,7 +101,7 @@ With the maintenance license module, the reader asks **Ist die Maschine in Ordnu
 - **Wartung nötig** (Needs maintenance) opens a text field with the on-screen keyboard. Describe the problem (3 to 500 characters) and tap **Weiter** (Next). The session ends, and the maintainers are notified.
 - **Abbrechen** (Cancel) keeps the session running.
 
-End-of-use forms follow the answer; the reader does not ask again after them. The session summary or the confirmation says **Wartungsteam benachrichtigt** (Maintainers have been notified), or **Meldung nicht gesendet. Bitte erneut melden.** (Report not sent. Please report it again.) if the session ended but the request could not be filed. Ending someone else's session never asks.
+End-of-use forms follow the answer; the reader does not ask again after them. The session summary or the confirmation says **Wartungsteam benachrichtigt** (Maintainers have been notified), or **Meldung nicht gesendet. Bitte erneut melden.** (Report not sent. Please report it again.) if the session ended but the request could not be filed. If the session is ended elsewhere while you type the reason, the reader says **Meldung nicht gesendet** (Report not sent) and asks you to report the problem again. Ending someone else's session never asks.
 
 ## Report a problem
 

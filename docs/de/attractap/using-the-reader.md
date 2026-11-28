@@ -101,7 +101,7 @@ Mit dem Lizenzmodul maintenance fragt der Leser **Ist die Maschine in Ordnung?**
 - **Wartung nötig** öffnet ein Textfeld mit der Bildschirmtastatur. Beschreiben Sie das Problem (3 bis 500 Zeichen) und tippen Sie auf **Weiter**. Die Sitzung endet, und das Wartungsteam wird benachrichtigt.
 - **Abbrechen** lässt die Sitzung weiterlaufen.
 
-Die Formulare zum Nutzungsende folgen auf die Antwort; danach fragt der Leser nicht erneut. Die Zusammenfassung oder die Bestätigung zeigt **Wartungsteam benachrichtigt**, oder **Meldung nicht gesendet. Bitte erneut melden.**, wenn die Sitzung beendet wurde, die Anfrage aber nicht erstellt werden konnte. Beim Beenden einer fremden Sitzung wird nie gefragt.
+Die Formulare zum Nutzungsende folgen auf die Antwort; danach fragt der Leser nicht erneut. Die Zusammenfassung oder die Bestätigung zeigt **Wartungsteam benachrichtigt**, oder **Meldung nicht gesendet. Bitte erneut melden.**, wenn die Sitzung beendet wurde, die Anfrage aber nicht erstellt werden konnte. Wird die Sitzung an anderer Stelle beendet, während Sie den Grund eingeben, zeigt der Leser **Meldung nicht gesendet** und bittet Sie, das Problem erneut zu melden. Beim Beenden einer fremden Sitzung wird nie gefragt.
 
 ## Ein Problem melden
 
