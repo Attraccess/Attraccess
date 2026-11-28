@@ -75,6 +75,21 @@ export class OnboardIoFixture {
       ),
     );
 
+  /**
+   * Resolves once the adapter has finished an OFF write to the channel, such as a pulse shutdown.
+   * Call it before the action that triggers the write. A timed sleep can end before the file I/O does,
+   * or while the output register is truncated for rewriting.
+   */
+  switchedOff(channel: number): Promise<void> {
+    const done = deferred();
+    const write = this.adapter.write.bind(this.adapter);
+    this.adapter.write = async (physical, value, admit) => {
+      await write(physical, value, admit);
+      if (physical.channel === channel && !value) done.resolve();
+    };
+    return done.promise;
+  }
+
   async setup() {
     this.directory = await mkdtemp(join(tmpdir(), 'cc100-digital-'));
     this.paths = { input: join(this.directory, 'din'), output: join(this.directory, 'dout') };

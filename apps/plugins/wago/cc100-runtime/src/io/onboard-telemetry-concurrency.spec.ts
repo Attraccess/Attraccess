@@ -34,18 +34,15 @@ describe('CC100 packed digital I/O', () => {
     await started.promise;
     try {
       await reconnect;
+      const pulseEnded = fixture.switchedOff(0);
       await fixture.command('DO1', true, 'pulse', 'pulse');
-      await new Promise((resolve) => setTimeout(resolve, 80));
+      // Telemetry stays stalled here: a shutdown that waited for it would time out the test.
+      await pulseEnded;
       expect(await readFile(fixture.paths.output, 'utf8')).toBe('0');
       await fixture.command('DO2', true);
-      const writtenOff = deferred();
-      const write = fixture.adapter.write.bind(fixture.adapter);
-      jest.spyOn(fixture.adapter, 'write').mockImplementation(async (physical, value) => {
-        await write(physical, value);
-        if (physical.channel === 3 && !value) writtenOff.resolve();
-      });
+      const writtenOff = fixture.switchedOff(3);
       const disconnect = fixture.runtime.setConnected(false);
-      await writtenOff.promise;
+      await writtenOff;
       expect(await readFile(fixture.paths.output, 'utf8')).toBe('0');
       release.resolve();
       await disconnect;

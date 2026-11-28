@@ -50,10 +50,11 @@ describe('CC100 packed digital I/O', () => {
     pulsed.logicalChannels[0].pulse = { durationMs: 20 };
     await fixture.apply(pulsed);
     await Promise.all([fixture.command('DO2', true), fixture.command('DO3', true), fixture.command('DO4', true)]);
+    const pulseEnded = fixture.switchedOff(0);
     await fixture.command('DO1', true, 'pulse', 'pulse');
     await fixture.command('DO1', true, 'pulse', 'pulse');
     expect(fixture.messages.at(-1)?.payload.status).toBe('duplicate');
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await pulseEnded;
     expect(await readFile(fixture.paths.output, 'utf8')).toBe('14');
     await fixture.runtime.setConnected(false);
     expect(await readFile(fixture.paths.output, 'utf8')).toBe('0');

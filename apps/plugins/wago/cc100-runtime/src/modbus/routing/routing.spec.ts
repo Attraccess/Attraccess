@@ -1,13 +1,23 @@
 import { decodeRaw, readPdu, writePdu } from '../protocol/protocol';
 
 import { ModbusProtocolFixture, format } from './routing.test-utils';
+
+// Fragments the response in real time while the transport's own timers are faked.
+const realDelay = setTimeout;
+
 describe('Modbus protocol fixtures (no hardware)', () => {
   let fixture: ModbusProtocolFixture;
   beforeEach(() => {
+    // The transport's 100 ms deadline and reconnect delay expire only when a test advances them.
+    // On real timers a loaded host can spend longer than that on one loopback exchange.
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
     fixture = new ModbusProtocolFixture();
     fixture.setup();
   });
   afterEach(async () => {
+    // Let the transport release its bus, which can wait for the reconnect delay.
+    await jest.runOnlyPendingTimersAsync();
+    jest.useRealTimers();
     await fixture.cleanup();
   });
   it('reads fragmented FC03/04 responses with transaction and multiple unit routing', async () => {
@@ -16,7 +26,7 @@ describe('Modbus protocol fixtures (no hardware)', () => {
       units.push(request[6]);
       const r = fixture.response(request, Buffer.from([request[7], 4, 0, 0, 0, request[6]]));
       socket.write(r.subarray(0, 5));
-      setTimeout(() => socket.end(r.subarray(5)), 2);
+      realDelay(() => socket.end(r.subarray(5)), 2);
     });
     const values = await Promise.all([
       transport.request(1, readPdu(3, format)),
@@ -49,19 +59,29 @@ describe('Modbus protocol fixtures (no hardware)', () => {
       socket.end(fixture.response(request, ++calls === 1 ? Buffer.from([0x83, 2]) : Buffer.from([3, 4, 0, 0, 0, 9]))),
     );
     await expect(transport.request(1, readPdu(3, format))).rejects.toThrow('exception 2');
-    await expect(transport.request(1, readPdu(3, format))).resolves.toEqual(Buffer.from([0, 0, 0, 9]));
+    const next = expect(transport.request(1, readPdu(3, format))).resolves.toEqual(Buffer.from([0, 0, 0, 9]));
+    await jest.advanceTimersByTimeAsync(5);
+    await next;
   });
 
   it('bounds a stalled queue and reconnects after timeout without replay', async () => {
     let calls = 0;
+    let stalled!: () => void;
+    const received = new Promise<void>((resolve) => {
+      stalled = resolve;
+    });
     const transport = await fixture.fixture((request, socket) => {
       if (++calls > 1) socket.end(fixture.response(request, Buffer.from([3, 4, 0, 0, 0, 1])));
+      else stalled();
     });
-    const first = transport.request(1, readPdu(3, format));
-    const second = transport.request(2, readPdu(3, format));
+    const first = expect(transport.request(1, readPdu(3, format))).rejects.toThrow('timeout');
+    const second = expect(transport.request(2, readPdu(3, format))).resolves.toBeDefined();
     await expect(transport.request(3, readPdu(3, format))).rejects.toThrow('queue full');
-    await expect(first).rejects.toThrow('timeout');
-    await expect(second).resolves.toBeDefined();
+    await received;
+    await jest.advanceTimersByTimeAsync(100);
+    await first;
+    await jest.advanceTimersByTimeAsync(5);
+    await second;
     expect(calls).toBe(2);
   });
 
