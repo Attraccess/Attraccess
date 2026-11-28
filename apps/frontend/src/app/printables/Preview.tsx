@@ -6,7 +6,8 @@ import type { Mesh } from './stl';
 
 interface PreviewProps {
   body: Mesh;
-  letters: Mesh;
+  /** The second part, drawn in the accent colour: the card's letters or the plug cover. */
+  accent: Mesh;
   /** Accessible name for the canvas container; the canvas itself has no text content. */
   ariaLabel: string;
 }
@@ -37,9 +38,38 @@ export function disposeMeshGroup(scene: THREE.Scene, group: THREE.Mesh[]): void 
   }
 }
 
-export function Preview({ body, letters, ariaLabel }: PreviewProps) {
+/** Vertical field of view of the preview camera, in degrees. */
+const FOV = 35;
+/** Where the camera starts, looking at the origin from the front and above. */
+const CAMERA_START = new THREE.Vector3(0, -90, 70);
+
+/**
+ * Bounds of all parts together. Models are built wherever their .scad puts them (the card in the
+ * first octant, the plug cover around the z axis), so the preview centres on these instead of on
+ * a per-model constant.
+ */
+export function partsBounds(geometries: THREE.BufferGeometry[]): THREE.Box3 {
+  const bounds = new THREE.Box3();
+  for (const geometry of geometries) {
+    geometry.computeBoundingBox();
+    if (geometry.boundingBox) bounds.union(geometry.boundingBox);
+  }
+  return bounds;
+}
+
+/**
+ * Camera distance at which the bounds' enclosing sphere fills the view height. Never closer than
+ * the starting distance, which suits the keychain card.
+ */
+export function fitDistance(bounds: THREE.Box3): number {
+  const radius = bounds.getBoundingSphere(new THREE.Sphere()).radius;
+  return Math.max(CAMERA_START.length(), radius / Math.tan(THREE.MathUtils.degToRad(FOV / 2)));
+}
+
+export function Preview({ body, accent, ariaLabel }: PreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
 
   // Scene setup runs once; only the geometry changes as the label is edited.
   useEffect(() => {
@@ -49,8 +79,12 @@ export function Preview({ body, letters, ariaLabel }: PreviewProps) {
     const scene = new THREE.Scene();
     sceneRef.current = scene;
 
-    const camera = new THREE.PerspectiveCamera(35, 1, 1, 1000);
-    camera.position.set(0, -90, 70);
+    const camera = new THREE.PerspectiveCamera(FOV, 1, 1, 1000);
+    camera.position.copy(CAMERA_START);
+    // The models are Z-up (OpenSCAD's convention). With three's default Y-up camera a sideways
+    // drag would tumble an upright model onto its side instead of turning it like a turntable.
+    camera.up.set(0, 0, 1);
+    cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -104,36 +138,45 @@ export function Preview({ body, letters, ariaLabel }: PreviewProps) {
       renderer.dispose();
       container.removeChild(renderer.domElement);
       sceneRef.current = null;
+      cameraRef.current = null;
     };
   }, []);
 
-  // Rebuilds the mesh pair whenever the STL data changes. The cleanup below disposes exactly the
-  // group this run created (captured by closure, not read back from a ref), so it fires both when
-  // swapping to a newer pair and on unmount — no pair is ever left undisposed, and because each
-  // run's cleanup only ever touches its own group, two runs can never dispose the same objects.
+  // Rebuilds the mesh pair whenever the STL data changes, and only then: the dependencies are the
+  // two meshes, which keep their identity until a new render replaces them. The cleanup below
+  // disposes exactly the group this run created (captured by closure, not read back from a
+  // ref), so it fires both when swapping to a newer pair and on unmount — no pair is ever left
+  // undisposed, and because each run's cleanup only ever touches its own group, two runs can
+  // never dispose the same objects.
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
 
-    // The card is modelled in the first octant; centre it so it orbits about itself.
+    const bodyGeometry = toGeometry(body);
+    const accentGeometry = toGeometry(accent);
     const group: THREE.Mesh[] = [
       new THREE.Mesh(
-        toGeometry(body),
-        new THREE.MeshStandardMaterial({ color: BODY_COLOR, roughness: 0.75, metalness: 0 })
+        bodyGeometry,
+        new THREE.MeshStandardMaterial({ color: BODY_COLOR, roughness: 0.75, metalness: 0 }),
       ),
       new THREE.Mesh(
-        toGeometry(letters),
-        new THREE.MeshStandardMaterial({ color: LETTER_COLOR, roughness: 0.55, metalness: 0 })
+        accentGeometry,
+        new THREE.MeshStandardMaterial({ color: LETTER_COLOR, roughness: 0.55, metalness: 0 }),
       ),
     ];
 
+    // Centre the assembly on the origin so it orbits about itself, and back the camera off far
+    // enough to see all of it, keeping whatever angle the user has rotated to.
+    const bounds = partsBounds([bodyGeometry, accentGeometry]);
+    const center = bounds.getCenter(new THREE.Vector3()).negate();
     for (const mesh of group) {
-      mesh.position.set(-30, -20, -1);
+      mesh.position.copy(center);
       scene.add(mesh);
     }
+    cameraRef.current?.position.setLength(fitDistance(bounds));
 
     return () => disposeMeshGroup(scene, group);
-  }, [body, letters]);
+  }, [body, accent]);
 
   return <div ref={containerRef} role="img" aria-label={ariaLabel} className="h-80 w-full" />;
 }

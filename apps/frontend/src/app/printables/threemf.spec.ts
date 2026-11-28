@@ -37,6 +37,9 @@ describe('buildThreeMf', () => {
     expect(xml).toContain('<base name="Body" displaycolor="#B4B4B4FF"');
     expect(xml).toContain('<base name="Letters" displaycolor="#1D9BF0FF"');
     expect(xml.match(/<object /g)).toHaveLength(2);
+    // Slicers list each object under its own name, not "Object 1"/"Object 2".
+    expect(xml).toContain('<object id="2" name="Body"');
+    expect(xml).toContain('<object id="3" name="Letters"');
     expect(xml.match(/<item /g)).toHaveLength(2);
   });
 
@@ -49,6 +52,19 @@ describe('buildThreeMf', () => {
     const xml = model(unzipSync(buildThreeMf([{ name: 'Body', color: '#B4B4B4', mesh: twoTriangles }])));
     expect(xml.match(/<vertex /g)).toHaveLength(4);
     expect(xml.match(/<triangle /g)).toHaveLength(2);
+  });
+
+  it('places a part through its build item when given an offset', () => {
+    const xml = model(
+      unzipSync(
+        buildThreeMf([
+          { name: 'Body', color: '#B4B4B4', mesh: triangle },
+          { name: 'Cover', color: '#FFFFFF', mesh: triangle, offset: [60, 0, -43] },
+        ]),
+      ),
+    );
+    expect(xml).toContain('<item objectid="2" />');
+    expect(xml).toContain('<item objectid="3" transform="1 0 0 0 1 0 0 0 1 60.0000 0.0000 -43.0000" />');
   });
 
   it('escapes characters that would otherwise break the XML', () => {

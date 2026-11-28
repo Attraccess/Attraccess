@@ -15,6 +15,10 @@ describe('scadWithLabel', () => {
     );
   });
 
+  it("takes replacement patterns like $' in the label literally", () => {
+    expect(scadWithLabel('LABEL = "x";\nPART = "body";', "a$'b$&")).toBe('LABEL = "a$\'b$&";\nPART = "body";');
+  });
+
   it('leaves other assignments alone', () => {
     const out = scadWithLabel('LABEL = "a";\nBRAND = "Attraccess";\nLABEL_CAP_MAX = 10;', 'b');
     expect(out).toContain('BRAND = "Attraccess";');

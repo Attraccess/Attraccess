@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it, vi } from 'vitest';
-import { disposeMeshGroup, toGeometry } from './Preview';
+import { disposeMeshGroup, fitDistance, partsBounds, toGeometry } from './Preview';
 import type { Mesh } from './stl';
 import { BODY_COLOR } from './download';
 
@@ -8,8 +8,24 @@ import { BODY_COLOR } from './download';
 function twoTriangleMesh(): Mesh {
   return {
     positions: new Float32Array([
-      0, 0, 0, 1, 0, 0, 0, 1, 0, // triangle 1
-      1, 0, 0, 1, 1, 0, 0, 1, 0, // triangle 2
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      0, // triangle 1
+      1,
+      0,
+      0,
+      1,
+      1,
+      0,
+      0,
+      1,
+      0, // triangle 2
     ]),
     triangleCount: 2,
   };
@@ -63,5 +79,47 @@ describe('disposeMeshGroup', () => {
     for (const spy of [...geometryDisposeSpies, ...materialDisposeSpies]) {
       expect(spy).toHaveBeenCalledTimes(1);
     }
+  });
+});
+
+describe('partsBounds', () => {
+  it('includes a part that reaches beyond the first one', () => {
+    const body = toGeometry({ positions: new Float32Array([-10, -10, 0, 10, 10, 0, 0, 0, 20]), triangleCount: 1 });
+    const cover = toGeometry({ positions: new Float32Array([-5, -5, 30, 5, 5, 30, 0, 0, 40]), triangleCount: 1 });
+    const bounds = partsBounds([body, cover]);
+    expect(bounds.max.z).toBe(40);
+    expect(bounds.getCenter(new THREE.Vector3()).z).toBe(20);
+  });
+
+  it('spans every part, so the preview centres on the real assembly', () => {
+    const body = toGeometry({
+      positions: new Float32Array([-27, -27, -0.8, 27, 27, -0.8, 0, 0, 60.8]),
+      triangleCount: 1,
+    });
+    const cover = toGeometry({ positions: new Float32Array([-23, -23, 43, 23, 23, 43, 0, 0, 60.8]), triangleCount: 1 });
+    const bounds = partsBounds([body, cover]);
+    expect(bounds.min.z).toBeCloseTo(-0.8, 5);
+    expect(
+      bounds
+        .getCenter(new THREE.Vector3())
+        .toArray()
+        .map((v) => Number(v.toFixed(3))),
+    ).toEqual([0, 0, 30]);
+  });
+});
+
+describe('fitDistance', () => {
+  it('never moves closer than the starting distance', () => {
+    const card = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(60, 40, 2));
+    expect(fitDistance(card)).toBeGreaterThanOrEqual(Math.hypot(90, 70));
+    expect(fitDistance(new THREE.Box3(new THREE.Vector3(), new THREE.Vector3(1, 1, 1)))).toBeCloseTo(
+      Math.hypot(90, 70),
+      5,
+    );
+  });
+
+  it('backs off for a taller model so all of it stays in view', () => {
+    const cover = new THREE.Box3(new THREE.Vector3(-27, -27, -0.8), new THREE.Vector3(27, 27, 60.8));
+    expect(fitDistance(cover)).toBeGreaterThan(150);
   });
 });

@@ -6,6 +6,8 @@ export interface ThreeMfPart {
   /** `#RRGGBB`. */
   color: string;
   mesh: Mesh;
+  /** Where the build item places the object, in mm. Omitted: the mesh's own coordinates. */
+  offset?: [number, number, number];
 }
 
 const CORE_NS = 'http://schemas.microsoft.com/3dmanufacturing/core/2015/02';
@@ -63,11 +65,17 @@ export function buildThreeMf(parts: ThreeMfPart[]): Uint8Array<ArrayBuffer> {
   const objects = parts
     .map(
       (part, index) =>
-        `<object id="${index + 2}" type="model" pid="1" pindex="${index}">${meshXml(part.mesh)}</object>`,
+        `<object id="${index + 2}" name="${escapeXml(part.name)}" type="model" pid="1" pindex="${index}">${meshXml(part.mesh)}</object>`,
     )
     .join('');
 
-  const items = parts.map((_, index) => `<item objectid="${index + 2}" />`).join('');
+  const items = parts
+    .map(({ offset }, index) =>
+      offset
+        ? `<item objectid="${index + 2}" transform="1 0 0 0 1 0 0 0 1 ${offset.map((v) => v.toFixed(4)).join(' ')}" />`
+        : `<item objectid="${index + 2}" />`,
+    )
+    .join('');
 
   const model = `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xml:lang="en-US" xmlns="${CORE_NS}">

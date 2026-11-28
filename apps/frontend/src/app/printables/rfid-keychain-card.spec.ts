@@ -10,8 +10,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { parseBinaryStl, type Mesh } from './stl';
-import { boundingBox } from './testBoundingBox';
+import { parseBinaryStl, type Mesh, boundingBox } from './stl';
 
 const PUBLIC_DIR = join(__dirname, '../../../public/openscad');
 const SCAD = readFileSync(join(__dirname, 'rfid-keychain-card.scad'), 'utf8');
@@ -59,10 +58,7 @@ async function render(defines: Record<string, string | boolean>): Promise<Render
 
   instance.FS.mkdir('/fonts');
   instance.FS.writeFile('/fonts/fonts.conf', readFileSync(join(PUBLIC_DIR, 'fonts/fonts.conf')));
-  instance.FS.writeFile(
-    '/fonts/Sansation_Regular.ttf',
-    readFileSync(join(PUBLIC_DIR, 'fonts/Sansation_Regular.ttf'))
-  );
+  instance.FS.writeFile('/fonts/Sansation_Regular.ttf', readFileSync(join(PUBLIC_DIR, 'fonts/Sansation_Regular.ttf')));
   instance.ENV.FONTCONFIG_FILE = '/fonts/fonts.conf';
   instance.FS.writeFile('/card.scad', SCAD);
 

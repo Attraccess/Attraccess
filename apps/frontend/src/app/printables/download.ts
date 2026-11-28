@@ -10,6 +10,9 @@ import { triggerDownload } from '../../utils/download';
 export const BODY_COLOR = '#256D7B';
 export const LETTER_COLOR = '#FFFFFF';
 
+/** The keychain card's label until the user types their own. */
+export const DEFAULT_CARD_LABEL = 'Tobias J.';
+
 /** Turns a label into something safe for a filename, falling back when nothing survives. */
 export function toFileSlug(label: string): string {
   const slug = label
@@ -54,7 +57,8 @@ export function scadWithLabel(source: string, label: string): string {
   if (!pattern.test(source)) {
     throw new Error('Could not find the LABEL assignment in the .scad source');
   }
-  return source.replace(pattern, `LABEL = ${JSON.stringify(label)};`);
+  // A replacer function, so `$&`, `$'` and the like in the label are taken literally.
+  return source.replace(pattern, () => `LABEL = ${JSON.stringify(label)};`);
 }
 
 export function downloadCard(render: CardRender, label: string, format: MeshFormat): void {
