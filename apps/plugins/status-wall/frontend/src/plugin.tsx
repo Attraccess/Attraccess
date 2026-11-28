@@ -24,7 +24,7 @@ export default class StatusWallPlugin implements AttraccessFrontendPlugin {
   pluginStore!: PluginStore;
 
   getPluginName(): string {
-    return 'status-wall-plugin@0.1.0';
+    return 'status-wall-plugin@0.1.1';
   }
 
   getDependencies(): string[] {

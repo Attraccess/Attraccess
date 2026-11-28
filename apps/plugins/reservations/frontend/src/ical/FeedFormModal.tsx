@@ -2,7 +2,7 @@ import { Button, LabeledSwitch, ResourceSelector, StandardModal, StatusDialog } 
 import { Description, Fieldset, ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { createFeed, listHostGroups, updateFeed } from '../api';
+import { createFeed, listHostGroups, ReservationsApiError, updateFeed } from '../api';
 import { useReservationsTranslations } from '../i18n';
 import { describeError } from '../lib/errors';
 import type { IcalFeed, IcalFeedSecret, IcalSelection } from '../lib/types';
@@ -53,7 +53,13 @@ export function FeedFormModal({ isOpen, feed, onOpenChange, onSaved }: Readonly<
       onSaved(secret);
       onOpenChange(false);
     },
-    onError: (failure) => setError(describeError(failure, t)),
+    onError: (failure) =>
+      setError(
+        // A feed names no culprit, and the picker has no row for a hidden resource: say how to get rid of it.
+        failure instanceof ReservationsApiError && failure.code === 'RESOURCE_NOT_FOUND'
+          ? t('feeds.form.unavailableResource')
+          : describeError(failure, t),
+      ),
   });
 
   const hasSelection =

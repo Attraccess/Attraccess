@@ -729,6 +729,55 @@ resources yield negative answers (`false`, all-false, `[]`) rather than errors.
 | `getMaintenanceWindows(resourceId, from, to)`   | Windows overlapping `[from, to)` as `{ maintenanceId, resourceId, startTime, endTime \| null, reason \| null }`. Open-ended maintenance counts until it is finished.                                                                                                                                                                                                                                                                                                             |
 | `getActiveSessions(resourceId)`                 | Running sessions `{ usageId, userId, startTime }`, earliest first.                                                                                                                                                                                                                                                                                                                                                                                                               |
 
+#### Machine visibility
+
+Whatever tells a person that a machine exists (a list, a page, a feed, an export) has to follow the instance's **Who can
+see the machine list** setting and the hidden resource groups. Do not rebuild either rule: ask the host for the
+resources the person may see. These methods are part of `context.resourceAccess` (permission `ACCESS_RESOURCES`); the
+principal is described above.
+
+| Method                                     | Returns                                                                                                                                  |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `listVisibleResourceIds(principal)`        | The ids of every resource the principal may see.                                                                                         |
+| `filterVisible(principal, resourceIds)`    | The existing, visible ids among `resourceIds`, in the given order. Call it once for a whole list instead of `canSee` per entry.          |
+| `canSee(principal, resourceId)`            | Whether the resource exists and the principal may see it.                                                                                |
+| `getResourceListScope(principal)`          | `all` or `permitted`: whether the setting narrows the principal's machine list. Use it to allow a selection that means "every resource". |
+| `filterVisibleGroups(principal, groupIds)` | The resource groups among `groupIds` that core would list for the principal, in the given order.                                         |
+
+The first three combine core's machine list rule (`resources.update` and `resources.access.manage` holders pass it for
+every machine; in the `authenticated` mode so do `resources.read` holders; everyone else passes it for what they are
+introduced to, introduce or maintain, currently use, and machines that allow or require supervision) with the
+hidden-group rule, so both must pass. Under the hidden-group rule, a machine that is only in hidden groups also needs
+`resources.update`, or an introducer role or introduction on one of those groups. `getResourceListScope` looks only at
+the setting: `all` does not mean the principal may see every machine. Pass `request.user` for
+request work and a user id for background work done for a person, such as rendering their calendar feed. Unknown users
+see nothing.
+
+Routes with the machine id in their path take the `@ResourceVisible()` decorator. For a signed-in request it answers a
+resource the caller cannot see with the same 404 as core (`ResourceNotFoundException`), before your handler runs. It
+needs no plugin permission. It reads `:resourceId`; pass the parameter name for another one. It only checks an id made
+of plain digits and passes anything else on, so the route must read the parameter with `ParseIntPipe`, which rejects
+non-integer text with `400`:
+
+```ts
+@Auth()
+@Controller('widgets')
+class WidgetsController {
+  @Get('resources/:resourceId/widgets')
+  @ResourceVisible()
+  list(@Param('resourceId', ParseIntPipe) resourceId: number) {}
+
+  @Get('resources/:id/diagnostics')
+  @ResourceVisible('id')
+  diagnostics(@Param('id', ParseIntPipe) id: number) {}
+}
+```
+
+For a machine named in a body or query, check `canSee` yourself and throw `ResourceNotFoundException`. A test that
+builds your Nest module has to provide `PLUGIN_RESOURCE_VISIBILITY_HOST` (a `PluginResourceVisibilityHost`) from a
+`@Global()` module, as the host does. These APIs need Attraccess `2.0.0-beta.2` or later: declare that as
+`attraccessVersion.min` and in `attraccess.host`.
+
 ### Persistence
 
 A plugin has no database access. Data of your own lives in tables the plugin declares and reads and writes through
@@ -773,6 +822,9 @@ query handles. Each group checks its own permission when a method is called.
 | `hostData.users`     | `READ_USERS`       | `getUsernames(ids)` (kept for compatibility), `getDisplayNames(ids)` (a map of user id to display name: "First Last", or the username), `getLocales(ids)`, `isActive(id)` (exists, not deleted, not disabled), `listIdsWithAnyPermission(keys)`.                                                        |
 | `hostData.settings`  | `READ_SETTINGS`    | `getApp(key)`: the trimmed value of an application setting, or `null`.                                                                                                                                                                                                                                  |
 | `hostData.flows`     | `TRIGGER_FLOWS`    | `findNodes(query)`: flow nodes by `type`, `typePrefix`, `dataEquals`, `dataIn`, `resourceId`, `excludeResourceId`, `excludeFlowId`, `orderById` and `limit`, as `{ id, type, resourceId, resourceName, flowId, flowName, data }`.                                                                       |
+
+`hostData.resources.filterVisible` is **deprecated**: it applies only the hidden-group rule, not the machine list setting.
+Its behaviour is unchanged for existing plugins; use [Machine visibility](#machine-visibility) instead.
 
 `PluginUserModel` (`id`, `username`, `firstName`, `lastName`, `displayName`, `locale`, `isDisabled`; `displayName` is the computed "First Last" or the username, show it to people) and `PluginResourceModel` (`id`, `name`, `type`,
 `description`, `allowTakeOver`, `maxParallelSessions`, `supervisionMode`) come from `@attraccess/application-models` and

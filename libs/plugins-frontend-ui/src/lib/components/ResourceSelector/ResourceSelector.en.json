@@ -3,6 +3,9 @@
     "label": "Search resources",
     "placeholder": "Type to search"
   },
+  "selection": {
+    "clear": "Clear selection"
+  },
   "table": {
     "ariaLabel": "Resources",
     "columns": {

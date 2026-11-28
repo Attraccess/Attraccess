@@ -1,4 +1,5 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ResourceNotFoundException, type PluginAccessPrincipal } from '@attraccess/plugins-backend-sdk';
+import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { Clock, PLUGIN_CONTEXT, STATUS_WALL_CLOCK, type PluginContext } from './constants';
 import { tablesOf, type WallRow } from './storage';
@@ -70,23 +71,62 @@ export class WallsService {
     return toWall(row);
   }
 
-  async create(input: WallInput): Promise<Wall> {
+  /**
+   * A manager selects only what they may see themselves: a hidden machine or group answers like a missing one, and
+   * "every resource" (which covers future ones too) needs a manager whose machine list is not narrowed. With "every
+   * resource" the lists show nothing, so they are not checked until it is switched off again. `stored` is the wall's
+   * current selection: what was deleted since stays accepted, so the wall can still be edited.
+   */
+  private async assertSelectable(viewer: PluginAccessPrincipal, selection: WallSelection, stored?: WallSelection) {
+    if (selection.all) {
+      if ((await this.context.resourceAccess.getResourceListScope(viewer)) !== 'all') {
+        throw new ForbiddenException('ResourceListNarrowed');
+      }
+      return;
+    }
+    const resource = await this.refusedResourceId(viewer, selection.resourceIds, stored?.resourceIds ?? []);
+    if (resource !== undefined) throw new ResourceNotFoundException(resource);
+    if (await this.refusesGroup(viewer, selection.groupIds, stored?.groupIds ?? [])) {
+      throw new NotFoundException('ResourceGroupNotFound');
+    }
+  }
+
+  private async refusedResourceId(viewer: PluginAccessPrincipal, selected: number[], stored: number[]) {
+    if (selected.length === 0) return undefined;
+    const visible = new Set(await this.context.resourceAccess.filterVisible(viewer, selected));
+    const refused = selected.filter((id) => !visible.has(id));
+    if (refused.length === 0) return undefined;
+    const existing = await this.context.hostData.resources.getNames(refused.filter((id) => stored.includes(id)));
+    return refused.find((id) => !stored.includes(id) || existing.has(id));
+  }
+
+  private async refusesGroup(viewer: PluginAccessPrincipal, selected: number[], stored: number[]) {
+    if (selected.length === 0) return false;
+    const visible = new Set(await this.context.resourceAccess.filterVisibleGroups(viewer, selected));
+    const refused = selected.filter((id) => !visible.has(id));
+    if (refused.some((id) => !stored.includes(id))) return true;
+    // The host cannot tell a deleted group from a hidden one; a stored group that shows nothing may stay.
+    return refused.length > 0 && (await this.context.hostData.resources.listIdsInGroups(refused)).length > 0;
+  }
+
+  async create(viewer: PluginAccessPrincipal, input: WallInput): Promise<Wall> {
+    const selection = parseSelection(input.selection);
+    await this.assertSelectable(viewer, selection);
     const now = this.clock();
     const row = await this.walls.insert({
       name: input.name.trim(),
       token: newToken(),
-      selection: parseSelection(input.selection),
+      selection,
       createdAt: now,
       updatedAt: now,
     });
     return toWall(row);
   }
 
-  async update(id: number, input: WallInput): Promise<Wall> {
-    const changed = await this.walls.update(
-      { id },
-      { name: input.name.trim(), selection: parseSelection(input.selection), updatedAt: this.clock() },
-    );
+  async update(viewer: PluginAccessPrincipal, id: number, input: WallInput): Promise<Wall> {
+    const selection = parseSelection(input.selection);
+    await this.assertSelectable(viewer, selection, (await this.get(id)).selection);
+    const changed = await this.walls.update({ id }, { name: input.name.trim(), selection, updatedAt: this.clock() });
     if (changed === 0) throw new NotFoundException();
     return this.get(id);
   }

@@ -190,6 +190,7 @@
         "{workspaceRoot}/apps/attractap/firmware/src/display/ui/ui_schema.hpp",
         "{workspaceRoot}/apps/attractap/firmware/tests/ui-fixtures/*.json",
         "{workspaceRoot}/apps/frontend/src/app/layout/sidebar/navigation.tsx",
+        "{workspaceRoot}/apps/plugins/*/backend/**/*.ts",
         {
           "externalDependencies": ["jest"]
         }

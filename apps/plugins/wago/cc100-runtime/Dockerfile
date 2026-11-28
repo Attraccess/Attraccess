@@ -5,8 +5,9 @@ ARG BUILDPLATFORM
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-bookworm-slim AS build
 WORKDIR /workspace
 COPY . .
-# Node 25 and later no longer bundle Corepack.
-RUN npm install -g corepack@0.36.0 && corepack enable && pnpm install --frozen-lockfile && pnpm nx run plugin-wago:build-cc100-runtime
+# Node 25 and later no longer bundle Corepack. The esbuild bundle needs no native addon, so skip install
+# scripts: better-sqlite3 would otherwise download a prebuilt binary or fall back to node-gyp.
+RUN npm install -g corepack@0.36.0 && corepack enable && pnpm install --frozen-lockfile --ignore-scripts && pnpm nx run plugin-wago:build-cc100-runtime
 
 FROM node:22.23.4-bookworm-slim
 WORKDIR /app

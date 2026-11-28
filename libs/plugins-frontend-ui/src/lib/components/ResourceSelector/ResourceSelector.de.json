@@ -3,6 +3,9 @@
     "label": "Ressourcen suchen",
     "placeholder": "Tippe um zu suchen"
   },
+  "selection": {
+    "clear": "Auswahl leeren"
+  },
   "table": {
     "ariaLabel": "Ressourcen",
     "columns": {

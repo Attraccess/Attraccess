@@ -57,3 +57,12 @@ it('keeps selections hidden by the search when the header checkbox selects or cl
   await user.click(screen.getAllByRole('checkbox')[0]);
   expect(selected).toHaveBeenLastCalledWith([7]);
 });
+it('clears the whole selection, including a resource the list does not show', async () => {
+  const user = userEvent.setup();
+  const selected = vi.fn();
+  const { rerender } = render(<ResourceSelector selection={[7]} onSelectionChange={selected} />);
+  await user.click(screen.getByRole('button', { name: 'Clear selection' }));
+  expect(selected).toHaveBeenLastCalledWith([]);
+  rerender(<ResourceSelector selection={[]} onSelectionChange={selected} />);
+  expect(screen.queryByRole('button', { name: 'Clear selection' })).not.toBeInTheDocument();
+});

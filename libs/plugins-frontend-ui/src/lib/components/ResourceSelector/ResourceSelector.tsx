@@ -21,6 +21,7 @@ import { SearchIcon } from 'lucide-react';
 import { useState, PropsWithChildren } from 'react';
 import de from './ResourceSelector.de.json';
 import en from './ResourceSelector.en.json';
+import { Button } from '../button';
 
 interface Props {
   selection: number[];
@@ -121,6 +122,12 @@ export function ResourceSelector(props: Readonly<Props>) {
           </TableContent>
         </TableScrollContainer>
       </TableRoot>
+      {/* A selected resource the caller may no longer see has no row here, so this is the only way to drop it. */}
+      {multiple && selection.length > 0 ? (
+        <Button variant="tertiary" size="sm" className="self-start" onPress={() => onSelectionChange([])}>
+          {t('selection.clear')}
+        </Button>
+      ) : null}
     </div>
   );
 }

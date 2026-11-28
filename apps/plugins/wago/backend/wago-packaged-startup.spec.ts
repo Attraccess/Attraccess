@@ -6,6 +6,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { runInThisContext } from 'node:vm';
+import { HostModule } from './host-module.test-fixture';
 
 it('resolves the packaged commissioning and managed-runtime providers to the same Wago service', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'wago-packaged-startup-'));
@@ -30,7 +31,7 @@ it('resolves the packaged commissioning and managed-runtime providers to the sam
     const plugin = (bundledModule.exports as { default: PluginBackendModule }).default;
     const context = {} as PluginContext;
     const registration = plugin.register(context);
-    const compiled = await Test.createTestingModule({ imports: [registration] }).compile();
+    const compiled = await Test.createTestingModule({ imports: [HostModule, registration] }).compile();
     module = compiled;
     const provider = (name: string) => {
       const token = registration.providers?.find((entry) => typeof entry === 'function' && entry.name === name);

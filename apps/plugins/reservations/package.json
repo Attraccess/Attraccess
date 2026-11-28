@@ -1,6 +1,6 @@
 {
   "name": "@attraccess/plugin-reservations",
-  "version": "0.2.1-alpha.0",
+  "version": "0.2.2-alpha.0",
   "description": "Official Attraccess plugin to reserve resources for a specific time window.",
   "license": "SEE LICENSE IN LICENSE.md",
   "repository": {
@@ -30,7 +30,7 @@
   "attraccess": {
     "displayName": "Reservations",
     "description": "Reserve a resource for a specific time window.",
-    "host": "^2.0.0-0",
+    "host": "^2.0.0-beta.2",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "styles": "frontend/style.css",

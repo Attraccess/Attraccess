@@ -46,6 +46,9 @@ export interface PluginAccessPrincipalUser {
  */
 export type PluginAccessPrincipal = number | PluginAccessPrincipalUser;
 
+/** `all`: the principal sees every machine. `permitted`: core narrows the machine list for them. */
+export type PluginResourceListScope = 'all' | 'permitted';
+
 /**
  * Read-only access and state queries over core authorization data. Requires the
  * ACCESS_RESOURCES permission. All answers reuse the logic core uses to authorise
@@ -55,6 +58,48 @@ export type PluginAccessPrincipal = number | PluginAccessPrincipalUser;
  * and unknown resources yield negative answers (`false`, all-false results, empty lists) rather than errors.
  */
 export interface PluginResourceAccessContext {
+  /**
+   * The ids of every resource the principal may see. This is the rule to use for anything that tells a person that a
+   * machine exists (lists, pages, feeds, exports): core's "who can see the machine list" setting combined with the
+   * hidden-resource-group rule. Do not rebuild either rule in a plugin.
+   *
+   * - `resources.update` and `resources.access.manage` holders pass the machine list rule; in the `authenticated`
+   *   mode so do `resources.read` holders. Everyone else sees the machines they are introduced to (directly or
+   *   through a group), introduce or maintain, currently use, or that allow or require supervision.
+   * - A machine that is only in hidden groups also needs `resources.update`, or an introducer role or introduction
+   *   on one of those groups.
+   *
+   * Pass `request.user` for request work, so an API token's scope applies, and a user id for background work done
+   * for a person (a calendar feed, for example). An unknown user sees nothing.
+   */
+  listVisibleResourceIds(principal: PluginAccessPrincipal): Promise<number[]>;
+
+  /**
+   * The subset of `resourceIds` that exist and that the principal may see (rule of
+   * {@link listVisibleResourceIds}), in the given order and without duplicates. Use it once for a whole list
+   * instead of calling {@link canSee} per entry.
+   */
+  filterVisible(principal: PluginAccessPrincipal, resourceIds: number[]): Promise<number[]>;
+
+  /**
+   * Whether the resource exists and the principal may see it (rule of {@link listVisibleResourceIds}). For a route
+   * with the machine id in its path use the `ResourceVisible` decorator.
+   */
+  canSee(principal: PluginAccessPrincipal, resourceId: number): Promise<boolean>;
+
+  /**
+   * Core's machine list rule alone: `all` when the setting does not narrow the principal's machine list (it says
+   * nothing about hidden resource groups). Use it to allow a selection that stands for every machine, including
+   * future ones. `permitted` for an unknown user.
+   */
+  getResourceListScope(principal: PluginAccessPrincipal): Promise<PluginResourceListScope>;
+
+  /**
+   * The subset of `groupIds` that exist and that core would list for the principal (hidden groups, and in a narrowed
+   * machine list only groups with a visible machine or that the principal is part of), in the given order.
+   */
+  filterVisibleGroups(principal: PluginAccessPrincipal, groupIds: number[]): Promise<number[]>;
+
   /**
    * Whether the user may start a session on the resource. Covers direct and group
    * introductions, retraining blocks, introducers/maintainers and `resources.update`,

@@ -11,6 +11,8 @@ import { ResourceMaintenanceService } from '../../resources/maintenances/mainten
 import { ResourceUsageService } from '../../resources/usage/sessions/resource-usage.service';
 import { ResourceActivityVisibilityService } from '../../resources/usage/authorization/resource-activity-visibility.service';
 import { ResourceHealthService } from '../../resources/health/resource-health.service';
+import { ResourceGroupsService } from '../../resources/groups/resourceGroups.service';
+import { ResourceListVisibilityService } from '../../resources/visibility/resource-list-visibility.service';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import {
   PLUGIN_CORE_LOOKUP,
@@ -50,6 +52,10 @@ export function createHostResourceAccessContext(host: PluginHostRefs): PluginRes
       maintenance: host.get(ResourceMaintenanceService),
       rbac: host.get(RbacService),
       visibility: host.get(ResourceActivityVisibilityService),
+      listVisibility: host.get(ResourceListVisibilityService),
+      groups: host.get(ResourceGroupsService),
+      filterOutHiddenGroupResources: (userId, resourceIds, options) =>
+        host.get<PluginHostDataPort>(PLUGIN_HOST_DATA).resources.filterVisible(userId, resourceIds, options),
       findUser: (userId) => lookup.findUser(userId),
       findResource: (resourceId) => lookup.findResourceSupervision(resourceId),
       listResourceIds: () => lookup.listResourceIds(),

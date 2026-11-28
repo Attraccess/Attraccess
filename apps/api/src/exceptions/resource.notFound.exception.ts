@@ -1,9 +1,2 @@
-import { NotFoundException } from '@nestjs/common';
-
-export class ResourceNotFoundException extends NotFoundException {
-  constructor(resourceId: number) {
-    super('ResourceNotFoundException', {
-      description: `Resource with ID ${resourceId} not found`,
-    });
-  }
-}
+// The SDK owns the class, so plugin routes answer a hidden machine exactly like core does (ATT-1407).
+export { ResourceNotFoundException } from '@attraccess/plugins-backend-sdk';

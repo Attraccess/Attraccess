@@ -25,6 +25,10 @@ export interface PluginResourceDirectory {
    * The subset of `resourceIds` (existing resources) the user may see. Core hides resources that only belong to hidden
    * resource groups unless the user is an introducer of the group or holds a granted group introduction.
    * `seeAll` skips that rule, for callers that already established `resources.update`.
+   *
+   * @deprecated This applies only the hidden-group rule, not core's "who can see the machine list" setting. To decide
+   * what a person may see, use `context.resourceAccess.filterVisible` (or `canSee`, `listVisibleResourceIds`), and
+   * the `ResourceVisible` decorator on `resources/:resourceId` routes.
    */
   filterVisible(userId: number, resourceIds: number[], options?: { seeAll?: boolean }): Promise<number[]>;
   /** The subset of `resourceIds` whose sessions always need a supervisor (`supervision_required`). */
