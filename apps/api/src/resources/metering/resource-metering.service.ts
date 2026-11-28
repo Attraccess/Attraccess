@@ -16,7 +16,7 @@ import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event'
 
 import { LiveNotificationsService } from '../../billing/live-notifications/live-notifications.service';
 
-import { MeteringOperationError, MeteringReadings } from './metering-readings';
+import { archivedMeterAccepts, MeteringOperationError, MeteringReadings } from './metering-readings';
 
 import { MeteringReport } from '../flows/node-executors/index';
 
@@ -32,7 +32,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { type FinalCollection, type MeterFinal, MeteringSettlement } from './metering-settlement';
 
-import { MeteringCatalog } from './metering-catalog';
+import { ListMetersOptions, MeteringCatalog } from './metering-catalog';
 
 import { findActiveMeterSessions, getMeteringSessionLimit } from './meter-sessions';
 
@@ -130,6 +130,10 @@ export class ResourceMeteringService implements OnModuleInit {
     options: { trigger: ResourceFlowNodeType; timeoutSeconds: number; freshAfter?: Date },
   ): Promise<ResourceMeteringOperationRecord> {
     return this.enqueue(session.resourceId, async () => {
+      // The cron listed its meters earlier: a meter archived meanwhile gets no further request. This check is not
+      // locked, so an archive right after it still lets one request out; `complete()` then refuses its reply.
+      if (!archivedMeterAccepts(kind) && (await this.store.findMeterById(session.meterId))?.archivedAt)
+        throw new MeteringOperationError('METER_ARCHIVED');
       const requestedAt = new Date();
       // A flow addresses the person's own measuring point with the user the session belongs to.
       const userId = session.usageId === null ? null : await this.store.findUsageOwner(session.usageId);
@@ -227,16 +231,19 @@ export class ResourceMeteringService implements OnModuleInit {
             definition.collect.interimIntervalMinutes * 60_000
         )
           continue;
-        if (await this.store.existsLifecycleAttempt(meter.resourceId)) continue;
-        const { byMeter } = await findActiveMeterSessions(this.store, meter.resourceId, [meter.id]);
-        const running = (byMeter.get(meter.id) ?? []).flatMap(({ session }) => (session ? [session] : []));
-        // A session measured per session is read at its own measuring point; everyone else shares one reading.
-        // Each session follows the allocation it captured at its start.
-        const own = running.filter((session) => session.accounting === 'per-session');
-        const shared = running.filter((session) => session.accounting !== 'per-session');
-        const targets = [...own, ...shared.slice(0, 1)];
-        this.interimAttempts.set(key, { at: Date.now(), running: true });
+        // Claim the meter before the next await, so an overlapping tick cannot start a second collection.
+        this.interimAttempts.set(key, { at: attempt?.at ?? 0, running: true });
+        let collected = false;
         try {
+          if (await this.store.existsLifecycleAttempt(meter.resourceId)) continue;
+          const { byMeter } = await findActiveMeterSessions(this.store, meter.resourceId, [meter.id]);
+          const running = (byMeter.get(meter.id) ?? []).flatMap(({ session }) => (session ? [session] : []));
+          // A session measured per session is read at its own measuring point; everyone else shares one reading.
+          // Each session follows the allocation it captured at its start.
+          const own = running.filter((session) => session.accounting === 'per-session');
+          const shared = running.filter((session) => session.accounting !== 'per-session');
+          const targets = [...own, ...shared.slice(0, 1)];
+          collected = true;
           for (const session of targets.length ? targets : [null])
             await this.runOperation(
               session ?? { id: null, meterId: meter.id, resourceId: meter.resourceId, usageId: null },
@@ -247,7 +254,9 @@ export class ResourceMeteringService implements OnModuleInit {
               },
             );
         } finally {
-          this.interimAttempts.set(key, { at: Date.now(), running: false });
+          if (collected) this.interimAttempts.set(key, { at: Date.now(), running: false });
+          else if (attempt) this.interimAttempts.set(key, attempt);
+          else this.interimAttempts.delete(key);
         }
       } catch (error) {
         this.logger.warn(`Meter ${meter.id} collection failed: ${this.reason(error)}`);
@@ -310,8 +319,8 @@ export class ResourceMeteringService implements OnModuleInit {
     return this.catalog.createMeter(resourceId, name);
   }
 
-  listMeters(resourceId: number) {
-    return this.catalog.listMeters(resourceId);
+  listMeters(resourceId: number, options?: ListMetersOptions) {
+    return this.catalog.listMeters(resourceId, options);
   }
 
   waive(resourceId: number, sessionId: string, initiatorId: number): Promise<ResourceMeteringSessionRecord> {

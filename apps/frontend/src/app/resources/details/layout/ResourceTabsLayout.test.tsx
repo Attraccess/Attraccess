@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ResourceTabsLayout } from './ResourceTabsLayout';
 import { createMockResource } from '../../../../test-utils/fixtures';
 import { ResourceQrCode } from '../qrcode';
+import { ApiError } from '@attraccess/react-query-client';
 const state = vi.hoisted(() => ({
   update: true,
   canDelete: true,
@@ -138,5 +139,21 @@ it('redirects invalid ids and offers recovery from missing resources', () => {
   state.loading = true;
   mount();
   expect(document.querySelector('[data-cy="resource-details-loading-spinner"]')).toBeTruthy();
+  expect(screen.queryByText('Resource content')).toBeNull();
+});
+it('shows the not-found page, not the cached machine, once the machine answers 404 (ATT-843)', () => {
+  // The machine was read before; the refetch after it became hidden answers 404 while the cache still holds it.
+  state.resource = createMockResource({ id: 7, name: 'Hidden lathe', description: 'Secret notes' });
+  state.error = new ApiError(
+    { method: 'GET', url: '/api/resources/7' },
+    { url: '/api/resources/7', ok: false, status: 404, statusText: 'Not Found', body: undefined },
+    'Not Found',
+  );
+  mount();
+  expect(screen.getByRole('heading', { name: 'Resource not found' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /Back to resources/i })).toBeTruthy();
+  expect(screen.queryByText('Hidden lathe')).toBeNull();
+  expect(screen.queryByText('Secret notes')).toBeNull();
+  expect(screen.queryByRole('tab')).toBeNull();
   expect(screen.queryByText('Resource content')).toBeNull();
 });

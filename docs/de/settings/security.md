@@ -1,5 +1,5 @@
 # Sicherheitseinstellungen
-<!-- llms-description: Sicherheitseinstellungen für Sitzungs-Cookies und Authentifizierung: SameSite, Sitzungskonfiguration, Kartenschlüssel und Rate-Limiting. -->
+<!-- llms-description: Sicherheitseinstellungen für Sitzungs-Cookies und Authentifizierung: SameSite, Sitzungskonfiguration, Kartenschlüssel, Rate-Limiting und Netzwerkbeschränkung. -->
 
 Attraccess bietet verschiedene sicherheitsrelevante Einstellungen fuer Sitzungs-Cookies und Authentifizierung. Diese Einstellungen beeinflussen, wie Benutzer angemeldet bleiben und wie die Anwendung mit Cross-Site-Anfragen umgeht.
 
@@ -49,6 +49,8 @@ Die Schlüssel der Attractap-Karten werden nur vom Server erzeugt und geprüft; 
 
 > [!WARNING]
 > **Sichern Sie `AUTH_SESSION_SECRET` zusammen mit den Datenbank-Backups.** Ohne das Secret lassen sich die gespeicherten Kartenschlüssel und Kopplungsschlüssel nicht lesen. Bereits registrierte Karten können dann weder genutzt noch von Attraccess zurückgesetzt werden und müssen mit anderen Werkzeugen gelöscht werden. Gekoppelte Reader können sich nicht mehr verbinden und müssen neu gekoppelt werden.
+
+Der Schalter **UID-only-Karten erlauben (unsicher)** unter **Einstellungen -> RFID-Kartenregistrierung** ist standardmäßig aus. Er erlaubt günstige Karten ohne Verschlüsselung, die sich mit günstigen Werkzeugen kopieren lassen; siehe [UID-only-Karten](attractap/rfid-cards.md#uid-only-karten-unsicher).
 
 Wird das Secret geändert, sind die gespeicherten Kartenschlüssel und Kopplungsschlüssel unlesbar, bis sie neu verschlüsselt wurden. So tauschen Sie das Secret gezielt aus:
 
@@ -131,6 +133,61 @@ Setzen Sie die Umgebungsvariable `TRUST_PROXY` auf die Anzahl vertrauenswuerdige
 > Vertrauen Sie nur so vielen Hops, wie tatsaechlich existieren. Vertraut `TRUST_PROXY` mehr Hops als Ihre reale Proxy-Kette, koennen Clients `X-Forwarded-For` faelschen, ihre scheinbare IP rotieren und das Rate-Limiting umgehen. Nicht gesetzt vertraut Attraccess keinen Weiterleitungs-Headern (sicherer Standard). Aenderungen werden nach einem Neustart wirksam.
 
 Dieselbe Client-IP gilt für die Begrenzungen der Anfragen zur [Attractap-Reader-Kopplung](attractap/pairing.md) (pro Adresse). Stellen Sie außerdem sicher, dass der Proxy den Header `Sec-WebSocket-Protocol` durchreicht, über den Reader ihre verschlüsselte Verbindung wählen.
+
+## Netzwerkbeschränkung
+
+Die **Netzwerkbeschränkung** erlaubt ausgewählte Ressourcen-Aktionen nur aus Ihrem lokalen Netzwerk. Sie ist standardmäßig aus und wird unter **Einstellungen → Sicherheit → Netzwerkbeschränkung** eingerichtet. Änderungen gelten sofort auf der Instanz, auf der Sie speichern; weitere Instanzen mit derselben Datenbank übernehmen sie innerhalb von etwa einer Minute (Cache der Einstellungen).
+
+Ist sie an, entscheidet Attraccess für jede HTTP-Anfrage, ob der Aufrufer aus einem **erlaubten Netzwerk** kommt. Für Aufrufer von außerhalb werden die folgenden Aktionen mit HTTP `403` und dem Fehlercode `NETWORK_RESTRICTED` abgelehnt, es sei denn, eine Rolle des Aufrufers erlaubt die Aktion von außerhalb. Das gilt für Browser-Sitzungen, API-Tokens und MCP-Tool-Aufrufe gleichermaßen.
+
+| Aktion | Was sie umfasst |
+|--------|-----------------|
+| Sitzung starten | Eine Nutzungssitzung starten |
+| Sitzung übernehmen | Eine Sitzung mit Übernahme starten |
+| Sitzung beenden | Eine Sitzung beenden (die eigene oder die eines anderen Nutzers) |
+| Tür öffnen / Tür aufschließen / Falle öffnen / Tür abschließen | Die Türsteuerung einer Ressource |
+| Beaufsichtigung anfragen | Einen beaufsichtigten Start anfragen |
+| Beaufsichtigung genehmigen | Eine Anfrage für einen beaufsichtigten Start genehmigen (Ablehnen ist nie eingeschränkt) |
+
+Eine beaufsichtigte Anfrage, die die Sitzung eines anderen Nutzers übernimmt, braucht sowohl **Beaufsichtigung anfragen** als auch **Sitzung übernehmen**. Bei einer Tür mit „Nur Zutritt“ öffnet ein über die API gesendetes Aufschließen die Tür und braucht daher **Tür öffnen**.
+
+### Einstellungen
+
+| Einstellung | Beschreibung |
+|-------------|--------------|
+| **Aktionen auf das lokale Netzwerk beschränken** | Standardmäßig aus. Solange sie aus ist, ändert sich nichts. |
+| **Erlaubte Netzwerke** | Pro IP-Adresse oder CIDR-Bereich (IPv4 und IPv6) ein Tag mit Entfernen-Schaltfläche, zum Beispiel `10.0.0.0/8`, `192.168.0.0/16`, `fc00::/7`. Geben Sie einen Eintrag ein und klicken Sie auf **Hinzufügen** (oder drücken Sie Enter). Mehrere Einträge, getrennt durch Kommas, Semikolons oder Leerzeichen, können auf einmal eingefügt werden. Ein ungültiger Wert wird am Feld genannt und aus dieser Eingabe wird nichts übernommen; ein Eintrag, der in beliebiger Schreibweise schon in der Liste steht (`10.0.0.1/8` ist `10.0.0.0/8`), wird übersprungen. Die Liste fasst höchstens 200 Einträge, und auch der Server lehnt beim Speichern einen ungültigen Eintrag ab und nennt ihn. Text, der beim Verlassen des Feldes noch darin steht, wird übernommen oder, wenn er ungültig ist, am Feld genannt. Unter der Liste bieten Schnellauswahl-Schaltflächen das /24-Netz (IPv4) bzw. /64-Netz (IPv6) Ihrer eigenen Verbindung und Ihre Adresse an, die Netze der Netzwerkschnittstellen des Servers, die privaten Bereiche (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`) sowie Loopback und Link-lokal; ein Vorschlag, den die Liste schon enthält oder der in einem größeren Eintrag liegt, wird ausgeblendet. Prüfen Sie einen vorgeschlagenen Bereich, bevor Sie ihn hinzufügen: Ein öffentliches Netz des Servers oder das Netz eines Reverse Proxys lässt jeden Aufrufer darin als lokal gelten. Wird die Beschränkung bei leerer Liste eingeschaltet, werden die privaten Bereiche sowie Loopback und Link-lokal (`127.0.0.0/8`, `::1/128`, `169.254.0.0/16`, `fe80::/10`) eingetragen; Sie können sie vor dem Speichern entfernen. Die Liste darf nicht leer sein, solange die Beschränkung an ist. IPv4-gemappte IPv6-Adressen (`::ffff:10.0.0.5`) werden als IPv4 geprüft. |
+| **Adressquelle** | Woher die Adresse des Aufrufers stammt, siehe unten. |
+| **Von außerhalb erlaubt, pro Rolle** | Eine Tabelle mit einer Zeile pro Rolle und einer Spalte pro Aktion. Ein gesetzter Haken erlaubt den Mitgliedern der Rolle die Aktion auch außerhalb des erlaubten Netzwerks. Ein Nutzer darf eine Aktion, wenn **eine** seiner Rollen sie erlaubt. Neue Rollen erlauben von außerhalb nichts, und Administratoren sind **nicht** ausgenommen: Setzen Sie auch bei ihnen Haken, wenn sie den Zugriff behalten sollen. Die Tabelle lässt sich auch bearbeiten, solange die Beschränkung aus ist. |
+
+Die Karte zeigt die Adresse, die Attraccess bei Ihnen erkennt, und ob sie mit den gespeicherten Einstellungen in den erlaubten Netzwerken liegt. Prüfen Sie das, bevor Sie die Beschränkung einschalten. Gespeichert und verworfen wird die Karte wie die anderen Sicherheitseinstellungen über die gemeinsame Leiste am unteren Rand.
+
+### Adressquelle
+
+| Quelle | Verhalten |
+|--------|-----------|
+| **Client-Adresse** (Standard) | Die Adresse, die Attraccess für die Anfrage ermittelt. Hinter einem Reverse Proxy setzen Sie `TRUST_PROXY` (siehe [Reverse Proxies und die echte Client-IP](#reverse-proxies-und-die-echte-client-ip)); ohne diese Einstellung wirkt jede Anfrage, als käme sie vom Proxy, meist einer privaten Adresse, und alle gälten als lokal. `X-Forwarded-For` wird ignoriert, solange `TRUST_PROXY` nicht gesetzt ist. |
+| **Request-Header** | Die Adresse wird aus einem Header gelesen, standardmäßig `X-Real-Ip`, den Traefik setzt. Enthält der Header eine kommagetrennte Liste, zählt der **letzte** Eintrag, den Ihr nächster Proxy geschrieben hat. Fehlt der Header, ist er leer oder keine IP-Adresse, gilt der Aufrufer als **außerhalb**. |
+
+> [!WARNING]
+> **Der Header-Modus ist nur sicher, wenn Attraccess ausschließlich über den Proxy erreichbar ist, der den Header überschreibt.** Kann ein Client Attraccess direkt erreichen, oder reicht der Proxy einen vom Client gesendeten Header unverändert durch, kann der Client `X-Real-Ip: 192.168.1.10` senden und wirkt lokal. Nutzen Sie **Client-Adresse** mit `TRUST_PROXY`, sofern Sie den Netzwerkpfad nicht selbst kontrollieren.
+
+### Beispiel: Traefik
+
+Lassen Sie Attraccess entweder die Client-Adresse vom Proxy übernehmen oder den Header lesen, den Traefik setzt:
+
+| Aufbau | Attraccess |
+|--------|------------|
+| Client-Adresse (empfohlen) | `TRUST_PROXY=1` für den Attraccess-Container setzen und **Client-Adresse** wählen. |
+| Request-Header | **Request-Header** mit dem Namen `X-Real-Ip` wählen und sicherstellen, dass nur Traefik den Attraccess-Port erreicht. |
+
+Tragen Sie Ihre LAN- und VPN-Bereiche unter **Erlaubte Netzwerke** ein, zum Beispiel `192.168.0.0/16`, und schalten Sie die Beschränkung dann ein. Hinter Traefik auf demselben Docker-Host verbindet sich der Proxy selbst von einer privaten Adresse; deshalb kommt es auf die Adressquelle an.
+
+### Was nie eingeschränkt wird
+
+Physische Reader (Attractap), Plugin-Reader und Geräte-Integrationen, Flows und andere Automatisierungen sowie Reservierungen starten und beenden Sitzungen wie bisher, egal was die Beschränkung sagt. Alles andere, etwa das Ansehen von Ressourcen, die Benutzerverwaltung und die Einstellungen, bleibt von überall erreichbar, damit ein Administrator die Konfiguration immer korrigieren kann.
+
+Ein blockierter Versuch steht im Server-Log auf Stufe `warn` (Nutzer, Aktion, Ressource und erkannte Adresse). Er ist kein Audit-Log-Ereignis. Änderungen an der Netzwerkbeschränkung und an der Rollentabelle werden wie andere Einstellungsänderungen im Audit-Log festgehalten.
 
 ## Freigegebene Websites
 
@@ -267,3 +324,4 @@ docker compose logs attraccess | grep -E 'auth\.failed'
 - [SSL einrichten](installation/ssl-setup.md) -- HTTPS konfigurieren
 - [SSO Ueberblick](user-management/sso-overview.md) -- Single Sign-On einrichten
 - [Einstellungen Ueberblick](settings/overview.md) -- Alle Systemeinstellungen
+- [Sichtbarkeit der Maschinenliste](settings/overview.md#sichtbarkeit-der-maschinenliste) -- Wer welche Maschinen sieht

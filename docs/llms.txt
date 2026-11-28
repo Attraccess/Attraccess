@@ -21,14 +21,14 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Backup & Restore](https://docs.attraccess.org/en/installation/backup-restore.md): Explains what Attraccess data to back up (the PostgreSQL database and the storage volume), how to back it up with the balena sidecar, Coolify or pg_dump, and how to restore it.
 
 ## English: First-Time Setup
-- [Setup Wizard](https://docs.attraccess.org/en/setup/first-time-setup.md): Walks through the five-step first-run setup wizard: application settings, email settings, license, administrator account and email verification.
+- [Setup Wizard](https://docs.attraccess.org/en/setup/first-time-setup.md): The five-step setup wizard (application and email settings, license, administrator account, email verification) and the default registration and machine visibility policy.
 - [Email / SMTP](https://docs.attraccess.org/en/setup/smtp-email.md): Configure the SMTP email server Attraccess uses for verification, password resets and invitations, with provider examples and Mailpit testing.
 - [Email Templates](https://docs.attraccess.org/en/setup/email-templates.md): Manage and customize the email templates Attraccess sends, including available templates, plugin templates and placeholders.
 - [Branding](https://docs.attraccess.org/en/setup/branding.md): Customize the application URL, logo and name, color mode and email layout to match your organization.
 
 ## English: User Management
 - [Overview](https://docs.attraccess.org/en/user-management/overview.md): Overview of user management: creating accounts, assigning permissions and configuring login methods as an administrator.
-- [Creating Users](https://docs.attraccess.org/en/user-management/creating-users.md): The ways users get an account: self-registration, SSO registration, project invitations and creation by an administrator.
+- [Creating Users](https://docs.attraccess.org/en/user-management/creating-users.md): The ways users get an account: self-registration, SSO registration, project invitations and creation by an administrator, and what an account can reach before its email is verified.
 - [Permissions](https://docs.attraccess.org/en/user-management/permissions.md): Explains the role-based permission model, default roles, permission keys, plugin-declared permissions, assigning roles and SSO-managed roles.
 - [SSO Overview](https://docs.attraccess.org/en/user-management/sso-overview.md): Overview of Single Sign-On with OIDC and SAML: prerequisites, providers, auto-discovery, permission mapping and account linking.
 - [OIDC Setup](https://docs.attraccess.org/en/user-management/sso-oidc.md): How to create and configure an OpenID Connect SSO provider, including the callback URL and testing the login.
@@ -55,7 +55,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Meters](https://docs.attraccess.org/en/flows/energy-metering.md): Named meters per resource for electricity, water or any value, with cumulative counters, session boundaries and optional billing.
 
 ## English: Forms
-- [Overview](https://docs.attraccess.org/en/forms/overview.md): Introduces forms collected from users at points of resource use, including where a form applies, when it is shown, field types and submissions.
+- [Overview](https://docs.attraccess.org/en/forms/overview.md): Introduces forms collected from users at points of resource use, including where a form applies, when it is shown, field types (including photos) and submissions.
 - [Creating Forms](https://docs.attraccess.org/en/forms/creating-forms.md): How to create, edit, move and delete forms and their fields for one resource, a resource group or every resource, which requires the Manage Resources permission.
 
 ## English: Projects
@@ -70,9 +70,9 @@ The documentation pages are plain Markdown files. English pages live under https
 - [BLE Bridge](https://docs.attraccess.org/en/attractap/ble-bridge.md): Sets up the Attractap BLE Bridge on a GL.iNet GL-S10, a headless reader that only relays Bluetooth Low Energy for plugins such as door locks.
 - [Setup](https://docs.attraccess.org/en/attractap/setup.md): Guide to connect a new Attractap reader to your network, pair it with Attraccess and assign resources to it.
 - [Reader Pairing](https://docs.attraccess.org/en/attractap/pairing.md): How a reader joins an installation with one admin approval, reader states, re-pairing and the encrypted connection.
-- [RFID Cards](https://docs.attraccess.org/en/attractap/rfid-cards.md): How RFID cards link to user accounts, how to manage cards, supported card types and which readers may enroll or reset cards.
+- [RFID Cards](https://docs.attraccess.org/en/attractap/rfid-cards.md): How RFID cards link to user accounts, how to manage cards, supported card types, insecure UID-only cards and which readers may enroll or reset cards.
 - [Firmware Updates](https://docs.attraccess.org/en/attractap/firmware-updates.md): How Attractap readers receive over-the-air firmware updates from the Attraccess backend, firmware variants and troubleshooting.
-- [Reader Security](https://docs.attraccess.org/en/attractap/reader-security.md): How to secure Attractap Touch V2 readers so they only accept firmware signed with your own Secure Boot keys, including backup and restore.
+- [Reader Security](https://docs.attraccess.org/en/attractap/reader-security.md): How to secure Attractap Touch V2 readers over the network so they only run firmware signed with your own keys, with key backup, restore and the protection's limits.
 - [Reader Display](https://docs.attraccess.org/en/attractap/reader-ui.md): How plugins show notes and prompts on Attractap reader screens, which readers support them, and the related admin settings and alerts.
 - [LED Guide (Lite)](https://docs.attraccess.org/en/attractap/led-guide.md): Explains the LED ring animations and one-time feedback signals of the display-less Attractap Lite reader.
 
@@ -138,8 +138,8 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Metrics Reference](https://docs.attraccess.org/en/monitoring/metrics-reference.md): Reference of all metrics at the /api/metrics endpoint: HTTP, authentication, user, resource and Attractap device metrics.
 
 ## English: System Settings
-- [Overview](https://docs.attraccess.org/en/settings/overview.md): Administrator overview of System Settings: application settings, resource activity visibility, email and additional settings.
-- [Security](https://docs.attraccess.org/en/settings/security.md): Security settings for session cookies and authentication, including SameSite, session configuration, card keys and rate limiting.
+- [Overview](https://docs.attraccess.org/en/settings/overview.md): Administrator overview of System Settings: application settings, machine list visibility, resource activity visibility, email and additional settings.
+- [Security](https://docs.attraccess.org/en/settings/security.md): Security settings for session cookies and authentication, including SameSite, session configuration, card keys and rate limiting, and the network restriction.
 - [Audit log](https://docs.attraccess.org/en/settings/audit-log.md): How to browse, filter, inspect and export the audit log of recorded activity and control recording and retention.
 
 ## English: Developer Guide
@@ -151,7 +151,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Adding a Database Backend](https://docs.attraccess.org/en/developer/adding-a-database-backend.md): How the PostgreSQL backend is structured, the steps to add another relational backend, the backup and restore contract, and how the one-time SQLite import fits in.
 - [API Log Destinations](https://docs.attraccess.org/en/developer/logging.md): How the API routes logs to destinations with RoutedLogger, including registering a driver and startup ownership.
 - [API Reference](https://docs.attraccess.org/en/developer/api-reference.md): Describes the REST API and its OpenAPI docs, the generated API client and React Query hooks, authentication and key modules.
-- [MCP Server (AI Clients)](https://docs.attraccess.org/en/developer/mcp.md): Explains how to connect MCP clients to Attraccess with API tokens or OAuth, which tools are exposed, how permissions apply and how the reviewed manifest is maintained.
+- [MCP Server (AI Clients)](https://docs.attraccess.org/en/developer/mcp.md): Explains how to connect MCP clients with API tokens or OAuth, how permissions choose the tools and how to revoke an app.
 - [AI Agents (llms.txt & WebMCP)](https://docs.attraccess.org/en/developer/ai-agents.md): Explains the llms.txt index and the experimental WebMCP tools of the docs site, how to try them in Chrome and how to add pages.
 - [Contributing](https://docs.attraccess.org/en/developer/contributing.md): How to contribute to Attraccess: forking, branching, code style, testing, issue tracking and reporting bugs.
 
@@ -184,14 +184,14 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Backup & Wiederherstellung](https://docs.attraccess.org/de/installation/backup-restore.md): Erklärt, welche Attraccess-Daten gesichert werden (PostgreSQL-Datenbank und Storage-Volume), wie Sie mit dem balena-Sidecar, Coolify oder pg_dump sichern und wie Sie wiederherstellen.
 
 ## Deutsch: Ersteinrichtung
-- [Einrichtungsassistent](https://docs.attraccess.org/de/setup/first-time-setup.md): Führt durch den fünfstufigen Einrichtungsassistenten beim ersten Start: Anwendungs- und E-Mail-Einstellungen, Lizenz, Administrator-Konto und E-Mail-Bestätigung.
+- [Einrichtungsassistent](https://docs.attraccess.org/de/setup/first-time-setup.md): Die fünf Schritte des Einrichtungsassistenten (Anwendung, E-Mail, Lizenz, Administrator-Konto, Bestätigung) und die Standardrichtlinie für Registrierung und Sichtbarkeit.
 - [E-Mail / SMTP](https://docs.attraccess.org/de/setup/smtp-email.md): SMTP-Server für Kontobestätigungen, Passwort-Zurücksetzungen und Einladungen konfigurieren, mit Anbieterbeispielen und Test per Mailpit.
 - [E-Mail-Vorlagen](https://docs.attraccess.org/de/setup/email-templates.md): E-Mail-Vorlagen von Attraccess verwalten und anpassen, inklusive verfügbarer Vorlagen, Plugin-Vorlagen und Platzhalter.
 - [Erscheinungsbild](https://docs.attraccess.org/de/setup/branding.md): Anwendungs-URL, Logo und Name, Farbmodus und E-Mail-Layout an das Erscheinungsbild Ihrer Organisation anpassen.
 
 ## Deutsch: Benutzerverwaltung
 - [Überblick](https://docs.attraccess.org/de/user-management/overview.md): Überblick über die Benutzerverwaltung: Konten anlegen, Berechtigungen vergeben und Anmeldemethoden als Administrator konfigurieren.
-- [Benutzer anlegen](https://docs.attraccess.org/de/user-management/creating-users.md): Die Wege zu einem Benutzerkonto: Selbstregistrierung, SSO-Registrierung, Projekteinladungen und Anlegen durch einen Administrator.
+- [Benutzer anlegen](https://docs.attraccess.org/de/user-management/creating-users.md): Die Wege zu einem Benutzerkonto (Selbstregistrierung, SSO-Registrierung, Projekteinladungen, Anlegen durch einen Administrator) und was ein Konto vor der E-Mail-Bestätigung erreicht.
 - [Berechtigungen](https://docs.attraccess.org/de/user-management/permissions.md): Erklärt das rollenbasierte Berechtigungsmodell, Standardrollen, Berechtigungsschlüssel, Plugin-Berechtigungen, die Vergabe von Rollen und SSO-verwaltete Rollen.
 - [SSO Überblick](https://docs.attraccess.org/de/user-management/sso-overview.md): Überblick über Single Sign-On mit OIDC und SAML: Voraussetzungen, Anbieter, automatische Erkennung, Berechtigungszuordnung und Kontoverknüpfung.
 - [OIDC einrichten](https://docs.attraccess.org/de/user-management/sso-oidc.md): So legen Sie einen OpenID-Connect-SSO-Anbieter an und konfigurieren ihn, inklusive Callback-URL und Test der Anmeldung.
@@ -218,7 +218,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Zähler](https://docs.attraccess.org/de/flows/energy-metering.md): Benannte Zähler pro Ressource für Strom, Wasser oder beliebige Werte, mit Sitzungsgrenzen, kumulativen Zählern und optionaler Abrechnung.
 
 ## Deutsch: Formulare
-- [Überblick](https://docs.attraccess.org/de/forms/overview.md): Stellt Formulare vor, die bei der Ressourcennutzung abgefragt werden, inklusive Geltungsbereich, Anzeigezeitpunkten, Feldtypen und Einreichungen.
+- [Überblick](https://docs.attraccess.org/de/forms/overview.md): Stellt Formulare vor, die bei der Ressourcennutzung abgefragt werden, inklusive Geltungsbereich, Anzeigezeitpunkten, Feldtypen (auch Fotos) und Einreichungen.
 - [Formulare erstellen](https://docs.attraccess.org/de/forms/creating-forms.md): So erstellen, bearbeiten, verschieben und löschen Sie Formulare und Felder für eine Ressource, eine Ressourcengruppe oder alle Ressourcen; erfordert die Berechtigung Ressourcen verwalten.
 
 ## Deutsch: Projekte
@@ -233,9 +233,9 @@ The documentation pages are plain Markdown files. English pages live under https
 - [BLE Bridge](https://docs.attraccess.org/de/attractap/ble-bridge.md): Richtet die Attractap BLE Bridge auf einem GL.iNet GL-S10 ein, einem Leser ohne Display, der nur Bluetooth Low Energy für Plugins wie Türschlösser weiterleitet.
 - [Einrichtung](https://docs.attraccess.org/de/attractap/setup.md): Anleitung, einen neuen Attractap-Leser mit dem Netzwerk zu verbinden, mit Attraccess zu koppeln und Ressourcen zuzuweisen.
 - [Reader koppeln](https://docs.attraccess.org/de/attractap/pairing.md): Wie ein Leser mit einer Admin-Freigabe in die Installation aufgenommen wird: Status, erneutes Koppeln und verschlüsselte Verbindung.
-- [RFID-Karten](https://docs.attraccess.org/de/attractap/rfid-cards.md): Wie RFID-Karten mit Benutzerkonten verknüpft sind, Kartenverwaltung, Kartentypen und welche Leser Karten registrieren oder zurücksetzen dürfen.
+- [RFID-Karten](https://docs.attraccess.org/de/attractap/rfid-cards.md): Wie RFID-Karten mit Benutzerkonten verknüpft sind, Kartenverwaltung, Kartentypen, unsichere UID-only-Karten und welche Leser Karten registrieren oder zurücksetzen dürfen.
 - [Firmware-Updates](https://docs.attraccess.org/de/attractap/firmware-updates.md): Wie Attractap-Leser Over-the-Air-Firmware-Updates vom Attraccess-Backend erhalten, inklusive Firmware-Varianten und Fehlerbehebung.
-- [Reader-Sicherheit](https://docs.attraccess.org/de/attractap/reader-security.md): Wie Attractap-Touch-V2-Reader gesichert werden, damit sie nur mit deinen eigenen Secure-Boot-Schlüsseln signierte Firmware akzeptieren, inklusive Backup und Wiederherstellung der Schlüssel.
+- [Reader-Sicherheit](https://docs.attraccess.org/de/attractap/reader-security.md): Wie Attractap-Touch-V2-Reader über das Netzwerk gesichert werden, damit sie nur mit deinen Schlüsseln signierte Firmware akzeptieren, samt Schlüssel-Backup und Grenzen des Schutzes.
 - [Reader-Anzeige](https://docs.attraccess.org/de/attractap/reader-ui.md): Wie Plugins Hinweise und Abfragen auf Attractap-Bildschirmen anzeigen, welche Leser das können, sowie Admin-Einstellungen und Alarme.
 
 ## Deutsch: MQTT & IoT
@@ -300,8 +300,8 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Metriken-Referenz](https://docs.attraccess.org/de/monitoring/metrics-reference.md): Referenz aller Metriken am Endpunkt /api/metrics: HTTP, Authentifizierung, Benutzer, Ressourcen und Attractap-Geräte.
 
 ## Deutsch: Systemeinstellungen
-- [Überblick](https://docs.attraccess.org/de/settings/overview.md): Administratorübersicht der Systemeinstellungen: Anwendung, Sichtbarkeit der Ressourcennutzung, E-Mail und weitere Einstellungen.
-- [Sicherheit](https://docs.attraccess.org/de/settings/security.md): Sicherheitseinstellungen für Sitzungs-Cookies und Authentifizierung: SameSite, Sitzungskonfiguration, Kartenschlüssel und Rate-Limiting.
+- [Überblick](https://docs.attraccess.org/de/settings/overview.md): Administratorübersicht der Systemeinstellungen: Anwendung, Sichtbarkeit der Maschinenliste, Sichtbarkeit der Ressourcennutzung, E-Mail und weitere Einstellungen.
+- [Sicherheit](https://docs.attraccess.org/de/settings/security.md): Sicherheitseinstellungen für Sitzungs-Cookies und Authentifizierung: SameSite, Sitzungskonfiguration, Kartenschlüssel, Rate-Limiting und Netzwerkbeschränkung.
 - [Audit-Protokoll](https://docs.attraccess.org/de/settings/audit-log.md): Wie Sie das Audit-Protokoll durchsuchen, filtern, prüfen und exportieren sowie Aufzeichnung und Aufbewahrung steuern.
 
 ## Deutsch: Für Entwickler
@@ -313,7 +313,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Datenbank-Backend hinzufügen](https://docs.attraccess.org/de/developer/adding-a-database-backend.md): Schritte, um Attraccess ein weiteres relationales Backend hinzuzufügen, der Backup- und Restore-Vertrag, den es einhalten muss, und wie der einmalige SQLite-Import dazu passt.
 - [API-Log-Ziele](https://docs.attraccess.org/de/developer/logging.md): Wie die API Logs mit RoutedLogger an Ziele leitet, inklusive Treiber-Registrierung und Start-Lebenszyklus.
 - [API-Referenz](https://docs.attraccess.org/de/developer/api-reference.md): Beschreibt die REST-API mit OpenAPI-Dokumentation, generiertem API-Client und React-Query-Hooks, Authentifizierung und wichtigen Modulen.
-- [MCP-Server (KI-Clients)](https://docs.attraccess.org/de/developer/mcp.md): Erklärt, wie MCP-Clients per API-Token oder OAuth mit Attraccess verbunden werden, welche Tools es gibt, wie Berechtigungen wirken und wie das geprüfte Manifest gepflegt wird.
+- [MCP-Server (KI-Clients)](https://docs.attraccess.org/de/developer/mcp.md): Erklärt, wie MCP-Clients per API-Token oder OAuth verbunden werden, wie Berechtigungen die Tools bestimmen und wie du eine App widerrufst.
 - [KI-Agenten (llms.txt & WebMCP)](https://docs.attraccess.org/de/developer/ai-agents.md): Erklärt den llms.txt-Index und die experimentellen WebMCP-Tools der Dokumentation, das Ausprobieren in Chrome und das Hinzufügen von Seiten.
 - [Mitwirken](https://docs.attraccess.org/de/developer/contributing.md): Wie Sie zu Attraccess beitragen: Fork, Branch, Code-Stil, Tests, Issue-Tracking und Fehlermeldungen.
 

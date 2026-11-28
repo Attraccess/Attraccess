@@ -54,6 +54,11 @@ describe('VersionService', () => {
       expect(service.getCurrentVersion()).toEqual({ version: '0.0.16', commitHash: 'abc123def456' });
     });
 
+    it('treats an empty COMMIT_SHA (image built without the build arg) as unknown', () => {
+      configService.get.mockReturnValue({ VERSION: '0.0.16', COMMIT_SHA: '' });
+      expect(service.getCurrentVersion()).toEqual({ version: '0.0.16', commitHash: null });
+    });
+
     it('normalizes a "v"-prefixed version', () => {
       configService.get.mockReturnValue({ VERSION: 'v1.2.3' });
       expect(service.getCurrentVersion()).toEqual({ version: '1.2.3', commitHash: null });

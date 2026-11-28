@@ -124,7 +124,7 @@ describe('plugin node failure behaviour', () => {
 
   it('logs the failure and continues on the normal output', async () => {
     buildDoorFlow(registerFailingNode(), { failureBehavior: 'log-and-continue' });
-    scope.flowLogs.start(1);
+    scope.flowLogs.keepAlive(1);
 
     await expect(scope.service.handleResourceSessionStartedEvent(doorUnlockEvent())).resolves.toBeUndefined();
 
@@ -141,6 +141,40 @@ describe('plugin node failure behaviour', () => {
       failureKind: 'controller-rejection',
       failureBehavior: 'log-and-continue',
     });
+  });
+
+  it('continues only on the normal output when the node succeeds without naming a handle', async () => {
+    // Like the WAGO command node: outputs ['output', 'failure'], success returns no handle.
+    buildDoorFlow(registerFailingNode({ execute: async (_node, input) => ({ payload: input }) }), {
+      failureBehavior: 'failure-output',
+    });
+
+    await expect(scope.service.handleResourceSessionStartedEvent(doorUnlockEvent())).resolves.toBeUndefined();
+
+    expect(afterOutput).toHaveBeenCalledTimes(1);
+    expect(afterFailure).not.toHaveBeenCalled();
+  });
+
+  it('continues on the sole declared output when a single-output plugin node names no handle', async () => {
+    const doneType = `plugin.failure-policy.done-${typeIndex++}`;
+    registerPluginFlowNodes('failure-policy', [
+      {
+        type: doneType,
+        label: 'Done only',
+        configSchema: {},
+        inputs: ['input'],
+        outputs: ['done'],
+        execute: async (_node, input) => ({ payload: input }),
+      },
+    ]);
+    buildDoorFlow(doneType, {});
+    scope.edgesBySourceAndHandle['engage|done'] = [{ source: 'engage', target: 'on-output' }];
+    delete scope.edgesBySourceAndHandle['engage|output'];
+
+    await expect(scope.service.handleResourceSessionStartedEvent(doorUnlockEvent())).resolves.toBeUndefined();
+
+    expect(afterOutput).toHaveBeenCalledTimes(1);
+    expect(afterFailure).not.toHaveBeenCalled();
   });
 
   it('fails the flow when the failure hook throws or answers with an unknown behaviour', async () => {

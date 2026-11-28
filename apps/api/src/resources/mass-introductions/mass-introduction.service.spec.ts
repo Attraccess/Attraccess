@@ -77,7 +77,8 @@ describe('MassIntroductionService', () => {
         {
           provide: MASS_INTRODUCTION_TARGET_STORE,
           useValue: {
-            findResourceName: jest.fn((id: number) => Promise.resolve({ id, name: 'Laser' })),
+            // Machine 404 does not exist.
+            findResourceName: jest.fn((id: number) => Promise.resolve(id === 404 ? null : { id, name: 'Laser' })),
             findGroupName: jest.fn((id: number) => Promise.resolve({ id, name: 'Wood shop' })),
             // Resources of a group (group 3 holds resources 5 and 6).
             resourceIdsOfGroup: jest.fn(() => Promise.resolve([5, 6])),
@@ -109,6 +110,11 @@ describe('MassIntroductionService', () => {
     expect(session.target).toEqual({ type: MassIntroductionTargetType.RESOURCE, id: 5, name: 'Laser' });
   });
 
+  it('answers a missing machine like one the caller does not introduce, unless they manage access (ATT-843)', async () => {
+    await expect(service.start(introducer, { resourceId: 404 })).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.start(admin, { resourceId: 404 })).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('introduces QR participants on behalf of the introducer and reports them live', async () => {
     const session = await service.start(introducer, { resourceId: 5 });
 
@@ -129,7 +135,7 @@ describe('MassIntroductionService', () => {
     expect(update.session.participants).toEqual([
       expect.objectContaining({ userId: alice.id, username: 'alice', method: MassIntroductionMethod.QR }),
     ]);
-    expect(service.get(session.id, introducer.id).participants).toHaveLength(1);
+    expect((await service.get(session.id, introducer.id)).participants).toHaveLength(1);
   });
 
   it('grants once per participant, even for concurrent scans', async () => {
@@ -150,7 +156,7 @@ describe('MassIntroductionService', () => {
 
     expect(result.alreadyIntroduced).toBe(true);
     expect(resourceIntroductions.grant).not.toHaveBeenCalled();
-    expect(service.get(session.id, introducer.id).participants[0].alreadyIntroduced).toBe(true);
+    expect((await service.get(session.id, introducer.id)).participants[0].alreadyIntroduced).toBe(true);
   });
 
   it('uses the group services for resource-group sessions', async () => {
@@ -186,10 +192,10 @@ describe('MassIntroductionService', () => {
   it('lets only the owner read or cancel a session', async () => {
     const session = await service.start(introducer, { resourceId: 5, readerId: 3 });
 
-    expect(() => service.get(session.id, admin.id)).toThrow(NotFoundException);
-    expect(() => service.cancel(session.id, admin.id)).toThrow(NotFoundException);
+    await expect(service.get(session.id, admin.id)).rejects.toThrow(NotFoundException);
+    await expect(service.cancel(session.id, admin.id)).rejects.toThrow(NotFoundException);
 
-    service.cancel(session.id, introducer.id);
+    await service.cancel(session.id, introducer.id);
 
     expect(readerPort.disarm).toHaveBeenCalledWith(
       expect.objectContaining({ readerId: 3, reason: MassIntroductionEndReason.CANCELLED }),
@@ -208,13 +214,28 @@ describe('MassIntroductionService', () => {
     await expect(service.start(introducer, { resourceId: 5, readerId: 3 })).resolves.toBeDefined();
   });
 
+  it('disarms the reader and ends the session when the store fails after arming', async () => {
+    const store = (service as unknown as { store: { attachReader: () => Promise<boolean> } }).store;
+    jest.spyOn(store, 'attachReader').mockRejectedValueOnce(new Error('database down'));
+
+    await expect(service.start(introducer, { resourceId: 5, readerId: 3 })).rejects.toThrow('database down');
+
+    expect(readerPort.disarm).toHaveBeenCalledWith(
+      expect.objectContaining({ readerId: 3, reason: MassIntroductionEndReason.CANCELLED }),
+    );
+    const [{ sessionId }] = readerPort.disarm.mock.calls.at(-1) as [{ sessionId: string }];
+    await expect(service.get(sessionId, introducer.id)).rejects.toBeInstanceOf(NotFoundException);
+    // Ended quietly: the introducer's start failed, there is nothing to tell them live.
+    expect(eventsOfType(MassIntroductionLiveEventType.ENDED)).toEqual([]);
+  });
+
   it('keeps the running session when its replacement cannot arm the reader', async () => {
     const running = await service.start(introducer, { resourceId: 5 });
     readerPort.arm.mockRejectedValueOnce(new ConflictException('busy'));
 
     await expect(service.start(introducer, { resourceId: 5, readerId: 4 })).rejects.toBeInstanceOf(ConflictException);
 
-    expect(service.get(running.id, introducer.id).id).toBe(running.id);
+    expect((await service.get(running.id, introducer.id)).id).toBe(running.id);
     expect(eventsOfType(MassIntroductionLiveEventType.ENDED)).toEqual([]);
   });
 
@@ -229,7 +250,7 @@ describe('MassIntroductionService', () => {
     const second = await service.start(introducer, { resourceId: 5, readerId: 3 });
 
     expect(second.reader?.state).toBe(MassIntroductionReaderState.ACTIVE);
-    expect(() => service.get(first.id, introducer.id)).toThrow(NotFoundException);
+    await expect(service.get(first.id, introducer.id)).rejects.toThrow(NotFoundException);
   });
 
   it('replaces an earlier session of the same introducer for the same target', async () => {
@@ -259,19 +280,22 @@ describe('MassIntroductionService', () => {
 
     expect(participant.method).toBe(MassIntroductionMethod.NFC);
     expect(participantCount).toBe(1);
-    expect(service.get(session.id, introducer.id).participants.map((p) => p.username)).toEqual(['alice', 'bob']);
+    expect((await service.get(session.id, introducer.id)).participants.map((p) => p.username)).toEqual([
+      'alice',
+      'bob',
+    ]);
   });
 
   it('keeps the QR code working after the reader detaches', async () => {
     const session = await service.start(introducer, { resourceId: 5, readerId: 3 });
 
-    service.detachReader(session.id, 3);
+    await service.detachReader(session.id, 3);
 
-    expect(service.get(session.id, introducer.id).reader?.state).toBe(MassIntroductionReaderState.DETACHED);
+    expect((await service.get(session.id, introducer.id)).reader?.state).toBe(MassIntroductionReaderState.DETACHED);
     await expect(service.redeemCard(session.id, 3, alice)).rejects.toBeInstanceOf(NotFoundException);
     await expect(scan(session, alice)).resolves.toBeDefined();
 
-    service.cancel(session.id, introducer.id);
+    await service.cancel(session.id, introducer.id);
     expect(readerPort.disarm).not.toHaveBeenCalled();
   });
 
@@ -285,7 +309,7 @@ describe('MassIntroductionService', () => {
 
       expect(session.code).toMatch(/^\d{6}$/);
       expect(new Date(session.codeRefreshAt).getTime() - startedAt).toBeLessThanOrEqual(PERIOD_MS);
-      const later = service.get(session.id, introducer.id);
+      const later = await service.get(session.id, introducer.id);
       expect(later.publicId).toBe(session.publicId);
 
       // Still accepted one period later (typed just before it changed), no longer two periods later.
@@ -319,7 +343,7 @@ describe('MassIntroductionService', () => {
 
       jest.setSystemTime(Date.now() + 60_000);
       await expect(
-        service.redeem(session.publicId, service.get(session.id, introducer.id).code, alice),
+        service.redeem(session.publicId, (await service.get(session.id, introducer.id)).code, alice),
       ).resolves.toBeDefined();
     });
 
@@ -343,7 +367,7 @@ describe('MassIntroductionService', () => {
     it('stops accepting codes when the session ends', async () => {
       const session = await service.start(introducer, { resourceId: 5 });
 
-      service.cancel(session.id, introducer.id);
+      await service.cancel(session.id, introducer.id);
 
       await expect(scan(session, alice)).rejects.toBeInstanceOf(NotFoundException);
     });

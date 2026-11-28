@@ -14,6 +14,10 @@ describe('CompanionController device endpoints', () => {
     getResourcesForDevice: jest.Mock;
   };
   let gateway: { disconnectDevice: jest.Mock };
+  // Machine list visibility (ATT-843): machine 2 is hidden from the caller.
+  const listVisibility = {
+    filterVisible: jest.fn(async (_user: unknown, ids: number[]) => ids.filter((id) => id !== 2)),
+  };
 
   beforeEach(() => {
     store = new FakeCompanionDeviceStore();
@@ -25,6 +29,7 @@ describe('CompanionController device endpoints', () => {
       service,
       gateway as unknown as CompanionGateway,
       gatewayService as unknown as CompanionGatewayService,
+      listVisibility as never,
     );
   });
 
@@ -57,5 +62,16 @@ describe('CompanionController device endpoints', () => {
     await controller.remove(device.id);
     expect(gateway.disconnectDevice).toHaveBeenCalledWith(device.id);
     expect(await store.findDevice(device.id)).toBeNull();
+  });
+
+  it('lists only the machines of a device that the caller may see (ATT-843)', async () => {
+    const device = await store.registerDevice({ name: 'abcd', tokenHash: 'h' });
+    gatewayService.getResourcesForDevice.mockResolvedValueOnce([
+      { id: 1, name: 'Laser' },
+      { id: 2, name: 'Hidden lathe' },
+    ]);
+    await expect(controller.getResources(device.id, { user: { id: 5 } } as never)).resolves.toEqual([
+      { id: 1, name: 'Laser' },
+    ]);
   });
 });

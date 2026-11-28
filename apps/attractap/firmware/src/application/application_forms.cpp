@@ -67,6 +67,18 @@ void Application::handleFormFields(const API::ResourceUsageFormFieldsPage &page)
     return;
   }
 
+  // The answer to a count poll for the open image field: update the count (and the QR code if its link changed) in
+  // place. The page is never rebuilt, so nothing the user typed or scrolled on it is lost.
+  if (!this->awaitingFieldRender && this->formImagePolling && page.fieldCount > 0 &&
+      page.fields[0].type == API::ResourceUsageFormFieldType::IMAGE &&
+      this->formCursorFormIdx < this->pendingFormRequest.formCount &&
+      page.formId == this->pendingFormRequest.forms[this->formCursorFormIdx].id &&
+      page.offset == this->formCursorOffset) {
+    this->formImagePollInFlight = false;
+    Display::formsScreen.updateImageField(entry->page.fields[0]);
+    return;
+  }
+
   // Render only when this page is the one the user is actually waiting on.
   if (this->awaitingFieldRender &&
       this->formCursorFormIdx < this->pendingFormRequest.formCount) {
@@ -80,6 +92,27 @@ void Application::handleFormFields(const API::ResourceUsageFormFieldsPage &page)
   }
 }
 
+// While the open page is an image field, ask the server for its count every few seconds: the phone uploads straight
+// to the server, which keeps the count, so this works whichever API instance took the upload.
+void Application::pollFormImageCount() {
+  if (!this->formImagePolling) return;
+  if (!this->hasPendingFormRequest || this->awaitingFieldRender || this->formPageSubmitPending ||
+      !Display::isActive(&Display::formsScreen) ||
+      this->formCursorFormIdx >= this->pendingFormRequest.formCount) {
+    return;
+  }
+  const uint32_t now = millis();
+  if (static_cast<int32_t>(now - this->formImagePollAt) < 0) return;
+  // A slow server must not pile up requests: wait for the answer to the last one, unless it got lost.
+  if (this->formImagePollInFlight && now - this->formImagePollSentAt < FORM_IMAGE_POLL_TIMEOUT_MS) return;
+  this->formImagePollAt = now + FORM_IMAGE_POLL_MS;
+  this->formImagePollInFlight = true;
+  this->formImagePollSentAt = now;
+  this->api.requestFormFields(this->pendingFormRequest.resourceId, this->pendingFormRequest.action,
+                              this->pendingFormRequest.forms[this->formCursorFormIdx].id, this->formCursorOffset,
+                              API::MAX_FORM_PAGE_FIELDS);
+}
+
 void Application::onActionResult(const std::string &eventType) {
   if (eventType == "START_RESOURCE_USAGE_SESSION" ||
       eventType == "STOP_RESOURCE_USAGE_SESSION") {
@@ -87,6 +120,7 @@ void Application::onActionResult(const std::string &eventType) {
     this->hasPendingFormRequest = false;
     this->hasPendingServerFormFlow = false;
     this->formFlowSubmitted = false;
+    this->formImagePolling = false;
     this->leaveForms();
   }
 }
@@ -152,6 +186,10 @@ void Application::clearFormPageCache() {
 void Application::renderFormFieldPage(
     const API::ResourceUsageFormFieldsPage &page) {
   bool canGoBack = this->globalFormFieldNumber() > 1;
+  this->formImagePolling =
+      page.fieldCount > 0 && page.fields[0].type == API::ResourceUsageFormFieldType::IMAGE;
+  this->formImagePollAt = millis() + FORM_IMAGE_POLL_MS;
+  this->formImagePollInFlight = false;
   Display::formsScreen.renderFormField(
       page, canGoBack, this->isLastFormField(), this->globalFormFieldNumber(),
       this->totalFormFields());
@@ -256,9 +294,15 @@ void Application::requestCurrentFormField() {
   const API::ResourceUsageFormMeta &form =
       this->pendingFormRequest.forms[this->formCursorFormIdx];
 
-  // Serve from cache when available (instant); otherwise fetch and wait.
+  // Serve from cache when available (instant); otherwise fetch and wait. An image field is always fetched again:
+  // its count and its link (the server issues a fresh one once the old one expired) change while the page is away.
   FormPageCacheEntry *cached =
       this->findFormPageCache(form.id, this->formCursorOffset);
+  if (cached && cached->page.fieldCount > 0 &&
+      cached->page.fields[0].type == API::ResourceUsageFormFieldType::IMAGE) {
+    cached->valid = false;
+    cached = nullptr;
+  }
   if (cached) {
     this->awaitingFieldRender = false;
     this->renderFormFieldPage(cached->page);
@@ -342,6 +386,7 @@ void Application::handleFormPageBack() {
 
 void Application::finishFormFlow() {
   this->hasPendingFormRequest = false;
+  this->formImagePolling = false;
   this->formPageSubmitPending = false;
   this->formFlowSubmitted = true;
   this->leaveForms();
@@ -350,7 +395,8 @@ void Application::finishFormFlow() {
 
   if (this->pendingActionType == PENDING_ACTION_START_SESSION) {
     this->api.startResourceUsageSession(this->pendingActionResourceId,
-                                        this->pendingActionProjectId, this->pendingActionIsTakeover);
+                                        this->pendingActionProjectId, this->pendingActionIsTakeover, nullptr, nullptr,
+                                        this->pendingActionEstimateMinutes);
   } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
     this->api.stopResourceUsageSession(this->pendingActionResourceId, this->pendingActionUsageId);
   } else {
@@ -380,12 +426,9 @@ void Application::handleFormsCancel() {
     }
   }
   this->hasPendingFormRequest = false;
+  this->formImagePolling = false;
   this->formFlowSubmitted = false;
-  this->pendingActionType = PENDING_ACTION_NONE;
-  this->pendingActionResourceId = 0;
-  this->pendingActionProjectId = 0;
-  this->pendingActionIsTakeover = false;
-  this->pendingActionUsageId = 0;
+  this->resetPendingAction();
   this->hasPendingServerFormFlow = false;
   this->pendingFormRequestResourceId = 0;
   this->pendingFormRequestAction = API::ResourceUsageFormActionType::UNKNOWN;

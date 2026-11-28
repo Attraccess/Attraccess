@@ -1,5 +1,6 @@
 import { OnEvent } from '@nestjs/event-emitter';
-import { Inject, Logger, UseInterceptors } from '@nestjs/common';
+import { remoteEvent } from './reader-event-relay';
+import { Inject, Logger, Optional, UseInterceptors } from '@nestjs/common';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -41,15 +42,17 @@ import { ReaderSessionService } from '../security/reader-session.service';
 import { PAIRING_SUBPROTOCOL, SESSION_SUBPROTOCOL } from '../security/session-framing';
 import { readerWebSocketOptions } from './websocket-transport-options';
 import { WebsocketService } from './websocket.service';
+import { LegacyFirmwareUpdateService } from './legacy-firmware-update.service';
+import { ReaderRouter } from './reader-router';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
-import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, forgetReaderFormState } from './websocket.types';
+import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 import { SKIPS_ACTIVITY_WRITE } from './websocket-activity';
 import { randomBytes } from 'crypto';
 import type { IncomingMessage } from 'http';
 import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 
-/** Events of the removed token sign-in; a reader that still sends one is closed. */
+/** Events of the removed token sign-in; a session that sends one is closed (old readers use LegacyFirmwareUpdateService). */
 const TOKEN_SIGN_IN_EVENTS = new Set<string>(['READER_REGISTER', 'READER_AUTHENTICATE']);
 
 @WebSocketGateway({
@@ -131,11 +134,23 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   @Inject(PairingService)
   protected pairingService: PairingService;
 
+  @Inject(LegacyFirmwareUpdateService)
+  protected legacyFirmwareUpdate: LegacyFirmwareUpdateService;
+
   @Inject(ReaderBleDriver)
   protected readerBleDriver: ReaderBleDriver;
 
   @Inject(ReaderSessionService)
   protected readerSessionService: ReaderSessionService;
+
+  @Optional()
+  @Inject(ReaderRouter)
+  protected readerRouter?: ReaderRouter;
+
+  /** Without Nest (unit tests) this instance is the whole cluster. */
+  protected get router(): ReaderRouter {
+    return (this.readerRouter ??= new ReaderRouter(this.websocketService));
+  }
 
   protected readonly connectedAt = new WeakMap<object, bigint>();
 
@@ -170,11 +185,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   protected onReaderSessionEnded(
     socket: AuthenticatedWebSocket,
     reason: CardConversationFailure = 'READER_SESSION_ENDED',
+    readerId: number | null = socket.readerId,
   ) {
     this.cardConversations.abort(socket, reason);
     this.cardHandler.clearVerifiedUser(socket);
     if (reason === 'READER_SESSION_ENDED') this.uiHandler.endCardSession(socket);
-    forgetReaderFormState(socket);
+    // A closed connection (READER_UNREACHABLE) ends only the photo links it issued: a newer connection of the same
+    // reader, maybe on another instance, keeps its own.
+    this.formsHandler.endReaderForms(socket, { readerId, connectionClosed: reason === 'READER_UNREACHABLE' });
     if (socket.state.supervisionFlow && !socket.state.supervisionFlow.webInitiated) {
       this.supervisionHandler.cancelForSocket(socket);
     }
@@ -193,11 +211,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     if (!socket.state) return;
     // Plugin BLE sessions and pending calls are bound to this connection's reader identity.
     this.readerBleDriver.socketClosed(socket);
-    this.onReaderSessionEnded(socket, reason);
-    if (socket.state.supervisionFlow) this.supervisionHandler.cancelForSocket(socket);
+    this.onReaderSessionEnded(socket, reason, readerId);
+    if (socket.state.supervisionFlow) this.supervisionHandler.cancelForSocket(socket, readerId);
     if (socket.state.massIntroductionFlow) this.massIntroductionHandler.cancelForSocket(socket, readerId);
-    socket.state.enrollment = null;
-    socket.state.resetNfcCardData = null;
+    this.cardHandler.endCardFlows(socket, readerId);
   }
 
   public async sendResourceList(readerId: number) {
@@ -205,6 +222,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   @OnEvent('settings.default-language')
+  @OnEvent(remoteEvent('settings.default-language'))
   async updateReaderLanguage(language: 'en' | 'de') {
     this.websocketService.readerLanguage = language;
     const readers = Array.from(this.websocketService.sockets.values()).filter((socket) =>
@@ -241,6 +259,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   /** Revoked or re-paired credentials end live sessions immediately. */
   @OnEvent(CREDENTIAL_CHANGED_EVENT)
+  @OnEvent(remoteEvent(CREDENTIAL_CHANGED_EVENT))
   public async onCredentialChanged(readerId: number) {
     await this.disconnectReader(readerId);
   }
@@ -413,9 +432,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
     if (client.protocol !== SESSION_SUBPROTOCOL) {
-      // The upgrade check refuses these already. A reader that offers no subprotocol is a token reader.
-      this.logger.warn('Closing a connection without the session subprotocol: token sign-in no longer supported');
-      client.close();
+      // No subprotocol: an old reader with token sign-in. It may only update its firmware, then it pairs.
+      const licensed = this.licenseService.verifyLicense({ modules: [LicenseModuleType.ATTRACTAP] });
+      this.legacyFirmwareUpdate.handleConnection(
+        client,
+        licensed.then(() => undefined),
+      );
       return;
     }
     // Taken over before the first await: early TLS bytes must not be missed and a stray text
@@ -472,6 +494,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     await this.readerSessionService.accept(client as unknown as AuthenticatedWebSocket, session, (socket) => {
       this.websocketService.sockets.set(socket.id, socket);
       this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
+      // Other instances route this reader's work here from now on (ATT-1163).
+      if (socket.readerId) this.router.cluster.presence.socketConnected(socket.readerId, socket.id);
     });
   }
 
@@ -522,6 +546,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     cleanupSocketState(socket, { uiHandler: this.uiHandler, crashReportHandler: this.crashReportHandler });
     this.websocketService.sockets.delete(socket.id);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
+    if (readerId) this.router.cluster.presence.socketDisconnected(readerId, socket.id);
   }
 
   protected async clientWasActive(socket: AuthenticatedWebSocket) {

@@ -1,5 +1,6 @@
 import { TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 import { ApiError } from '@attraccess/react-query-client';
+import { NETWORK_RESTRICTED_ERROR_CODE } from '@attraccess/application-models';
 
 export interface Props {
   error: ApiError | Error;
@@ -14,8 +15,26 @@ export function getApiErrorMessage(error: ApiError | Error): string {
   return String(((error as ApiError).body as { message?: string | string[] } | undefined)?.message ?? error.message);
 }
 
+/** A 403 for an action the user's network does not allow (the server's NETWORK_RESTRICTED error code). */
+export function isNetworkRestrictedError(error: unknown): boolean {
+  const body = (error as ApiError | undefined)?.body as { code?: string; message?: unknown } | undefined;
+  return body?.code === NETWORK_RESTRICTED_ERROR_CODE || body?.message === NETWORK_RESTRICTED_ERROR_CODE;
+}
+
+/** The machine-readable `code` some server errors carry next to their message. */
+export function getApiErrorCode(error: ApiError | Error): string | undefined {
+  const code = ((error as ApiError).body as { code?: unknown } | undefined)?.code;
+  return typeof code === 'string' ? code : undefined;
+}
+
 export function getTranslationKeyForApiError(props: Props) {
   let errorMessage = getApiErrorMessage(props.error);
+
+  // A coded error (e.g. SESSION_DURATION_ESTIMATE_REQUIRED) is translated by its code, not its English message.
+  const code = getApiErrorCode(props.error);
+  if (code && props.tExists(props.baseTranslationKey + '.' + code, { succeedIfKeyIsObject: true })) {
+    return { key: props.baseTranslationKey + '.' + code, errorMessage };
+  }
 
   // Initialization wraps setup errors; retain their actionable configuration guidance.
   errorMessage = errorMessage.replace(/^METER_INITIALIZATION_FAILED: (?=METER_NOT_CONFIGURED: )/, '');

@@ -10,6 +10,7 @@ import { projectInvitationTranslations } from './defaults/accounts-translations'
 import { resetPasswordTranslations } from './defaults/accounts-translations';
 import { resourceHealthChangedTranslations } from './defaults/resources-translations';
 import { resourceSessionEndedTranslations } from './defaults/resources-translations';
+import { resourceSessionEndingSoonTranslations } from './defaults/resources-translations';
 import { resourceTakeoverTranslations } from './defaults/resources-translations';
 import { resourceUsageBillingTransactionSummaryTranslations } from './defaults/resources-translations';
 import { resourceUsageNoteAddedTranslations } from './defaults/resources-translations';
@@ -296,6 +297,26 @@ export const emailResourceDefaults = {
     ],
   },
 
+  [EmailTemplateType.RESOURCE_SESSION_ENDING_SOON]: {
+    subject: '{{t "subject" "Your session on {resource} ends soon" resource=resource.name}}',
+    variables: [
+      'user.username',
+      'user.firstName',
+      'user.lastName',
+      'user.displayName',
+      'user.email',
+      'user.id',
+      'host.frontend',
+      'host.backend',
+      'resource.id',
+      'resource.name',
+      'resource.url',
+      'session.id',
+      'session.endsAt',
+      'session.minutesLeft',
+    ],
+  },
+
   [EmailTemplateType.ACCESS_CHANGE]: {
     subject: '{{accessChange.title}}',
     variables: [
@@ -370,6 +391,7 @@ export const SHIPPED_TRANSLATIONS: ShippedTranslation[] = [
   ...accessChangeTranslations,
   ...resourceTakeoverTranslations,
   ...resourceSessionEndedTranslations,
+  ...resourceSessionEndingSoonTranslations,
 ];
 
 // In the webpack bundle __dirname is the dist root (assets copied next to main.js);

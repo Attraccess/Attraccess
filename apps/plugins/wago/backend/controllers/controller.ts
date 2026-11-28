@@ -1,4 +1,4 @@
-import { Auth, type AuthenticatedRequest, type PluginContext } from '@attraccess/plugins-backend-sdk';
+import { Auth, type AuthenticatedRequest, type PluginContext, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import {
   BadRequestException,
   Body,
@@ -191,6 +191,7 @@ export class WagoControllerApi {
 
   @Auth('system.settings.manage')
   @Post('controllers/:id/credentials/rotate')
+  @NotAnMcpTool('Credential flow: PLC credentials and commissioning')
   async rotateCredentials(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { confirm?: boolean; retry?: boolean },
@@ -223,6 +224,7 @@ export class WagoControllerApi {
 
   @Auth('system.settings.manage')
   @Post('controllers/:id/credentials/manual/complete')
+  @NotAnMcpTool('Credential flow: PLC credentials and commissioning')
   completeManualCredentials(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { name?: string; verifier?: string; username?: string; password?: string },
@@ -248,7 +250,9 @@ export class WagoControllerApi {
     );
   }
 
-  @Post('controllers/:id/claim') claim(
+  @Post('controllers/:id/claim')
+  @NotAnMcpTool('Credential flow: delivers broker credentials to the PLC')
+  claim(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { name?: string; verifier?: string; mqttServerId?: number },
     @Req() request: AuthenticatedRequest,
@@ -272,6 +276,7 @@ export class WagoControllerApi {
 
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/management/:action')
+  @NotAnMcpTool('Credential flow: PLC credentials and commissioning')
   manageSecurity(
     @Param('id', ParseIntPipe) id: number,
     @Param('action') action: string,
@@ -290,6 +295,7 @@ export class WagoControllerApi {
 
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/platform/:action')
+  @NotAnMcpTool('Credential flow: PLC credentials and commissioning')
   platformAction(
     @Param('id', ParseIntPipe) id: number,
     @Param('action') action: string,
@@ -319,6 +325,7 @@ export class WagoControllerApi {
 
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/recover')
+  @NotAnMcpTool('Credential flow: PLC credentials and commissioning')
   recoverCommissioningSession(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: CommissioningAttemptInput,
@@ -333,6 +340,7 @@ export class WagoControllerApi {
 
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/deliver')
+  @NotAnMcpTool('Credential flow: PLC credentials and commissioning')
   deliverCommissioningSession(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: CommissioningAttemptInput,
@@ -347,6 +355,7 @@ export class WagoControllerApi {
 
   @Auth('system.settings.manage')
   @Post('commissioning/sessions/:id/confirm-host-key')
+  @NotAnMcpTool('Credential flow: PLC credentials and commissioning')
   confirmCommissioningHostKey(
     @Param('id', ParseIntPipe) id: number,
     @Body()
@@ -367,6 +376,7 @@ export class WagoControllerApi {
 
   @Auth('system.settings.manage')
   @Post('commissioning/sessions')
+  @NotAnMcpTool('Credential flow: PLC credentials and commissioning')
   createCommissioningSession(
     @Body() body: { mqttServerId?: number; targetHost?: string; name?: string },
     @Req() request?: AuthenticatedRequest,

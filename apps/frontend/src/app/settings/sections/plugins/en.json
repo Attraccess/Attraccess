@@ -81,10 +81,10 @@
     "installTitle": "Install {{pluginName}}?",
     "installDescription": "Review the package source and requested permissions before installing.",
     "installApproval": "I acknowledge this source and its requested permissions.",
-    "restartWarning": "Installing this plugin requires an application restart to activate it.",
+    "restartWarning": "The plugin takes effect after a restart. Use “Restart now” in the banner when you are ready.",
     "cancel": "Cancel",
     "confirmInstall": "Install plugin",
-    "installSuccess": "Plugin installed. The app will restart in a few seconds to activate it.",
+    "installSuccess": "Plugin installed. It takes effect after a restart; use “Restart now” in the banner.",
     "installError": "The plugin was not installed.",
     "installPermissionHelp": "Sign in with a role that can manage plugins, then try again.",
     "installRouteHelp": "Reload Attraccess to pick up the latest client. If this persists, check that the frontend and API are running the same version.",
@@ -127,37 +127,75 @@
   },
   "noPermissions": "None requested",
   "updatePolicy": {
-    "title": "Automatic updates",
-    "description": "Check installed packages from their original registry. Automatic updates never apply major releases, permission additions, prereleases, or deprecated packages.",
-    "enabled": "Check for updates",
-    "enabledHint": "Disabled checks leave installed packages unchanged.",
-    "mode": "Default update policy",
-    "modeHint": "A plugin can use a stricter override.",
-    "prerelease": "Allow prereleases",
-    "prereleaseHint": "Prereleases are never automatically applied.",
     "checkNow": "Check all now",
     "checked": "Plugin update checks completed",
     "checkError": "Could not check plugin updates",
-    "saved": "Update policy saved",
-    "saveError": "Could not save update policy",
     "available": "Update available",
     "availableTitle": "Plugin updates are available",
-    "availableDescription": "{{count}} installed marketplace plugin can be updated. Review the available version before applying it.",
     "reviewUpdates": "Review updates",
-    "modes": {
-      "off": "Off",
+    "availableDescription": {
+      "one": "One installed marketplace plugin has an update.",
+      "many": "{{count}} installed marketplace plugins have an update."
+    },
+    "installsInWindow": "Automatic updates are on: Attraccess installs the updates its safeguards allow in the next update window and then restarts. You can also review and install them now.",
+    "manualOnly": "Automatic updates are off, so nothing is installed on its own. Review the updates to install them.",
+    "checksOff": "Update checks are off, so nothing is installed on its own. Review the updates to install them."
+  },
+  "autoUpdates": {
+    "title": "Automatic updates",
+    "description": "Let Attraccess install plugin updates and restart on its own, only at the times you choose.",
+    "checks": "Check for plugin updates",
+    "enabled": "Install updates automatically",
+    "offHint": "Off: Attraccess shows available updates but installs nothing and does not restart for them.",
+    "needsChecks": "Update checks are off, so nothing will be installed.",
+    "checksOffHint": "Update checks are off: Attraccess neither looks for plugin updates nor installs them.",
+    "step": "Largest update step",
+    "stepHint": "Limits which updates are announced and, once automatic updates are on, installed. A plugin can have its own setting under Manage version.",
+    "steps": {
       "patch": "Patch only",
       "minor": "Patch and minor",
       "follow": "Follow package policy"
-    }
+    },
+    "weekdays": "Weekdays",
+    "weekdaysRequired": "Choose at least one weekday.",
+    "weekday": {
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday",
+      "7": "Sunday"
+    },
+    "start": "Start time",
+    "startRequired": "Enter a start time.",
+    "duration": "Duration (minutes)",
+    "durationHint": "1 to 1440. A window may run past midnight.",
+    "durationInvalid": "Enter a duration from 1 to 1440 minutes.",
+    "timeZone": "Time zone",
+    "timeZoneHint": "The start time is a clock time in this zone.",
+    "timeZoneRequired": "Choose a time zone.",
+    "nextWindow": "Next update window: {{start}} to {{end}} ({{timeZone}})",
+    "openWindow": "Update window open now: {{start}} to {{end}} ({{timeZone}})",
+    "restartNote": "Attraccess restarts during this window if it installed an update.",
+    "save": "Save",
+    "turnOn": "Turn on automatic updates",
+    "discard": "Discard changes",
+    "cancel": "Cancel",
+    "confirmTitle": "Turn on automatic updates?",
+    "confirmAction": "Turn on",
+    "confirmMessage": "Attraccess will install plugin updates on its own and restart during the scheduled windows. The restart interrupts use for a short time.",
+    "saved": "Automatic update settings saved",
+    "saveError": "Could not save the automatic update settings",
+    "loadError": "Could not load the automatic update settings"
   },
   "deleteTooltip": "Remove plugin",
   "deleteConfirmation": {
     "title": "Remove plugin?",
     "cancel": "Cancel",
     "delete": "Remove",
-    "messageRegistry": "Remove the plugin {{pluginName}}? Its code and runtime registrations will be removed and the app will reload. Its data and secrets are kept, so installing it again continues with them.",
-    "messageUploaded": "Remove the plugin {{pluginName}}? Its code, runtime registrations and all of its stored data will be deleted permanently, and the app will reload. Create a backup first if you might need the data.",
+    "messageRegistry": "Remove the plugin {{pluginName}}? Its code is removed but keeps running until Attraccess restarts; the page reloads now. Its data and secrets are kept, so installing it again continues with them.",
+    "messageUploaded": "Remove the plugin {{pluginName}}? Its code and all of its stored data will be deleted permanently. Its code keeps running until Attraccess restarts; the page reloads now. Create a backup first if you might need the data.",
     "messageRefused": "Remove the refused plugin {{pluginName}}? Its files will be removed without running its code, and the app will reload. Its stored data stays in the database until a compatible version takes it over."
   },
   "error": {
@@ -177,21 +215,19 @@
   "success": {
     "replace": {
       "title": "Plugin version replaced",
-      "description": "The app will restart in a few seconds to activate the selected version."
+      "description": "The selected version takes effect after a restart; use “Restart now” in the banner."
     },
     "delete": {
       "title": "Plugin removed",
-      "description": "The app will reload in a few seconds to drop the plugin's code."
+      "description": "The change takes effect after Attraccess restarts; use “Restart now” in the banner."
     }
   },
   "versionManagement": {
     "title": "Manage {{pluginName}} version",
-    "current": "Current version: {{version}}",
     "loading": "Loading available versions...",
-    "selected": "Selected version: {{version}}",
     "spec": "Requested version or channel",
     "autoUpdate": "Plugin automatic update policy",
-    "savePolicy": "Save version policy",
+    "savePolicy": "Save update settings",
     "policySaved": "Plugin version policy saved",
     "policyError": "Could not save plugin version policy",
     "overrides": {
@@ -204,19 +240,35 @@
     "published": "Published: {{date}}",
     "permissionApproval": "I approve these new permissions: {{permissions}}",
     "permissionRemovals": "Removed permissions: {{permissions}}",
-    "majorApproval": "I approve this major version update and its restart/downtime.",
+    "majorApproval": "I approve this major version update. It takes effect after a restart.",
     "deprecated": "Deprecated by publisher: {{notice}}",
     "integrity": "Integrity: {{integrity}}",
     "repository": "Release repository",
-    "downgradeWarning": "Downgrading can affect plugin data and requires an application restart.",
+    "downgradeWarning": "Downgrading can affect plugin data. It takes effect after a restart.",
     "cancel": "Cancel",
-    "update": "Update",
-    "downgrade": "Downgrade",
     "direction": {
       "current": "Current",
       "newer": "Newer",
       "older": "Older"
-    }
+    },
+    "currentHeading": "Current version",
+    "requestedSpec": "Requested: {{spec}}",
+    "availableHeading": "Available versions",
+    "noVersions": "No other versions are available.",
+    "detailsHeading": "Version {{version}}",
+    "settingsHeading": "Update settings",
+    "settingsDescription": "These rules decide which versions update checks offer and automatic updates may install. Saving them installs nothing right away.",
+    "specDescription": "An exact version, a range such as ^1.2.0, or a channel such as latest.",
+    "updateTo": "Update to {{version}}",
+    "downgradeTo": "Downgrade to {{version}}",
+    "notCompatible": "Not compatible: {{reason}}",
+    "notCompatibleNoReason": "Not compatible with this Attraccess version",
+    "installedNow": "Installed now",
+    "showOlderIncompatible": "Show {{count}} older incompatible versions",
+    "hideOlderIncompatible": "Hide older incompatible versions",
+    "details": "Release details",
+    "update": "Update",
+    "automaticUpdatesOff": "Automatic updates are off on this host. This setting installs nothing until they are turned on under Automatic updates."
   },
   "dependencies": {
     "title": "Plugin dependencies",

@@ -326,9 +326,13 @@ def build_variant(variant, variant_path, log_level, secure=False):
         f"-DSDKCONFIG={sdkconfig_path}",
         f"-DATTRACTAP_VARIANT={variant}",
         f"-DATTRACTAP_LOG_LEVEL={log_level}",
-        # Shipped images never contain the lab test hooks, the crash trigger or the device-lab CA and keep the beeper on.
+        # Shipped images never contain the lab test hooks (nor the run-time stats they bring), the crash trigger,
+        # the LVGL perf monitor or the device-lab CA and keep the beeper on.
         "-DATTRACTAP_TEST_HOOKS=OFF",
+        # The lab's conversion stop-before-burn (ATT-1208) never reaches a shipped image.
+        "-DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=OFF",
         "-DATTRACTAP_CRASH_TRIGGER=OFF",
+        "-DATTRACTAP_LV_PERF_MONITOR=OFF",
         "-DATTRACTAP_LAB_CA=",
         "-DATTRACTAP_BEEPER_DEFAULT=ON",
         *(["-DATTRACTAP_SECURE_PROFILE=ON"] if secure else []),

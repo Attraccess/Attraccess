@@ -71,6 +71,41 @@ export class Resource {
   @Column({ type: 'integer', nullable: true })
   @ApiProperty({
     description:
+      'Longest a session on this machine may run, in minutes (1-43200). The server ends a session that reaches it. Null means no limit. Machines only; applies to sessions started afterwards.',
+    example: 480,
+    required: false,
+    nullable: true,
+    type: Number,
+    minimum: 1,
+    maximum: 43200,
+  })
+  maxSessionDurationMinutes!: number | null;
+
+  @Column({ type: 'boolean', default: false })
+  @ApiProperty({
+    description:
+      'Whether starting a session on this machine requires the user to say how long they will use it at most. The machine stops automatically when that time is up. Machines only.',
+    example: false,
+    default: false,
+  })
+  requireSessionDurationEstimate!: boolean;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description:
+      'The estimate used for a start from a reader that cannot ask for one, when an estimate is required and no maximum session time is set (1-43200). Null means 60 minutes.',
+    example: 60,
+    required: false,
+    nullable: true,
+    type: Number,
+    minimum: 1,
+    maximum: 43200,
+  })
+  defaultSessionDurationEstimateMinutes!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description:
       'Days after a user was trained on this resource before retraining is required. Null disables the age-based trigger.',
     example: 365,
     required: false,

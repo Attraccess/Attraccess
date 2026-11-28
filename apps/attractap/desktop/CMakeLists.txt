@@ -160,6 +160,8 @@ add_executable(attractap-demo-protocol-tests
     tests/demo-protocol.test.cpp
     "${FIRMWARE_DIR}/src/api/demo/websocket.cpp"
     "${FIRMWARE_DIR}/src/api/demo/sessions.cpp"
+    "${FIRMWARE_DIR}/src/api/demo/form_helpers.cpp"
+    "${FIRMWARE_DIR}/src/api/demo/projects.cpp"
     "${FIRMWARE_DIR}/src/demo/demo_store.cpp")
 target_compile_definitions(attractap-demo-protocol-tests PRIVATE DEMO_MODE)
 target_compile_options(attractap-demo-protocol-tests PRIVATE -UNDEBUG)
@@ -186,6 +188,8 @@ add_executable(attractap-demo-session-clock-tests
     tests/demo-session-clock.test.cpp tests/controlled-clock.cpp src/profile_store.cpp
     "${FIRMWARE_DIR}/src/api/demo/websocket.cpp"
     "${FIRMWARE_DIR}/src/api/demo/sessions.cpp"
+    "${FIRMWARE_DIR}/src/api/demo/form_helpers.cpp"
+    "${FIRMWARE_DIR}/src/api/demo/projects.cpp"
     "${FIRMWARE_DIR}/src/demo/demo_store.cpp")
 target_compile_definitions(attractap-demo-session-clock-tests PRIVATE DEMO_MODE)
 target_compile_options(attractap-demo-session-clock-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)

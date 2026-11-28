@@ -30,8 +30,11 @@ import { VerifyEmail } from './verify-email/index';
 import { ResetPassword } from './reset-password/resetPassword';
 import { UnauthorizedLayout } from './unauthorized/unauthorized-layout/layout';
 import { AcceptInvitation } from './accept-invitation/index';
+import { FormPhotoPage } from './form-photo/FormPhotoPage';
+import { FORM_PHOTO_ROUTE } from '@attraccess/application-models';
 import { NotFound } from './not-found/index';
 import { BootScreen } from '../components/bootScreen/index';
+import { CurrentUserLoadError } from '../components/currentUserLoadError/index';
 import { configureApiClient } from '../api/index';
 import { useLocaleSync } from '../hooks/useLocaleSync';
 import { useDateTimePreferencesSync } from '../hooks/useDateTimePreferencesSync';
@@ -128,6 +131,15 @@ export function AppRoutes() {
         element={
           <UnauthorizedLayout>
             <AcceptInvitation />
+          </UnauthorizedLayout>
+        }
+      />
+      {/* The phone page behind the QR code of an image field on a reader: public, the link token authorises. */}
+      <Route
+        path={`${FORM_PHOTO_ROUTE}/:token`}
+        element={
+          <UnauthorizedLayout>
+            <FormPhotoPage />
           </UnauthorizedLayout>
         }
       />
@@ -277,7 +289,8 @@ export function AppLayout(props: PropsWithChildren) {
 }
 
 export function App() {
-  const { isInitialized, user, needsTwoFactorSetup, isTwoFactorStatusLoading } = useAuth();
+  const { authStatus, retryCurrentUser, isCurrentUserFetching, user, needsTwoFactorSetup, isTwoFactorStatusLoading } =
+    useAuth();
   useLocaleSync();
   useDateTimePreferencesSync();
 
@@ -285,7 +298,14 @@ export function App() {
 
   return (
     <LiveUpdatesProvider userId={!isTwoFactorStatusLoading && !needsTwoFactorSetup ? user?.id : undefined}>
-      <AppLayout>{isInitialized ? <AppContent /> : <BootScreen />}</AppLayout>
+      <AppLayout>
+        {/* Wait for the first current-user answer on every route; only a 401 shows the sign-in page. */}
+        {authStatus === 'loading' && <BootScreen />}
+        {authStatus === 'error' && (
+          <CurrentUserLoadError onRetry={retryCurrentUser} isRetrying={isCurrentUserFetching} />
+        )}
+        {(authStatus === 'authenticated' || authStatus === 'unauthenticated') && <AppContent />}
+      </AppLayout>
     </LiveUpdatesProvider>
   );
 }

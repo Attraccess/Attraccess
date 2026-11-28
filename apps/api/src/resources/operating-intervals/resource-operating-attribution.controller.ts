@@ -1,4 +1,13 @@
-import { BadRequestException, Controller, ForbiddenException, Get, Param, ParseIntPipe, Query, Req } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  ParseIntPipe,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import {
@@ -7,8 +16,10 @@ import {
 } from './resource-operating-attribution.service';
 import { ResourceMaintenanceService } from '../maintenances/maintenance.service';
 import { ResourceOperatingAttributionQueryDto } from './dtos/resourceOperatingAttributionQuery.dto';
+import { ResourceListVisible } from '../visibility/resource-list-visible.interceptor';
 
 @ApiTags('Resources')
+@ResourceListVisible()
 @Controller('resources/:resourceId/operating-attribution')
 export class ResourceOperatingAttributionController {
   constructor(

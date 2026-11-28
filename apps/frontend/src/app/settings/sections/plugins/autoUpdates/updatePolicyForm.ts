@@ -1,0 +1,76 @@
+import type { PluginUpdatePolicyDto } from '@attraccess/react-query-client';
+
+/** The panel's draft of the policy. A field the admin cleared is null, and the policy cannot be saved then. */
+export interface UpdatePolicyForm {
+  checksEnabled: boolean;
+  automaticUpdates: boolean;
+  mode: PluginUpdatePolicyDto['mode'];
+  weekdays: number[];
+  startMinute: number | null;
+  durationMinutes: number | null;
+  timeZone: string | null;
+}
+
+export const browserTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+/**
+ * The form for a stored policy. While no time zone was ever chosen and automatic updates are off, the browser's is
+ * filled in; once they are on without one (set through the API), the host uses UTC, so the form shows that.
+ */
+export function toUpdatePolicyForm(policy: PluginUpdatePolicyDto): UpdatePolicyForm {
+  return {
+    checksEnabled: policy.checksEnabled,
+    automaticUpdates: policy.automaticUpdates,
+    mode: policy.mode,
+    ...policy.schedule,
+    timeZone: policy.schedule.timeZone ?? (policy.automaticUpdates ? 'UTC' : browserTimeZone()),
+  };
+}
+
+/** Whether saving `form` would change anything compared with `saved`. */
+export function changesUpdatePolicy(form: UpdatePolicyForm, saved: UpdatePolicyForm): boolean {
+  return (Object.keys(saved) as (keyof UpdatePolicyForm)[]).some(
+    (field) => JSON.stringify(form[field]) !== JSON.stringify(saved[field]),
+  );
+}
+
+export type UpdatePolicyFormErrors = Partial<Record<'weekdays' | 'startMinute' | 'durationMinutes' | 'timeZone', true>>;
+
+/** What the host would refuse: the schedule has to be complete, with at least one weekday while the switch is on. */
+export function updatePolicyFormErrors(form: UpdatePolicyForm): UpdatePolicyFormErrors {
+  const errors: UpdatePolicyFormErrors = {};
+  if (form.automaticUpdates && form.weekdays.length === 0) errors.weekdays = true;
+  if (form.startMinute === null) errors.startMinute = true;
+  const duration = form.durationMinutes;
+  if (duration === null || !Number.isInteger(duration) || duration < 1 || duration > 1440)
+    errors.durationMinutes = true;
+  if (!form.timeZone) errors.timeZone = true;
+  return errors;
+}
+
+/**
+ * `form` with every incomplete or invalid schedule field taken from `fallback`. For switching automatic updates off:
+ * the schedule fields are hidden then, so one of them must not block saving unseen.
+ */
+export function withCompleteSchedule(form: UpdatePolicyForm, fallback: UpdatePolicyForm): UpdatePolicyForm {
+  const invalid = Object.keys(updatePolicyFormErrors(form)) as (keyof UpdatePolicyFormErrors)[];
+  return { ...form, ...Object.fromEntries(invalid.map((field) => [field, fallback[field]])) };
+}
+
+/**
+ * The request body for a form without errors. It names only what the panel edits: the host keeps every other field, so
+ * a value changed through the API meanwhile (`prerelease`) is not put back.
+ */
+export function toUpdatePolicyBody(form: UpdatePolicyForm) {
+  return {
+    checksEnabled: form.checksEnabled,
+    automaticUpdates: form.automaticUpdates,
+    mode: form.mode,
+    schedule: {
+      weekdays: form.weekdays,
+      startMinute: form.startMinute as number,
+      durationMinutes: form.durationMinutes as number,
+      timeZone: form.timeZone,
+    },
+  };
+}

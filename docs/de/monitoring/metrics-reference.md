@@ -215,7 +215,7 @@ sum by (outcome) (increase(attraccess_plugin_ble_notifications_total{outcome!="d
 
 **Dauer-Buckets:** 100ms, 500ms, 1s, 5s, 10s, 30s, 1min, 5min, 15min, 30min
 
-**Job-Namen:** `sumup_poll`, `session_cleanup`, `maintenance_evaluator`, `flow_daily_cleanup`, `flow_minute_tick`.
+**Job-Namen:** `sumup_poll`, `session_cleanup`, `maintenance_evaluator`, `flow_daily_cleanup`, `flow_minute_tick`, `session_auto_end`.
 
 ### Beispiel-PromQL-Abfragen
 

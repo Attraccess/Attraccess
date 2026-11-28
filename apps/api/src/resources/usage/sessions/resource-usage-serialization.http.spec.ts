@@ -1,3 +1,4 @@
+import { NetworkRestrictionService } from '../../../network-restriction/network-restriction.service';
 import {
   CanActivate,
   ClassSerializerInterceptor,
@@ -15,6 +16,7 @@ import { ResourceUsageService } from './resource-usage.service';
 import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';
 import { SessionEndNotifier } from '../pre-start/session-end-notifier.service';
 import { PreStartService } from '../pre-start/pre-start.service';
+import { ResourceListVisibilityService } from '../../visibility/resource-list-visibility.service';
 
 class FakeAuth implements CanActivate {
   canActivate(context: ExecutionContext) {
@@ -74,6 +76,7 @@ describe('usage session responses', () => {
     endSession: jest.fn().mockResolvedValue(session),
     lockDoor: jest.fn().mockResolvedValue(session),
     unlockDoor: jest.fn().mockResolvedValue(session),
+    isAccessOnlyDoor: jest.fn().mockResolvedValue(false),
     unlatchDoor: jest.fn().mockResolvedValue(session),
     updateSessionProject: jest.fn().mockResolvedValue(session),
     getResourceUsageHistory: jest.fn().mockResolvedValue({ data: [session], total: 1 }),
@@ -91,6 +94,7 @@ describe('usage session responses', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [ResourceUsageController],
       providers: [
+        { provide: ResourceListVisibilityService, useValue: { canSee: jest.fn(async () => true) } },
         { provide: ResourceUsageService, useValue: service },
         {
           provide: ResourceActivityVisibilityService,
@@ -101,6 +105,7 @@ describe('usage session responses', () => {
         },
         { provide: PreStartService, useValue: { gateHttp: jest.fn().mockResolvedValue(undefined) } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+        { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
       ],
     })
       .overrideGuard(DualAuthGuard)

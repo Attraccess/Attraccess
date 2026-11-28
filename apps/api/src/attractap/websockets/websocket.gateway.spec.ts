@@ -1,4 +1,3 @@
-import { Logger } from '@nestjs/common';
 import { IncomingMessage } from 'http';
 import { WebSocket } from 'ws';
 import { LicenseModuleType } from '../../license/license.service';
@@ -6,6 +5,7 @@ import { PAIRING_SUBPROTOCOL, SESSION_SUBPROTOCOL } from '../security/session-fr
 import { makeStringLVGLReady, sanitizeForLVGL } from './websocket-lvgl';
 import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
+import { LegacyFirmwareUpdateService } from './legacy-firmware-update.service';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 
 describe('AttractapGateway', () => {
@@ -68,17 +68,17 @@ describe('AttractapGateway', () => {
       expect(mockClient.close).toHaveBeenCalled();
     });
 
-    it('closes a connection without the session subprotocol: token sign-in is gone', async () => {
-      const warned = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    it('hands a connection without a subprotocol to the update-only path for old readers', async () => {
+      const legacy: LegacyFirmwareUpdateService = fixture.gateway['legacyFirmwareUpdate'];
+      const handle = jest.spyOn(legacy, 'handleConnection').mockImplementation(() => undefined);
       const mockClient = { close: jest.fn(), send: jest.fn(), on: jest.fn() } as unknown as WebSocket;
 
       await fixture.gateway.handleConnection(mockClient);
 
-      expect(mockClient.close).toHaveBeenCalledTimes(1);
-      expect(mockClient.send).not.toHaveBeenCalled();
+      expect(fixture.licenseService.verifyLicense).toHaveBeenCalledWith({ modules: [LicenseModuleType.ATTRACTAP] });
+      expect(handle).toHaveBeenCalledWith(mockClient, expect.any(Promise));
+      expect(mockClient.close).not.toHaveBeenCalled();
       expect(fixture.websocketService.sockets.size).toBe(0);
-      expect(warned).toHaveBeenCalledTimes(1);
-      expect(String(warned.mock.calls[0][0])).toContain('token sign-in no longer supported');
     });
 
     it('gates pairing connections on the license check', async () => {

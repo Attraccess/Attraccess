@@ -5,6 +5,7 @@ import { Resource, ResourceMeter } from '@attraccess/database-entities';
 import type { FlowResourceRecord } from '@attraccess/application-models';
 import type { FlowResourceDirectory } from '../../../resources/flows/flow-resource-directory.port';
 import { toFlowResourceRecord } from './flow-mappers';
+import { ACTIVE_METER } from '../metering/meter-rows';
 
 @Injectable()
 export class TypeOrmFlowResourceDirectory implements FlowResourceDirectory {
@@ -16,7 +17,10 @@ export class TypeOrmFlowResourceDirectory implements FlowResourceDirectory {
   }
 
   async meterIds(resourceId: number): Promise<number[]> {
-    const meters = await this.dataSource.manager.find(ResourceMeter, { where: { resourceId }, select: { id: true } });
+    const meters = await this.dataSource.manager.find(ResourceMeter, {
+      where: { resourceId, ...ACTIVE_METER },
+      select: { id: true },
+    });
     return meters.map((meter) => meter.id);
   }
 }

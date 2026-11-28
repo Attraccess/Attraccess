@@ -6,4 +6,10 @@ export class PluginSystemStatusDto {
 
   @ApiProperty({ description: 'Identifier for the current API process' })
   instanceId!: string;
+
+  @ApiProperty({
+    description:
+      'Whether plugin changes (install, update, upload, removal) wait for a restart of this API process to take effect',
+  })
+  restartRequired!: boolean;
 }

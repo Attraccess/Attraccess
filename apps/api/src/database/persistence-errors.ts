@@ -32,6 +32,8 @@ export interface PersistenceErrorClassifier {
    * whose connection dropped may have committed. Omitted means nothing is retried by default.
    */
   isSafeToRetry?(error: unknown): boolean;
+  /** The name of the constraint or unique index the database reported the failure on, when it names one. */
+  constraintName?(error: unknown): string | undefined;
 }
 
 export const DATABASE_BUSY_MESSAGE = 'The database is busy; try again shortly';
@@ -68,6 +70,16 @@ export function isSafeToRetry(error: unknown): boolean {
     if (classifier.isSafeToRetry?.(error)) return true;
   }
   return false;
+}
+
+/** The constraint or unique index that rejected the write, when it was a unique violation and the database named it. */
+export function uniqueViolationConstraint(error: unknown): string | undefined {
+  if (!isUniqueViolation(error)) return undefined;
+  for (const classifier of classifiers) {
+    const name = classifier.constraintName?.(error);
+    if (name) return name;
+  }
+  return undefined;
 }
 
 export const isDatabaseBusyError = (error: unknown): boolean => classifyPersistenceError(error) === 'busy';

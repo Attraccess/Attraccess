@@ -6,6 +6,8 @@ import {
   IsBoolean,
   IsInt,
   IsPositive,
+  Min,
+  Max,
   IsArray,
   ValidateNested,
   ArrayMaxSize,
@@ -44,6 +46,21 @@ export class StartUsageSessionDto {
   @IsPositive()
   @IsOptional()
   projectId?: number;
+
+  @ApiProperty({
+    description:
+      'How long the user will use the machine at most, in minutes (1-43200). Required when the machine requires a duration estimate (400 SESSION_DURATION_ESTIMATE_REQUIRED otherwise, naming the maximum session time); it must not exceed the maximum session time (400 SESSION_DURATION_ESTIMATE_EXCEEDS_MAXIMUM). The machine stops automatically when this time is up. Ignored when the machine does not require an estimate.',
+    required: false,
+    example: 120,
+    minimum: 1,
+    maximum: 43200,
+    type: Number,
+  })
+  @IsInt()
+  @Min(1)
+  @Max(43200)
+  @IsOptional()
+  estimatedDurationMinutes?: number;
 
   @ApiProperty({
     description: 'Form submissions required for this action',

@@ -932,9 +932,9 @@ const sessionEndHook: SessionEndHook = async (ctx) => ({
   (zum Beispiel eine Bestätigung mit ungültigem Step-Key) zählen jeweils als Hook-Fehler. Standard ist **fail
   closed**: Der Start wird mit „Vorübergehend nicht startbar“ blockiert.
 - Ein `block` mit ungültigem `reason` (fehlend, einen Kernstatus nachahmend oder mit einem Host-Code wie
-  `CONFIRMATION_REQUIRED`, `CONFIRMATION_UNAVAILABLE`, `HOOK_UNAVAILABLE`, `STEP_EXPIRED` oder `STEP_UNKNOWN`)
-  blockiert trotzdem, auch bei fail open, mit „Vorübergehend nicht startbar“. Er wird protokolliert und zählt nicht
-  für den Circuit Breaker.
+  `CONFIRMATION_REQUIRED`, `CONFIRMATION_UNAVAILABLE`, `HOOK_UNAVAILABLE`, `STEP_EXPIRED`, `STEP_UNKNOWN` oder
+  `FORM_PHOTO_UNSUPPORTED`) blockiert trotzdem, auch bei fail open, mit „Vorübergehend nicht startbar“. Er wird
+  protokolliert und zählt nicht für den Circuit Breaker.
 - Nach 5 aufeinanderfolgenden Fehlern öffnet ein Circuit Breaker für das Plugin: Die Ausfallrichtlinie gilt, ohne
   den Hook aufzurufen; nach 60 s geht der nächste Aufruf als Probe durch und schließt den Breaker, wenn er gelingt;
   außerdem entsteht ein Admin-Alarm. Session-End-Hooks haben einen eigenen Breaker. Admins können den Alarm
@@ -1288,6 +1288,17 @@ pnpm nx zip plugin-rabbitmq
 # Alle Plugin-Apps auflisten:
 pnpm nx show projects --projects=tag:type:plugin
 ```
+
+**Ladeprüfung der Pakete:** Der `plugins`-Job von Pull Requests, Nightlies und Releases führt nach dem Packen auch
+`pnpm nx run api:verify-packed-plugins` aus. Sie installiert jeden gepackten Plugin-Tarball unter seinem
+npm-Paketnamen (`@attraccess/plugin-<name>`) über den npm-Installationsweg des Hosts, startet einen echten
+API-Host auf PostgreSQL (Core- und Plugin-Migrationen, Plugin-Erkennung, `AppModule`) und schlägt fehl, wenn ein
+Plugin nicht den Zustand „geladen“ erreicht. Lizenzpflichtige Plugins laden, weil die Prüfung die von ihnen
+deklarierten Lizenzmodule gewährt; ihre Storage-Kompilierung und Migrationen laufen also trotzdem. `pack-test`
+prüft nur den Tarball und sieht daher nicht, was ein Host bei Installation oder Laden ablehnt. Der nächtliche
+`publish-plugins`-Job und der Veröffentlichungsschritt des Releases laufen erst, wenn sie bestanden wurde. Lokal führen Sie sie nach
+`pnpm nx run-many --target=pack --projects=tag:type:plugin` aus; sie braucht PostgreSQL und eine administrative
+`TEST_DATABASE_URL`.
 
 PR-Builds laden die ZIPs als Artefakte hoch (mit Sticky-PR-Kommentar); Releases
 hängen sie als Release-Assets an.

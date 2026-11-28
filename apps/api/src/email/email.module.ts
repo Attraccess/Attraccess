@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { EmailService } from './email.service';
 import { PluginEmailService } from './plugin-email.service';
+import { SessionEndingSoonEmailService } from './session-ending-soon-email.service';
 import { EmailTemplateModule } from '../email-template/email-template.module';
 import { EmailLayoutModule } from '../email-layout/email-layout.module';
 import { SettingsModule } from '../settings/settings.module';
@@ -8,7 +9,7 @@ import { EmailPersistenceModule } from '../database/adapters/email/email-persist
 
 @Module({
   imports: [EmailTemplateModule, EmailLayoutModule, SettingsModule, EmailPersistenceModule],
-  providers: [EmailService, PluginEmailService],
-  exports: [EmailService, PluginEmailService],
+  providers: [EmailService, PluginEmailService, SessionEndingSoonEmailService],
+  exports: [EmailService, PluginEmailService, SessionEndingSoonEmailService],
 })
 export class EmailModule {}

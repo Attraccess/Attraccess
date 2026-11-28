@@ -21,6 +21,7 @@ export type ResourceMeteringOperationStatus = 'pending' | 'completed' | 'failed'
 @Entity()
 @Index('IDX_resource_metering_session_usage', ['usageId', 'meterId'], { unique: true })
 @Index('IDX_resource_metering_session_resource', ['resourceId'])
+@Index('IDX_resource_metering_session_meter', ['meterId'])
 export class ResourceMeteringSession {
   @PrimaryColumn({ type: 'varchar' })
   id!: string;
@@ -111,6 +112,7 @@ export class ResourceMeteringSession {
 /** One request/reply to the flow-defined meter; the audit trail behind a charge. */
 @Entity()
 @Index('IDX_resource_metering_operation_session', ['sessionId'])
+@Index('IDX_resource_metering_operation_meter', ['meterId'])
 export class ResourceMeteringOperation {
   @PrimaryColumn({ type: 'varchar' })
   id!: string;

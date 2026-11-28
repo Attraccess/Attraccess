@@ -13,6 +13,7 @@ export type { PluginReaderCapabilitiesColumn } from './entities/plugin-reader.en
 export { AttractapInstallation } from './entities/attractap-installation.entity';
 export { AttractapSecureBootKey } from './entities/attractap-secure-boot-key.entity';
 export type { SecureBootKeyRole } from './entities/attractap-secure-boot-key.entity';
+export { AttractapSecureConversion } from './entities/attractap-secure-conversion.entity';
 export {
   ReaderUiAlert,
   ReaderUiPluginSettings,
@@ -36,6 +37,7 @@ export { EmailLayout } from './entities/email-layout.entity';
 export { EmailTemplateTranslation } from './entities/email-template-translation.entity';
 export { EmailTemplate } from './entities/email-template.entity';
 export { Form, FormField, FormSubmission, FormResourceOverride } from './entities/form';
+export { FormImage, FormImageHandoff } from './entities/form-image.entity';
 export { Message } from './entities/message.entity';
 export { MqttServer } from './entities/mqttServer.entity';
 export { NotificationPreference } from './entities/notification-preference.entity';
@@ -122,6 +124,7 @@ export { ResourceUsage } from './entities/resourceUsage.entity';
 export { NFCCard } from './entities/rfidCard.entity';
 export { NFCCardPendingChange } from './entities/nfcCardPendingChange.entity';
 export { RolePermission } from './entities/role-permission.entity';
+export { RoleNetworkAction } from './entities/role-network-action.entity';
 export { Role } from './entities/role.entity';
 export { Session } from './entities/session.entity';
 export { Setting } from './entities/setting.entity';
@@ -143,6 +146,7 @@ import { PluginBleEndpointEntity } from './entities/plugin-ble-endpoint.entity';
 import { PluginReaderEntity } from './entities/plugin-reader.entity';
 import { AttractapInstallation } from './entities/attractap-installation.entity';
 import { AttractapSecureBootKey } from './entities/attractap-secure-boot-key.entity';
+import { AttractapSecureConversion } from './entities/attractap-secure-conversion.entity';
 import {
   ReaderUiAlert,
   ReaderUiPluginSettings,
@@ -159,6 +163,7 @@ import { Conversation } from './entities/conversation.entity';
 import { EmailTemplateTranslation } from './entities/email-template-translation.entity';
 import { EmailTemplate } from './entities/email-template.entity';
 import { Form, FormField, FormSubmission, FormResourceOverride } from './entities/form';
+import { FormImage, FormImageHandoff } from './entities/form-image.entity';
 import { Message } from './entities/message.entity';
 import { MqttServer } from './entities/mqttServer.entity';
 import { NotificationPreference } from './entities/notification-preference.entity';
@@ -202,6 +207,7 @@ import { ResourceUsage } from './entities/resourceUsage.entity';
 import { NFCCard } from './entities/rfidCard.entity';
 import { NFCCardPendingChange } from './entities/nfcCardPendingChange.entity';
 import { RolePermission } from './entities/role-permission.entity';
+import { RoleNetworkAction } from './entities/role-network-action.entity';
 import { Role } from './entities/role.entity';
 import { Session } from './entities/session.entity';
 import { Setting } from './entities/setting.entity';
@@ -235,6 +241,7 @@ export const entities = {
   PluginReaderEntity,
   AttractapInstallation,
   AttractapSecureBootKey,
+  AttractapSecureConversion,
   ReaderUiAlert,
   ReaderUiPluginSettings,
   ReaderUiReaderSettings,
@@ -261,6 +268,8 @@ export const entities = {
   FormField,
   FormSubmission,
   FormResourceOverride,
+  FormImage,
+  FormImageHandoff,
   ResourceHealthState,
   ResourceFlowVariable,
   PasswordPolicy,
@@ -278,6 +287,7 @@ export const entities = {
   Permission,
   Role,
   RolePermission,
+  RoleNetworkAction,
   UserRole,
   ApiToken,
   ApiTokenPermission,

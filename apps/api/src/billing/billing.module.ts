@@ -10,9 +10,11 @@ import { LicenseModule } from '../license/license.module';
 import { LiveTopicsModule } from '../live-updates/live-topics.module';
 import { BillingLiveTopicsProvider } from './live-notifications/billing-live-topics.provider';
 import { BillingPersistenceModule } from '../database/adapters/billing/billing-persistence.module';
+import { ResourceListVisibilityModule } from '../resources/visibility/resource-list-visibility.module';
 
 @Module({
   imports: [
+    ResourceListVisibilityModule,
     BillingPersistenceModule,
     ResourceFlowsModule,
     EmailModule,

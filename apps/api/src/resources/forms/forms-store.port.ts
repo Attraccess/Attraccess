@@ -78,6 +78,9 @@ export interface FormOverrideInput {
 export interface ResourceFormStore {
   resourceExists(resourceId: number): Promise<boolean>;
 
+  /** The name of a resource that is not deleted, or null. */
+  findResourceName(resourceId: number): Promise<string | null>;
+
   groupExists(groupId: number): Promise<boolean>;
 
   /** Live forms; resource forms of a deleted resource are inert and left out. */

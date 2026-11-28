@@ -7,6 +7,7 @@ import { BillingConfigurationStore, ResourceRates } from '../../../billing/ports
 import type { BillingTransactionContext } from '../../../billing/ports/billing-ledger.port';
 import { TransactionContextResolver } from '../transaction-context';
 import { toConfigurationRecord } from './billing-mappers';
+import { ACTIVE_METER } from '../metering/meter-rows';
 
 @Injectable()
 export class TypeOrmBillingConfigurationStore implements BillingConfigurationStore {
@@ -70,7 +71,7 @@ export class TypeOrmBillingConfigurationStore implements BillingConfigurationSto
   async hasPricedMeter(resourceId: number, context?: BillingTransactionContext): Promise<boolean> {
     const count = await this.contexts
       .manager(context)
-      .count(ResourceMeter, { where: { resourceId, creditsPerUnit: MoreThan(0) } });
+      .count(ResourceMeter, { where: { resourceId, creditsPerUnit: MoreThan(0), ...ACTIVE_METER } });
     return count > 0;
   }
 }

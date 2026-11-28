@@ -35,6 +35,14 @@ export function validHeaders(overrides: Record<string, string | undefined> = {})
   >;
 }
 
+/**
+ * Request deadline for sidecars that run the real matter.js controller. It matters for a fabric create: under load one
+ * can outlast the 10 s default, then answers 504 while its work keeps the single-flight gate, and the next call sees a
+ * misleading 409 `busy`. Backup and node calls already get the 60 s contract maximum. Tests that use it need a jest
+ * timeout well above it, so a hung create still fails in `expectOk`.
+ */
+export const REAL_CONTROLLER_DEADLINE_MS = 25_000;
+
 export type Running = { sidecar: Sidecar; port: number; logs: string[]; stop(): Promise<void> };
 
 export async function startSidecar(
@@ -57,6 +65,8 @@ export async function startSidecar(
 export type JsonBody = any;
 
 export type HttpResult = {
+  /** The request line, such as `POST /v1/fabric`, so a failed result can name the call it answered. */
+  request: string;
   status: number;
   headers: Record<string, string | string[] | undefined>;
   body: JsonBody;
@@ -81,7 +91,7 @@ export function http(
         } catch {
           // keep raw text
         }
-        resolve({ status: res.statusCode ?? 0, headers: res.headers, body, raw });
+        resolve({ request: `${method} ${path}`, status: res.statusCode ?? 0, headers: res.headers, body, raw });
       });
     });
     req.on('error', reject);

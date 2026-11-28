@@ -4,6 +4,7 @@ import { EmailTemplate, Resource, User } from '@attraccess/database-entities';
 import { EmailTemplateType, type UsageSession } from '@attraccess/application-models';
 import { createTransport } from 'nodemailer';
 import { EmailService } from '../email/email.service';
+import { SessionEndingSoonEmailService } from '../email/session-ending-soon-email.service';
 import { EmailTemplateService } from '../email-template/email-template.service';
 import { EMAIL_RECIPIENT_DIRECTORY } from '../email/email-recipient-directory.port';
 import {
@@ -28,6 +29,7 @@ import {
 import { NotificationDispatchService } from './notification-dispatch.service';
 import { NotificationPreferenceService } from './notification-preference.service';
 import { NotificationLiveService } from './notification-live.service';
+import { NotificationCategory } from './notification-types';
 
 jest.mock('nodemailer', () => ({ createTransport: jest.fn() }));
 
@@ -40,6 +42,7 @@ describe('Notification email language fallback', () => {
   const push = createMock<PushService>();
   let sessions: ResourceSessionNotificationListener;
   let notes: ResourceUsageNoteNotificationListener;
+  let dispatch: NotificationDispatchService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -84,6 +87,7 @@ describe('Notification email language fallback', () => {
       providers: [
         NotificationDispatchService,
         EmailService,
+        SessionEndingSoonEmailService,
         ResourceSessionNotificationListener,
         ResourceUsageNoteNotificationListener,
         { provide: SettingsService, useValue: settings },
@@ -101,6 +105,7 @@ describe('Notification email language fallback', () => {
     }).compile();
     sessions = module.get(ResourceSessionNotificationListener);
     notes = module.get(ResourceUsageNoteNotificationListener);
+    dispatch = module.get(NotificationDispatchService);
   });
 
   async function notifyWithoutActorNames() {
@@ -183,5 +188,24 @@ describe('Notification email language fallback', () => {
       expect(mail.html).toContain('Alice &amp; Bob');
       expect(mail.html).toContain('Laser');
     }
+  });
+
+  it('renders the session ending soon email in German', async () => {
+    recipient.locale = 'de';
+    const endsAt = new Date('2026-06-04T12:15:00.000Z');
+
+    await dispatch.sendEmailTemplate(recipient, NotificationCategory.RESOURCE_SESSION_ENDING_SOON, {
+      resource: { id: resource.id, name: resource.name },
+      session: { id: 10, endsAt, minutesLeft: 5 },
+    });
+
+    expect(templates.getTranslationsMap).toHaveBeenCalledWith(EmailTemplateType.RESOURCE_SESSION_ENDING_SOON, 'de');
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    const [mail] = sendMail.mock.calls[0];
+    expect(mail.subject).toBe('Deine Sitzung auf Laser endet bald');
+    expect(mail.html).toContain('wird in etwa 5 Minuten automatisch beendet');
+    expect(mail.html).toContain(`Automatisches Ende: ${endsAt.toISOString()}`);
+    expect(mail.html).toContain('https://example.com/resources/4');
+    expect(mail.html).toContain('Ressource ansehen');
   });
 });

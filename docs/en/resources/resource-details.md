@@ -61,6 +61,10 @@ Chronological list of all usage sessions showing:
 | **Maintenance Schedules** | Resource manager | Automatic maintenance triggers |
 | **Groups** | Resource manager | [Group membership](resources/resource-groups.md) |
 
+## Automatic stop
+
+If the machine has a max session time or requires a duration estimate, the usage area shows **Stops automatically at HH:MM** with a live countdown and the extend buttons (**+1 h** to **+24 h**, **Extend to maximum**). See [Automatic stop and extending a session](resources/usage-tracking.md#automatic-stop-and-extending-a-session).
+
 ## See Also
 
 - [Creating Resources](resources/creating-resources.md)

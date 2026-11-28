@@ -15,6 +15,8 @@ import { PluginBleService } from './ble/plugin-ble.service';
 import { PluginReadersService } from './readers/plugin-readers.service';
 
 import { PluginService } from './plugin.service';
+import { markPluginRestartRequired } from './runtime/restart-required';
+import { markPluginRemoved } from './runtime/removed-plugins';
 
 import { ResourceHealthService } from '../resources/health/resource-health.service';
 
@@ -31,7 +33,6 @@ export class PluginUninstallService {
   private static readonly logger = new Logger('PluginService');
 
   constructor(
-    private readonly pluginService: PluginService,
     private readonly ble: PluginBleService,
     private readonly readers: PluginReadersService,
     @Optional() private readonly moduleRef?: ModuleRef,
@@ -53,7 +54,20 @@ export class PluginUninstallService {
     }
   }
 
-  async deletePlugin(pluginId: string, deferRestart = false) {
+  /**
+   * The removed plugin's code runs until the restart: refuse its reader and BLE calls, and end the BLE sessions and
+   * watches it already holds (its endpoints stay, as an npm removal keeps plugin data). A failure is logged.
+   */
+  async stopRemovedPlugin(pluginId: string): Promise<void> {
+    markPluginRemoved(pluginId);
+    try {
+      await this.ble.closePluginSessions(pluginId, 'shutdown');
+    } catch (error) {
+      PluginUninstallService.logger.error(`Failed to close the BLE sessions of plugin ${pluginId}`, error as Error);
+    }
+  }
+
+  async deletePlugin(pluginId: string) {
     // Refused plugins (SDK 1.x, unsupported engine) are listed too, so an admin can remove them.
     const plugin = PluginService.getManifestById(pluginId);
 
@@ -85,6 +99,9 @@ export class PluginUninstallService {
       }
     }
 
+    // Its code runs until the restart: refuse its reader and BLE calls before their rows go.
+    markPluginRemoved(plugin.id);
+
     // The plugin's BLE endpoints reference a plugin that is going away. A failure is logged, never blocking.
     try {
       await this.ble.deleteAllForPlugin(plugin.id);
@@ -115,7 +132,7 @@ export class PluginUninstallService {
       );
     }
 
-    // restart app
-    if (!deferRestart) this.pluginService.requestRestart();
+    // Its files are gone; the code that runs from memory stops at the next restart.
+    markPluginRestartRequired();
   }
 }

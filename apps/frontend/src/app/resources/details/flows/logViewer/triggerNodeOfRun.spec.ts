@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { triggerNodeOfRun } from './index';
+import { triggerNodeOfRun } from './triggerNodeOfRun';
 import { ResourceFlowNodeDto } from '@attraccess/react-query-client';
 
 const node = (type: string) => ({ id: type, type, position: { x: 0, y: 0 }, data: {} }) as ResourceFlowNodeDto;

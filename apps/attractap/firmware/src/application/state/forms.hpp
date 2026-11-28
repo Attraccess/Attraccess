@@ -35,6 +35,18 @@ bool pendingActionIsTakeover = false;
 #endif
 
 #if defined(HAS_LVGL_DISPLAY)
+// The duration the user chose for the start in progress (ATT-43), carried through form and plugin-step retries;
+// 0 when the machine asks for none.
+uint32_t pendingActionEstimateMinutes = 0;
+// Set when the duration input answered, so the start it interrupted runs without asking again.
+bool durationEstimateChosen = false;
+// The start button press the duration input interrupted.
+bool durationStartPending = false;
+// The session the extension screen extends: 0 for the card holder's own, else the other person's usageId.
+uint32_t extendUsageId = 0;
+#endif
+
+#if defined(HAS_LVGL_DISPLAY)
 bool hasPendingFormRequest = false;
 #endif
 
@@ -107,6 +119,17 @@ uint32_t formCacheTick = 0;
 
 #if defined(HAS_LVGL_DISPLAY)
 bool awaitingFieldRender = false;
+#endif
+
+// The open page is an image field: its count is re-requested while the user adds photos on the phone (ATT-879).
+// One request at a time: the next waits for the answer, or for FORM_IMAGE_POLL_TIMEOUT_MS if the answer was lost.
+#if defined(HAS_LVGL_DISPLAY)
+static constexpr uint32_t FORM_IMAGE_POLL_MS = 3000;
+static constexpr uint32_t FORM_IMAGE_POLL_TIMEOUT_MS = 15000;
+bool formImagePolling = false;
+uint32_t formImagePollAt = 0;
+bool formImagePollInFlight = false;
+uint32_t formImagePollSentAt = 0;
 #endif
 
 #if defined(HAS_LVGL_DISPLAY)

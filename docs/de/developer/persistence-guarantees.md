@@ -123,11 +123,68 @@ Prozesslokale Annahmen, die ein zweites Replikat brechen würde:
 
 - Speicherinterne Ketten und Sperren wie die Session-Change-Queue, die Leser-Sitzungsverwaltung und Plugin-Upload-Sperren.
 - Zeitgeber, etwa die Auswertung der Wartungspläne (ATT-627), die in jedem Replikat liefen.
-- Live-Update-Verteilung und WebSocket-Sitzungen, die nur Clients desselben Prozesses erreichen.
+- Live-Update-Verteilung der meisten Themen und die Websockets der Companion-Geräte, die nur Clients desselben
+  Prozesses erreichen (Masseneinweisungen und Aufsicht sind geteilt, siehe unten).
 - Die MQTT-Verbindungen und der Plugin-Event-Bus.
 - Rate-Limit-Zustand ohne Valkey; mit Valkey ist er geteilt.
 
 Was PostgreSQL für eine geteilte Datenbank bereits liefert: die atomaren Guthaben- und Nutzungs-Integritätsgarantien
 (Constraints, Trigger, Advisory Locks), Einzelgewinner bei Unique-Schlüsseln und atomare Sitzungs- und Token-Rotation.
-Für mehrere Replikate fehlen noch ein Leader oder eine Sperre für Zeitgeber sowie geteilte Live Updates; die
-Skalierungs-Folgearbeiten übernehmen das.
+Für mehrere Replikate fehlen noch ein Leader oder eine Sperre für Zeitgeber sowie geteilte Live Updates für die Themen
+außer Masseneinweisungen und Aufsicht; die Skalierungs-Folgearbeiten übernehmen das.
+
+### Über Valkey geteilt (ATT-1163)
+
+Mit gesetztem `VALKEY_URL` gilt Folgendes über API-Instanzen hinweg. Ohne Valkey gelten dieselben Garantien innerhalb
+des einen Prozesses, wie bisher.
+
+- **Lebenszeichen der Instanzen**: Jede Instanz erneuert alle 5 s einen Herzschlag, der nach 15 s verfällt. Eine
+  verbliebene Instanz (genau eine, per atomarer Sperre) entfernt dann die Leser der weggefallenen Instanz, gibt deren
+  Bildschirm-Sperren frei und beendet die Aufsichtsanfragen, deren Anfragende sie hielt.
+- **Leser-Präsenz**: welche Instanzen eine Websocket-Verbindung je Leser halten, neueste Verbindung zuerst. „Leser ist
+  offline" heißt, keine Instanz hält ihn. Leser-Arbeit läuft auf den haltenden Instanzen: im Prozess, wenn es diese
+  ist, sonst über den Pub/Sub-Bus in Valkey (Anfrage/Antwort mit Zeitlimits).
+- **Bildschirm-Sperre je Leser**: Ein Ablauf belegt einen Leser (Masseneinweisung, im Web gestartete Aufsicht,
+  Karten-Einlernen, Karten-Zurücksetzen), per atomarer Sperre genommen und per Vergleichen-und-Löschen freigegeben, mit
+  TTL, damit eine abgestürzte Instanz keinen Leser blockiert. Ein zweiter Ablauf bekommt die übliche 409. Eine am Leser
+  gestartete Aufsicht nimmt keine Sperre; sie schützt der Socket-Zustand der Instanz, die den Leser hält. Mit und ohne Valkey
+  antworten Karten-Einlernen und Karten-Zurücksetzen mit 409, solange am Leser eine Aufsicht läuft. Verbindet
+  sich ein Leser neu mit einer anderen Instanz, bevor seine alte aufgeräumt ist, endet ein über den alten Socket
+  gestarteter Ablauf dann.
+- **Masseneinweisungen**: Sitzungen, Teilnehmende und Zähler falscher Codes liegen mit nativen TTLs in Valkey. Jede
+  Person wird je Sitzung höchstens einmal eingewiesen (atomare Beitritts-Sperre; ein gleichzeitiger Beitritt wartet auf
+  den Gewinner), fünf falsche Codes je Minute zählen über alle Instanzen, und eine Sitzung endet genau einmal.
+- **Aufsichtsanfragen**: Offene Anfragen liegen in Valkey. Genehmigen, Ablehnen, Ablauf, Abbruch durch die anfragende
+  Person, Abbruch am Leser und Abschluss per Karte nehmen die Anfrage in einem atomaren Schritt aus den offenen, sodass
+  eine Anfrage höchstens einmal endet und höchstens eine Sitzung startet. Eine Leser-Anfrage je Person ist eine atomare
+  Reservierung.
+- **Fristen** (Ablauf von Masseneinweisungen und Aufsichtsanfragen): eine sortierte Menge, die jede Instanz alle 500 ms
+  durchsieht; das Entfernen eines Eintrags ist die Sperre, sodass jede Frist genau einmal auslöst, etwa innerhalb einer
+  Sekunde. Keine Keyspace-Benachrichtigungen.
+- **Live-Updates** der Themen `mass-introduction` und `supervision` (und des Aufsichts-SSE-Endpunkts) erreichen die
+  Streams der Person auf jeder Instanz. Andere Themen bleiben je Prozess (Folgearbeit).
+
+Weiter je Prozess: der blockierte Aufsichtsaufruf der anfragenden Person und eine über eine andere Instanz geleitete
+Plugin-BLE-Verbindung (beide schlagen sauber fehl, wenn diese Instanz wegfällt; sie werden nicht verschoben), die
+Metrik-Messwerte, Rate Limits ohne Valkey, Zeitgeber und die übrigen Live-Themen. Pub/Sub ist ohne Zustellgarantie:
+Eine Nachricht, die während eines Wiederverbindens veröffentlicht wird, geht verloren; wichtige Ergebnisse
+(Aufsichtsergebnisse, Abläufe) liegen deshalb zusätzlich in Valkey und werden nach der Frist nachgeschlagen. Ein
+widerrufener oder neu gekoppelter Leser-Schlüssel verlässt sich ebenfalls nicht auf seine Nachricht: Jede Instanz
+hält Schlüssel höchstens 10 s im Cache und prüft die Leser, die sie hält, alle 30 s gegen die Datenbank. Fällt Valkey genau zwischen dem Scharfschalten eines Lesers auf einer
+anderen Instanz und seinem Eintrag in die Masseneinweisung aus, kann dieser Leser bis zum Ende der 15 min Laufzeit der
+Sitzung scharf und belegt bleiben.
+
+Ebenfalls je Instanz, gewollt oder als bekannte Grenze:
+
+- **Zulassung zur Kopplung**: Verbindungsversuche je Adresse und die Obergrenze wartender Leser schützen die Instanz,
+  die den Socket des Lesers hält. Die Zahl falscher Codes je genehmigender Person wird geteilt.
+- **Hinweise der Leser-Oberfläche**: Nach einem Crash-Loop-Hinweis pausiert die Instanz, die den Leser hält, dessen
+  Plugin-Hooks. Wird der Hinweis auf einer anderen Instanz geschlossen, endet die Pause nur dort; die Instanz des Lesers
+  setzt fort, wenn ihr 30-Minuten-Fenster endet.
+- **BLE-Schreibvorgänge ohne Antwort**: Ihr Fenster und späte Fehler verfolgt die Verbindung auf der Instanz, die den
+  Leser hält.
+
+Valkey muss eigenständig oder hinter Sentinel laufen: Die Koordination führt Lua-Skripte über mehrere Schlüssel aus, was
+ein geshardeter Cluster nicht erlaubt. Instanzen aus der Zeit vor dieser Änderung halten den geteilten Zustand im
+eigenen Prozess; beim Aktualisieren deshalb alle Instanzen gemeinsam neu starten, ein rollendes Update über diese
+Version hinweg wird nicht unterstützt.

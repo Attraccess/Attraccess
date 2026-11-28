@@ -309,7 +309,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     >;
     scope.edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: waitNode.id }];
     scope.edgesBySourceAndHandle[`${waitNode.id}|`] = [];
-    scope.flowLogs.start(1);
+    scope.flowLogs.keepAlive(1);
 
     await expect(scope.service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {})).rejects.toThrow(
       /Timeout waiting for MQTT message/,
@@ -336,7 +336,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     scope.nodesById = { [inputNode.id]: inputNode, [outputNode.id]: outputNode };
     scope.edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: outputNode.id }];
     scope.mqttClientService.publish = jest.fn().mockRejectedValue({});
-    scope.flowLogs.start(1);
+    scope.flowLogs.keepAlive(1);
 
     await expect(scope.service.runFlow(1, ResourceFlowNodeType.INPUT_BUTTON, {})).rejects.toThrow(
       "Failed to publish MQTT message to topic 'devices/state' on server 1: no error details were provided",

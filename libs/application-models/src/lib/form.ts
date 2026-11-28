@@ -3,6 +3,7 @@ export enum FormFieldType {
   NUMBER = 'number',
   BOOLEAN = 'boolean',
   SELECT = 'select',
+  IMAGE = 'image',
 }
 
 export enum ResourceFormAction {

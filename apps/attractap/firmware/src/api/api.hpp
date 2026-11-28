@@ -71,6 +71,7 @@ protected:
         cardApduCallback;
     std::function<void(uint32_t detectionId, const char *conversationId)> cardConversationEndCallback;
     std::function<uint32_t()> cardConversationStartCallback;
+    std::function<bool(uint8_t &sak, uint16_t &atqa)> cardInfoProvider;
     // (event type that carried the error, error code); OTA reports its own labels.
     std::function<void(const char *eventType, const char *code)> errorCallback;
     std::function<void(const ActionResult &)> actionResultCallback;
@@ -135,6 +136,9 @@ public:
     // Called right before CARD_DETECTED goes out: the card relay opens before the first command can
     // arrive. Returns the detection id for the CARD_DETECTED payload.
     void setCardConversationStartCallback(std::function<uint32_t()> callback);
+    // SAK and ATQA of the card being announced; CARD_DETECTED carries them when this returns true. The server needs
+    // the SAK to tell UID-only cards (no ISO 14443-4) from secure ones. A reader without them behaves as before.
+    void setCardInfoProvider(std::function<bool(uint8_t &sak, uint16_t &atqa)> provider);
     // conversationId is nullptr when the server ends a detection without a conversation (early error).
     void setCardConversationEndCallback(std::function<void(uint32_t detectionId, const char *conversationId)> callback);
 
@@ -149,7 +153,8 @@ public:
     // so there is no first card tap. The reader waits for a supervisor card exactly as usual, but
     // must not start the session itself — the server verifies the card through the relay and does the rest.
 
-    void requestSupervision(uint32_t resourceId);
+    // estimatedDurationMinutes (ATT-43): the estimate chosen before asking; 0 sends none.
+    void requestSupervision(uint32_t resourceId, uint32_t estimatedDurationMinutes = 0);
     void cancelSupervision();
     void setSupervisionStartCallback(std::function<void(SupervisionStartCommand)> callback);
     void setSupervisionRequestResultCallback(std::function<void(SupervisionRequestResult)> callback);
@@ -178,7 +183,10 @@ public:
 
     // `stepId`/`choice` answer a plugin confirmation (UI_STEP_REQUEST); the server matches them to the step.
     void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0, bool forceTakeOver = false,
-                                   const char *stepId = nullptr, const char *choice = nullptr);
+                                   const char *stepId = nullptr, const char *choice = nullptr,
+                                   uint32_t estimatedDurationMinutes = 0);
+    // Moves the automatic end of the card holder's own session (usageId 0) later: by a step in minutes, or `toMax`.
+    void extendResourceUsageSession(uint32_t resourceId, uint32_t usageId, uint32_t extendByMinutes, bool toMax);
 
     // Reader UI (ATT-1187)
     void setUiStepRequestCallback(std::function<void(const ui::StepRequest &)> callback) { uiStepRequestCallback = callback; }

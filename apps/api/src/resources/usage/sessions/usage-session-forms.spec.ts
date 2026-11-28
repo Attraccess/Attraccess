@@ -53,7 +53,7 @@ describe('usage sessions with inherited forms', () => {
           (action === ResourceFormAction.END && form.isRequiredOnResourceUsageEnd),
       ),
     );
-    const forms = new ResourceFormsService({ findRequiredForAction } as never);
+    const forms = new ResourceFormsService({ findRequiredForAction } as never, {} as never);
     scope.forms.prepareRequiredSubmissions.mockImplementation((options) => forms.prepareRequiredSubmissions(options));
   });
 

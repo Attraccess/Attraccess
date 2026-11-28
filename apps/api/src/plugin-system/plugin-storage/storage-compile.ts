@@ -33,7 +33,25 @@ export interface StorageNaming {
    * `adoption` creates (the 1.x tables adopted in place) keep their own names. Everything else is derived.
    */
   readonly adoptable?: boolean;
+  /**
+   * The 1.x namespace (the plugin.json name of the 1.x release) the adopted names keep, when it differs from
+   * `namespace`: the npm package `@attraccess/plugin-shelly` adopts the `plugin_shelly_*` tables of the 1.x `shelly`.
+   * Only meaningful together with `adoptable`.
+   */
+  readonly legacyNamespace?: string;
 }
+
+/** The length of the longest own prefix (current or 1.x namespace) `name` starts with; 0 when none does. */
+function ownMatch(naming: StorageNaming, name: string): number {
+  const legacy = naming.adoptable && naming.legacyNamespace ? namespaceMatch(name, naming.legacyNamespace) : 0;
+  return Math.max(namespaceMatch(name, naming.namespace), legacy);
+}
+
+const allowedPrefixes = (naming: StorageNaming): string =>
+  [naming.namespace, ...(naming.adoptable && naming.legacyNamespace ? [naming.legacyNamespace] : [])]
+    .flatMap((ns) => [`plugin_${ns}_`, `${ns}_`])
+    .map((prefix) => `"${prefix}"`)
+    .join(' or ');
 
 const FIELD_TYPES: readonly PluginStorageFieldType[] = [
   'string',
@@ -106,14 +124,19 @@ function checkExplicitTableName(naming: StorageNaming, logical: string, name: st
         `with adoption); other tables are always named "${derivedTableName(naming, logical)}"`,
     );
   }
-  if (namespaceMatch(name, naming.namespace) === 0) {
-    fail(naming, `physicalName "${name}" must start with "plugin_${naming.namespace}_" or "${naming.namespace}_"`);
+  if (ownMatch(naming, name) === 0) {
+    fail(naming, `physicalName "${name}" must start with ${allowedPrefixes(naming)}`);
   }
 }
 
 /** Refuses a name that lies in the storage namespace of another installed plugin. */
 function checkForeignNamespace(naming: StorageNaming, label: string, name: string): void {
-  const claimedBy = foreignNamespaceOf(name, naming.namespace, naming.siblingNamespaces ?? []);
+  const claimedBy = foreignNamespaceOf(
+    name,
+    naming.namespace,
+    naming.siblingNamespaces ?? [],
+    naming.adoptable ? naming.legacyNamespace : undefined,
+  );
   if (claimedBy !== undefined) {
     fail(naming, `${label} lies in the storage namespace "${claimedBy}" of another installed plugin`);
   }
@@ -148,11 +171,11 @@ function checkedIndexName(naming: StorageNaming, given: unknown): string {
     );
   }
   const body = typeof given === 'string' ? indexNameBody(given) : '';
-  if (typeof given !== 'string' || !IDENTIFIER.test(given) || namespaceMatch(body, naming.namespace) === 0) {
+  if (typeof given !== 'string' || !IDENTIFIER.test(given) || ownMatch(naming, body) === 0) {
     fail(
       naming,
       `index name "${String(given)}" must match ${IDENTIFIER.source} and, after an optional IDX_/UQ_ marker, start ` +
-        `with "plugin_${naming.namespace}_" or "${naming.namespace}_"`,
+        `with ${allowedPrefixes(naming)}`,
     );
   }
   checkForeignNamespace(naming, `index name "${given}"`, body);

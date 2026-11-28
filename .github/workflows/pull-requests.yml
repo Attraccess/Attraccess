@@ -340,6 +340,10 @@ jobs:
       - uses: ./.github/actions/setup-browser-tests
       - name: Test and pack all plugin apps
         run: node scripts/ci-test-projects.mjs --group=plugins
+      # Loads every packed plugin in a real host (PostgreSQL) under its npm package name, as the marketplace installs
+      # it. `pack-test` only inspects the tarball; this fails when a real host refuses the plugin.
+      - name: Load packed official plugins in a real host
+        run: pnpm nx run api:verify-packed-plugins
       # The cross-project HeroUI guard (generators:no-fields-in-cards) also scans plugin
       # sources, but `generators` deliberately does not list plugin projects as implicit
       # dependencies (core tooling must not know plugin names). Run it here whenever any

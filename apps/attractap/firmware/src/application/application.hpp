@@ -31,6 +31,8 @@ private:
     Logger logger;
     API &api;
     bool firmwareUpdateActive = false;
+    // The "Secure this reader" conversion took NFC and the screen (ATT-1208); the reader restarts to give them back.
+    bool conversionNfcSuspended = false;
     Beeper beeper;
     // The card the server last refused; its repeat detections are ignored (ATT-882).
     RefusedCardGuard refusedCardGuard;
@@ -149,6 +151,15 @@ private:
     void leaveTopUp();
     void leaveForms();
     void openProjects();
+    // Duration estimate and extension (ATT-43)
+    bool needsDurationEstimate(uint32_t resourceId, uint32_t &maxMinutes) const;
+    void openDurationInput(uint32_t maxMinutes);
+    void openExtendScreen(uint32_t usageId);
+    // Whether the list still shows the session the extension screen extends, with a deadline.
+    bool extendTargets(const API::ResourceBrief &resource) const;
+    void handleExtend(uint32_t minutes, bool toMax);
+    // Forgets the start or stop in progress: its type, target, takeover flag, estimate and chosen session.
+    void resetPendingAction();
     void finishCardAuthentication(bool success);
 
 #else
@@ -179,6 +190,7 @@ private:
     void handleFormPageBack();
     void handleFormsCancel();
     void pollUsageStats();
+    void pollFormImageCount();
     void requestCurrentFormField();
     void advanceFormCursor();
     void retreatFormCursor();

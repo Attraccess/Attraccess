@@ -2,7 +2,7 @@ import { registerAttractapSupervisionHandlerFixture } from './handler.test-fixtu
 import type { SocketState } from './handler.test-fixture';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
-import { SupervisionMode } from '@attraccess/application-models';
+import { ResourceType, SupervisionMode } from '@attraccess/application-models';
 import type { ReaderSupervisionCallbacks } from '../../../../resources/supervision/supervision.types';
 
 // What SupervisionService hands to onResolved: no name parts, the display name already computed.
@@ -13,6 +13,7 @@ describe('AttractapSupervisionHandler', () => {
 
   const lastPayload = (socket: AuthenticatedWebSocket) =>
     (socket.sendMessage as jest.Mock).mock.calls.at(-1)?.[0].data.payload;
+  const lastMessage = (socket: AuthenticatedWebSocket) => (socket.sendMessage as jest.Mock).mock.calls.at(-1)?.[0].data;
 
   describe('armReader', () => {
     it('arms every socket of the reader and tells it to wait for a card', async () => {
@@ -232,6 +233,53 @@ describe('AttractapSupervisionHandler', () => {
       expect(socket.state.supervisionFlow).toMatchObject({ requestId: 'req-1', resourceId: fixture.RESOURCE_ID });
     });
 
+    it('keeps the estimate of a reader that asks for it, so an approval on the web uses it', async () => {
+      const socket = tappedSocket();
+      socket.state.sessionDuration = true;
+
+      await fixture.handler.handleSupervisionRequest(socket, {
+        type: AttractapEventType.SUPERVISION_REQUEST,
+        payload: { resourceId: fixture.RESOURCE_ID, estimatedDurationMinutes: 240 },
+      });
+
+      expect(fixture.supervisionService.createReaderRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ dto: { estimatedDurationMinutes: 240 }, canAskDuration: true }),
+      );
+    });
+
+    it('refuses an estimate above the maximum before asking any supervisor', async () => {
+      const socket = tappedSocket();
+      socket.state.sessionDuration = true;
+      const resource = await fixture.resourceReads.findResource(fixture.RESOURCE_ID);
+      fixture.resourceReads.findResource.mockResolvedValue({
+        ...resource,
+        type: ResourceType.Machine,
+        requireSessionDurationEstimate: true,
+        maxSessionDurationMinutes: 60,
+      });
+
+      await fixture.handler.handleSupervisionRequest(socket, {
+        type: AttractapEventType.SUPERVISION_REQUEST,
+        payload: { resourceId: fixture.RESOURCE_ID, estimatedDurationMinutes: 90 },
+      });
+
+      expect(errorSent(socket)).toBe('SESSION_DURATION_ESTIMATE_EXCEEDS_MAXIMUM');
+      expect(fixture.supervisionService.createReaderRequest).not.toHaveBeenCalled();
+    });
+
+    it('drops an invalid estimate and lets a reader that cannot ask fall back', async () => {
+      const socket = tappedSocket();
+
+      await fixture.handler.handleSupervisionRequest(socket, {
+        type: AttractapEventType.SUPERVISION_REQUEST,
+        payload: { resourceId: fixture.RESOURCE_ID, estimatedDurationMinutes: 0 },
+      });
+
+      expect(fixture.supervisionService.createReaderRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ dto: {}, canAskDuration: false }),
+      );
+    });
+
     it('names the approving supervisor by display name when the reader request resolves', async () => {
       const socket = tappedSocket();
 
@@ -285,6 +333,20 @@ describe('AttractapSupervisionHandler', () => {
 
       expect(errorSent(socket)).toBe('NO_SUPERVISORS_AVAILABLE');
       expect(fixture.supervisionService.createReaderRequest).not.toHaveBeenCalled();
+    });
+
+    it('answers SUPERVISION_FAILED at once when the request cannot be stored', async () => {
+      const socket = tappedSocket();
+      // With several instances the request lives in Valkey.
+      fixture.supervisionService.createReaderRequest.mockRejectedValueOnce(new Error('Connection is closed.'));
+
+      await expect(request(socket)).resolves.toBeUndefined();
+
+      expect(lastMessage(socket)).toEqual({
+        type: AttractapEventType.SUPERVISION_REQUEST,
+        payload: { error: 'SUPERVISION_FAILED' },
+      });
+      expect(socket.state.supervisionFlow).toBeNull();
     });
 
     it('refuses before anyone has tapped a card', async () => {

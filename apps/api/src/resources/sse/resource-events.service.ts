@@ -3,6 +3,7 @@ import { Observable, Subject } from 'rxjs';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   ResourceSessionStartedEvent,
+  ResourceUsageSessionExtendedEvent,
   ResourceUsageSessionEndedEvent,
   ResourceUsageSessionTakenOverEvent,
 } from '../usage/events/resource-usage.events';
@@ -163,6 +164,20 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
       ownerUserId: event.usage.userId,
     });
     this.logger.debug(`Queued ${ResourceUsageSessionEndedEvent.EVENT_NAME} event for resource ${resourceId}`);
+  }
+
+  /**
+   * The automatic end of a session moved. Carries no session: viewers refetch what they may see, and the owner and
+   * managers hear it even when they may not see other people's activity.
+   */
+  @OnEvent(ResourceUsageSessionExtendedEvent.EVENT_NAME)
+  handleResourceSessionExtended(event: ResourceUsageSessionExtendedEvent) {
+    const resourceId = event.usage.resourceId;
+    this.emitWithSessionStatus(resourceId, {
+      eventType: ResourceUsageSessionExtendedEvent.EVENT_NAME,
+      resourceId,
+      ownerUserId: event.usage.userId,
+    });
   }
 
   @OnEvent(ResourceUsageSessionTakenOverEvent.EVENT_NAME)

@@ -70,7 +70,8 @@ export function StatusDialog(props: Readonly<StatusDialogProps>) {
         <AlertDialog.Dialog className="sm:max-w-[440px]" data-cy={dataCy}>
           <AlertDialog.Header>
             <AlertDialog.Icon status={ICON_STATUS[status]} />
-            <AlertDialog.Heading>{title}</AlertDialog.Heading>
+            {/* Titles often carry user-chosen names: a long one wraps instead of leaving the dialog. */}
+            <AlertDialog.Heading className="w-full wrap-anywhere">{title}</AlertDialog.Heading>
           </AlertDialog.Header>
           {children !== undefined && (
             <AlertDialog.Body>

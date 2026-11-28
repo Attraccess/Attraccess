@@ -1,8 +1,16 @@
 import { CheckIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { TableRowActions, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { NfcCard, UseGetAllCardsKeyFn, useToggleCardActive } from '@attraccess/react-query-client';
+import {
+  ApiError,
+  NfcCard,
+  UseGetAllCardsKeyFn,
+  useDeleteUidOnlyCard,
+  useToggleCardActive,
+} from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
+import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import de from './de.json';
 import en from './en.json';
 
@@ -12,13 +20,23 @@ interface NfcCardRowActionsProps {
 }
 
 export function NfcCardRowActions({ card, onDeleteClick }: Readonly<NfcCardRowActionsProps>) {
-  const { t } = useTranslations({ de, en });
+  const { t, tExists } = useTranslations({
+    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+  });
   const queryClient = useQueryClient();
   const toast = useToastMessage();
   const { mutateAsync: toggleActive } = useToggleCardActive(undefined, {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: UseGetAllCardsKeyFn({}, []) }),
     onError: (error) => toast.error({ title: t('nfcCardsTable.toggleError'), description: (error as Error).message }),
   });
+
+  // Nothing is written to a UID-only card, so it is deleted right away, without a reader.
+  const { mutateAsync: deleteUidOnly } = useDeleteUidOnlyCard(undefined, {
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: UseGetAllCardsKeyFn({}, []) }),
+    onError: (error) => toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' }),
+  });
+  const isUidOnly = card.type === 'uid-only';
 
   return (
     <TableRowActions
@@ -55,7 +73,16 @@ export function NfcCardRowActions({ card, onDeleteClick }: Readonly<NfcCardRowAc
           label: t('nfcCardsTable.actions.delete'),
           icon: Trash2Icon,
           tone: 'danger',
-          onPress: onDeleteClick,
+          onPress: isUidOnly ? () => deleteUidOnly({ path: { id: card.id } }) : onDeleteClick,
+          ...(isUidOnly
+            ? {
+                confirm: {
+                  title: t('nfcCardsTable.deleteUidOnlyModal.title'),
+                  message: t('nfcCardsTable.deleteUidOnlyModal.description', { id: card.id }),
+                  'data-cy': 'nfc-card-delete-uid-only-modal',
+                },
+              }
+            : {}),
           'data-cy': `nfc-card-table-cell-delete-button-${card.id}`,
         },
       ]}

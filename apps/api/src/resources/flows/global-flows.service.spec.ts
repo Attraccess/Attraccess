@@ -146,6 +146,26 @@ describe('GlobalFlowsService', () => {
     expect(audit.record).not.toHaveBeenCalled();
   });
 
+  it('rejects an edge whose source is not on the canvas and names it', async () => {
+    await expect(
+      service.saveCanvas(
+        5,
+        {
+          nodes: [{ id: 'ok', type: T.INPUT_RESOURCE_USAGE_STARTED, position, data: {} }],
+          edges: [{ id: 'gone', source: 'deleted', target: 'ok', sourceHandle: null, targetHandle: null }],
+        },
+        testActor,
+      ),
+    ).rejects.toMatchObject({
+      response: {
+        message: [expect.stringContaining('gone')],
+        edges: [{ edgeId: 'gone', source: 'deleted', target: 'ok' }],
+      },
+    });
+    expect(graph.replaceGlobalCanvas).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
   it('records nothing when the database rejects a canvas save', async () => {
     graph.replaceGlobalCanvas.mockRejectedValueOnce(new Error('database rejected write'));
     await expect(

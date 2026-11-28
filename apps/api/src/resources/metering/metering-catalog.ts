@@ -24,6 +24,46 @@ export async function requireMeter(
   return meter;
 }
 
+/** Runs a write that names a meter; a name an active meter of the resource already has is a 409. */
+export async function withMeterNameConflict<T>(write: () => Promise<T>): Promise<T> {
+  try {
+    return await write();
+  } catch (error) {
+    if (error instanceof MeterNameTakenError) throw new ConflictException('METER_NAME_EXISTS');
+    throw error;
+  }
+}
+
+/** Whether the meter ever accepted a reading. */
+export function hasObservations(meter: ResourceMeterRecord): boolean {
+  return meter.lifetimeValue !== '0' || meter.counterValue !== null || meter.latestObservedAt !== null;
+}
+
+/** Whether one of the usages captured the meter's terms when it started. */
+export function capturedBy(usages: MeteringUsageRecord[], meterId: number): boolean {
+  return usages.some((usage) => usage.meterRates?.some((rate) => rate.meterId === meterId));
+}
+
+/**
+ * The delete rule: a meter may be deleted when it never recorded anything and no usage that has not ended captured
+ * it. Sessions, operations and segments go with a deleted meter, so any of them counts as history.
+ */
+export async function meterIsDeletable(
+  store: MeteringStore,
+  meter: ResourceMeterRecord,
+  openUsages: MeteringUsageRecord[],
+  context?: TransactionContext,
+): Promise<boolean> {
+  if (hasObservations(meter) || capturedBy(openUsages, meter.id)) return false;
+  return !(await store.hasMeterRecords(meter.id, context));
+}
+
+export interface ListMetersOptions {
+  includeArchived?: boolean;
+  /** Work out `deletable`; otherwise it is false. Only people who may delete a meter need it. */
+  withDeletable?: boolean;
+}
+
 /** Meter configuration and read-only views of definition and consumption state. */
 export class MeteringCatalog {
   constructor(private readonly store: MeteringStore) {}
@@ -65,8 +105,15 @@ export class MeteringCatalog {
     };
   }
 
-  async listMeters(resourceId: number) {
-    const meters = await this.store.listMeters(resourceId);
+  async listMeters(resourceId: number, options: ListMetersOptions = {}) {
+    const meters = await this.store.listMeters(resourceId, undefined, { includeArchived: options.includeArchived });
+    // Loaded once, and only when a meter without readings needs the full check.
+    let openUsages: MeteringUsageRecord[] | undefined;
+    const deletable = async (meter: ResourceMeterRecord) => {
+      if (!options.withDeletable || hasObservations(meter)) return false;
+      openUsages ??= await this.store.findOpenUsages(resourceId);
+      return meterIsDeletable(this.store, meter, openUsages);
+    };
     const { byMeter } = await findActiveMeterSessions(
       this.store,
       resourceId,
@@ -75,7 +122,8 @@ export class MeteringCatalog {
     const result = [];
     for (const meter of meters) {
       const sessions = [];
-      for (const { usage, session: held } of byMeter.get(meter.id) ?? []) {
+      // Nothing runs on an archived meter: it has no session to show.
+      for (const { usage, session: held } of meter.archivedAt ? [] : (byMeter.get(meter.id) ?? [])) {
         const captured = usage.meterRates?.find((rate) => rate.meterId === meter.id);
         const session = held && (usage.meterRates == null || captured != null) ? held : undefined;
         const sessionRate = captured?.creditsPerUnit ?? session?.creditsPerUnit ?? 0;
@@ -133,6 +181,8 @@ export class MeteringCatalog {
         // The earliest running session, for clients that show one session per meter.
         session: sessions[0] ?? null,
         sessions,
+        archivedAt: meter.archivedAt,
+        deletable: await deletable(meter),
       });
     }
     return result;
@@ -140,41 +190,34 @@ export class MeteringCatalog {
 
   async createMeter(resourceId: number, name: string) {
     if (!(await this.store.resourceExists(resourceId))) throw new BadRequestException('RESOURCE_NOT_FOUND');
-    let meter: ResourceMeterRecord;
-    try {
-      meter = await this.store.createMeter(resourceId, name.trim());
-    } catch (error) {
-      if (error instanceof MeterNameTakenError) throw new ConflictException('METER_NAME_EXISTS');
-      throw error;
-    }
+    const meter = await withMeterNameConflict(() => this.store.createMeter(resourceId, name.trim()));
     return this.getMeterDto(resourceId, meter.id);
   }
 
   async updateMeter(resourceId: number, meterId: number, name: string) {
     const meter = await requireMeter(this.store, resourceId, meterId);
-    try {
-      await this.store.renameMeter(resourceId, meter.id, name.trim());
-    } catch (error) {
-      if (error instanceof MeterNameTakenError) throw new ConflictException('METER_NAME_EXISTS');
-      throw error;
-    }
+    await withMeterNameConflict(() => this.store.renameMeter(resourceId, meter.id, name.trim()));
     return this.getMeterDto(resourceId, meterId);
   }
 
   async setRate(resourceId: number, meterId: number, creditsPerUnit: number) {
     const meter = await requireMeter(this.store, resourceId, meterId);
     await this.store.setMeterRate(meter.id, creditsPerUnit);
-    return this.getMeterDto(resourceId, meterId);
+    // Billing managers may change prices without being allowed to delete the meter.
+    return this.getMeterDto(resourceId, meterId, false);
   }
 
   async setAllocation(resourceId: number, meterId: number, allocation: MeterAllocationKind) {
     const meter = await requireMeter(this.store, resourceId, meterId);
     await this.store.setMeterAllocation(meter.id, allocation);
-    return this.getMeterDto(resourceId, meterId);
+    // Billing managers may change prices without being allowed to delete the meter.
+    return this.getMeterDto(resourceId, meterId, false);
   }
 
-  private async getMeterDto(resourceId: number, meterId: number) {
-    const meter = (await this.listMeters(resourceId)).find((m) => m.id === meterId);
+  /** One meter, active or archived; `withDeletable` for people who may delete it. */
+  async getMeterDto(resourceId: number, meterId: number, withDeletable = true) {
+    const meters = await this.listMeters(resourceId, { includeArchived: true, withDeletable });
+    const meter = meters.find((m) => m.id === meterId);
     if (!meter) throw new BadRequestException('METER_NOT_FOUND');
     return meter;
   }

@@ -4,6 +4,10 @@
     "description": "Passe deine Suche oder die Filter-Optionen an, um Ressourcen zu finden",
     "clear": "Filter und Suche zurücksetzen"
   },
+  "restricted": {
+    "title": "Noch nichts zu sehen",
+    "description": "Maschinen und Türen erscheinen hier, sobald du in sie eingewiesen bist. Bitte das Werkstatt-Team oder einen Einweiser, dich einzuweisen."
+  },
   "firstResource": {
     "title": "Noch keine Ressourcen",
     "description": "Füge deine erste Maschine oder Tür hinzu, um Zugang und Nutzung zu verwalten.",

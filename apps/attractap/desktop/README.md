@@ -54,7 +54,10 @@ dist/apps/attractap-desktop/attractap-desktop.app/Contents/MacOS/attractap-deskt
 
 - Click the display to interact with the firmware. The 480 × 480 LVGL image and
   touch coordinates scale together when resizing the window.
-- Click the **NFC pad** to open the four-card menu below the display.
+- Click the **NFC pad** to open the four-card menu below the display. Card 4 is a cheap
+  **UID-only** card (SAK 0x00, no ISO 14443-4, answers no APDU), like an NTAG213 or a
+  MIFARE Classic: use it to try the UID-only flow once an administrator allowed UID-only
+  cards in the settings. Cards 1 to 3 are secure cards (SAK 0x20).
 - **Press and hold** a card to present it. It stays present while held, including
   when the pointer moves off the card, and is removed on release. Leaving the
   window, losing focus, closing the menu, or quitting also removes it.

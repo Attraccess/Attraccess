@@ -1,7 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 // Release channels: nightlies own `next`, Attraccess releases own `latest`. `alpha` is frozen legacy.
 export const CHANNELS = { next: { nightly: true }, latest: { nightly: false } };
@@ -294,7 +293,7 @@ function main(argv) {
   return publishPlanned(toPublish, channel, head);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (import.meta.main) {
   try {
     process.exit(main(process.argv.slice(2)));
   } catch (error) {

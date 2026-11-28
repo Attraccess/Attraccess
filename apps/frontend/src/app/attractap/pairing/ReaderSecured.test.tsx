@@ -57,7 +57,7 @@ describe('ReaderSecured', () => {
         })}
       />,
     );
-    expect(screen.getByText('secured.notSecured')).toBeInTheDocument();
+    expect(screen.getByText('secured.labKey')).toBeInTheDocument();
     expect(screen.getByText('secured.profile.secure-lab')).toBeInTheDocument();
     expect(screen.getByText('secured.problem.profile-not-secure')).toBeInTheDocument();
     expect(screen.getByText('secured.problem.flash-encryption-not-release')).toBeInTheDocument();
@@ -65,6 +65,7 @@ describe('ReaderSecured', () => {
 
   it('says so when no report arrived yet', () => {
     render(<ReaderSecured reader={reader({ firmwareProfile: 'secure' })} />);
+    expect(screen.getByText('secured.notSecured')).toBeInTheDocument();
     expect(screen.getByText('secured.notChecked')).toBeInTheDocument();
   });
 });

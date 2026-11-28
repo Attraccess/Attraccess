@@ -200,6 +200,30 @@ describe('AttractapCardHandler', () => {
       expect(idle.state.resetNfcCardData).toBeFalsy();
     });
 
+    it.each([
+      ['enrollment', () => scope.handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 1 })],
+      ['reset', () => scope.handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 })],
+    ])('refuses to arm %s while the reader runs a supervision, as with Valkey', async (_flow, start) => {
+      const socket = scope.createMockSocket({
+        state: {
+          cardRelay: true,
+          supervisionFlow: {
+            resourceId: 5,
+            requesterUserId: 2,
+            requestId: 'r1',
+            approvedSupervisorUserId: null,
+            webInitiated: true,
+          },
+        },
+      });
+      scope.websocketService.sockets.set(socket.id, socket);
+
+      await expect(start()).rejects.toThrow(new ConflictException('READER_BUSY'));
+      expect(socket.state.enrollment).toBeFalsy();
+      expect(socket.state.resetNfcCardData).toBeFalsy();
+      expect(socket.sendMessage).not.toHaveBeenCalled();
+    });
+
     it('refuses to arm enrollment on a reader the admin policy excludes', async () => {
       const socket = scope.createMockSocket();
       scope.websocketService.sockets.set(socket.id, socket);

@@ -10,13 +10,15 @@ import {
   PreparedPlugin,
   samePermissions,
   PluginUpdatePolicy,
+  automaticUpdateRefusal,
   eligibleForPolicy,
   isDistTag,
   sameUpdatePolicy,
-  DEFAULT_PLUGIN_UPDATE_POLICY,
+  patchUpdatePolicy,
+  readStoredUpdatePolicy,
+  pluginsWithLegacyUpdateSettings,
   REGISTRY_PARENT,
   UPDATE_POLICY_KEY,
-  normalizeUpdatePolicy,
   PluginInstallPlan,
   TRANSACTION_FILE,
   backupDirectoryName,
@@ -28,11 +30,14 @@ import { createHash } from 'crypto';
 import { orderPluginDependencies } from '../runtime/dependencies';
 
 import { PluginService } from '../plugin.service';
+import { markPluginRestartRequired } from '../runtime/restart-required';
 
 import { existsSync } from 'fs';
 
 import { join } from 'path';
 import * as semver from 'semver';
+
+import { resolvePluginChannel } from '../../config/app.config';
 
 import { NpmInstallationPlan } from './installation-plan';
 
@@ -154,7 +159,7 @@ export class NpmInstallation {
             migrationOutcome: 'pending-restart',
             restartRequested: 1,
           });
-        if (!audit?.context) new PluginService().requestRestart();
+        markPluginRestartRequired();
         return prepared.find(({ installed }) => installed.name === plan.root).installed;
       });
     } finally {
@@ -164,10 +169,11 @@ export class NpmInstallation {
 
   async install(
     name: string,
-    spec: string,
+    spec: string | undefined,
     registryId?: string,
     audit?: NpmPluginAuditState,
     planToken?: string,
+    recordAs?: string,
   ): Promise<InstalledNpmPlugin> {
     if (this.state.listInstalled().some((plugin) => plugin.name === name)) {
       throw new BadRequestException('Package is already installed; use the replacement endpoint');
@@ -175,8 +181,11 @@ export class NpmInstallation {
     const registry = await this.registry.registry(registryId);
     const { version, metadata } = await this.plan.resolveVersion(name, spec, registry);
     const plan = await this.plan.installPlan(name, version, registry.id);
-    if (plan.plugins.length > 1) return this.installGraph(plan, registry, spec, undefined, [], audit, planToken);
-    return this.installFromRegistry(name, version, registry, undefined, [], spec, metadata, audit);
+    // Without an explicit spec the install follows the host's plugin channel.
+    const requestedSpec = recordAs ?? spec ?? resolvePluginChannel();
+    if (plan.plugins.length > 1)
+      return this.installGraph(plan, registry, requestedSpec, undefined, [], audit, planToken);
+    return this.installFromRegistry(name, version, registry, undefined, [], requestedSpec, metadata, audit);
   }
 
   async installFromRegistry(
@@ -246,7 +255,7 @@ export class NpmInstallation {
             this.logger.error(`Failed to record quarantine cleanup failure for ${name}`, stateError);
           }
           if (audit) Object.assign(audit, { activationOutcome: 'quarantined', restartRequested: 1 });
-          if (!audit?.context) new PluginService().requestRestart();
+          markPluginRestartRequired();
           return quarantined;
         }
         try {
@@ -306,7 +315,7 @@ export class NpmInstallation {
             migrationOutcome: 'pending-restart',
             restartRequested: 1,
           });
-        if (!audit?.context) new PluginService().requestRestart();
+        markPluginRestartRequired();
         return installed;
       });
     } finally {
@@ -325,9 +334,10 @@ export class NpmInstallation {
     try {
       policy = await this.getUpdatePolicy();
       if (!policy.checksEnabled) return installed;
+      const channel = resolvePluginChannel();
       const candidates = await this.plan.installedVersionCandidates(name);
       const requested = isDistTag(installed.requestedSpec)
-        ? await this.plan.resolveVersion(
+        ? await this.plan.resolveRequestedSpec(
             name,
             installed.requestedSpec,
             await this.registry.registry(installed.registryId),
@@ -337,12 +347,17 @@ export class NpmInstallation {
         const current = this.state.installed(name);
         // Candidates and dist-tag resolutions belong to the snapshot used for the registry request.
         if (snapshotChanged(current, await this.getUpdatePolicy())) return null;
-        const candidate = candidates.find(
-          (item) =>
-            item.direction === 'newer' &&
-            item.compatible &&
-            eligibleForPolicy(item, current, policy, requested?.version),
-        );
+        // The newest eligible version: an update installed on its own must not climb one release at a time.
+        const [candidate] = candidates
+          .filter(
+            (item) =>
+              item.direction === 'newer' &&
+              item.compatible &&
+              // While automatic updates are on, the offer is what they would install; while off, only an announcement.
+              (!policy.automaticUpdates || !automaticUpdateRefusal(item, current, candidates)) &&
+              eligibleForPolicy(item, current, policy, requested?.version, channel === 'next'),
+          )
+          .sort((left, right) => semver.rcompare(left.version, right.version));
         const blocked = candidates.some((item) => item.direction === 'newer' && item.compatible) && !candidate;
         const updated = {
           ...current,
@@ -388,6 +403,13 @@ export class NpmInstallation {
       checked.push(...results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])));
     }
     return checked;
+  }
+
+  async recordAutoUpdateFailure(name: string, version: string, failedAt: Date): Promise<void> {
+    await this.state.mutateInstalls(async () => {
+      const current = this.state.installed(name);
+      await this.state.writeState({ ...current, autoUpdateFailure: { version, failedAt: failedAt.toISOString() } });
+    });
   }
 
   async replaceInstalled(
@@ -437,7 +459,7 @@ export class NpmInstallation {
   async updateRequestedSpec(name: string, requestedSpec: string): Promise<InstalledNpmPlugin> {
     const installed = this.state.installed(name);
     const registry = await this.registry.registry(installed.registryId);
-    await this.plan.resolveVersion(name, requestedSpec, registry);
+    await this.plan.resolveRequestedSpec(name, requestedSpec, registry);
     return this.state.mutateInstalls(async () => {
       const updated = { ...this.state.installed(name), requestedSpec };
       await this.state.writeState(updated);
@@ -466,7 +488,7 @@ export class NpmInstallation {
     if (!['inherit', 'off', 'patch', 'minor', 'follow'].includes(updateOverride ?? ''))
       throw new BadRequestException('Invalid plugin update override');
     const installed = this.state.installed(name);
-    await this.plan.resolveVersion(name, requestedSpec, await this.registry.registry(installed.registryId));
+    await this.plan.resolveRequestedSpec(name, requestedSpec, await this.registry.registry(installed.registryId));
     return this.state.mutateInstalls(async () => {
       const updated = { ...this.state.installed(name), requestedSpec, updateOverride };
       await this.state.writeState(updated);
@@ -475,20 +497,43 @@ export class NpmInstallation {
   }
 
   async getUpdatePolicy(): Promise<PluginUpdatePolicy> {
-    const raw = await this.settings.getPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY);
-    if (!raw) return DEFAULT_PLUGIN_UPDATE_POLICY;
-    try {
-      return normalizeUpdatePolicy(JSON.parse(raw));
-    } catch {
-      return DEFAULT_PLUGIN_UPDATE_POLICY;
-    }
+    return readStoredUpdatePolicy(await this.settings.getPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY)).policy;
   }
 
-  async setUpdatePolicy(patch: Partial<PluginUpdatePolicy>): Promise<PluginUpdatePolicy> {
+  async setUpdatePolicy(patch: unknown): Promise<PluginUpdatePolicy> {
     return this.state.mutateInstalls(async () => {
-      const policy = normalizeUpdatePolicy({ ...(await this.getUpdatePolicy()), ...patch });
-      await this.settings.setPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY, JSON.stringify(policy));
+      const policy = patchUpdatePolicy(await this.getUpdatePolicy(), patch);
+      await this.storeUpdatePolicy(policy);
       return policy;
+    });
+  }
+
+  private storeUpdatePolicy(policy: PluginUpdatePolicy): Promise<void> {
+    return this.settings.setPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY, JSON.stringify(policy));
+  }
+
+  /**
+   * Writes down, once, that automatic updates became opt-in: a policy and plugin overrides saved before that are stored
+   * in their new, switched-off form. Reading already treats them that way, so this only makes it permanent and says so.
+   */
+  async persistUpdateOptIn(): Promise<void> {
+    await this.state.mutateInstalls(async () => {
+      const reset = pluginsWithLegacyUpdateSettings();
+      if (reset.length > 0) {
+        await this.state.writeRecords(readInstalledNpmPlugins());
+        const overrides = reset.filter(({ override }) => override).map(({ name, override }) => `${name} (${override})`);
+        if (overrides.length > 0)
+          this.logger.warn(
+            `Automatic plugin updates are now opt-in. Reset these plugin update overrides to inherit: ${overrides.join(', ')}`,
+          );
+      }
+      const stored = readStoredUpdatePolicy(await this.settings.getPlainSetting(REGISTRY_PARENT, UPDATE_POLICY_KEY));
+      if (!stored.legacy) return;
+      await this.storeUpdatePolicy(stored.policy);
+      this.logger.warn(
+        'Automatic plugin updates are now opt-in. The update policy saved by an earlier version has automatic updates ' +
+          'off; turn them on under Settings → Plugins.',
+      );
     });
   }
 }

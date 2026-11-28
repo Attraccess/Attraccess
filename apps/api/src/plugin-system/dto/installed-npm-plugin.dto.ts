@@ -97,4 +97,6 @@ export class InstalledPluginVersionDto {
   semverImpact: 'major' | 'minor' | 'patch' | 'prerelease' | 'none';
   @ApiProperty()
   matchesRequestedSpec: boolean;
+  @ApiProperty({ type: String, nullable: true })
+  publisher: string | null;
 }

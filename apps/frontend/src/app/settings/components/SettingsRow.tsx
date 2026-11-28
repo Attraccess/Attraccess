@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 interface SettingsRowProps {
   label: ReactNode;
   hint?: ReactNode;
+  /** Id of the hint element, so the control can point `aria-describedby` at it. */
+  hintId?: string;
   /** Put the control under the label instead of beside it — for long values and wide inputs. */
   stacked?: boolean;
   children: ReactNode;
@@ -24,7 +26,7 @@ interface SettingsRowProps {
  * `min(100%, 16rem)` basis lets a wide control drop to its own full-width line and keeps a narrow
  * one inline, with no breakpoint to keep in sync with the control's actual width.
  */
-export function SettingsRow({ label, hint, stacked, children, 'data-testid': testId }: SettingsRowProps) {
+export function SettingsRow({ label, hint, hintId, stacked, children, 'data-testid': testId }: SettingsRowProps) {
   return (
     <div
       data-slot="settings-row"
@@ -39,7 +41,11 @@ export function SettingsRow({ label, hint, stacked, children, 'data-testid': tes
           touches flex-grow, so the basis stands whatever the order. */}
       <div className={cn('flex min-w-0 flex-col gap-1', !stacked && 'grow basis-[min(100%,16rem)]')}>
         <div className="text-sm font-medium text-foreground">{label}</div>
-        {hint ? <div className="text-xs text-muted">{hint}</div> : null}
+        {hint ? (
+          <div id={hintId} className="text-xs text-muted">
+            {hint}
+          </div>
+        ) : null}
       </div>
 
       <div className={cn('flex items-start gap-2', stacked ? 'w-full' : 'shrink-0')}>{children}</div>

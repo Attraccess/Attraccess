@@ -118,6 +118,28 @@ the reader to its normal screens. A disconnect does too. Messages for any other
 `MassIntroduction: refused session=… reason=…` and
 `MassIntroduction: ended reason=… session=…`.
 
+## Image form fields (ATT-879)
+
+A touch reader has no camera, so an `image` form field is a QR code: the phone opens the link, takes or uploads the
+photos there and the server stores them. The reader announces `capabilities.formImages: true` in its firmware info
+(touch variants with a display only; the Lite and the BLE Bridge never do). The server sends `type: "image"` fields
+only to readers that announce it, so older firmware never sees a field type it cannot render.
+
+`RESOURCE_USAGE_FORM_FIELDS` carries three extra properties for an image field (its `value` is `null`):
+
+| Property     | Meaning                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| `handoffUrl` | The full link for the QR code. The reader only renders it and never builds a link itself |
+| `imageCount` | Photos the server holds for this attempt so far                                          |
+| `maxImages`  | The most photos the field takes                                                          |
+
+While an image field is the open page, the reader sends `RESOURCE_USAGE_FORM_GET_FIELDS` (same resource, action,
+form, offset and limit as the page) every 3 seconds. The answer updates the count, and redraws the QR code only when
+`handoffUrl` changed (a fresh link follows an expired one), without rebuilding the page. Polling stops when the page is
+left, cancelled or submitted. On Next/Submit the field is sent in `answers` with an empty string; the server fills in
+the photo ids it holds for the attempt and answers `REQUIRED_FIELD` in `RESOURCE_USAGE_FORM_PAGE_RESULT` when a
+required field has none.
+
 ## Card relay protocol (2.0.0)
 
 Firmware 2.0.0 holds no card keys and no card session state (ATT-1145). The server runs all
@@ -128,14 +150,23 @@ functions and answers their card events with `FIRMWARE_UPDATE_REQUIRED`. The key
 firmware 1.x (`CARD_AUTHENTICATION_DATA` with `keyNo`/`key`, enrollment and reset key events,
 `REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA` and friends) are gone.
 
-| Direction       | Event                   | Payload                                                                                                                                                                        |
-| --------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Reader → server | `CARD_DETECTED`         | `purpose` (`tap`, `enroll`, `reset`, `supervisor`, `mass-introduction`), `uid` (lowercase hex), `detectionId`, optional `resourceId`, optional `sessionId` (mass introduction) |
-| Server → reader | `CARD_APDU`             | `conversationId`, `detectionId`, `seq`, `apdu` (hex, at most 62 bytes)                                                                                                         |
-| Reader → server | `CARD_APDU_RESPONSE`    | `conversationId`, `seq`, `response` (hex, the card's answer including status bytes, at most 56 bytes)                                                                          |
-| Reader → server | `CARD_REMOVED`          | `conversationId` (the card did not answer: it left the field)                                                                                                                  |
-| Server → reader | `CARD_CONVERSATION_END` | `detectionId`, optional `conversationId` (absent when the server refused the card before any command)                                                                          |
-| Reader → server | `READER_SESSION_ENDED`  | none: the reader's login ended (logout or timeout), the server forgets the verified user                                                                                       |
+| Direction       | Event                   | Payload                                                                                                                                                                                                                                                      |
+| --------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Reader → server | `CARD_DETECTED`         | `purpose` (`tap`, `enroll`, `reset`, `supervisor`, `mass-introduction`), `uid` (lowercase hex), `detectionId`, optional `sak` and `atqa` (numbers: the card's select answers, since 2.14.0), optional `resourceId`, optional `sessionId` (mass introduction) |
+| Server → reader | `CARD_APDU`             | `conversationId`, `detectionId`, `seq`, `apdu` (hex, at most 62 bytes)                                                                                                                                                                                       |
+| Reader → server | `CARD_APDU_RESPONSE`    | `conversationId`, `seq`, `response` (hex, the card's answer including status bytes, at most 56 bytes)                                                                                                                                                        |
+| Reader → server | `CARD_REMOVED`          | `conversationId` (the card did not answer: it left the field)                                                                                                                                                                                                |
+| Server → reader | `CARD_CONVERSATION_END` | `detectionId`, optional `conversationId` (absent when the server refused the card before any command)                                                                                                                                                        |
+| Reader → server | `READER_SESSION_ENDED`  | none: the reader's login ended (logout or timeout), the server forgets the verified user                                                                                                                                                                     |
+
+**UID-only cards (since 2.14.0).** The reader sends the card's SAK (and ATQA) in `CARD_DETECTED` and announces
+`capabilities.uidOnlyCards: true`. A card whose SAK lacks bit `0x20` does not speak ISO 14443-4 (MIFARE Classic,
+Ultralight, NTAG21x): the server cannot send it APDUs, so it enrolls or accepts it on its UID alone, but only while
+an administrator allowed UID-only cards, and it never writes anything to it. The presence probe follows the card
+family: ISO 14443-4 cards get the keyless DESFire command, SAK `0x00` cards a READ of page 0, other cards (MIFARE
+Classic) are released and selected again by UID. A reader without the capability sends no SAK and behaves as before.
+The server answers `UID_ONLY_CARDS_DISABLED` for a UID-only card while the setting is off and
+`RANDOM_UID_NOT_SUPPORTED` for an enrollment of a random UID (4 bytes starting `0x08`).
 
 Every card presentation gets a new `detectionId` (per boot, counting from 1). The server echoes
 it in `CARD_APDU` and `CARD_CONVERSATION_END`, so a late message for an earlier card can neither
@@ -277,9 +308,9 @@ secure profile; development units stay unfused. A later secure bridge build need
 - Secure Boot v2 (RSA-PSS), which the classic ESP32 supports only from chip revision v3.0 (ECO3).
   Record each unit's revision before planning (`esptool --chip esp32 chip_id` prints it):
 
-  | Unit | Chip revision | PHY | PSRAM |
-  | ---- | ------------- | --- | ----- |
-  | (filled in during the first-deployment QA) | | | |
+  | Unit                                       | Chip revision | PHY | PSRAM |
+  | ------------------------------------------ | ------------- | --- | ----- |
+  | (filled in during the first-deployment QA) |               |     |       |
 
 - Flash encryption (release mode) with a per-device key, NVS encryption with the flash-encryption-based
   scheme (the classic ESP32 has no HMAC peripheral), and a disabled ROM download mode / JTAG.
@@ -291,6 +322,59 @@ secure profile; development units stay unfused. A later secure bridge build need
 
 Installations that rely on the reader secure profile get bridges without it; physical access to a
 bridge exposes its flash, including its pairing credentials.
+
+## Session duration protocol (2.12.0)
+
+Machines can limit how long a session runs (ATT-43): a **maximum session time**, and an option that **requires the
+user to say how long they will use the machine**. The server ends a session automatically at its deadline. The
+Touch and Touch V2 readers (also their demo variants) ask for the estimate and extend running sessions; the
+reader announces this with `capabilities.sessionDuration: true` in its firmware info. Lite, the BLE bridge, plugin
+readers and Touch readers on older firmware are never refused for a missing estimate: the server starts them with
+the machine's maximum as the deadline, or with its default estimate (60 minutes unless set) when there is no maximum.
+
+| Direction       | Event                           | Payload                                                                                                                                                                           |
+| --------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reader → server | `READER_FIRMWARE_INFO`          | `capabilities.sessionDuration: true`                                                                                                                                              |
+| Server → reader | `RESOURCE_LIST`                 | per machine `requireSessionDurationEstimate` (bool), `maxSessionDurationMinutes` (int or `null`)                                                                                  |
+| Server → reader | `RESOURCE_LIST` (session)       | on `ownUsageSession`, `activeUsageSession` and the listed sessions: `autoEndAt` (ISO), `autoEndUtcOffsetMinutes`, `autoEndInSeconds`, `hasMaxSessionTime`, `extendLimitInSeconds` |
+| Reader → server | `START_RESOURCE_USAGE_SESSION`  | optional `estimatedDurationMinutes` (1 to 43200); the server refuses a value above the maximum                                                                                    |
+| Reader → server | `SUPERVISION_REQUEST`           | optional `estimatedDurationMinutes`: the estimate chosen before asking for supervision, so a supervisor's approval on the web starts the session with it                          |
+| Reader → server | `EXTEND_RESOURCE_USAGE_SESSION` | `resourceId`, `usageId` (only for another person's session), `extendByMinutes` (60, 120, 240, 360, 720 or 1440) or `toMax: true`, `cardSessionId`                                 |
+| Server → reader | `EXTEND_RESOURCE_USAGE_SESSION` | `success: true` with `usageId`, or `error` (`SESSION_EXTENSION_EXCEEDS_MAXIMUM`, `SESSION_EXTENSION_NOT_POSSIBLE`, `SESSION_EXTENSION_INVALID`)                                   |
+
+The seconds in the list (`autoEndInSeconds`, `extendLimitInSeconds`) are relative to the moment the server built the
+list. The reader stores `millis()` when the list arrives and counts down from it, so the remaining time is right on a
+reader without a wall clock; the stop time ("Stops at 17:30") comes from `autoEndAt` and the zone offset, never from
+the reader's clock. `extendLimitInSeconds` is how far the end can still be pushed: the machine's maximum, or 30 days
+when it has none (`hasMaxSessionTime` tells which). The reader only enables a step that fits, and "Extend to
+maximum" only for a machine with a maximum and room below it; the server decides anyway and refuses with a code
+(nothing is clipped).
+
+Start: when `requireSessionDurationEstimate` is set the reader opens the **duration input** (hours and minutes
+steppers, quick picks 30 min / 1 h / 2 h / 4 h / 8 h, the maximum and the hint that the machine stops automatically)
+before it sends the start request, for a start, a takeover and a supervised start. Quick picks and values above the
+maximum cannot be chosen; Cancel aborts the start. The chosen minutes travel with the start request and with its
+retries after a usage form or a plugin confirmation. The input comes before the forms because the server asks for
+forms in answer to the first start request, which must already carry the estimate. A supervised start asks before the
+supervision: the reader sends the estimate in `SUPERVISION_REQUEST` (a supervisor may approve on the web, where the
+session starts without another request from the reader) and again in the start request after a supervisor card.
+
+Running session: the session area of the details screen shows "Stops automatically in 1:23:45 (at 17:30)" and an
+**Extend** button. The countdown is neutral and turns amber in the last 15 minutes. Extend opens a screen with +1 h,
++2 h, +4 h, +6 h, +12 h, +24 h and "Extend to maximum". The server resends the list after an extension, and also after
+one made on the web, so the screen updates live and closes when the session no longer has a deadline (or another
+session took its place). Extending needs the same identity as stopping: the card holder's own session (sent without
+`usageId`), or, on a machine with one session at a time, another person's session where the reader offers the card
+holder the force-stop (an introducer or a resource manager). Then the request names that session's `usageId`, like the
+force-stop, and the extension screen shows the owner's name. The server checks the rule of ending a session either way.
+On a machine with parallel sessions the reader extends only the own session.
+
+Memory: the list adds about 40 bytes to each of the (at most 10) listed resources; the two screens are built on entry and
+destroyed on leaving, like the project picker.
+
+Compatibility: an older reader ignores the new list fields and never sends `estimatedDurationMinutes`; an older
+server sends none of the fields, so the reader shows nothing new. `EXTEND_RESOURCE_USAGE_SESSION` is only sent to a
+server that put `autoEndInSeconds` in the list.
 
 ## Bluetooth setup (2.11.0)
 
@@ -600,7 +684,9 @@ API signs them per installation. It is never available for demo variants.
   `"true"` while the variant's secure build is on. Customers see no change until a
   variant is flipped after its hardware run.
 - Standard builds refuse every fuse-burning option (Secure Boot, flash encryption, NVS
-  encryption, anti-rollback), so a web-flashable image can never burn eFuses.
+  encryption, anti-rollback), so a web-flashable image never burns eFuses on its own. The
+  only eFuse write a standard build can make is the conversion's digest burn (step 4
+  below), and only on the server's burn command naming this reader and the verified digests.
 - `secure-version-floor.txt` must equal `CONFIG_BOOTLOADER_APP_SECURE_VERSION`; CI
   fails if either decreases. The eFuse field has 16 steps: bump only for security fixes.
 - No TLS key material in PSRAM: mbedTLS keys, secrets, bignums, PK and cipher contexts
@@ -644,7 +730,9 @@ marks a reader secured only after its eFuse report shows that lock.
 
 ### eFuse report and profile claims (ATT-1207)
 
-The firmware never writes an eFuse. Secure builds only read them: once per session, right after
+The firmware writes exactly two eFuse fields, both during a "Secure this reader" conversion (see
+below): the digest burn (KEY0/KEY1) in the plain app and the `WR_DIS_RD_DIS` lock in the release
+secure app. Everything else is read only. Secure builds read the eFuses once per session, right after
 `READER_FIRMWARE_INFO`, the reader sends one `efuse.report` control frame inside the TLS session
 (`src/api/security/efuse_report.cpp`, `efuse_snapshot.cpp`). It lists, per key block, the purpose
 and whether it is used or read-protected, the two public Secure Boot digests (never any key
@@ -658,6 +746,76 @@ is expected to report _not secured_. `tests/efuse-report` checks the message for
 
 Lab secure readers use public keys and development-mode flash encryption; see
 `lab/secure-boot/README.md`.
+
+### "Secure this reader" conversion (ATT-1208, 2.15.0)
+
+A paired plain reader moves to the release secure profile over the network, keeping its P-256
+pairing identity. The server drives every step inside the `attractap-session.v1` session
+(`conversion.*` CONTROL frames); the reader only acts on them. Code: `src/api/conversion/`.
+
+Plain builds of a variant with `ATTRACTAP_SECURE_PROFILE_BUILD "true"` compile the conversion
+client (`ATTRACTAP_CONVERSION_CLIENT`) and send `capabilities.secureConversion: true` in
+`READER_FIRMWARE_INFO`. Once per session, before the eFuse report, every reader sends
+`conversion.status` (`none`, `transferring` with bytes/total, `verified`, `burned`; a secure app
+after its migration `migrated` with `rdDisLocked`).
+
+| Step | Who                | What                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1    | plain app          | `conversion.preflight` → `conversion.preflight-report`: chip and revision, flash size, MAC, partition-table SHA-256, KEY0–5 purpose/used/read/write protection, `SECURE_BOOT_EN`, `SPI_BOOT_CRYPT_CNT`, `DIS_DOWNLOAD_MANUAL_ENCRYPT`, JTAG, free internal heap and largest block, variant, version, profile. Read only; the server judges it.                                                                                                                                                                                                   |
+| 2    | plain app          | `conversion.offer` (signed app and bootloader: sizes, SHA-256; both digests; variant; profile marker; secure-version floor). The reader requests 4 KiB chunks with `FIRMWARE_REQUEST_CHUNK` `{offset, length, conversion: "app" \| "bootloader", id}`; the app goes into the inactive OTA slot, the bootloader into the staging region. Then the NVS backup is staged. Resumable after any disconnect or power cut.                                                                                                                              |
+| 3    | plain app          | Verify, sent as `conversion.verified`: both signature blocks (RSA-PSS, the key digest equals `digest0`), both SHA-256 values, the variant (`FIRMWARE_VARIANT` and the firmware name in the image), the profile marker, `secure_version` ≥ floor, bootloader ≤ 0x8000, the NVS backup.                                                                                                                                                                                                                                                            |
+| 4    | plain app          | `conversion.burn {id, mac, digest0, digest1}`: burned only when the MAC is this reader's, the digests are the verified ones and KEY0/KEY1 are free; KEY0/KEY1 get purposes `SECURE_BOOT_DIGEST0/1` in one eFuse batch. The reader reports what it reads back (`conversion.burned`), or `conversion.burn-refused {reason}`. A repeated command burns nothing and reports again.                                                                                                                                                                   |
+| 5, 6 | plain app          | `conversion.write-bootloader`: re-verify against the burned digests, re-stage the NVS backup if settings changed, then "Don't unplug": select the new slot, write the bootloader at 0x0 and read it back (on a mismatch the original bootloader is written back), erase the first sector of the old plain app, report `conversion.bootloader-written`, restart. A failure carries `reason` (`refused`, `recheck-failed`, `write-failed`, `restore-failed`); after `restore-failed` the reader stays on with "Don't unplug" and does not restart. |
+| 7    | bootloader         | Secure Boot on, release-mode flash encryption in place (brick window 2; nothing on screen).                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 8    | secure app         | Before anything else (`ConversionMigration::initNvs`, main.cpp), only with Secure Boot and flash encryption on (otherwise NVS and staging stay untouched): erase the plain NVS, init encrypted NVS (KEY4 HMAC key burned read-protected by ESP-IDF), write the staged namespaces, read them back, mark them migrated, erase the staging region (header sector last), then lock RD_DIS (`WR_DIS_RD_DIS`). The P-256 key in the staging region is erased with it. A restart after the marker only finishes the erase (`migration_plan.hpp`).       |
+| 10   | secure app, server | `conversion.status` `migrated`, then the eFuse report: the server marks the reader secured.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+
+**Prepare boot (step 5).** `esp_ota_set_boot_partition` selects the new app, and after the bootloader
+write the first 4 KiB of the old plain app are erased. That app has no valid image header any more:
+the secure bootloader cannot boot it (it is unsigned anyway), and first-boot flash encryption skips
+an app partition without a valid image, so only the new app is encrypted, which keeps brick window 2
+short. To be validated on hardware in T4 (ATT-1209). Plain builds of conversion variants allow writes
+to the bootloader region (`sdkconfig.conversion`, `CONFIG_SPI_FLASH_DANGEROUS_WRITE_ALLOWED`);
+`sdkconfig.secure` and CMake forbid it in secure builds.
+
+**Staging region.** The last 256 KiB of `spiffs`: flash 0xFA0000..0xFE0000 (spiffs spans
+0xC90000..0xFE0000, coredump follows). Nothing in the firmware mounts or uses spiffs, and it is not
+flagged `encrypted`, so the secure app reads the region as the plain app wrote it.
+
+| Offset (in region) | Size    | Content                                                                                                 |
+| ------------------ | ------- | ------------------------------------------------------------------------------------------------------- |
+| 0x00000            | 4 KiB   | Header: magic `ATSC`, version, conversion id, both digests, image sizes and SHA-256, app slot, CRC-32   |
+| 0x01000            | 4 KiB   | Progress: one bit per done 4 KiB chunk (cleared, never erased), NVS record, verified record             |
+| 0x02000            | 32 KiB  | Signed bootloader                                                                                       |
+| 0x0A000            | 216 KiB | NVS backup of `readerpair`, `settings`, `cert_mgr` (not `demo_store`), format in `nvs_backup_codec.hpp` |
+
+While a valid header is present, nothing erases NVS: start-up skips the usual erase on
+`NO_FREE_PAGES`/`NEW_VERSION_FOUND`, and the bridge's factory reset is gated too. The staging data is
+deleted only after the secure app read the migrated entries back (a server `conversion.cancel`
+before the burn also wipes it). A wipe erases the header sector last, so a wipe cut short still
+counts as pending and is finished later (the server cancels the stale staging again, the secure app
+finishes it on its next boot). No log line carries keys, NVS values or staging payloads.
+
+**RD_DIS lock.** Compiled only into release secure images (`ATTRACTAP_RD_DIS_LOCK` in
+`conversion_build.hpp`): never into secure-lab, demo, debug (`sdkconfig.debug`), test-hook or
+stop-before-burn builds. It runs only while a conversion is pending (the staging header, or the
+`conversion` NVS marker after the region is gone), only once KEY4 holds the read-protected HMAC key,
+and only once (it checks the lock first). `tests/secure-conversion` proves the lock is compiled out
+of every other build flavour.
+
+**Screens.** A routed full-screen layout (`src/display/screens/secureConversion`), never a popup:
+transfer progress, "checking", and "Don't unplug" from the burn until the restart. NFC is suspended
+while it shows; a conversion that stops before the burn restarts the reader to give NFC back.
+The flash encryption (step 7, in the bootloader) and step 8 (at the top of `app_main`, before
+the settings and the display exist) cannot show anything; the last screen before them is the "Don't
+unplug" of the bootloader write, with the hint that restart and encryption take a few minutes.
+
+**Stop-before-burn (lab/HIL only).** `-DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=ON` needs
+`ATTRACTAP_TEST_HOOKS=ON`, and every test-hooks build has it on: the reader runs steps 1–3 and
+refuses every `conversion.burn` with reason `stop-before-burn` (the server records the conversion as
+failed and the reader stays plain), and the burn code itself is compiled out. `apps/attractap-lab/hil/run.sh`
+builds plain lab images with it; `build_firmwares.py` forces it off and `tools/check_release_build.py`
+fails a release image compiled with it.
 
 ## Building
 
@@ -705,6 +863,15 @@ idf.py -B build/dbg -DATTRACTAP_VARIANT=attractap-touch \
        -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.debug" build
 ```
 
+The debug overlay also turns on the FreeRTOS run-time stats (the same options as
+`sdkconfig.lab-stats`), which add the `debug.stats` serial topic (see "Task stats").
+
+LVGL perf monitor (development builds only): `-DATTRACTAP_LV_PERF_MONITOR=ON` on a display variant
+such as `attractap-touch-v2` turns on LVGL's sysmon perf monitor in log mode. FPS, render and flush
+time go to the serial log, not to the panel. Other variants fail the configure step. The option is
+`OFF` by default, `build_firmwares.py` passes `OFF`, such an image does not claim `release: true`,
+and `tools/check_release_build.py` fails a release image compiled with it.
+
 Note: `tools/build_individual_ca_certs.py` needs network access on the first
 run (it downloads Mozilla's CA bundle, cached for 7 days). Run it once before
 `idf.py` when building without `build_firmwares.py`.
@@ -730,6 +897,13 @@ partition such as `otadata` on the secure profile): ESP-IDF asserts that the sta
 RAM while the cache is frozen for the mapping. The main task, `LvglTask`, `LedTask`, `Beeper` and
 the `esp_websocket_client` task (`websocket_task`, 16 KB, created by the component with plain
 `xTaskCreate`; no released component version can put it in PSRAM) keep internal stacks.
+
+`CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP` stays off: an HIL A/B run on a Touch V2 (ATT-1276) showed
+no internal RAM gain with it (1 KB lower minimum free) and about 60 KB less free PSRAM, because
+`ALWAYSINTERNAL=1024` already sends the larger blocks to PSRAM.
+
+The heap log (every 30 s, INFO) shows both kinds: `Heap internal: free= largest= min=` and
+`Heap PSRAM: free= largest=`.
 
 ## Display Theme
 
@@ -759,7 +933,9 @@ asset shared by those screens, embedded once with four-byte alignment through
 ## Host Tests
 
 From the repository root, run `pnpm nx run attractap-firmware:test`. It runs
-SupervisionFlow logic tests, the UTF-8-safe text copy used for server-supplied names (`tests/text`:
+the "Secure this reader" conversion tests (`tests/secure-conversion`: staging format, NVS backup codec,
+conversion messages, burn decision incl. stop-before-burn, signature check against espsecure's output,
+and the RD_DIS lock build matrix), SupervisionFlow logic tests, the UTF-8-safe text copy used for server-supplied names (`tests/text`:
 display names are cut to 79 bytes in whole characters) and the
 [real LVGL host-rendering harness](tests/display-theme/README.md).
 The latter checks theme states, both logo assets, selected production screens
@@ -816,7 +992,8 @@ shows over the same console. These topics exist only in firmware built with
 `-DATTRACTAP_TEST_HOOKS=ON` (display variants; configuring a headless variant
 with it fails). Release builds never contain them: the option defaults to
 `OFF` and `build_firmwares.py` passes `-DATTRACTAP_TEST_HOOKS=OFF`. Like all
-topics except `auth.*`, each command needs the serial PIN in `authCode`.
+topics except `auth.*` and the lab-only `debug.*` topics, each command needs
+the serial PIN in `authCode`.
 
 `-DATTRACTAP_BEEPER_DEFAULT=OFF` turns the beeper off on readers without a
 saved beeper setting (new or erased readers). The setting itself still works;
@@ -929,6 +1106,39 @@ Errors: `INVALID_PAYLOAD` (missing or out-of-range value), `WIDGET_NOT_FOUND`,
 The lookup reads LVGL objects only: text drawn without a label (images, canvas
 content, button-matrix keys without text) cannot be matched, and keys are
 reported without separate hit-testing of overlapping keys.
+
+### Task stats (debug and lab builds only)
+
+`CMND debug.stats` (no PIN, like `debug.crash`) logs one row per FreeRTOS task at INFO, between
+`=== FreeRTOS run-time stats (...) ===` and `=== End run-time stats ===`:
+
+```
+[TaskStats] INFO: Task               Runtime us    CPU  StackHWM  Core
+[TaskStats] INFO: IDLE1             12345678901  48.3%      1234  1
+```
+
+- Runtime: microseconds the task ran since boot (64-bit counters, so they do not wrap). A short
+  sample needs two calls.
+- CPU: share of both cores, cut to one decimal. All rows, including `IDLE0` and `IDLE1`, add up to
+  about 97-100 %: interrupt time and the slices still running are not counted.
+- StackHWM: free stack bytes at the lowest point. Core: `0`, `1` or `any` (unpinned).
+
+The rows go out 20 ms apart, because the console's 1 KB TX buffer drops lines of a burst, so a call
+takes about half a second. The reply `RESP debug.stats {"success":true}` comes after the end line;
+`{"error":"STATS_UNAVAILABLE"}` means the snapshot could not be taken (the log says why). Taking
+the snapshot briefly masks interrupts on the calling core, which can disturb one display frame: do
+not call it during timing or display measurements.
+
+The topic exists where `CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS` is on: builds with
+`sdkconfig.debug`, and every build with `-DATTRACTAP_TEST_HOOKS=ON` (CMake layers
+`sdkconfig.lab-stats` after the defaults, also with `ATTRACTAP_SECURE_LAB`, never for a release
+secure profile). sdkconfig defaults only reach a new `sdkconfig`: delete the build directory after
+switching the test hooks on or off, and once for a directory created before firmware 2.11.1 (such
+as an old `build/hil-*` of `apps/attractap-lab/hil/run.sh`). Other builds answer `UNKNOWN_TOPIC`
+after the PIN check, like any unknown topic (`PIN_NOT_SET` on a reader without a PIN).
+`tools/check_release_build.py` fails a release build whose sdkconfig enables the stats or whose
+image contains the `debug.stats` topic. The stats cost a little CPU and RAM, so lab and debug
+images differ slightly from release.
 
 ## Crash reports and coredump upload (ATT-474, ATT-1144)
 

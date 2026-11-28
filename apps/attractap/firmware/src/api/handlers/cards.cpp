@@ -19,6 +19,13 @@ bool API::sendCardDetected(const char *purpose, const uint8_t *uid, uint8_t uidL
     payload["purpose"] = purpose;
     payload["detectionId"] = detectionId;
     payload["uid"] = hexToString(const_cast<uint8_t *>(uid), uidLength);
+    uint8_t sak = 0;
+    uint16_t atqa = 0;
+    if (this->cardInfoProvider != nullptr && this->cardInfoProvider(sak, atqa))
+    {
+        payload["sak"] = sak;
+        payload["atqa"] = atqa;
+    }
     if (resourceId != 0)
     {
         payload["resourceId"] = resourceId;
@@ -76,6 +83,11 @@ void API::setCardApduCallback(std::function<void(uint32_t detectionId, const cha
 void API::setCardConversationStartCallback(std::function<uint32_t()> callback)
 {
     this->cardConversationStartCallback = callback;
+}
+
+void API::setCardInfoProvider(std::function<bool(uint8_t &sak, uint16_t &atqa)> provider)
+{
+    this->cardInfoProvider = provider;
 }
 
 void API::setCardConversationEndCallback(std::function<void(uint32_t detectionId, const char *conversationId)> callback)

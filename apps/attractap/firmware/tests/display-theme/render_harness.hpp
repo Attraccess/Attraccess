@@ -266,10 +266,19 @@ void testPickerForCanEndOtherSessions();
 void testDetailsOwnershipFromOwnSession();
 void testParallelSessionLockscreen(Renderer &renderer);
 
+void testSessionDurationRules();
+void testDurationInputScreen(Renderer &renderer);
+void testDurationInputWithoutMaximum(Renderer &renderer);
+void testExtendSessionScreen(Renderer &renderer);
+void testExtendWithoutMaximum();
+void testExtendOtherPersonsSession(Renderer &renderer);
+void testDetailsAutoEnd(Renderer &renderer);
+
 void testDemoFixtureLocales(Renderer &renderer);
 void testDemoResourceListLocales(Renderer &renderer);
 void testCatalogLocales(Renderer &renderer);
 void testPowerOffLocales(Renderer &renderer);
 void testFormAndProjectLocaleRefresh(Renderer &renderer);
 void testDemoMaterialCaptions(Renderer &renderer);
+void testFormImageField(Renderer &renderer);
 void testFirmwareUpdateLocales(Renderer &renderer);

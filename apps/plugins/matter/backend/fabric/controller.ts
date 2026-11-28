@@ -1,4 +1,4 @@
-import { Auth, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, type AuthenticatedRequest, NotAnMcpTool } from '@attraccess/plugins-backend-sdk';
 import { BadRequestException, Body, Controller, Get, HttpCode, Inject, Post, Req } from '@nestjs/common';
 import { MATTER_OPERATIONS } from '../permissions';
 import type { z } from 'zod';
@@ -34,6 +34,7 @@ export class MatterFabricController {
   @Auth(...MATTER_OPERATIONS.fabricCreate)
   @Post('fabric/create')
   @HttpCode(200)
+  @NotAnMcpTool('Key material: creates the fabric and returns its recovery key')
   create(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<CreateResult> {
     return this.fabric.create(parse(createFabricSchema, body).label, principalOf(request));
   }
@@ -41,6 +42,7 @@ export class MatterFabricController {
   @Auth(...MATTER_OPERATIONS.recoveryKeyGenerate)
   @Post('fabric/recovery-key')
   @HttpCode(200)
+  @NotAnMcpTool('Secret management: reveals a recovery key')
   generateKey(@Req() request: AuthenticatedRequest): Promise<RecoveryKeyReveal> {
     return this.fabric.generateRecoveryKey(principalOf(request));
   }
@@ -48,6 +50,7 @@ export class MatterFabricController {
   @Auth(...MATTER_OPERATIONS.recoveryKeyAcknowledge)
   @Post('fabric/recovery-key/acknowledge')
   @HttpCode(200)
+  @NotAnMcpTool('Secret management: recovery key handling')
   async acknowledge(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<FabricBackupStatus> {
     await this.keys.acknowledge(parse(acknowledgeSchema, body).keyId, principalOf(request));
     return this.fabric.status();
@@ -56,6 +59,7 @@ export class MatterFabricController {
   @Auth(...MATTER_OPERATIONS.recoveryKeyRotate)
   @Post('fabric/recovery-key/rotate')
   @HttpCode(200)
+  @NotAnMcpTool('Secret management: reveals a rotated recovery key')
   rotate(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<RecoveryKeyReveal> {
     parse(rotateSchema, body);
     return this.fabric.rotateRecoveryKey(principalOf(request));
@@ -64,6 +68,7 @@ export class MatterFabricController {
   @Auth(...MATTER_OPERATIONS.recoveryAcceptSidecar)
   @Post('recovery/accept-sidecar')
   @HttpCode(200)
+  @NotAnMcpTool('Key material: fabric recovery')
   acceptSidecar(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<FabricBackupStatus> {
     parse(acceptSidecarSchema, body);
     return this.fabric.acceptSidecar(principalOf(request));
@@ -72,6 +77,7 @@ export class MatterFabricController {
   @Auth(...MATTER_OPERATIONS.recoveryStartNew)
   @Post('recovery/start-new')
   @HttpCode(200)
+  @NotAnMcpTool('Key material: replaces the fabric')
   startNew(@Body() body: unknown, @Req() request: AuthenticatedRequest): Promise<CreateResult> {
     return this.fabric.startNew(parse(startNewSchema, body).label, principalOf(request));
   }

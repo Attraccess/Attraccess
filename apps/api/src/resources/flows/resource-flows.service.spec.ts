@@ -300,6 +300,28 @@ describe('saving MQTT flow subscriptions', () => {
     expect(graph.auditEvents).toEqual([]);
   });
 
+  it('rejects an edge to a node the canvas does not contain, names it and saves nothing', async () => {
+    const { graph, events, audit, service } = context;
+    const saving = service.saveResourceFlow(
+      1,
+      {
+        nodes: [node('nut', ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED, 'a')],
+        edges: [{ id: 'failure', source: 'nut', sourceHandle: 'failure', target: 'FAIL', targetHandle: null }],
+      },
+      testActor,
+    );
+    await expect(saving).rejects.toBeInstanceOf(BadRequestException);
+    await expect(saving).rejects.toMatchObject({
+      response: {
+        message: [expect.stringContaining('failure')],
+        edges: [{ edgeId: 'failure', source: 'nut', target: 'FAIL' }],
+      },
+    });
+    expect(graph.calls).not.toContain('replaceResourceCanvas');
+    expect(events.emit).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
   it('does not announce a flow change when persistence fails', async () => {
     const { graph, events, service } = context;
     graph.addNode({

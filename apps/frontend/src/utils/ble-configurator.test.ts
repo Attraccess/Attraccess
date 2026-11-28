@@ -79,10 +79,30 @@ it('lists readers and bridges in setup mode and subscribes to notifications befo
 });
 
 it('treats a closed device picker as a cancel, not an error', async () => {
-  requestDevice.mockRejectedValueOnce(Object.assign(new Error('User cancelled'), { name: 'NotFoundError' }));
+  requestDevice.mockRejectedValueOnce(Object.assign(new Error('User cancelled the requestDevice() chooser.'), { name: 'NotFoundError' }));
   const { BleConfigurator } = await import('./ble-configurator');
   await expect(BleConfigurator.getInstance().connect()).resolves.toBe(false);
   expect(BleConfigurator.getInstance().isConnected).toBe(false);
+});
+
+it('rejects when the browser blocked Bluetooth instead of treating it as a cancel', async () => {
+  requestDevice.mockRejectedValueOnce(
+    Object.assign(new Error('Bluetooth permission has been blocked.'), { name: 'NotFoundError' }),
+  );
+  const { BleConfigurator, isBluetoothBlocked } = await import('./ble-configurator');
+  const error = await BleConfigurator.getInstance()
+    .connect()
+    .catch((err: unknown) => err);
+  expect(isBluetoothBlocked(error)).toBe(true);
+});
+
+it('tells a blocked or disabled Bluetooth apart from a cancelled picker', async () => {
+  const { isBluetoothBlocked, isChooserCancelled } = await import('./ble-configurator');
+  const notFound = (message: string) => Object.assign(new Error(message), { name: 'NotFoundError' });
+  expect(isChooserCancelled(notFound('User cancelled the requestDevice() chooser.'))).toBe(true);
+  expect(isBluetoothBlocked(notFound('User cancelled the requestDevice() chooser.'))).toBe(false);
+  expect(isBluetoothBlocked(notFound('User or their enterprise policy has disabled Web Bluetooth.'))).toBe(true);
+  expect(isBluetoothBlocked(notFound('Bluetooth adapter not available.'))).toBe(false);
 });
 
 it('splits a long command into writes of at most 180 bytes', async () => {

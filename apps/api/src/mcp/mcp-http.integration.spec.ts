@@ -153,8 +153,9 @@ describe('MCP endpoint with API tokens (real application)', () => {
         inputSchema: { additionalProperties: boolean };
       }>;
       const names = tools.map((tool) => tool.name);
-      expect(names).toEqual(expect.arrayContaining(['listRoles', 'createRole', 'getAllResources', 'info']));
+      expect(names).toEqual(expect.arrayContaining(['listRoles', 'createRole', 'getAllResources']));
       for (const denied of [
+        'info',
         'createSession',
         'createApiToken',
         'rebootHost',
@@ -168,6 +169,30 @@ describe('MCP endpoint with API tokens (real application)', () => {
       }
       expect(tools.every((tool) => tool.inputSchema.additionalProperties === false && tool.description)).toBe(true);
       expect(new Set(names).size).toBe(names.length);
+    });
+
+    it('lists only the tools the token permissions allow, so a narrow token sees less than a broad one', async () => {
+      const owner = await t.createUser(ADMIN_PERMISSIONS);
+      const namesFor = async (bearer: string) =>
+        ((await t.rpc(bearer, 'tools/list')).body.result.tools as Array<{ name: string }>).map((tool) => tool.name);
+      const narrow = await namesFor(await t.createApiToken(owner.id, ['users.api-tokens.manage']));
+      const broad = await namesFor(token);
+      expect(narrow).not.toContain('listRoles');
+      expect(narrow).not.toContain('createRole');
+      expect(broad).toEqual(expect.arrayContaining(['listRoles', 'createRole']));
+      expect(narrow.length).toBeLessThan(broad.length);
+      // Tools with no permission requirement stay visible to every signed-in caller.
+      expect(narrow).toContain('getAllResources');
+    });
+
+    it('answers a call of a hidden tool exactly like a call of an unknown tool', async () => {
+      const owner = await t.createUser(ADMIN_PERMISSIONS);
+      const narrow = await t.createApiToken(owner.id, ['users.api-tokens.manage']);
+      const hidden = (await t.callTool(narrow, 'listRoles')).body;
+      const unknown = (await t.callTool(narrow, 'listRolesNoSuchTool')).body;
+      expect(hidden.error).toEqual({ code: -32602, message: 'MCP error -32602: Unknown tool: listRoles' });
+      expect(unknown.error).toEqual({ code: -32602, message: 'MCP error -32602: Unknown tool: listRolesNoSuchTool' });
+      expect(hidden.result).toBeUndefined();
     });
 
     it('runs a read call and a write call through the REST pipeline', async () => {
@@ -199,11 +224,10 @@ describe('MCP endpoint with API tokens (real application)', () => {
 
     it('enforces the token allow-list intersected with the owner permissions', async () => {
       const owner = await t.createUser(ADMIN_PERMISSIONS);
-      // Token allow-list narrower than the owner: reading roles is not part of it.
+      // Token allow-list narrower than the owner: reading roles is not part of it, so the tool is not even visible.
       const narrow = await t.createApiToken(owner.id, ['users.api-tokens.manage']);
-      const denied = resultOf((await t.callTool(narrow, 'listRoles')).body);
-      expect(denied.isError).toBe(true);
-      expect(denied.content[0].text).toMatch(/^HTTP 403 Forbidden: Insufficient permissions/);
+      const denied = (await t.callTool(narrow, 'listRoles')).body;
+      expect(denied.error).toMatchObject({ code: -32602, message: expect.stringContaining('Unknown tool: listRoles') });
       const readCapable = await t.createApiToken(owner.id, ['users.api-tokens.manage', 'users.roles.manage']);
       expect(resultOf((await t.callTool(readCapable, 'listRoles')).body).isError).toBeUndefined();
       // Losing a role permission in Attraccess removes it from the token on the next call.

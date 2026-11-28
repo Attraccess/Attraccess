@@ -15,9 +15,14 @@ const state = vi.hoisted(() => ({
   contactPending: false,
   forms: vi.fn(),
   apiError: vi.fn(),
+  invalidate: vi.fn(),
+  restricted: new Set<string>(),
   endOptions: undefined as undefined | { onError?: (error: Error) => void },
 }));
 
+vi.mock('../../../../../hooks/useNetworkRestriction', () => ({
+  useNetworkRestriction: () => ({ isRestricted: (action: string) => state.restricted.has(action) }),
+}));
 vi.mock('../../../../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 1 }, hasPermission: () => state.update }),
 }));
@@ -62,8 +67,9 @@ vi.mock('@attraccess/react-query-client', () => ({
   useMessagingContactResourceHolder: () => ({ mutate: state.contact, isPending: state.contactPending }),
   UseResourceUsageGetActiveSessionKeyFn: () => [],
   UseResourceUsageGetHistoryKeyFn: () => [],
+  useGetNetworkRestrictionStatusKey: 'network-status',
 }));
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
 vi.mock('../../../forms/hooks/useResourceFormsSubmission', () => ({
   useResourceFormsSubmission: () => ({ requestForms: state.forms, modal: null, clearFormsDraft: vi.fn() }),
 }));
@@ -120,6 +126,7 @@ describe('ParallelSessionsDisplay', () => {
     state.update = false;
     state.introducer = false;
     state.contactPending = false;
+    state.restricted = new Set();
     state.forms.mockResolvedValue([]);
   });
   afterEach(cleanup);
@@ -180,6 +187,23 @@ describe('ParallelSessionsDisplay', () => {
     const error = new Error('NoOwnActiveSessionError');
     state.endOptions?.onError?.(error);
     expect(state.apiError).toHaveBeenCalledWith(expect.objectContaining({ error, baseTranslationKey: 'api' }));
+  });
+
+  it('keeps End visible but disabled outside the allowed network, and says why once', () => {
+    state.update = true;
+    state.restricted = new Set(['usage.end']);
+    mount();
+    for (const button of screen.getAllByRole('button', { name: /^endSession.ariaLabel/ }))
+      expect(button).toBeDisabled();
+    expect(screen.getAllByRole('note')).toHaveLength(1);
+  });
+
+  it('asks for the network status again after a NETWORK_RESTRICTED refusal', () => {
+    state.update = true;
+    mount();
+    state.endOptions?.onError?.({ body: { message: 'NETWORK_RESTRICTED' } } as unknown as Error);
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['network-status'] });
+    expect(state.apiError).toHaveBeenCalled();
   });
 
   it('ends the chosen session by usage id after confirmation', async () => {

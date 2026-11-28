@@ -26,7 +26,6 @@ export interface FlowContextType {
   resourceType: 'machine' | 'door';
   resourceSeparateUnlockAndUnlatch: boolean;
   resourceAllowTakeOver: boolean;
-  liveLogs: ResourceFlowLog[];
   addLiveLogReceiver: (receiver: LiveLogReceiver) => void;
   removeLiveLogReceiver: (receiver: LiveLogReceiver) => void;
   flowNodeTypes: NodeTypes;

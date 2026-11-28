@@ -35,6 +35,28 @@ export function isWebBluetoothAvailable(): boolean {
   return window.isSecureContext && !!navigator.bluetooth;
 }
 
+/**
+ * The user closed the device picker without a pick. Chrome rejects with `NotFoundError` both for that ("User cancelled
+ * the requestDevice() chooser") and for a picker it never showed (Bluetooth blocked for the site, adapter off), so the
+ * message tells them apart.
+ */
+export function isChooserCancelled(err: unknown): boolean {
+  return err instanceof Error && err.name === 'NotFoundError' && /cancel/i.test(err.message);
+}
+
+/**
+ * The browser did not show the picker because Bluetooth is blocked for this site or switched off by the user or a policy
+ * ("Bluetooth permission has been blocked.", "User or their enterprise policy has disabled Web Bluetooth.").
+ */
+export function isBluetoothBlocked(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    err.name === 'NotFoundError' &&
+    !isChooserCancelled(err) &&
+    /blocked|disabled|denied/i.test(err.message)
+  );
+}
+
 /** Chrome reports a write on a not yet encrypted link as one of these, depending on the platform. */
 function isSecurityError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
@@ -83,7 +105,7 @@ export class BleConfigurator implements ConfiguratorTransport {
 
   /**
    * Opens the browser's device picker and connects to the chosen reader or bridge.
-   * Resolves false when the user closed the picker; rejects when connecting failed.
+   * Resolves false when the user closed the picker; rejects when connecting failed or the browser blocked Bluetooth.
    */
   public async connect(): Promise<boolean> {
     if (this.isConnected) return true;
@@ -96,7 +118,7 @@ export class BleConfigurator implements ConfiguratorTransport {
         optionalServices: [SETUP_SERVICE_UUID],
       });
     } catch (err) {
-      if (err instanceof Error && err.name === 'NotFoundError') return false;
+      if (isChooserCancelled(err)) return false;
       throw err;
     }
 

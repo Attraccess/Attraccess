@@ -1,5 +1,5 @@
 # Einrichtungsassistent
-<!-- llms-description: Führt durch den fünfstufigen Einrichtungsassistenten beim ersten Start: Anwendungs- und E-Mail-Einstellungen, Lizenz, Administrator-Konto und E-Mail-Bestätigung. -->
+<!-- llms-description: Die fünf Schritte des Einrichtungsassistenten (Anwendung, E-Mail, Lizenz, Administrator-Konto, Bestätigung) und die Standardrichtlinie für Registrierung und Sichtbarkeit. -->
 
 Wenn Sie Attraccess zum ersten Mal starten und noch kein Benutzerkonto existiert, werden Sie automatisch zum Einrichtungsassistenten weitergeleitet. Dieser führt Sie durch die Grundkonfiguration in fünf Schritten.
 
@@ -65,6 +65,22 @@ Erstellen Sie Ihr erstes Benutzerkonto. Dieses wird Ihr Administrator-Konto.
 Nach der Registrierung erhalten Sie eine Bestätigungs-E-Mail. Klicken Sie auf den Link in der E-Mail, um Ihr Konto zu verifizieren. Haben Sie etwas falsch eingegeben, korrigieren Sie Ihre Administrator-Angaben über den Link in diesem Schritt.
 
 Danach können Sie sich anmelden und mit der Konfiguration von Attraccess beginnen.
+
+## Standardrichtlinie für Registrierung und Sichtbarkeit
+
+Entscheiden Sie das, bevor Sie die Instanz für Personen öffnen. Die Standardwerte und was daraus für den Datenschutz folgt:
+
+| Richtlinie                          | Standard                                                                                                                                                                                                                                                       | Wo ändern                                                                 |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **Selbstregistrierung**             | Offen. Die Whitelist der Registrierungsdomains ist `*`, jede Person kann also mit beliebiger E-Mail-Adresse ein Konto anlegen. Entfernen Sie `*` und tragen Sie Ihre Domains ein, um das einzuschränken; eine leere Liste schaltet die Selbstregistrierung ab. | **Einstellungen** > **Sicherheit** > **Erlaubte Registrierungs-Domains**  |
+| **Sichtbarkeit der Maschinenliste** | **Nur in eine Maschine eingewiesene Personen** bei neuen Installationen. Von einer früheren Version aktualisierte Instanzen behalten **Alle mit „Ressourcen lesen“**, bis ein Administrator es ändert.                                                         | **Einstellungen** > **Allgemein** > **Wer die Maschinenliste sehen darf** |
+
+Jedes neue Konto erhält die Standardrolle `user`, die nur **Ressourcen lesen** enthält. Was dieses Konto sieht, hängt von der Sichtbarkeit der Maschinenliste ab:
+
+- Bei **Nur in eine Maschine eingewiesene Personen** sieht ein neues Konto nur die Maschinen, die beaufsichtigte Nutzung erlauben oder erfordern, bis jemand es einweist. Ihre übrige Ausstattung bleibt Außenstehenden unbekannt.
+- Bei **Alle mit „Ressourcen lesen“** und offener Selbstregistrierung kann jede Person ein Konto anlegen und Ihre gesamte Geräteliste lesen. Das verrät Außenstehenden, welche Maschinen Ihre Werkstatt hat und welche nicht. Behandeln Sie die Geräteliste als betriebliche Information, die Sie schützen müssen: Schränken Sie die Registrierungsdomains ein oder wechseln Sie zu **Nur in eine Maschine eingewiesene Personen**.
+
+Die genauen Regeln stehen unter [Sichtbarkeit der Maschinenliste](settings/overview.md#sichtbarkeit-der-maschinenliste); was ein Konto vor der Bestätigung seiner E-Mail-Adresse kann, steht unter [Benutzer anlegen](user-management/creating-users.md#was-ein-konto-vor-der-bestätigung-der-e-mail-adresse-erreicht).
 
 ## Nach der Ersteinrichtung
 

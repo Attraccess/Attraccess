@@ -4,6 +4,8 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { PluginMigrationService } from './plugin-migration.service';
 import { PluginService } from './plugin.service';
+import { isPluginRestartRequired } from './runtime/restart-required';
+import { isPluginRemoved } from './runtime/removed-plugins';
 import { PluginUninstallService } from './plugin-uninstall.service';
 import { compilePluginStorage } from './plugin-storage/storage-schema';
 import { assertNamespaceUnclaimed, claimStorageNames } from './plugin-storage/storage-registry';
@@ -13,7 +15,7 @@ describe('PluginUninstallService', () => {
 
   const bleEndpoints = { deleteAllForPlugin: jest.fn().mockResolvedValue(undefined) };
   const readers = { deleteAllForPlugin: jest.fn().mockResolvedValue(undefined) };
-  const uninstaller = () => new PluginUninstallService(new PluginService(), bleEndpoints as never, readers as never);
+  const uninstaller = () => new PluginUninstallService(bleEndpoints as never, readers as never);
 
   function writeDeletablePlugin(withStorage = false) {
     fixture.writePlugin(fixture.root, 'delete-me', {
@@ -33,24 +35,47 @@ describe('PluginUninstallService', () => {
 
   it('deletes the BLE endpoints the plugin owns, and still uninstalls when that fails', async () => {
     const plugin = writeDeletablePlugin();
-    await uninstaller().deletePlugin(plugin.id, true);
+    await uninstaller().deletePlugin(plugin.id);
     expect(bleEndpoints.deleteAllForPlugin).toHaveBeenCalledWith(plugin.id);
 
     const second = writeDeletablePlugin();
     bleEndpoints.deleteAllForPlugin.mockRejectedValueOnce(new Error('db locked'));
-    await uninstaller().deletePlugin(second.id, true);
+    await uninstaller().deletePlugin(second.id);
     expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
   });
 
   it('deletes the plugin readers, and still uninstalls when that fails', async () => {
     const plugin = writeDeletablePlugin();
-    await uninstaller().deletePlugin(plugin.id, true);
+    await uninstaller().deletePlugin(plugin.id);
     expect(readers.deleteAllForPlugin).toHaveBeenCalledWith(plugin.id);
 
     const second = writeDeletablePlugin();
     readers.deleteAllForPlugin.mockRejectedValueOnce(new Error('db locked'));
-    await uninstaller().deletePlugin(second.id, true);
+    await uninstaller().deletePlugin(second.id);
     expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
+  });
+
+  it('refuses the reader and BLE calls of the removed plugin before deleting its rows', async () => {
+    const plugin = writeDeletablePlugin();
+    let removedWhenReadersWent = false;
+    readers.deleteAllForPlugin.mockImplementationOnce(async () => {
+      removedWhenReadersWent = isPluginRemoved(plugin.id);
+    });
+
+    await uninstaller().deletePlugin(plugin.id);
+
+    expect(removedWhenReadersWent).toBe(true);
+    expect(isPluginRemoved(plugin.id)).toBe(true);
+  });
+
+  it('stops a removed npm plugin: refuses its reader and BLE calls and ends its open BLE sessions', async () => {
+    const closePluginSessions = jest.fn().mockResolvedValue(undefined);
+    const service = new PluginUninstallService({ ...bleEndpoints, closePluginSessions } as never, readers as never);
+
+    await service.stopRemovedPlugin('npm-plugin');
+
+    expect(isPluginRemoved('npm-plugin')).toBe(true);
+    expect(closePluginSessions).toHaveBeenCalledWith('npm-plugin', 'shutdown');
   });
 
   describe('health entries', () => {
@@ -67,7 +92,6 @@ describe('PluginUninstallService', () => {
     });
     const uninstallerWith = (health: unknown) =>
       new PluginUninstallService(
-        new PluginService(),
         bleEndpoints as never,
         readers as never,
         {
@@ -83,7 +107,7 @@ describe('PluginUninstallService', () => {
         entry(2, 'plugin:delete-me:lock-2-motor', 'manual'),
       ]);
 
-      await uninstallerWith(health).deletePlugin(plugin.id, true);
+      await uninstallerWith(health).deletePlugin(plugin.id);
 
       expect(health.listBySourceAndPrefix).toHaveBeenCalledWith('plugin', 'plugin:delete-me:');
       expect(health.clearEntry).toHaveBeenCalledTimes(1);
@@ -96,13 +120,13 @@ describe('PluginUninstallService', () => {
       const health = healthWith([entry(1, 'plugin:delete-me:a')]);
       health.clearEntry.mockRejectedValue(new Error('db locked'));
 
-      await uninstallerWith(health).deletePlugin(plugin.id, true);
+      await uninstallerWith(health).deletePlugin(plugin.id);
 
       expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
     });
   });
 
-  it('removes the plugin folder and schedules a restart', async () => {
+  it('removes the plugin folder and marks a restart as required without restarting', async () => {
     const plugin = writeDeletablePlugin();
     PluginService.quarantinePlugin(plugin, new Error('prior crash'));
 
@@ -110,8 +134,9 @@ describe('PluginUninstallService', () => {
 
     expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
     expect(PluginService.isPluginQuarantined(plugin)).toBe(false);
-    fixture.flushScheduledRestart();
-    expect(fixture.restartSpy).toHaveBeenCalledTimes(1);
+    expect(isPluginRestartRequired()).toBe(true);
+    expect(setTimeout).not.toHaveBeenCalledWith(expect.any(Function), 1000);
+    expect(fixture.restartSpy).not.toHaveBeenCalled();
   });
 
   it('drops the plugin storage while its bundle is still on disk', async () => {
@@ -121,7 +146,7 @@ describe('PluginUninstallService', () => {
       .spyOn(PluginMigrationService, 'dropStorage')
       .mockImplementation(async () => existsSync(folder));
 
-    await uninstaller().deletePlugin(plugin.id, true);
+    await uninstaller().deletePlugin(plugin.id);
 
     expect(runDown).toHaveBeenCalledWith(expect.objectContaining({ name: 'delete-me' }));
     await expect(runDown.mock.results[0].value).resolves.toBe(true);
@@ -134,7 +159,7 @@ describe('PluginUninstallService', () => {
     claimStorageNames(compilePluginStorage('delete-me', { tables: {}, migrations: [] }, { reservedTables: new Set() }));
     expect(() => assertNamespaceUnclaimed('Delete.Me', 'delete_me')).toThrow(/plugin "delete-me"/);
 
-    await uninstaller().deletePlugin(plugin.id, true);
+    await uninstaller().deletePlugin(plugin.id);
 
     expect(() => assertNamespaceUnclaimed('Delete.Me', 'delete_me')).not.toThrow();
   });
@@ -143,7 +168,7 @@ describe('PluginUninstallService', () => {
     const plugin = writeDeletablePlugin(true);
     const runDown = jest.spyOn(PluginMigrationService, 'dropStorage').mockRejectedValue(new Error('drop failed'));
 
-    await uninstaller().deletePlugin(plugin.id, true);
+    await uninstaller().deletePlugin(plugin.id);
 
     expect(runDown).toHaveBeenCalled();
     expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);

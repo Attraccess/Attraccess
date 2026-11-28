@@ -8,6 +8,7 @@ import {
   useGetLocalSignupDomainWhitelist,
 } from '@attraccess/react-query-client';
 import { SettingsSection } from '../../components/SettingsSection';
+import { NetworkRestrictionCard } from './networkRestriction/NetworkRestrictionCard';
 import { PasswordPolicySettings } from './components/PasswordPolicySettings';
 import { RateLimitSettings } from './components/RateLimitSettings';
 import { SecuritySaveBar } from './components/SecuritySaveBar';
@@ -16,6 +17,7 @@ import { SubHeading } from './components/SubHeading';
 import { TwoFactorSettings } from './components/TwoFactorSettings';
 import { PasswordPreview } from './PasswordPreview';
 import { useSecurityDrafts } from './useSecurityDrafts';
+import { useNetworkRestrictionDrafts } from './useNetworkRestrictionDrafts';
 import en from './en.json';
 import de from './de.json';
 
@@ -30,6 +32,7 @@ import de from './de.json';
 export function SecuritySection() {
   const { t } = useTranslations({ en, de });
   const drafts = useSecurityDrafts();
+  const network = useNetworkRestrictionDrafts();
   // Every query of the section starts here, above the early return, so all five go out in one
   // parallel round and the rows below get their data as props. Subscribing in the rows instead
   // delayed 2FA, the whitelist and the overrides until the gate opened, and refetched the policy
@@ -89,8 +92,11 @@ export function SecuritySection() {
         setPolicyDraft={drafts.setPolicyDraft}
       />
 
+      <NetworkRestrictionCard drafts={network} />
+
       <SecuritySaveBar
         drafts={drafts}
+        network={network}
         policy={policy}
         rateLimit={rateLimit}
         twoFactorPolicy={twoFactor?.policy}

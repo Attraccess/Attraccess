@@ -101,6 +101,39 @@ describe('SessionStrategy', () => {
       expect(twoFactorService.getStatus).not.toHaveBeenCalled();
     });
 
+    // ATT-843, documented in the setup docs: the session strategy does not look at the email verification flag. An
+    // account whose email address changed (which clears the flag) keeps its sessions and API tokens.
+    describe('an account with an unverified email address', () => {
+      const unverified = { ...mockUser, isEmailVerified: false } as AuthenticatedSessionUser;
+
+      it('keeps its session', async () => {
+        sessionService.authenticateSession.mockResolvedValue({
+          user: unverified,
+          session: { id: 'stable-session', ssoContext: null },
+        });
+        const result = await strategy.validate({
+          headers: { authorization: 'Bearer session-token' },
+          cookies: {},
+          path: '/api/resources',
+        } as Request);
+        expect(result.id).toBe(unverified.id);
+      });
+
+      it('keeps its API token', async () => {
+        apiTokenService.authenticate.mockResolvedValue({
+          user: unverified,
+          apiToken: { id: 4, permissionKeys: ['resources.read'] },
+        } as never);
+        rbacService.getEffectivePermissions.mockResolvedValue(new Set(['resources.read', 'users.api-tokens.manage']));
+        const result = await strategy.validate({
+          headers: { authorization: 'Bearer api-token' },
+          cookies: {},
+          path: '/api/resources',
+        } as Request);
+        expect(result.id).toBe(unverified.id);
+      });
+    });
+
     describe('display name on the principal', () => {
       const namedUser = (): AuthenticatedSessionUser =>
         ({ id: 7, username: 'ada', firstName: ' Ada ', lastName: 'Lovelace', email: 'ada@example.com' }) as never;

@@ -11,6 +11,7 @@ vi.mock('../../../utils/esp-tools', () => ({
 vi.mock('../../../utils/ble-configurator', () => ({
   BleConfigurator: { getInstance: () => ({ connect: state.connectBluetooth }) },
   isWebBluetoothAvailable: () => state.available,
+  isBluetoothBlocked: (err: unknown) => err instanceof Error && /blocked/.test(err.message),
 }));
 
 beforeEach(() => {
@@ -58,6 +59,20 @@ it('reports a failed Bluetooth connection', async () => {
   expect(description).not.toMatch(/the reader shows on its screen/);
   // macOS asks the user to accept the Bluetooth pairing; unanswered, the connection fails.
   expect(description).toMatch(/If your computer asks to pair over Bluetooth, accept the request/);
+});
+
+it('explains how to allow Bluetooth when the browser blocked it for the site', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  state.connectBluetooth.mockRejectedValueOnce(
+    Object.assign(new Error('Bluetooth permission has been blocked.'), { name: 'NotFoundError' }),
+  );
+  render(<ConnectScreen />);
+  fireEvent.click(screen.getByRole('button', { name: 'Set up over Bluetooth' }));
+  expect(await screen.findByText('Bluetooth is blocked for this site')).toBeTruthy();
+  const description = screen.getByText(/set Bluetooth \(or Bluetooth devices\) to Allow/).textContent;
+  // Brave ships Web Bluetooth switched off and reports it as a blocked permission.
+  expect(description).toMatch(/brave:\/\/flags\/#brave-web-bluetooth-api/);
+  expect(screen.queryByText('Could not connect over Bluetooth')).toBeNull();
 });
 
 it('explains a Bluetooth link that dropped during setup', () => {

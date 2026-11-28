@@ -7,6 +7,7 @@ import { StopCircle, ChevronDownIcon } from 'lucide-react';
 import { AttraccessUser, Button, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { SessionTimer } from '../SessionTimer';
+import { SessionAutoEnd } from '../SessionAutoEnd';
 import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
 import {
   ApiError,
@@ -17,6 +18,10 @@ import {
   UseResourceUsageGetHistoryKeyFn,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
+import { useRefreshNetworkRestrictionOnError } from '../../../../../hooks/useRefreshNetworkRestrictionOnError';
+import { NetworkRestrictedAction } from '@attraccess/application-models';
+import { useNetworkRestriction } from '../../../../../hooks/useNetworkRestriction';
+import { NetworkRestrictedHint } from '../../../../../components/networkRestriction/NetworkRestrictedHint';
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { FlowButtons } from './flowButtons';
@@ -44,7 +49,10 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
     },
   });
   const toast = useToastMessage();
+  const { isRestricted } = useNetworkRestriction();
+  const endRestricted = isRestricted(NetworkRestrictedAction.UsageEnd);
   const queryClient = useQueryClient();
+  const refreshNetworkRestriction = useRefreshNetworkRestrictionOnError();
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
 
   const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);
@@ -77,6 +85,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
     },
     onError: (err) => {
       console.error('Error ending session:', err);
+      refreshNetworkRestriction(err);
       toast.apiError({
         baseTranslationKey: 'api',
         t,
@@ -131,6 +140,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
         chipDataCy="active-session-live-chip"
       >
         <SessionTimer startTime={startTime} variant="hero" />
+        {myUsage?.autoEndAt && <SessionAutoEnd resourceId={resourceId} usage={myUsage} canExtend centered />}
 
         {(myUsage?.project || myUsage?.supervisorUser) && (
           <div className="border-t border-divider pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -156,12 +166,18 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
         />
 
         <ButtonGroup className="w-full">
-          <Button variant="danger" isPending={endSession.isPending} onPress={immediatelyEndSession}>
+          <Button
+            variant="danger"
+            isPending={endSession.isPending}
+            isDisabled={endRestricted}
+            onPress={immediatelyEndSession}
+          >
             <StopCircle className="w-4 h-4" />
             {t('endSession')}
           </Button>
           <Dropdown>
             <DropdownTrigger
+              isDisabled={endRestricted}
               className={`${buttonVariants({ isIconOnly: true, variant: 'danger' })} inline-flex items-center justify-center`}
             >
               <ChevronDownIcon />
@@ -175,6 +191,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
             </DropdownPopover>
           </Dropdown>
         </ButtonGroup>
+        <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageEnd} />
       </SessionStatusCard>
 
       <SessionNotesModal

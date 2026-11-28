@@ -4,6 +4,10 @@ import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { DoorControls } from './DoorControls';
 
+vi.mock('../../../../../hooks/useNetworkRestriction', () => ({
+  useNetworkRestriction: () => ({ isRestricted: () => false }),
+}));
+
 function renderControls(props: Partial<ComponentProps<typeof DoorControls>>) {
   const handlers = { onLock: vi.fn(), onUnlock: vi.fn(), onUnlatch: vi.fn(), onOpen: vi.fn() };
   render(

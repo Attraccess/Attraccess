@@ -1,6 +1,7 @@
 import {
   BillingTransaction,
   BillingTransactionItem,
+  FormImage,
   FormSubmission,
   Resource,
   ResourceMeter,
@@ -8,7 +9,7 @@ import {
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
-import { ResourceUsageAction } from '@attraccess/application-models';
+import { FormFieldType, ResourceUsageAction, parseFormImageIds } from '@attraccess/application-models';
 import type { SupervisionMode, UsageSessionResource } from '@attraccess/application-models';
 import type {
   UsageBillingItemDraft,
@@ -18,10 +19,11 @@ import type {
   UsageSessionWithParties,
 } from '@attraccess/application-models';
 import { Injectable } from '@nestjs/common';
-import { In, IsNull, Not } from 'typeorm';
+import { EntityManager, In, IsNull, Not } from 'typeorm';
 import {
   DoorActionDraft,
   MachineCapacity,
+  FormImageUnavailableError,
   MissingBillingTransactionError,
   PendingSessionDraft,
   SessionPage,
@@ -36,6 +38,7 @@ import { toUsageLifecycleAttempt, toUsageSession } from './usage-session-mapping
 import { toResourceRecord } from '../resources/resource-mapping';
 import { findRelations } from '../find-options';
 import { RESOURCE_LOCK, lockResource } from '../resources/resource-locks';
+import { ACTIVE_METER } from '../metering/meter-rows';
 
 /** Relations of running sessions and of session details (exported for the mapping spec). */
 export const ACTIVE_RELATIONS = ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'];
@@ -277,7 +280,7 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
   }
 
   async findMeterRates(resourceId: number, context?: TransactionContext): Promise<UsageMeterRate[]> {
-    const meters = await this.managers.resolve(context).find(ResourceMeter, { where: { resourceId } });
+    const meters = await this.managers.resolve(context).find(ResourceMeter, { where: { resourceId, ...ACTIVE_METER } });
     return meters.map((meter) => ({
       meterId: meter.id,
       name: meter.name,
@@ -397,6 +400,12 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     };
     if (draft.supervisorUserId !== undefined) usageData.supervisorUserId = draft.supervisorUserId;
     if (draft.projectId !== undefined) usageData.projectId = draft.projectId;
+    if (draft.autoEndAt) {
+      usageData.autoEndAt = draft.autoEndAt;
+      usageData.maxAutoEndAt = draft.maxAutoEndAt ?? null;
+      usageData.estimatedDurationMinutes = draft.estimatedDurationMinutes ?? null;
+      usageData.autoEndWarnedOffsetMinutes = draft.autoEndWarnedOffsetMinutes ?? null;
+    }
 
     const { identifiers } = await manager.createQueryBuilder().insert().into(ResourceUsage).values(usageData).execute();
 
@@ -465,13 +474,14 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
   async applyAttemptDrafts(attempt: UsageLifecycleAttempt, context?: TransactionContext): Promise<void> {
     const manager = this.managers.resolve(context);
     for (const submission of attempt.formSubmissions) {
-      await manager.save(FormSubmission, {
+      const saved = await manager.save(FormSubmission, {
         formId: submission.formId,
         resourceUsageId: submission.resourceUsageId,
         userId: submission.userId,
         action: submission.action,
         data: submission.data,
       } as Partial<FormSubmission>);
+      await this.attachImages(manager, saved.id, submission);
     }
     for (const { usageId, quantity, ...item } of attempt.billingItems) {
       const transaction = await manager.findOne(BillingTransaction, { where: { resourceUsageId: usageId } });
@@ -490,6 +500,27 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
         await manager.save(BillingTransactionItem, { billingTransactionId: transaction.id, ...item, quantity });
       }
     }
+  }
+
+  /**
+   * Hands the images an answer lists to the saved submission, in the same transaction. An image that is gone, already
+   * attached or not the submitter's stops the whole change.
+   */
+  private async attachImages(
+    manager: EntityManager,
+    submissionId: number,
+    submission: UsageLifecycleAttempt['formSubmissions'][number],
+  ): Promise<void> {
+    const ids = Object.values(submission.data)
+      .filter((answer) => answer.fieldDefinition.type === FormFieldType.IMAGE)
+      .flatMap((answer) => parseFormImageIds(answer.value));
+    if (!ids.length) return;
+    const result = await manager.update(
+      FormImage,
+      { id: In(ids), submissionId: IsNull(), userId: submission.userId ?? -1 },
+      { submissionId },
+    );
+    if (result.affected !== new Set(ids).size) throw new FormImageUnavailableError();
   }
 
   async recordDoorAction(draft: DoorActionDraft): Promise<UsageSessionWithParties> {

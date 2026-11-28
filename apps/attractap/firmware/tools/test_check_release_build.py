@@ -44,6 +44,9 @@ class CompileCommands(unittest.TestCase):
             self.assertEqual(len(errors), 1, define)
             self.assertIn(define, errors[0])
 
+    def test_perf_monitor_define_fails(self):
+        self.assertEqual(len(c.check_compile_commands([entry(["ATTRACTAP_LV_PERF_MONITOR=1"])])), 1)
+
     def test_arguments_form_is_read(self):
         commands = [{"file": SERIAL, "arguments": ["gcc", "-DATTRACTAP_CRASH_TRIGGER=1", SERIAL]}]
         self.assertEqual(len(c.check_compile_commands(commands)), 1)
@@ -56,6 +59,9 @@ class CompileCommands(unittest.TestCase):
 class AppImage(unittest.TestCase):
     def test_trigger_topic_fails(self):
         self.assertEqual(len(c.check_app_image(b"\x00prefix debug.crash suffix")), 1)
+
+    def test_stats_topic_fails(self):
+        self.assertEqual(len(c.check_app_image(b"\x00prefix debug.stats suffix")), 1)
 
     def test_lab_ca_fails(self):
         self.assertEqual(len(c.check_app_image(b"\x00Attractap Device Lab CA (lab builds only)\x00")), 1)
@@ -85,8 +91,39 @@ class AppHeadroom(unittest.TestCase):
             c.check_app_headroom(1, b"\x00" * 64)
 
 
+RELEASE_SDKCONFIG_H = "#define CONFIG_FREERTOS_HZ 1000\n#define CONFIG_FREERTOS_USE_TRACE_FACILITY 1\n"
+STATS_SDKCONFIG_H = RELEASE_SDKCONFIG_H + "#define CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS 1\n"
+
+
+class SdkconfigHeader(unittest.TestCase):
+    def test_release_config_passes(self):
+        self.assertEqual(c.check_sdkconfig_header(RELEASE_SDKCONFIG_H), [])
+
+    def test_run_time_stats_fail(self):
+        errors = c.check_sdkconfig_header(STATS_SDKCONFIG_H)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS", errors[0])
+
+    def test_similar_names_pass(self):
+        self.assertEqual(c.check_sdkconfig_header("#define CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS_X 1\n"), [])
+
+
+class SdkconfigFragments(unittest.TestCase):
+    """sdkconfig.debug carries the same run-time stats options as sdkconfig.lab-stats (README "Task stats")."""
+
+    @staticmethod
+    def options(name):
+        with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), name)) as f:
+            return {line.strip() for line in f if line.startswith("CONFIG_")}
+
+    def test_debug_overlay_has_every_lab_stats_option(self):
+        lab_stats = self.options("sdkconfig.lab-stats")
+        self.assertIn("CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y", lab_stats)
+        self.assertEqual(lab_stats - self.options("sdkconfig.debug"), set())
+
+
 class BuildDirectory(unittest.TestCase):
-    def build_dir(self, defines, image):
+    def build_dir(self, defines, image, sdkconfig_h=RELEASE_SDKCONFIG_H):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         with open(os.path.join(tmp.name, "compile_commands.json"), "w") as f:
@@ -96,6 +133,9 @@ class BuildDirectory(unittest.TestCase):
         os.makedirs(os.path.join(tmp.name, "partition_table"))
         with open(os.path.join(tmp.name, c.PARTITION_TABLE), "wb") as f:
             f.write(partition_table(0x640000, 0x640000))
+        os.makedirs(os.path.join(tmp.name, "config"))
+        with open(os.path.join(tmp.name, c.SDKCONFIG_HEADER), "w") as f:
+            f.write(sdkconfig_h)
         return tmp.name
 
     def run_main(self, build_dir):
@@ -107,6 +147,9 @@ class BuildDirectory(unittest.TestCase):
 
     def test_crash_trigger_build_fails(self):
         self.assertEqual(self.run_main(self.build_dir(["ATTRACTAP_CRASH_TRIGGER=1"], b"debug.crash")), 1)
+
+    def test_run_time_stats_build_fails(self):
+        self.assertEqual(self.run_main(self.build_dir(["LOG_LEVEL=ERROR"], b"app", STATS_SDKCONFIG_H)), 1)
 
     def test_missing_build_fails(self):
         self.assertEqual(self.run_main(os.path.join(tempfile.gettempdir(), "no-such-attractap-build")), 1)
@@ -122,7 +165,10 @@ class ReleaseBuildFlags(unittest.TestCase):
         args = run_idf.call_args[0][0]
         self.assertIn("-DATTRACTAP_CRASH_TRIGGER=OFF", args)
         self.assertIn("-DATTRACTAP_TEST_HOOKS=OFF", args)
+        self.assertIn("-DATTRACTAP_LV_PERF_MONITOR=OFF", args)
         self.assertIn("-DATTRACTAP_LAB_CA=", args)
+        # The lab's conversion stop-before-burn (ATT-1208) never reaches a shipped image.
+        self.assertIn("-DATTRACTAP_CONVERSION_STOP_BEFORE_BURN=OFF", args)
 
     def test_secure_release_builds_clear_the_lab_ca(self):
         with mock.patch.object(b, "run_idf", return_value=1) as run_idf, \

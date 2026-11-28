@@ -34,6 +34,29 @@ export class Resource {
   maxParallelSessions!: number;
 
   @ApiProperty({
+    description: 'Longest a session on this machine may run, in minutes (1-43200). Null means no limit. Machines only.',
+    example: 480,
+    nullable: true,
+    type: Number,
+  })
+  maxSessionDurationMinutes!: number | null;
+
+  @ApiProperty({
+    description: 'Whether starting a session requires an estimate of how long the machine will be used',
+    example: false,
+  })
+  requireSessionDurationEstimate!: boolean;
+
+  @ApiProperty({
+    description:
+      'The estimate for starts from readers that cannot ask for one, when an estimate is required and there is no maximum. Null means 60 minutes.',
+    example: 60,
+    nullable: true,
+    type: Number,
+  })
+  defaultSessionDurationEstimateMinutes!: number | null;
+
+  @ApiProperty({
     description:
       'Days after a user was trained on this resource before retraining is required. Null disables the age-based trigger.',
     example: 365,
@@ -204,6 +227,9 @@ export function toResourceDto(record: ResourceRecord): Resource {
   const dto: Resource = {
     allowTakeOver: record.allowTakeOver,
     maxParallelSessions: record.maxParallelSessions,
+    maxSessionDurationMinutes: record.maxSessionDurationMinutes,
+    requireSessionDurationEstimate: record.requireSessionDurationEstimate,
+    defaultSessionDurationEstimateMinutes: record.defaultSessionDurationEstimateMinutes,
     retrainingMaxAgeDays: record.retrainingMaxAgeDays,
     retrainingMaxInactivityDays: record.retrainingMaxInactivityDays,
     retrainingBlocksAccess: record.retrainingBlocksAccess,

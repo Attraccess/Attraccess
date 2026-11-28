@@ -26,6 +26,7 @@ import {
   ResourceReaderUiSettingsDto,
 } from './dtos/reader-ui-settings.dto';
 import { UiSlotService } from './websockets/handlers/ui/ui-slot.service';
+import { ResourceListVisible } from '../resources/visibility/resource-list-visible.interceptor';
 
 /**
  * Who may clear an alert. Plugin alerts reset the plugin globally (plugin managers); reader alerts belong to the
@@ -40,6 +41,7 @@ const CLEAR_PERMISSIONS: Record<string, SystemPermission[]> = {
 
 /** Admin side of the reader UI: settings, contribution status and alerts (ATT-1187 phase A). */
 @ApiTags('Attractap')
+@ResourceListVisible()
 @Controller()
 @RequiresLicense(LicenseModuleType.ATTRACTAP)
 export class ReaderUiAdminController {
@@ -84,7 +86,7 @@ export class ReaderUiAdminController {
   ): Promise<ResourceReaderUiSettingsDto> {
     await this.requireResource(resourceId);
     await this.settings.setResource(resourceId, dto, req.user);
-    this.slots.syncReader(undefined);
+    this.slots.syncReaderEverywhere(undefined);
     return this.settings.getResource(resourceId);
   }
 
@@ -108,7 +110,7 @@ export class ReaderUiAdminController {
   ): Promise<ReaderReaderUiSettingsDto> {
     await this.requireReader(readerId);
     await this.settings.setReader(readerId, dto.widgetsEnabled, req.user);
-    this.slots.syncReader(readerId);
+    this.slots.syncReaderEverywhere(readerId);
     return this.settings.getReader(readerId);
   }
 
@@ -121,7 +123,7 @@ export class ReaderUiAdminController {
   @ApiResponse({ status: 200, type: [ReaderUiContributionStatusDto] })
   async getContributions(@Param('readerId', ParseIntPipe) readerId: number): Promise<ReaderUiContributionStatusDto[]> {
     await this.requireReader(readerId);
-    return this.slots.contributionsOf(readerId);
+    return this.slots.contributionsAnywhere(readerId);
   }
 
   @Get('reader-ui/alerts')

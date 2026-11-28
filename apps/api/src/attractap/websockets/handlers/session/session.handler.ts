@@ -16,6 +16,8 @@ import { SupervisionService } from '../../../../resources/supervision/supervisio
 
 import { ResourceUsageService } from '../../../../resources/usage/sessions/resource-usage.service';
 
+import { validReaderEstimate } from '../../../../resources/usage/session-duration/session-duration.rules';
+
 import { UsersService } from '../../../../users-and-auth/users/users.service';
 
 import {
@@ -323,9 +325,11 @@ export class AttractapSessionHandler {
   public async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
     const userId = socket.state.verifiedUserId;
-    const { resourceId, projectId, forceTakeOver, stepId } = data.payload as {
+    const { resourceId, projectId, forceTakeOver, stepId, estimatedDurationMinutes } = data.payload as {
       resourceId: number;
       projectId?: number;
+      /** Minutes the card holder will use the machine at most (capabilities.sessionDuration readers). */
+      estimatedDurationMinutes?: number;
       forceTakeOver?: boolean;
       stepId?: string;
     };
@@ -348,6 +352,7 @@ export class AttractapSessionHandler {
       resourceId,
       action: formAction,
       requestId: data.payload?.requestId,
+      reject: (payload) => this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, payload),
     });
     if (formSubmissions === null) {
       return;
@@ -392,12 +397,19 @@ export class AttractapSessionHandler {
         await this.resourceUsageService.startSession(
           resourceId,
           user,
-          { projectId, formSubmissions, forceTakeOver },
+          {
+            projectId,
+            formSubmissions,
+            forceTakeOver,
+            ...validReaderEstimate(estimatedDurationMinutes),
+          },
           {
             ...(supervisorUserId ? { supervisorUserId } : {}),
             auditOrigin: { id: user.id, authenticationMethod: null },
             origin: supervisorUserId ? 'supervision' : 'reader',
             confirmedStepKeys: gate.satisfied,
+            // A reader without a duration input never gets refused for the missing estimate.
+            canAskDuration: socket.state.sessionDuration === true,
             ...(gate.language ? { language: gate.language } : {}),
           },
         );
@@ -407,7 +419,7 @@ export class AttractapSessionHandler {
       this.formsHandler.clearFormDraft(socket, resourceId, formAction);
       // The card channel won — settle the still-open web request so any supervisor popups close.
       if (flow?.requestId) {
-        this.supervisionService.settleByCard(flow.requestId);
+        void this.supervisionService.settleByCard(flow.requestId);
       }
       if (flow && socket.state.supervisionFlow === flow) socket.state.supervisionFlow = null;
       await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, {
@@ -445,9 +457,50 @@ export class AttractapSessionHandler {
         });
         return;
       }
-      this.logger.error(`Failed to start resource usage session: ${error.message}`);
-      await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: error.message });
+      const code = error?.getResponse?.()?.code; // SESSION_DURATION_ESTIMATE_*: the reader maps it to a text
+      this.logger[code ? 'debug' : 'error'](`Failed to start resource usage session: ${error.message}`); // coded: user error
+      await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: code ?? error.message });
     }
+  }
+
+  /** capabilities.sessionDuration readers: the card holder extends their session; same identity rules as a stop. */
+  public async handleExtendResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    const userId = socket.state.verifiedUserId;
+    const { resourceId, usageId, extendByMinutes, toMax } = data.payload as {
+      resourceId: number;
+      usageId?: number;
+      extendByMinutes?: number;
+      toMax?: boolean;
+    };
+    const type = AttractapEventType.EXTEND_RESOURCE_USAGE_SESSION;
+    this.resumeCardSession(socket, data);
+    if (!(await this.resourceActionGuard.validateResourceAction(socket, resourceId, type, data.payload?.requestId))) {
+      return;
+    }
+    const user = await this.findActingUser(userId);
+    if (!user) {
+      await this.reply(socket, data, type, { error: 'USER_NOT_FOUND' });
+      return;
+    }
+    try {
+      const session = await this.resourceUsageService.extendSession(
+        resourceId,
+        user,
+        {
+          ...(Number.isInteger(usageId) ? { usageId } : {}),
+          ...(Number.isInteger(extendByMinutes) ? { extendByMinutes } : {}),
+          ...(toMax === true ? { toMax } : {}),
+        },
+        { id: user.id, authenticationMethod: null },
+      );
+      await this.reply(socket, data, type, { success: true, usageId: session.id });
+    } catch (error) {
+      // The refusal code (SESSION_EXTENSION_EXCEEDS_MAXIMUM, ...) lets the reader say why.
+      const code = (error?.getResponse?.() as { code?: string } | undefined)?.code;
+      await this.reply(socket, data, type, { error: code ?? error.message });
+    }
+    // The reader's list carries the new deadline (an extension also publishes it to every reader of the machine).
+    await this.resourceListService.sendResourceListToSocket(socket, { resourceIds: new Set([resourceId]) });
   }
 
   public async handleStopResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
@@ -476,6 +529,7 @@ export class AttractapSessionHandler {
       resourceId,
       action: ResourceFormAction.END,
       requestId: data.payload?.requestId,
+      reject: (payload) => this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, payload),
     });
     if (formSubmissions === null) {
       return;

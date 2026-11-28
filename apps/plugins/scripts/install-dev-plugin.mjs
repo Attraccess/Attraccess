@@ -1,7 +1,7 @@
 // Stages a built plugin for discovery on the next dev API startup.
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { basename, join, relative, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 export function resolvePluginDir(workspaceRoot, env = process.env) {
@@ -64,7 +64,7 @@ function main() {
   process.stdout.write(`Installed dev plugin in ${target}. Restart a running API with pnpm serve to load it.\n`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (import.meta.main) {
   try {
     main();
   } catch (error) {

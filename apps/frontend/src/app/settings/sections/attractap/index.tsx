@@ -13,6 +13,7 @@ import {
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
+import { UidOnlyCardsSetting } from './UidOnlyCardsSetting';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { cardWritingBlocker, pairedReadersOnly } from '../../../attractap/cardWriting';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
@@ -82,7 +83,7 @@ export function AttractapSection() {
           data-testid="card-writer-mode"
         >
           <Label className="sr-only">{t('mode.label')}</Label>
-          {(['all', 'selected'] as const).map((option) => (
+          {(['all', 'selected', 'secured'] as const).map((option) => (
             <Radio key={option} value={option} data-testid={`card-writer-mode-${option}`}>
               <Radio.Content>
                 <Radio.Control>
@@ -141,6 +142,9 @@ export function AttractapSection() {
         onSave={() => save({ body: { mode, readerIds: mode === 'selected' ? readerIds : savedReaderIds } })}
         onDiscard={() => setDraft({})}
       />
+
+      {/* Below the save bar: it saves on its own. */}
+      <UidOnlyCardsSetting />
     </SettingsSection>
   );
 }

@@ -28,8 +28,8 @@ Eine passende Wire-Version genügt nicht. Attraccess, das Matter-Plugin und der 
 | -------------- | --------------------------------------------------------------------- |
 | Wire-Version   | `1`                                                                   |
 | Attraccess     | `^2.0.0-0` (Vorabversionen einer passenden Version werden akzeptiert) |
-| Matter-Plugin  | genau `0.5.0-alpha.0`                                                 |
-| Matter-Sidecar | genau `0.5.0-alpha.0`                                                 |
+| Matter-Plugin  | genau `0.5.1-alpha.0`                                                 |
+| Matter-Sidecar | genau `0.5.1-alpha.0`                                                 |
 | matter.js      | genau `0.18.0` (Plugin und Sidecar teilen sich ein Release)           |
 
 `attraccess.host` (`package.json`) und `attraccessVersion.min` (`plugin.json`) des Plugins werden aus derselben Tabelle abgeleitet; ein Test prüft, dass sie übereinstimmen. Jedes neue Plugin- oder Sidecar-Release braucht eine Tabellenaktualisierung, sonst lehnt der Sidecar es ab. Der Attraccess-Bereich ist bewusst ein Bereich: Ein neues Attraccess-2.x-Release erfordert nicht automatisch ein Sidecar-Release.

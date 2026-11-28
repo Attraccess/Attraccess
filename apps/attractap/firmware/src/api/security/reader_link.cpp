@@ -5,6 +5,7 @@
 #include "../../platform.hpp"
 #include "../../settings/settings.hpp"
 #include "../../state/state.hpp"
+#include "../conversion/conversion_link.hpp"
 
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
@@ -71,6 +72,12 @@ void ReaderLink::setup()
         post(isConnected ? EventType::Connected : EventType::Disconnected);
     });
     socket.setSubprotocol(subprotocolFor(channel));
+    // The conversion client (ATT-1208) talks through this session only.
+    ConversionLink::setPorts({
+        [this](const std::string &json) { return sendControl(json); },
+        [this](const std::string &json) { return sessionReady.load() && sendMessage(json.data(), json.size()); },
+        [this](const char *reason) { socket.forceReconnect(reason); },
+    });
 #ifdef ESP_PLATFORM
     if (!sessionWorker)
     {
@@ -173,12 +180,14 @@ void ReaderLink::loop()
             flushOutboxLocked();
         }
         lock = {};
-        if (efuseReportDue && !efuseReportSent && sessionReady.load() &&
+        if (efuseReportDue && (!efuseReportSent || !conversionStatusSent) && sessionReady.load() &&
             static_cast<int32_t>(millis() - efuseRetryAt) >= 0)
         {
             sendEfuseReport();
         }
     }
+
+    ConversionLink::loop();
 
     if (channel == Channel::Session && connected && handshakeStartedMs != 0 &&
         millis() - handshakeStartedMs > HANDSHAKE_TIMEOUT_MS)
@@ -236,6 +245,8 @@ void ReaderLink::handle(Event &event)
             outbox.clear();
             efuseReportSent = false;
             efuseReportDue = false;
+            conversionStatusSent = false;
+            ConversionLink::onSessionClosed();
             // The sign-in belonged to that session; the next one authenticates again.
             State::setApiState(false, "");
         }
@@ -304,6 +315,8 @@ void ReaderLink::useChannel(Channel next, const char *reason)
     }
     efuseReportSent = false;
     efuseReportDue = false;
+    conversionStatusSent = false;
+    ConversionLink::onSessionClosed();
     pairing.reset();
     connected = false;
     handshakeStartedMs = 0;

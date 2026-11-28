@@ -262,11 +262,19 @@ int main(int argc, char **argv)
         test("screen/parallel-sessions-can-end-other-sessions", [&] { testPickerForCanEndOtherSessions(); });
         test("screen/parallel-sessions-ownership", [&] { testDetailsOwnershipFromOwnSession(); });
         test("screen/parallel-sessions-lockscreen", [&] { testParallelSessionLockscreen(renderer); });
+        test("session-duration/rules", [] { testSessionDurationRules(); });
+        test("screen/duration-input", [&] { testDurationInputScreen(renderer); });
+        test("screen/duration-input-no-maximum", [&] { testDurationInputWithoutMaximum(renderer); });
+        test("screen/extend-session", [&] { testExtendSessionScreen(renderer); });
+        test("screen/extend-session-no-maximum", [] { testExtendWithoutMaximum(); });
+        test("screen/extend-session-other-person", [&] { testExtendOtherPersonsSession(renderer); });
+        test("screen/details-auto-end", [&] { testDetailsAutoEnd(renderer); });
         test("screen/usage-stats-expiry", [&] { testUsageStatsExpiry(renderer); });
         test("screen/pin-and-real-keyboard-events", [&] { testPin(renderer); });
         test("screen/power-off-bilingual", [&] { testPowerOffLocales(renderer); });
         test("screen/forms-and-projects-locale-refresh", [&] { testFormAndProjectLocaleRefresh(renderer); });
         test("screen/demo-material-captions", [&] { testDemoMaterialCaptions(renderer); });
+        test("screen/form-image-field", [&] { testFormImageField(renderer); });
         test("screen/firmware-update-bilingual", [&] { testFirmwareUpdateLocales(renderer); });
         std::cout << "RESULT " << passed << " passed, " << failed << " failed; " << checks << " checks; "
                   << renderer.captures << " real LVGL frames\n";

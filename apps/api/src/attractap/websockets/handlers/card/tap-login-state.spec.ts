@@ -127,8 +127,10 @@ describe('AttractapCardHandler login tap', () => {
       await scope.handler.handleCardTap(socket, CARD, RESOURCE_ID, 9);
 
       expect(socket.state.formDrafts).toBeUndefined();
-      // Which forms the previous user was shown goes with their answers (ATT-796).
+      // Which forms the previous user was shown goes with their answers (ATT-796), and the phone links of their image
+      // fields end with the whole login (ATT-879).
       expect(socket.state.formsPresented).toBeUndefined();
+      expect((scope.handler as any).formsHandler.endReaderForms).toHaveBeenCalledWith(socket);
       expect((scope.handler as any).supervisionHandler.cancelForSocket).toHaveBeenCalledWith(socket);
       expect(socket.state.supervisionFlow).toBeNull();
       expect(socket.state.verifiedUserId).toBe(CARD_USER.id);
@@ -149,6 +151,7 @@ describe('AttractapCardHandler login tap', () => {
       await scope.handler.handleCardTap(socket, CARD, RESOURCE_ID, CARD_USER.id);
 
       expect(socket.state.formDrafts).toEqual(drafts());
+      expect((scope.handler as any).formsHandler.endReaderForms).not.toHaveBeenCalled();
       expect(socket.state.supervisionFlow).toBe(flow);
       expect((scope.handler as any).supervisionHandler.cancelForSocket).not.toHaveBeenCalled();
     });

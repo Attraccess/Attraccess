@@ -135,6 +135,23 @@ describe.each(BUNDLED_PLUGINS)('adoption of existing tables by the bundled plugi
     }
   });
 
+  it('adopts the 1.x history and tables under the npm package name the marketplace installs (ATT-1402)', async () => {
+    const npmName = `@attraccess/plugin-${pluginName}`;
+    const db = await database();
+    const asNpm = compilePluginStorage(npmName, plugin.storage, { reservedTables: db.coreTables() });
+    await db.engine.migrate(baseline);
+    const expected = await seedRows(db);
+    await becomeLegacy(db, plugin.storage.adoption?.legacyMigrations ?? []);
+
+    const later = asNpm.migrations.slice(1).map((migration) => migration.version);
+    expect(await db.engine.migrate(asNpm)).toEqual({ pending: later, adopt: true });
+
+    const side = await db.connect();
+    const tables = side.contexts(npmName, asNpm).storage.open(plugin.storage as never) as never as Tables;
+    for (const [logical, row] of expected)
+      expect([logical, await tables[logical].find()]).toEqual([logical, [expect.objectContaining(row)]]);
+  });
+
   it('refuses a partial existing history and changes nothing', async () => {
     const legacy = compiled.legacyMigrations;
     const db = await database();

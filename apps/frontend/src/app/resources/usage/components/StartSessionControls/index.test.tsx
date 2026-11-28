@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@attraccess/react-query-client';
 import { StartSessionControls } from './index';
 
@@ -15,6 +15,7 @@ const {
   requestForms,
   toastError,
   bothCallbacks,
+  durationSettings,
 } = vi.hoisted(() => ({
   bothCallbacks: (options: unknown, callbacks: unknown, variables: unknown) => {
     // Mirrors TanStack: the hook-level callbacks run first, then the per-call ones.
@@ -42,8 +43,12 @@ const {
   accessOnly: { value: false },
   doorMutate: { lock: vi.fn(), unlock: vi.fn(), unlatch: vi.fn(), open: vi.fn() },
   startBlocked: { value: { blocked: false } as Record<string, unknown> },
+  durationSettings: { required: false, maxMinutes: null as number | null },
 }));
 
+vi.mock('../../../../../hooks/useNetworkRestriction', () => ({
+  useNetworkRestriction: () => ({ isRestricted: () => false }),
+}));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({
@@ -82,7 +87,9 @@ vi.mock('./DoorControls', async (importOriginal) => {
 vi.mock('../SessionNotesModal', () => ({ SessionNotesModal: () => null, SessionModalMode: { START: 'start' } }));
 vi.mock('./insufficientBalanceModal', () => ({ InsufficientBalanceModal: () => null }));
 vi.mock('../SupervisedStartModal', () => ({
-  SupervisedStartModal: () => <div data-testid="supervised-start-modal" />,
+  SupervisedStartModal: ({ requestBody }: { requestBody: unknown }) => (
+    <div data-testid="supervised-start-modal" data-body={JSON.stringify(requestBody)} />
+  ),
 }));
 
 vi.mock('@attraccess/react-query-client', async (original) => ({
@@ -94,7 +101,14 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
     SUPERVISION_REQUIRED: 'supervision_required',
   },
   useGetOneResourceById: () => ({
-    data: { id: 1, type: resourceType.value, supervisionMode: supervisionMode.value, accessOnly: accessOnly.value },
+    data: {
+      id: 1,
+      type: resourceType.value,
+      supervisionMode: supervisionMode.value,
+      accessOnly: accessOnly.value,
+      requireSessionDurationEstimate: durationSettings.required,
+      maxSessionDurationMinutes: durationSettings.maxMinutes,
+    },
   }),
   // The real StartBlockedGate renders; only its query answer is faked.
   useResourceUsageStartBlocked: () => ({
@@ -323,5 +337,112 @@ describe('StartSessionControls door actions', () => {
 
     expect(doorMutate.unlock).toHaveBeenCalledWith({ path: { resourceId: 1 } });
     expect(doorMutate.open).not.toHaveBeenCalled();
+  });
+});
+
+describe('StartSessionControls duration estimate', () => {
+  const formsMissing = () =>
+    new ApiError(
+      { method: 'POST', url: '/start' },
+      { url: '/start', ok: false, status: 400, statusText: 'Error', body: { message: 'Submit forms' } },
+      'Bad request',
+    );
+  const confirmationRequired = () =>
+    new ApiError(
+      { method: 'POST', url: '/start' },
+      {
+        url: '/start',
+        ok: false,
+        status: 409,
+        statusText: 'Conflict',
+        body: { code: 'CONFIRMATION_REQUIRED', stepId: 'step-1', confirmation: { title: 'Reserved', body: 'Go?' } },
+      },
+      'Conflict',
+    );
+  const confirmButton = () => document.querySelector('[data-cy="session-duration-confirm"]') as HTMLElement;
+
+  /** Presses start and answers the dialog with the given hours. */
+  const startWithEstimate = async (hours: string) => {
+    render(<StartSessionControls resourceId={1} />);
+    await userEvent.click(screen.getByText('start'));
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'hours' }), { target: { value: hours } });
+    await userEvent.click(confirmButton());
+  };
+
+  beforeEach(() => {
+    startMutate.mockClear();
+    requestForms.mockReset().mockResolvedValue([]);
+    supervisionMode.value = 'introduction_required';
+    resourceType.value = 'machine';
+    startBlocked.value = { blocked: false };
+    durationSettings.required = true;
+    durationSettings.maxMinutes = null;
+  });
+  afterEach(() => {
+    durationSettings.required = false;
+  });
+
+  it('asks before the forms and the start, and sends the estimate in the start body', async () => {
+    render(<StartSessionControls resourceId={1} />);
+    await userEvent.click(screen.getByText('start'));
+
+    expect(confirmButton()).toBeInTheDocument();
+    expect(requestForms).not.toHaveBeenCalled();
+    expect(startMutate).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'hours' }), { target: { value: '2' } });
+    await userEvent.click(confirmButton());
+
+    await waitFor(() => expect(startMutate).toHaveBeenCalledOnce());
+    expect(requestForms).toHaveBeenCalledOnce();
+    expect(startMutate.mock.calls[0][0].body).toMatchObject({ estimatedDurationMinutes: 120 });
+  });
+
+  it('sends nothing when the dialog is cancelled', async () => {
+    render(<StartSessionControls resourceId={1} />);
+    await userEvent.click(screen.getByText('start'));
+    await userEvent.click(screen.getByRole('button', { name: 'cancel' }));
+
+    await waitFor(() => expect(confirmButton()).toBeNull());
+    expect(requestForms).not.toHaveBeenCalled();
+    expect(startMutate).not.toHaveBeenCalled();
+  });
+
+  it('keeps the estimate in the retry after the forms were missing', async () => {
+    await startWithEstimate('3');
+    await waitFor(() => expect(startMutate).toHaveBeenCalledOnce());
+    const submissions = [{ formId: 7, data: { training: true } }];
+    requestForms.mockResolvedValue(submissions);
+
+    await act(() => startMutate.mock.calls[0][1].onError(formsMissing()));
+
+    expect(startMutate).toHaveBeenCalledTimes(2);
+    expect(startMutate.mock.calls[1][0].body).toMatchObject({
+      formSubmissions: submissions,
+      estimatedDurationMinutes: 180,
+    });
+  });
+
+  it('keeps the estimate in the retry after a plugin confirmation', async () => {
+    await startWithEstimate('2');
+    await waitFor(() => expect(startMutate).toHaveBeenCalledOnce());
+
+    await act(() => startMutate.mock.calls[0][1].onError(confirmationRequired()));
+    await userEvent.click(document.querySelector('[data-cy="start-confirmation-confirm"]') as HTMLElement);
+
+    expect(startMutate).toHaveBeenCalledTimes(2);
+    expect(startMutate.mock.calls[1][0].body).toMatchObject({
+      confirmedStepIds: ['step-1'],
+      estimatedDurationMinutes: 120,
+    });
+  });
+
+  it('carries the estimate in the supervised start request', async () => {
+    supervisionMode.value = 'supervision_required';
+    await startWithEstimate('4');
+
+    const modal = await screen.findByTestId('supervised-start-modal');
+    expect(JSON.parse(modal.dataset.body ?? '{}')).toMatchObject({ estimatedDurationMinutes: 240 });
+    expect(startMutate).not.toHaveBeenCalled();
   });
 });

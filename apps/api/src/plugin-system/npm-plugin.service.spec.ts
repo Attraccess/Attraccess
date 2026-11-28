@@ -7,6 +7,7 @@ import { NpmPluginService } from './npm-plugin.service';
 import type { SettingsMock } from './npm-plugin.test-fixture';
 import { setupNpmPluginFixture } from './npm-plugin.test-fixture';
 import { PluginService } from './plugin.service';
+import { isPluginRestartRequired } from './runtime/restart-required';
 import { npmInternals } from './npm/fixtures/compose.test-fixture';
 jest.mock('dns/promises', () => ({ lookup: jest.fn() }));
 describe('NpmPluginService', () => {
@@ -42,6 +43,7 @@ describe('NpmPluginService', () => {
       state.context = { operationId: randomUUID(), actorId: 42, authenticationMethod: 'api-token', apiTokenId: 9 };
       await service.install(name, '1.2.3', undefined, state);
       expect(PluginService.prototype.requestRestart).not.toHaveBeenCalled();
+      expect(isPluginRestartRequired()).toBe(true);
       expect(service.listInstalled()[0]).not.toHaveProperty('pendingAudit');
       const persisted = JSON.parse(readFileSync(join(fixture.root, '.npm-plugin-state.json'), 'utf8'));
       expect(persisted[0].pendingAudit.operationId).toBe(state.context.operationId);
@@ -241,10 +243,11 @@ describe('NpmPluginService', () => {
 
     expect(existsSync(join(fixture.root, installPath))).toBe(false);
     expect(service.listInstalled()).toEqual([]);
-    expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
+    expect(PluginService.prototype.requestRestart).not.toHaveBeenCalled();
+    expect(isPluginRestartRequired()).toBe(true);
   });
 
-  it('restarts after removing a package when quarantine cleanup fails', async () => {
+  it('marks a restart as required after removing a package when quarantine cleanup fails', async () => {
     const name = '@attraccess/plugin';
     const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
     mkdirSync(join(fixture.root, installPath), { recursive: true });
@@ -272,7 +275,8 @@ describe('NpmPluginService', () => {
 
     expect(existsSync(join(fixture.root, installPath))).toBe(false);
     expect(service.listInstalled()).toEqual([]);
-    expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
+    expect(PluginService.prototype.requestRestart).not.toHaveBeenCalled();
+    expect(isPluginRestartRequired()).toBe(true);
   });
 
   it('keeps a removed npm plugin quarantined when state persistence fails', async () => {
@@ -318,7 +322,7 @@ describe('NpmPluginService', () => {
     expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
   });
 
-  it('restarts after backup cleanup fails following a successful install', async () => {
+  it('marks a restart as required when backup cleanup fails after a successful install', async () => {
     const name = '@attraccess/plugin';
     const tarball = await fixture.packageTarball(name);
     const target = join(fixture.root, `npm-${Buffer.from(name).toString('base64url')}`);
@@ -349,7 +353,9 @@ describe('NpmPluginService', () => {
 
     await expect(service.install(name, '1.2.3')).resolves.toMatchObject({ name, version: '1.2.3' });
 
-    expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
+    expect(PluginService.prototype.requestRestart).not.toHaveBeenCalled();
+
+    expect(isPluginRestartRequired()).toBe(true);
     expect(service.listInstalled()).toEqual([expect.objectContaining({ name, version: '1.2.3' })]);
     expect(readdirSync(join(fixture.root, '.npm-backups'))).toHaveLength(1);
 
@@ -398,7 +404,8 @@ describe('NpmPluginService', () => {
       }),
     ]);
     expect(existsSync(join(fixture.root, `npm-${Buffer.from(name).toString('base64url')}`))).toBe(true);
-    expect(PluginService.prototype.requestRestart).toHaveBeenCalled();
+    expect(PluginService.prototype.requestRestart).not.toHaveBeenCalled();
+    expect(isPluginRestartRequired()).toBe(true);
   });
 
   it('keeps a plugin quarantined when its final active state cannot be persisted', async () => {

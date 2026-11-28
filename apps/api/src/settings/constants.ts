@@ -120,6 +120,7 @@ export const RESOURCES_PARENT = 'resources';
 
 export const RESOURCES_KEYS = {
   activityVisibility: 'activity_visibility',
+  listVisibility: 'list_visibility',
 } as const;
 
 export const RESOURCE_ACTIVITY_VISIBILITY_VALUES = ['all', 'introduced'] as const;
@@ -129,6 +130,21 @@ export type ResourceActivityVisibility = (typeof RESOURCE_ACTIVITY_VISIBILITY_VA
 /** A missing stored value means "all", so upgraded instances keep today's behaviour without a migration. */
 export const RESOURCE_ACTIVITY_VISIBILITY_DEFAULT: ResourceActivityVisibility = 'all';
 
+/**
+ * Who may see the machine list (ATT-843). "authenticated": every signed-in account with resources.read sees all
+ * machines. "permitted-only": only machines the account is introduced to, runs, introduces or maintains.
+ * There is deliberately no signed-out mode: every route needs a sign-in.
+ */
+export const RESOURCE_LIST_VISIBILITY_VALUES = ['authenticated', 'permitted-only'] as const;
+
+export type ResourceListVisibility = (typeof RESOURCE_LIST_VISIBILITY_VALUES)[number];
+
+/**
+ * A missing or unknown stored value means the restrictive mode: a fresh install has no stored value, and an upgraded
+ * instance gets "authenticated" stored by migration 1796300000000.
+ */
+export const RESOURCE_LIST_VISIBILITY_DEFAULT: ResourceListVisibility = 'permitted-only';
+
 export const ATTRACTAP_PARENT = 'attractap';
 
 export const ATTRACTAP_KEYS = {
@@ -136,4 +152,6 @@ export const ATTRACTAP_KEYS = {
   cardWriterMode: 'card_writer_mode',
   /** JSON array of reader ids allowed to enroll and reset cards when the mode is "selected". */
   cardWriterReaders: 'card_writer_readers',
+  /** "true" lets cards that only offer a UID (no AES) be enrolled and used. Off when unset. Insecure: such cards can be copied. */
+  allowUidOnlyCards: 'allow_uid_only_cards',
 } as const;

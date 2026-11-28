@@ -58,6 +58,8 @@ export enum AttractapEventType {
   READER_SESSION_ENDED = 'READER_SESSION_ENDED',
   START_RESOURCE_USAGE_SESSION = 'START_RESOURCE_USAGE_SESSION',
   STOP_RESOURCE_USAGE_SESSION = 'STOP_RESOURCE_USAGE_SESSION',
+  /** Reader → server (capabilities.sessionDuration): move the automatic end of the card holder's session later. */
+  EXTEND_RESOURCE_USAGE_SESSION = 'EXTEND_RESOURCE_USAGE_SESSION',
   LOCK_DOOR = 'LOCK_DOOR',
   UNLOCK_DOOR = 'UNLOCK_DOOR',
   UNLATCH_DOOR = 'UNLATCH_DOOR',
@@ -98,7 +100,8 @@ export enum AttractapEventType {
   //    CARD_SESSION_ENDED { cardSessionId }.
   //  START_RESOURCE_USAGE_SESSION gains optional `stepId`, `choice` and `cardSessionId`; replies may carry
   //  { error: 'START_BLOCKED', reason: { code, title, body } }. Host codes in `reason.code`: HOOK_UNAVAILABLE,
-  //  CONFIRMATION_UNAVAILABLE, CONFIRMATION_REQUIRED, STEP_EXPIRED, STEP_UNKNOWN.
+  //  CONFIRMATION_UNAVAILABLE, CONFIRMATION_REQUIRED, STEP_EXPIRED, STEP_UNKNOWN, FORM_PHOTO_UNSUPPORTED (also on
+  //  STOP_RESOURCE_USAGE_SESSION replies).
   UI_SLOT_UPDATE = 'UI_SLOT_UPDATE',
   UI_STEP_REQUEST = 'UI_STEP_REQUEST',
   UI_STEP_RESULT = 'UI_STEP_RESULT',
@@ -173,6 +176,10 @@ export interface ResourceUsageFormFieldPayload {
   isRequired: boolean;
   options: Record<string, unknown> | string[] | null;
   value?: FormFieldAnswerValue | null;
+  /** Image fields only (ATT-879): the link the reader shows as a QR code, the images added so far and the limit. */
+  handoffUrl?: string;
+  imageCount?: number;
+  maxImages?: number;
 }
 
 export interface ResourceUsageFormMetaPayload {
@@ -241,6 +248,13 @@ export type AttractapMessage<TPayload = any | undefined> = AttractapEvent<TPaylo
 export interface CardDetection {
   uid: string;
   detectionId: number;
+  /**
+   * The card's SAK (ISO 14443-3 select answer), when the reader firmware reports it. Bit 0x20 says the card
+   * speaks ISO 14443-4 (APDUs). Without it the server cannot tell a UID-only card from a secure one.
+   */
+  sak?: number;
+  /** The card's ATQA, when the reader reports it. Informational. */
+  atqa?: number;
 }
 
 /** What is still waiting to go out to this reader (session queue for paired readers, `bufferedAmount` otherwise). */
@@ -255,6 +269,7 @@ export function queuedSendBytes(socket: Pick<AuthenticatedWebSocket, 'pendingSen
 export function forgetReaderFormState(socket: Pick<AuthenticatedWebSocket, 'state'>): void {
   socket.state.formDrafts = undefined;
   socket.state.formsPresented = undefined;
+  socket.state.formHandoffs = undefined;
 }
 
 export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
@@ -292,6 +307,11 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
     signingIn?: { readerId: number; attempt: symbol };
     /** The reader runs firmware that relays card APDUs (capabilities.cardRelay, 2.0.0+). Older readers get no card functions. */
     cardRelay?: boolean;
+    /**
+     * The reader has a duration input and extend controls (capabilities.sessionDuration). Other readers are never
+     * refused for the missing estimate: the machine's maximum or default estimate sets their deadline.
+     */
+    sessionDuration?: boolean;
     /** False for the BLE Bridge (capabilities.nfc): it gets no resource list. Undefined until READER_FIRMWARE_INFO. */
     nfc?: boolean;
     /**
@@ -322,6 +342,8 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       };
       /** When the enrollment was armed (ms since epoch); a card arriving much later is refused. */
       armedAt: number;
+      /** The cluster-wide reader screen claim taken for it (ATT-1163); released when the enrollment ends. */
+      screenClaim?: string;
     } | null;
     /** Armed by an admin: the next card tapped on this reader is reset if it is this one. No key material here. */
     resetNfcCardData: {
@@ -333,6 +355,8 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       };
       /** When the reset was armed (ms since epoch); a card arriving much later is refused. */
       armedAt: number;
+      /** The cluster-wide reader screen claim taken for it (ATT-1163); released when the reset ends. */
+      screenClaim?: string;
     } | null;
     // Two-card supervision flow (ATT-493). Present while the reader is waiting
     // for a supervisor to authorise a non-introduced user's session — either by
@@ -369,6 +393,13 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
     formDrafts?: Record<string, Record<number, FormFieldAnswerValue>>;
     /** Per draft key, the forms already sent to the reader; it shows at most four at a time (ATT-796). */
     formsPresented?: Record<string, number[]>;
+    /**
+     * The reader announced `capabilities.formImages` (ATT-879): it can show an image field as a QR code. Readers
+     * without it never get a field of type `image`.
+     */
+    formImages?: boolean;
+    /** Image fields on screen: the handoff and its token per `resource:action:form:field`. The database holds the rest. */
+    formHandoffs?: Record<string, { handoffId: string; token: string }>;
     /** Live card authentication (ATT-1187). Null once the reader reported sign-out or the server expired it. */
     cardSession?: CardSessionState | null;
     /** Open reader UI steps by stepId; discarded when the socket closes. */

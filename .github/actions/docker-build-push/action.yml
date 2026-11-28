@@ -30,6 +30,10 @@ inputs:
     description: 'Docker Hub token (empty skips the Docker Hub login)'
     required: false
     default: ''
+  plugin-channel:
+    description: 'Plugin release channel baked into the image as ATTRACCESS_PLUGIN_CHANNEL ("next" for nightly images; empty keeps the host default "latest")'
+    required: false
+    default: ''
 
 outputs:
   digest:
@@ -73,7 +77,10 @@ runs:
         push: ${{ inputs.push }}
         tags: ${{ inputs.tags }}
         labels: ${{ inputs.labels }}
-        build-args: NODE_VERSION=${{ steps.node-version.outputs.value }}
+        build-args: |
+          NODE_VERSION=${{ steps.node-version.outputs.value }}
+          COMMIT_SHA=${{ github.sha }}
+          ATTRACCESS_PLUGIN_CHANNEL=${{ inputs.plugin-channel }}
         cache-from: type=gha
         # ignore-error: cache export is an optimization; transient GHA cache
         # backend errors (e.g. "not_found") must not fail the release build.

@@ -51,6 +51,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { AttractapSelect } from '../AttractapSelect/index';
 import { NfcCardRowActions } from './NfcCardRowActions';
 import { NfcCardStatusChip } from './NfcCardStatusChip';
+import { NfcCardTypeChip } from './NfcCardTypeChip';
 
 export interface EnrollNfcCardProps {
   children: (onOpen: () => void) => React.ReactNode;
@@ -245,7 +246,12 @@ export const NfcCardTableCell = (props: NfcCardTableCellProps) => {
   }
 
   if (props.header === 'status') {
-    return <NfcCardStatusChip isActive={props.card.isActive} />;
+    return (
+      <div className="flex flex-wrap items-center gap-1">
+        <NfcCardStatusChip isActive={props.card.isActive} />
+        <NfcCardTypeChip card={props.card} />
+      </div>
+    );
   }
 
   if (props.header === 'id') {

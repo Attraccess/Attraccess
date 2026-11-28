@@ -9,6 +9,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { randomBytes, randomUUID } from 'crypto';
@@ -22,12 +23,19 @@ import {
   type MassIntroductionTargetStore,
 } from './mass-introduction-target-store.port';
 import { MassIntroductionLiveService } from './mass-introduction-live.service';
+import { ClusterService } from '../../cluster/cluster.service';
+import { orServiceUnavailable } from '../../cluster/valkey-call';
 import {
-  ActiveMassIntroduction,
   MassIntroductionParticipant,
   MassIntroductionReaderPort,
   MassIntroductionTarget,
 } from './mass-introduction.types';
+import {
+  InMemoryMassIntroductionStore,
+  type MassIntroductionStore,
+  type StoredMassIntroduction,
+} from './mass-introduction-store';
+import { ValkeyMassIntroductionStore } from './valkey-mass-introduction-store';
 import {
   MassIntroductionMethod,
   MassIntroductionReaderState,
@@ -47,11 +55,14 @@ import {
  * Short-lived sessions in which an introducer introduces everyone who scans a QR code, or taps a
  * card at a chosen reader, to one resource or resource group (ATT-1151).
  *
- * Sessions live in memory like supervision requests: they last 15 minutes and are worthless after
- * an API restart, so persisting them would only add cleanup work.
+ * Sessions last 15 minutes and are worthless after they end, so they are never persisted: one API
+ * instance keeps them in memory, several share them in Valkey (ATT-1163), where they survive the
+ * restart of any one instance. The expiry fires exactly once, on whichever instance sweeps it.
  */
 /** The user as the service needs it; the names are optional so callers with only a username keep working. */
 type MassIntroductionUser = { id: number; username: string; firstName?: string | null; lastName?: string | null };
+
+const EXPIRY_QUEUE = 'mass-introduction';
 
 @Injectable()
 export class MassIntroductionService {
@@ -62,9 +73,9 @@ export class MassIntroductionService {
 
   protected readonly logger = new Logger(MassIntroductionService.name);
 
-  protected readonly sessions = new Map<string, ActiveMassIntroduction>();
+  protected readonly store: MassIntroductionStore;
 
-  protected readonly sessionIdsByPublicId = new Map<string, string>();
+  protected readonly cluster: ClusterService;
 
   protected readerPort: MassIntroductionReaderPort | null = null;
 
@@ -75,7 +86,15 @@ export class MassIntroductionService {
     protected readonly groupIntroducers: ResourceGroupsIntroducersService,
     protected readonly live: MassIntroductionLiveService,
     @Inject(MASS_INTRODUCTION_TARGET_STORE) protected readonly targets: MassIntroductionTargetStore,
-  ) {}
+    @Optional() cluster?: ClusterService,
+  ) {
+    this.cluster = cluster ?? ClusterService.local();
+    const max = MassIntroductionService.MAX_WRONG_CODES_PER_MINUTE;
+    this.store = this.cluster.valkey
+      ? new ValkeyMassIntroductionStore(this.cluster.valkey, max)
+      : new InMemoryMassIntroductionStore(max);
+    this.cluster.deadlines.onDue(EXPIRY_QUEUE, (sessionId) => this.end(sessionId, MassIntroductionEndReason.EXPIRED));
+  }
 
   /** Registered by the Attractap module at startup; see {@link MassIntroductionReaderPort}. */
   public setReaderPort(port: MassIntroductionReaderPort): void {
@@ -84,26 +103,30 @@ export class MassIntroductionService {
 
   public async start(user: AuthenticatedUser, dto: StartMassIntroductionDto): Promise<MassIntroductionSessionDto> {
     const { target, viaPermission } = await this.authorizeTarget(user, dto);
+    return orServiceUnavailable(this.startFor(user, dto, target, viaPermission));
+  }
 
+  protected async startFor(
+    user: AuthenticatedUser,
+    dto: StartMassIntroductionDto,
+    target: MassIntroductionTarget,
+    viaPermission: boolean,
+  ): Promise<MassIntroductionSessionDto> {
     // One session per introducer and target: starting again replaces the old QR code — but only once
     // the replacement works, so a start that fails (offline or busy reader) keeps the running one.
-    const replaced = Array.from(this.sessions.values()).filter(
-      (existing) =>
-        existing.introducer.id === user.id && existing.target.type === target.type && existing.target.id === target.id,
-    );
+    const replaced = await this.store.findForIntroducer(user.id, target);
     // A session holding the requested reader has to let go of it first, or arming would find it busy.
     for (const existing of replaced) {
       if (existing.reader?.state === MassIntroductionReaderState.ACTIVE && existing.reader.id === dto.readerId) {
-        this.end(existing, MassIntroductionEndReason.CANCELLED);
+        await this.end(existing.id, MassIntroductionEndReason.CANCELLED);
       }
     }
 
-    const now = new Date();
-    const session: ActiveMassIntroduction = {
+    const now = Date.now();
+    const session: StoredMassIntroduction = {
       id: randomUUID(),
       publicId: randomBytes(12).toString('base64url'),
       codeSecret: newMassIntroductionCodeSecret(),
-      wrongCodes: new Map(),
       target,
       introducer: {
         id: user.id,
@@ -114,51 +137,27 @@ export class MassIntroductionService {
         viaPermission,
       },
       reader: null,
-      participants: new Map(),
-      joining: new Map(),
       createdAt: now,
-      expiresAt: new Date(now.getTime() + MassIntroductionService.TTL_MS),
-      // Unreferenced: an open QR code must not keep the process alive on shutdown.
-      timeout: setTimeout(() => this.expire(session.id), MassIntroductionService.TTL_MS).unref(),
+      expiresAt: now + MassIntroductionService.TTL_MS,
     };
-    this.sessions.set(session.id, session);
-    this.sessionIdsByPublicId.set(session.publicId, session.id);
+    await this.store.create(session);
+    await this.cluster.deadlines.schedule(EXPIRY_QUEUE, session.id, session.expiresAt);
 
     if (dto.readerId != null) {
-      if (!this.readerPort) {
-        this.end(session, MassIntroductionEndReason.CANCELLED, { silent: true });
-        throw new ServiceUnavailableException('Reader integration is not available');
-      }
-      let readerName: string;
-      try {
-        ({ readerName } = await this.readerPort.arm({
-          readerId: dto.readerId,
-          allowedResourceIds: await this.linkedResourceIds(target),
-          sessionId: session.id,
-          targetName: target.name,
-          introducerUsername: user.username,
-          introducerDisplayName: formatUserDisplayName(user),
-          expiresAt: session.expiresAt,
-        }));
-      } catch (error) {
-        this.end(session, MassIntroductionEndReason.CANCELLED, { silent: true });
-        throw error;
-      }
-      // A concurrent start may have replaced this session while the reader was being armed; its
-      // end() could not disarm a reader it did not know about yet.
-      if (this.sessions.get(session.id) !== session) {
-        this.readerPort.disarm({
-          readerId: dto.readerId,
-          sessionId: session.id,
-          reason: MassIntroductionEndReason.CANCELLED,
-        });
-        throw new GoneException('The mass introduction was replaced while starting');
-      }
-      session.reader = { id: dto.readerId, name: readerName, state: MassIntroductionReaderState.ACTIVE };
+      await this.attachReader(session, user, dto.readerId);
     }
 
-    for (const existing of replaced) {
-      this.end(existing, MassIntroductionEndReason.CANCELLED);
+    // Looked up again: a start running at the same time (another tab, another instance) may have created one since.
+    // Of those, each start ends only the older ones, so of two concurrent starts exactly one stays.
+    const known = new Set(replaced.map((existing) => existing.id));
+    const concurrent = (await this.store.findForIntroducer(user.id, target)).filter(
+      (other) =>
+        !known.has(other.id) &&
+        other.id !== session.id &&
+        (other.createdAt < session.createdAt || (other.createdAt === session.createdAt && other.id < session.id)),
+    );
+    for (const existing of [...replaced, ...concurrent]) {
+      await this.end(existing.id, MassIntroductionEndReason.CANCELLED);
     }
 
     this.logger.log(
@@ -168,121 +167,154 @@ export class MassIntroductionService {
     return this.toDto(session);
   }
 
-  public get(sessionId: string, userId: number): MassIntroductionSessionDto {
-    return this.toDto(this.getOwned(sessionId, userId));
+  protected async attachReader(session: StoredMassIntroduction, user: AuthenticatedUser, readerId: number) {
+    if (!this.readerPort) {
+      await this.end(session.id, MassIntroductionEndReason.CANCELLED, { silent: true });
+      throw new ServiceUnavailableException('Reader integration is not available');
+    }
+    let readerName: string;
+    try {
+      ({ readerName } = await this.readerPort.arm({
+        readerId,
+        allowedResourceIds: await this.linkedResourceIds(session.target),
+        sessionId: session.id,
+        targetName: session.target.name,
+        introducerUsername: user.username,
+        introducerDisplayName: formatUserDisplayName(user),
+        expiresAt: new Date(session.expiresAt),
+      }));
+    } catch (error) {
+      await this.end(session.id, MassIntroductionEndReason.CANCELLED, { silent: true });
+      throw error;
+    }
+    // A concurrent start may have replaced this session while the reader was being armed; its
+    // end() could not disarm a reader it did not know about yet.
+    const reader = { id: readerId, name: readerName, state: MassIntroductionReaderState.ACTIVE };
+    let attached: boolean;
+    try {
+      attached = await this.store.attachReader(session.id, reader);
+    } catch (error) {
+      // Valkey failed after the reader was armed: the reader must not stay armed for a session nobody can end.
+      this.readerPort.disarm({ readerId, sessionId: session.id, reason: MassIntroductionEndReason.CANCELLED });
+      await this.end(session.id, MassIntroductionEndReason.CANCELLED, { silent: true }).catch(() => undefined);
+      throw error;
+    }
+    if (!attached) {
+      this.readerPort.disarm({ readerId, sessionId: session.id, reason: MassIntroductionEndReason.CANCELLED });
+      throw new GoneException('The mass introduction was replaced while starting');
+    }
+    session.reader = reader;
   }
 
-  public cancel(sessionId: string, userId: number): void {
-    this.end(this.getOwned(sessionId, userId), MassIntroductionEndReason.CANCELLED);
+  public async get(sessionId: string, userId: number): Promise<MassIntroductionSessionDto> {
+    return orServiceUnavailable(this.getOwned(sessionId, userId).then((session) => this.toDto(session)));
+  }
+
+  public async cancel(sessionId: string, userId: number): Promise<void> {
+    await orServiceUnavailable(
+      this.getOwned(sessionId, userId).then((session) => this.end(session.id, MassIntroductionEndReason.CANCELLED)),
+    );
   }
 
   /**
    * A participant scanned the QR code (which only names the session) and typed the code shown next
    * to it. The code changes every 15 seconds, so only people in the room can join.
    */
-  public async redeem(
+  public redeem(
     publicId: string,
     code: string,
     user: MassIntroductionUser,
     nowMs = Date.now(),
   ): Promise<RedeemMassIntroductionResponseDto> {
-    const session = this.sessions.get(this.sessionIdsByPublicId.get(publicId) ?? '');
+    return orServiceUnavailable(this.redeemCode(publicId, code, user, nowMs));
+  }
+
+  protected async redeemCode(
+    publicId: string,
+    code: string,
+    user: MassIntroductionUser,
+    nowMs: number,
+  ): Promise<RedeemMassIntroductionResponseDto> {
+    const session = await this.store.getByPublicId(publicId);
     if (!session) {
       throw new NotFoundException('This mass introduction has ended');
     }
-    const existing = session.participants.get(user.id);
+    const existing = await this.store.participant(session.id, user.id);
     if (existing) {
       return { target: { ...session.target }, alreadyIntroduced: existing.alreadyIntroduced };
     }
 
-    const attempts = session.wrongCodes.get(user.id);
-    if (attempts && nowMs - attempts.windowStart < 60_000) {
-      if (attempts.count >= MassIntroductionService.MAX_WRONG_CODES_PER_MINUTE) {
-        throw new HttpException('Too many wrong codes, try again in a minute', HttpStatus.TOO_MANY_REQUESTS);
-      }
-    } else {
-      session.wrongCodes.set(user.id, { windowStart: nowMs, count: 0 });
-    }
+    const tooManyWrongCodes = () =>
+      new HttpException('Too many wrong codes, try again in a minute', HttpStatus.TOO_MANY_REQUESTS);
     if (!isValidMassIntroductionCode(session.codeSecret, code, nowMs)) {
-      session.wrongCodes.get(user.id).count += 1;
+      // Counted atomically, so guesses spread over several instances share the one limit.
+      if (!(await this.store.countWrongCode(session.id, user.id, nowMs))) throw tooManyWrongCodes();
       throw new BadRequestException('Wrong or expired code');
     }
-    session.wrongCodes.delete(user.id);
+    if (await this.store.wrongCodesExhausted(session.id, user.id, nowMs)) throw tooManyWrongCodes();
+    await this.store.clearWrongCodes(session.id, user.id);
 
     const participant = await this.join(session, user, MassIntroductionMethod.QR);
     return { target: { ...session.target }, alreadyIntroduced: participant.alreadyIntroduced };
   }
 
   /** A participant tapped an authenticated card at the session's reader. */
-  public async redeemCard(
+  public redeemCard(
     sessionId: string,
     readerId: number,
     user: MassIntroductionUser,
   ): Promise<{ participant: MassIntroductionParticipant; participantCount: number }> {
-    const session = this.sessions.get(sessionId);
+    return orServiceUnavailable(this.redeemCardAt(sessionId, readerId, user));
+  }
+
+  protected async redeemCardAt(
+    sessionId: string,
+    readerId: number,
+    user: MassIntroductionUser,
+  ): Promise<{ participant: MassIntroductionParticipant; participantCount: number }> {
+    const session = await this.store.get(sessionId);
     if (!session || session.reader?.id !== readerId || session.reader.state !== MassIntroductionReaderState.ACTIVE) {
       throw new NotFoundException('NO_MASS_INTRODUCTION_IN_PROGRESS');
     }
     const participant = await this.join(session, user, MassIntroductionMethod.NFC);
-    return { participant, participantCount: session.participants.size };
+    return { participant, participantCount: (await this.store.participants(session.id)).length };
   }
 
-  /** The reader left the session (cancel button, disconnect); the QR code keeps working. */
-  public detachReader(sessionId: string, readerId: number): void {
-    const session = this.sessions.get(sessionId);
-    if (!session?.reader || session.reader.id !== readerId) {
-      return;
-    }
-    if (session.reader.state === MassIntroductionReaderState.DETACHED) {
-      return;
-    }
-    session.reader.state = MassIntroductionReaderState.DETACHED;
-    this.emitUpdated(session);
+  /** The reader left the session (cancel button, disconnect, its instance died); the QR code keeps working. */
+  public async detachReader(sessionId: string, readerId: number): Promise<void> {
+    const session = await this.store.detachReader(sessionId, readerId);
+    if (session) await this.emitUpdated(session);
   }
 
   protected async join(
-    session: ActiveMassIntroduction,
+    session: StoredMassIntroduction,
     user: MassIntroductionUser,
     method: MassIntroductionMethod,
   ): Promise<MassIntroductionParticipant> {
-    if (session.expiresAt.getTime() <= Date.now()) {
-      this.expire(session.id);
+    if (session.expiresAt <= Date.now()) {
+      await this.end(session.id, MassIntroductionEndReason.EXPIRED);
       throw new NotFoundException('This mass introduction has expired');
     }
 
-    const existing = session.participants.get(user.id);
-    if (existing) {
-      return existing;
+    const { participant, added } = await this.store.joinOnce(session.id, user.id, () =>
+      this.grant(session, user, method),
+    );
+    if (added) {
+      const current = await this.store.get(session.id);
+      if (current) await this.emitUpdated(current);
     }
-    const inFlight = session.joining.get(user.id);
-    if (inFlight) {
-      return inFlight;
-    }
-
-    const joining = this.grant(session, user, method);
-    session.joining.set(user.id, joining);
-    try {
-      const participant = await joining;
-      // A session that ended while granting keeps the grant but has no one left to notify.
-      if (this.sessions.get(session.id) === session) {
-        session.participants.set(user.id, participant);
-        this.emitUpdated(session);
-      }
-      return participant;
-    } finally {
-      session.joining.delete(user.id);
-    }
+    return participant;
   }
 
   protected async grant(
-    session: ActiveMassIntroduction,
+    session: StoredMassIntroduction,
     user: MassIntroductionUser,
     method: MassIntroductionMethod,
   ): Promise<MassIntroductionParticipant> {
     const { target, introducer } = session;
 
     if (!introducer.viaPermission && !(await this.isIntroducer(target, introducer.id))) {
-      this.end(session, MassIntroductionEndReason.REVOKED);
+      await this.end(session.id, MassIntroductionEndReason.REVOKED);
       throw new ForbiddenException('The introducer can no longer introduce to this target');
     }
 
@@ -324,10 +356,15 @@ export class MassIntroductionService {
     if ((dto.resourceId == null) === (dto.resourceGroupId == null)) {
       throw new BadRequestException('Provide exactly one of resourceId and resourceGroupId');
     }
-    const target = await this.loadTarget(dto);
     const viaPermission = user.effectivePermissions?.has('resources.access.manage') === true;
+    const notIntroducer = () => new ForbiddenException('You are not an introducer for this target');
+    // Without the permission, a missing target answers like one the caller does not introduce, so the answer does
+    // not tell which machine ids exist (ATT-843).
+    const target = await this.loadTarget(dto).catch((error: unknown) => {
+      throw !viaPermission && error instanceof NotFoundException ? notIntroducer() : error;
+    });
     if (!viaPermission && !(await this.isIntroducer(target, user.id))) {
-      throw new ForbiddenException('You are not an introducer for this target');
+      throw notIntroducer();
     }
     return { target, viaPermission };
   }
@@ -363,8 +400,8 @@ export class MassIntroductionService {
       : this.groupIntroducers.isIntroducer({ groupId: target.id, userId });
   }
 
-  protected getOwned(sessionId: string, userId: number): ActiveMassIntroduction {
-    const session = this.sessions.get(sessionId);
+  protected async getOwned(sessionId: string, userId: number): Promise<StoredMassIntroduction> {
+    const session = await this.store.get(sessionId);
     // Someone else's session is reported as missing so its id cannot be probed.
     if (!session || session.introducer.id !== userId) {
       throw new NotFoundException('Mass introduction not found');
@@ -372,24 +409,17 @@ export class MassIntroductionService {
     return session;
   }
 
-  protected expire(sessionId: string): void {
-    const session = this.sessions.get(sessionId);
-    if (session) {
-      this.end(session, MassIntroductionEndReason.EXPIRED);
-    }
-  }
-
-  protected end(
-    session: ActiveMassIntroduction,
+  /** Ends a session exactly once, whichever instance or path (cancel, expiry, replacement, revocation) gets there first. */
+  protected async end(
+    sessionId: string,
     reason: MassIntroductionEndReason,
     options: { silent?: boolean } = {},
-  ): void {
-    if (this.sessions.get(session.id) !== session) {
+  ): Promise<void> {
+    const session = await this.store.remove(sessionId);
+    if (!session) {
       return;
     }
-    clearTimeout(session.timeout);
-    this.sessions.delete(session.id);
-    this.sessionIdsByPublicId.delete(session.publicId);
+    void this.cluster.deadlines.cancel(EXPIRY_QUEUE, session.id).catch(() => undefined);
 
     if (session.reader?.state === MassIntroductionReaderState.ACTIVE) {
       this.readerPort?.disarm({ readerId: session.reader.id, sessionId: session.id, reason });
@@ -405,16 +435,17 @@ export class MassIntroductionService {
     this.logger.log(`Mass introduction ${session.id} ended (${reason})`);
   }
 
-  protected emitUpdated(session: ActiveMassIntroduction): void {
+  protected async emitUpdated(session: StoredMassIntroduction): Promise<void> {
     this.live.emitToIntroducer(session.introducer.id, {
       type: MassIntroductionLiveEventType.UPDATED,
       sessionId: session.id,
-      session: this.toDto(session),
+      session: await this.toDto(session),
     });
   }
 
-  protected toDto(session: ActiveMassIntroduction): MassIntroductionSessionDto {
+  protected async toDto(session: StoredMassIntroduction): Promise<MassIntroductionSessionDto> {
     const code = currentMassIntroductionCode(session.codeSecret);
+    const participants = await this.store.participants(session.id);
     return {
       id: session.id,
       publicId: session.publicId,
@@ -422,9 +453,9 @@ export class MassIntroductionService {
       codeRefreshAt: code.refreshAt,
       target: { ...session.target },
       reader: session.reader ? { ...session.reader } : null,
-      participants: Array.from(session.participants.values(), (participant) => ({ ...participant })),
-      createdAt: session.createdAt,
-      expiresAt: session.expiresAt,
+      participants: participants.map((participant) => ({ ...participant })),
+      createdAt: new Date(session.createdAt),
+      expiresAt: new Date(session.expiresAt),
     };
   }
 }

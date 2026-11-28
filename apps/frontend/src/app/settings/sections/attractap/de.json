@@ -13,6 +13,10 @@
       "selected": {
         "label": "Ausgewählten Readern",
         "description": "Nur die unten gewählten Reader können RFID-Karten registrieren und zurücksetzen."
+      },
+      "secured": {
+        "label": "Nur gesicherten Readern",
+        "description": "Nur Reader, die gerade gesichert sind, können RFID-Karten registrieren und zurücksetzen. Ein Reader, der seinen Status „Gesichert“ verliert, kann erst wieder Karten beschreiben, wenn er wieder gesichert ist."
       }
     }
   },
@@ -30,5 +34,23 @@
   "success": {
     "title": "Einstellungen gespeichert",
     "description": "Ihre Änderungen wurden übernommen."
+  },
+  "uidOnly": {
+    "label": "UID-only-Karten erlauben (unsicher)",
+    "description": "Günstige RFID-Karten (MIFARE Classic, MIFARE Ultralight, NTAG213/215/216, DESFire EV1) bieten nur eine UID und keine Verschlüsselung. Standardmäßig aus. Dieser Schalter gilt sofort; er wird nicht mit den Reader-Einstellungen oben gespeichert.",
+    "warningTitle": "Gefährliche Einstellung",
+    "warning": "UID-only-Karten lassen sich mit günstigen Werkzeugen kopieren. Wer eine solche Karte ausliest, kann sich an Maschinen und Türen als deren Besitzer ausgeben. Karten mit AES (NTAG 424 DNA, DESFire EV2/EV3) sind nie betroffen und brauchen immer ihren Schlüssel.",
+    "switch": "UID-only-Karten erlauben",
+    "offNote": "Solange dies aus ist, funktionieren vorhandene UID-only-Karten an keinem Reader und in keinem Plugin, bis die Einstellung wieder eingeschaltet wird. Sie bleiben in den Kartenlisten.",
+    "confirm": {
+      "title": "UID-only-Karten erlauben?",
+      "message": "UID-only-Karten lassen sich mit günstigen Werkzeugen kopieren. Wer eine solche Karte ausliest, kann sich an Maschinen und Türen als deren Besitzer ausgeben, auch an Türen, die über Plugins geöffnet werden. Schalten Sie dies nur ein, wenn Sie dieses Risiko akzeptieren. Jede Änderung wird im Audit-Log festgehalten.",
+      "confirm": "UID-only-Karten erlauben",
+      "cancel": "Abbrechen"
+    },
+    "saved": {
+      "enabled": "UID-only-Karten sind jetzt erlaubt",
+      "disabled": "UID-only-Karten werden jetzt abgelehnt"
+    }
   }
 }

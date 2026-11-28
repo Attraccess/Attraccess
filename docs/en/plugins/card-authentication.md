@@ -21,11 +21,17 @@ Card keys and session keys never leave the API. The plugin only sees the APDUs A
 both are protected by the card's secure messaging. The result carries the card's `id`, `uid` and `userId`, nothing else;
 for a plugin with `READER_DEVICES` also `authentication` (see below).
 
+> [!WARNING]
+> While an administrator allows [UID-only cards](attractap/rfid-cards.md#uid-only-cards-insecure), a UID that belongs to
+> a UID-only card is accepted on the UID alone: Attraccess sends no APDU and `exchange` is never called. Such cards can be
+> copied, so treat that result as weaker than a secure card's. Secure cards always prove their key.
+
 ## Permission
 
 Declare `CARD_AUTHENTICATION` in your manifest. Administrators see the permission on the Plugins page when they install
 the plugin. The SDK describes it as _"Authenticate NFC cards held to the plugin's own devices with the Attraccess card
-keys. The plugin receives the card and its owner, never the keys."_
+keys (UID-only cards, while an administrator allows them, by their UID alone). The plugin receives the card and its
+owner, never the keys."_
 
 ```json
 {
@@ -88,7 +94,7 @@ interface PluginCardChannel {
 
 | Field     | Meaning                                                                                                                                                        |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `uid`     | The card UID, hex, 4 to 32 characters; anything else resolves with `INVALID_UID`. It is compared exactly: send it in lowercase, as Attractap readers do.       |
+| `uid`     | The card UID, hex, 4 to 32 characters; anything else resolves with `INVALID_UID`. Upper and lower case are treated alike.                                      |
 | `device`  | Your own id of the device that holds the card (1 to 200 characters), for example a BLE endpoint id.                                                            |
 | `channel` | The card channel above.                                                                                                                                        |
 | `signal`  | Optional. Abort it when the card left the field or you give up; the conversation ends with `CARD_REMOVED`. An already aborted signal ends it before it starts. |
@@ -137,7 +143,7 @@ resolves with `BUSY`.
 | `INVALID_UID`                | The UID is not 4 to 32 hex characters.                                                                       |
 | `CARD_NOT_FOUND`             | No card is enrolled for this UID.                                                                            |
 | `CARD_NOT_ACTIVE`            | The card is enrolled but not the user's active card.                                                         |
-| `CARD_NOT_SUPPORTED`         | The card type is not supported (for example a DESFire EV1).                                                  |
+| `CARD_NOT_SUPPORTED`         | The card type is not supported, or it is a UID-only card while UID-only cards are not allowed.               |
 | `CARD_AUTHENTICATION_FAILED` | The card did not prove the stored key: a copied UID, a foreign card or a tampered answer.                    |
 
 Unlike on Attractap readers, `TIMEOUT` and `TOO_MANY_EXCHANGES` are reported separately.

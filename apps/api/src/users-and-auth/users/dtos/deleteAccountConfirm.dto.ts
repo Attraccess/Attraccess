@@ -1,8 +1,9 @@
-import { IsEmail, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class DeleteAccountConfirmDto {
   @IsString()
+  @IsNotEmpty()
   @ApiProperty({
     description: 'The delete account confirmation token',
     example: '1234567890',

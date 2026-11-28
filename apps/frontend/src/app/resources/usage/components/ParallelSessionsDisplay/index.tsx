@@ -2,6 +2,9 @@ import { useCallback, useState } from 'react';
 import { formatUserDisplayName } from '@attraccess/shared';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, UserX } from 'lucide-react';
+import { NetworkRestrictedAction } from '@attraccess/application-models';
+import { useNetworkRestriction } from '../../../../../hooks/useNetworkRestriction';
+import { NetworkRestrictedHint } from '../../../../../components/networkRestriction/NetworkRestrictedHint';
 import { AttraccessUser, Button, DateTimeDisplay, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
@@ -15,6 +18,8 @@ import { SessionNotesModal, SessionModalMode } from '../SessionNotesModal';
 import { useInvalidateSessionHistory } from '../OtherUserSessionDisplay';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
 import { useToastMessage } from '../../../../../components/toastProvider';
+import { useRefreshNetworkRestrictionOnError } from '../../../../../hooks/useRefreshNetworkRestrictionOnError';
+import { SessionAutoEnd } from '../SessionAutoEnd';
 import { useCanEndOtherSessions } from '../../hooks/useCanEndOtherSessions';
 import en from './translations/en.json';
 import de from './translations/de.json';
@@ -41,7 +46,10 @@ export function ParallelSessionsDisplay({
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
   });
   const navigate = useNavigate();
+  const { isRestricted } = useNetworkRestriction();
+  const endRestricted = isRestricted(NetworkRestrictedAction.UsageEnd);
   const { success, error: showError, apiError } = useToastMessage();
+  const refreshNetworkRestriction = useRefreshNetworkRestrictionOnError();
   const invalidateSessionHistory = useInvalidateSessionHistory(resourceId);
   const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);
   const [usageToEnd, setUsageToEnd] = useState<ResourceUsage | null>(null);
@@ -56,6 +64,7 @@ export function ParallelSessionsDisplay({
       success({ title: t('endSession.successful'), description: t('endSession.successfulDescription') });
     },
     onError: (err) => {
+      refreshNetworkRestriction(err);
       apiError({ error: err as ApiError, t, tExists, baseTranslationKey: 'api' });
     },
   });
@@ -120,6 +129,7 @@ export function ParallelSessionsDisplay({
                       <p className="text-xs text-muted">
                         {t('sessionStarted')} <DateTimeDisplay date={usage.startTime} />
                       </p>
+                      {usage.autoEndAt && <SessionAutoEnd resourceId={resourceId} usage={usage} canExtend={canEnd} />}
                       {usage.supervisorUser && (
                         <div className="flex items-center gap-1 text-xs text-muted">
                           {t('supervisedBy')} <AttraccessUser user={usage.supervisorUser} />
@@ -148,6 +158,7 @@ export function ParallelSessionsDisplay({
                           variant="danger-soft"
                           size="sm"
                           aria-label={t('endSession.ariaLabel', { name })}
+                          isDisabled={endRestricted}
                           onPress={() => setUsageToEnd(usage)}
                         >
                           <UserX className="w-3.5 h-3.5" />
@@ -159,6 +170,7 @@ export function ParallelSessionsDisplay({
                 );
               })}
             </ul>
+            {usages.some(canEndSession) && <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageEnd} />}
           </>
         )}
       </SessionStatusCard>

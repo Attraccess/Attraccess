@@ -33,6 +33,10 @@ import { sessionLimitOf } from './usage/sessions/active-usage';
 import { ResourceChangedEvent } from './events/resource-changed.event';
 
 import { assertDoorOptions } from './door-options';
+import {
+  normalizeSessionDurationSettings,
+  sessionDurationSettingsProblem,
+} from './usage/session-duration/session-duration.rules';
 import { AUDIT_DETAILS_BYTE_LIMIT, fitAuditText, fitAuditTexts } from '../audit/policies/projection';
 
 export const MAX_AUDIT_DETAILS_BYTES = AUDIT_DETAILS_BYTE_LIMIT;
@@ -55,6 +59,9 @@ export function resourceAuditSnapshot(resource: ResourceRecord) {
     imageFilename: resource.imageFilename,
     allowTakeOver: resource.allowTakeOver,
     maxParallelSessions: resource.maxParallelSessions,
+    maxSessionDurationMinutes: resource.maxSessionDurationMinutes,
+    requireSessionDurationEstimate: resource.requireSessionDurationEstimate,
+    defaultSessionDurationEstimateMinutes: resource.defaultSessionDurationEstimateMinutes,
     retrainingMaxAgeDays: resource.retrainingMaxAgeDays,
     retrainingMaxInactivityDays: resource.retrainingMaxInactivityDays,
     retrainingBlocksAccess: resource.retrainingBlocksAccess,
@@ -63,6 +70,11 @@ export function resourceAuditSnapshot(resource: ResourceRecord) {
     autoIntroductionTarget: resource.autoIntroductionTarget,
     autoIntroductionGroupId: resource.autoIntroductionGroupId,
   };
+}
+
+function assertSessionDurationSettings(settings: Parameters<typeof sessionDurationSettingsProblem>[0]): void {
+  const problem = sessionDurationSettingsProblem(settings);
+  if (problem) throw new BadRequestException(problem);
 }
 
 export function applyResourceFields(resource: ResourceRecord, dto: UpdateResourceDto): void {
@@ -82,6 +94,11 @@ export function applyResourceFields(resource: ResourceRecord, dto: UpdateResourc
   // Handle allowTakeOver field
   if (dto.allowTakeOver !== undefined) resource.allowTakeOver = dto.allowTakeOver;
   if (dto.maxParallelSessions !== undefined) resource.maxParallelSessions = dto.maxParallelSessions;
+  if (dto.maxSessionDurationMinutes !== undefined) resource.maxSessionDurationMinutes = dto.maxSessionDurationMinutes;
+  if (dto.requireSessionDurationEstimate !== undefined)
+    resource.requireSessionDurationEstimate = dto.requireSessionDurationEstimate;
+  if (dto.defaultSessionDurationEstimateMinutes !== undefined)
+    resource.defaultSessionDurationEstimateMinutes = dto.defaultSessionDurationEstimateMinutes;
 
   if (dto.retrainingMaxAgeDays !== undefined) resource.retrainingMaxAgeDays = dto.retrainingMaxAgeDays;
   if (dto.retrainingMaxInactivityDays !== undefined)
@@ -117,6 +134,15 @@ export function resourceUpdateAuditDetails(
     ...(before.imageFilename !== updatedResource.imageFilename ? ['image'] : []),
     ...(before.allowTakeOver !== updatedResource.allowTakeOver ? ['allowTakeOver'] : []),
     ...(before.maxParallelSessions !== updatedResource.maxParallelSessions ? ['maxParallelSessions'] : []),
+    ...(before.maxSessionDurationMinutes !== updatedResource.maxSessionDurationMinutes
+      ? ['maxSessionDurationMinutes']
+      : []),
+    ...(before.requireSessionDurationEstimate !== updatedResource.requireSessionDurationEstimate
+      ? ['requireSessionDurationEstimate']
+      : []),
+    ...(before.defaultSessionDurationEstimateMinutes !== updatedResource.defaultSessionDurationEstimateMinutes
+      ? ['defaultSessionDurationEstimateMinutes']
+      : []),
     ...(before.retrainingMaxAgeDays !== updatedResource.retrainingMaxAgeDays ? ['retrainingMaxAgeDays'] : []),
     ...(before.retrainingMaxInactivityDays !== updatedResource.retrainingMaxInactivityDays
       ? ['retrainingMaxInactivityDays']
@@ -188,6 +214,7 @@ export class ResourcesService {
     ids?: number[] | number;
     onlyInUseByUserId?: number;
     onlyWithPermissionForUserId?: number;
+    permittedForUserId?: number;
     onlyInUse?: boolean;
     returnUsingUser?: boolean;
   }): Promise<PaginatedResponse<ResourceRecord>> {
@@ -230,6 +257,14 @@ export class ResourcesService {
       separateUnlockAndUnlatch: dto.separateUnlockAndUnlatch || false,
     });
 
+    const durationSettings = normalizeSessionDurationSettings({
+      type: dto.type,
+      maxSessionDurationMinutes: dto.maxSessionDurationMinutes ?? null,
+      requireSessionDurationEstimate: dto.requireSessionDurationEstimate ?? false,
+      defaultSessionDurationEstimateMinutes: dto.defaultSessionDurationEstimateMinutes ?? null,
+    });
+    assertSessionDurationSettings(durationSettings);
+
     const resource = await this.store.create({
       name: dto.name,
       description: dto.description,
@@ -238,6 +273,7 @@ export class ResourcesService {
       documentationUrl: dto.documentationUrl || null,
       allowTakeOver: dto.allowTakeOver || false,
       maxParallelSessions: dto.maxParallelSessions ?? 1,
+      ...durationSettings,
       type: dto.type,
       separateUnlockAndUnlatch: dto.separateUnlockAndUnlatch || false,
       accessOnly: dto.accessOnly || false,
@@ -289,6 +325,8 @@ export class ResourcesService {
 
     applyResourceFields(resource, dto);
     assertDoorOptions(resource);
+    normalizeSessionDurationSettings(resource);
+    assertSessionDurationSettings(resource);
 
     if (image && dto.deleteImage) {
       throw new BadRequestException('Image and deleteImage cannot be used together');

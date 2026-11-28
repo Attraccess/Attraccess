@@ -3,6 +3,9 @@ import { buttonVariants } from '@heroui/styles';
 import { ChevronDownIcon, PlayIcon } from 'lucide-react';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { NetworkRestrictedAction } from '@attraccess/application-models';
+import { useNetworkRestriction } from '../../../../../hooks/useNetworkRestriction';
+import { NetworkRestrictedHint } from '../../../../../components/networkRestriction/NetworkRestrictedHint';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
@@ -12,6 +15,8 @@ interface MachineStartControlsProps {
   onStart: () => void;
   onStartWithNotes: () => void;
   isStarting: boolean;
+  /** A start that needs a supervisor is a supervision request, which has its own network rule. */
+  needsSupervisor?: boolean;
 }
 
 export function MachineStartControls({
@@ -20,8 +25,12 @@ export function MachineStartControls({
   onStart,
   onStartWithNotes,
   isStarting,
+  needsSupervisor,
 }: Readonly<MachineStartControlsProps>) {
   const { t } = useTranslations({ en, de });
+  const { isRestricted } = useNetworkRestriction();
+  const action = needsSupervisor ? NetworkRestrictedAction.SupervisionRequest : NetworkRestrictedAction.UsageStart;
+  const restricted = isRestricted(action);
   return (
     <>
       <p className="text-gray-500 dark:text-gray-400">{t('machine.noActiveSession')}</p>
@@ -32,12 +41,13 @@ export function MachineStartControls({
         placeholder={t('machine.project.placeholder')}
       />
       <ButtonGroup className="w-full">
-        <Button isPending={isStarting} onPress={onStart}>
+        <Button isPending={isStarting} isDisabled={restricted} onPress={onStart}>
           <PlayIcon className="w-4 h-4" />
           {t('machine.startSession')}
         </Button>
         <Dropdown>
           <DropdownTrigger
+            isDisabled={restricted}
             className={`${buttonVariants({ isIconOnly: true })} inline-flex items-center justify-center`}
           >
             <ChevronDownIcon />
@@ -51,6 +61,7 @@ export function MachineStartControls({
           </DropdownPopover>
         </Dropdown>
       </ButtonGroup>
+      <NetworkRestrictedHint actions={action} />
     </>
   );
 }

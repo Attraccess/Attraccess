@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ResourcesController } from './resources.controller';
-import { ScheduleModule } from '@nestjs/schedule';
 import { FileStorageModule } from '../common/modules/file-storage.module';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { ConfigModule } from '@nestjs/config';
@@ -23,11 +22,12 @@ import { LicenseModule } from '../license/license.module';
 import { LiveTopicsModule } from '../live-updates/live-topics.module';
 import { ResourcesPersistenceModule } from '../database/adapters/resources/resources-persistence.module';
 import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
+import { ResourceListVisibilityModule } from './visibility/resource-list-visibility.module';
 
 @Module({
   imports: [
+    ResourceListVisibilityModule,
     ResourcesPersistenceModule,
-    ScheduleModule.forRoot(),
     FileStorageModule,
     UsersAndAuthModule,
     ConfigModule,

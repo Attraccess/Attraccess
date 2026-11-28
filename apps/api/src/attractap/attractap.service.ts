@@ -466,6 +466,10 @@ export class AttractapService {
     return this.decryptCardKey(await this.cardStore.findByUid(uid));
   }
 
+  /**
+   * Stores the card and notifies its owner. Throws `CardAlreadyEnrolledError` (nothing stored, nobody notified) when
+   * another record holds the UID in any letter case.
+   */
   public async createNFCCard(
     user: AttractapCardOwner,
     data: NewAttractapNfcCard,
@@ -474,7 +478,12 @@ export class AttractapService {
     const activate = options.activate ?? true;
     const card = await this.cardStore.create(
       user,
-      { uid: data.uid, keyNo: data.keyNo, key: this.encryptionService.encrypt(data.key) },
+      {
+        uid: data.uid,
+        ...(data.type ? { type: data.type } : {}),
+        keyNo: data.keyNo,
+        key: data.key == null ? null : this.encryptionService.encrypt(data.key),
+      },
       activate,
     );
     this.notifyNfcCardChange(card, 'registered');

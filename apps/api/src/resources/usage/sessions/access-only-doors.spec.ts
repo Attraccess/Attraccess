@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { NetworkRestrictionService } from '../../../network-restriction/network-restriction.service';
 import { CanActivate, ExecutionContext, INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -17,6 +18,7 @@ import { SessionEndNotifier } from '../pre-start/session-end-notifier.service';
 import { ResourceUsageController } from './resource-usage.controller';
 import { ResourceUsageService } from './resource-usage.service';
 import { arrangeIntroducedUser, InMemoryUsageScope } from './fixtures/arrangements.test-fixture';
+import { ResourceListVisibilityService } from '../../visibility/resource-list-visibility.service';
 
 const user: UsageSessionUser = { id: 5, username: 'door-user' };
 const accessOnlyDoor: UsageSessionResource = {
@@ -116,6 +118,7 @@ describe('Access-only doors', () => {
       const moduleRef = await Test.createTestingModule({
         controllers: [ResourceUsageController],
         providers: [
+        { provide: ResourceListVisibilityService, useValue: { canSee: jest.fn(async () => true) } },
           // Only the door actions of the real service: as a provider it would also run its lifecycle hooks.
           {
             provide: ResourceUsageService,
@@ -128,6 +131,7 @@ describe('Access-only doors', () => {
           { provide: ResourceActivityVisibilityService, useValue: {} },
           { provide: PreStartService, useValue: {} },
           { provide: SessionEndNotifier, useValue: {} },
+          { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
         ],
       })
         .overrideGuard(DualAuthGuard)

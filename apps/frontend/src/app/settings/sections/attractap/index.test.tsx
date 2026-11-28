@@ -10,6 +10,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   UseGetCardWriterSettingsKeyFn: () => ['card-writer-settings'],
   useGetReaders: vi.fn(),
   useUpdateCardWriterSettings: vi.fn(),
+  useUpdateUidOnlyCardsSetting: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -67,6 +68,14 @@ describe('AttractapSection (which readers may write cards)', () => {
     expect(screen.getByTestId('card-writer-mode-all')).toBeInTheDocument();
     expect(screen.queryByTestId('card-writer-readers')).toBeNull();
     expect(view.container.querySelector('[data-slot="settings-save-bar"]')).toBeNull();
+  });
+
+  it('saves "only secured readers" without asking for a reader list', async () => {
+    render(<AttractapSection />);
+    await userEvent.click(screen.getByRole('radio', { name: /mode.options.secured.label/ }));
+    expect(screen.queryByTestId('card-writer-readers')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'saveBar.save' }));
+    expect(save).toHaveBeenCalledWith({ body: { mode: 'secured', readerIds: [] } });
   });
 
   it('blocks saving "selected readers" until a reader is picked, then saves the selection', async () => {

@@ -26,12 +26,15 @@
 #include "screens/supervision/supervisionScreen.hpp"
 #include "screens/massIntroduction/massIntroductionScreen.hpp"
 #include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
+#include "screens/secureConversion/secureConversionScreen.hpp"
 #include "screens/status/statusScreen.hpp"
 #include "screens/confirm/confirmScreen.hpp"
 #include "screens/networkStatus/networkStatusScreen.hpp"
 #include "screens/topUp/topUpScreen.hpp"
 #include "screens/forms/formsScreen.hpp"
 #include "screens/projectSelect/projectSelectScreen.hpp"
+#include "screens/duration/durationInputScreen.hpp"
+#include "screens/extend/extendSessionScreen.hpp"
 #ifdef DEMO_MODE
 #include "screens/demoSettings/demoSettingsScreen.hpp"
 #endif
@@ -73,12 +76,15 @@ public:
     static SupervisionScreen supervisionScreen;
     static MassIntroductionScreen massIntroductionScreen;
     static FirmwareUpdateScreen firmwareUpdateScreen;
+    static SecureConversionScreen secureConversionScreen;
     static StatusScreen statusScreen;
     static ConfirmScreen confirmScreen;
     static NetworkStatusScreen networkStatusScreen;
     static TopUpScreen topUpScreen;
     static FormsScreen formsScreen;
     static ProjectSelectScreen projectSelectScreen;
+    static DurationInputScreen durationInputScreen;
+    static ExtendSessionScreen extendSessionScreen;
 #ifdef DEMO_MODE
     static DemoSettingsScreen demoSettingsScreen;
 #endif

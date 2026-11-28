@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { EmailTemplateType } from '@attraccess/application-models';
+import { EmailTemplateType, NETWORK_RESTRICTION_HEADER_NAME_PATTERN } from '@attraccess/application-models';
 import { valid, validRange } from 'semver';
 import type { AuthenticationMethod } from '@attraccess/application-models';
 import { isAuthenticationMethod } from './projection';
@@ -39,7 +39,8 @@ export function safeAuditSender(value: string): string {
 export interface AdministrationAuditInput {
   action: string;
   operationId?: string;
-  actorId: number;
+  /** Null only for the system actor, on the actions the host performs on its own. */
+  actorId: number | null;
   authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number;
   subjectType: string;
@@ -123,9 +124,16 @@ export const SETTING_KEYS = [
   'audit.plugin_domains_disabled',
   'audit.retention_days',
   'resources.activityVisibility',
+  'resources.listVisibility',
   'attractap.cardWriterMode',
   'attractap.cardWriterReaders',
   'attractap.cardWriterReaderCount',
+  'attractap.allowUidOnlyCards',
+  'networkRestriction.enabled',
+  'networkRestriction.allowedRanges',
+  'networkRestriction.ipSource',
+  'networkRestriction.headerName',
+  'networkRestriction.roleActions',
   'metrics.apiKeyConfigured',
   'metrics.slowQueryThresholdSeconds',
   ...['http', 'ws', 'cron', 'db', 'external', 'sse', 'flow'].map((key) => `metrics.toggles.${key}`),
@@ -168,7 +176,11 @@ export const registry = { registryId: identifier, registryName: text, registryUr
 
 export const policy = {
   checksEnabled: flag,
+  automaticUpdates: flag,
   updateMode: enumeration('off', 'patch', 'minor', 'follow'),
+  // ISO weekdays, comma separated; empty while no day is chosen.
+  maintenanceWeekdays: (v: unknown) => typeof v === 'string' && /^([1-7](,[1-7]){0,6})?$/.test(v),
+  maintenanceTimeZone: text,
   maintenanceStartMinute: count,
   maintenanceDurationMinutes: count,
   prerelease: flag,
@@ -257,6 +269,10 @@ rules['plugin.retry_requested'] = {
   subject: 'plugin-package',
   fields: { pluginId: identifier, pluginName: text, pluginVersion: text, restartRequested: flag },
 };
+rules['plugin.restart_requested'] = {
+  subject: 'plugin-system',
+  fields: { pendingChanges: flag, restartRequested: flag },
+};
 
 export const ADMINISTRATION_AUDIT_ACTIONS = Object.keys(rules) as AdministrationAuditAction[];
 
@@ -280,7 +296,8 @@ export type AdministrationAuditAction =
       | 'package_policy_updated'
       | 'zip_uploaded'
       | 'zip_deleted'
-      | 'retry_requested'}`;
+      | 'retry_requested'
+      | 'restart_requested'}`;
 
 /** Numeric grouping key for public string-keyed subjects; retain the original key in event details.
  * This persisted identifier hash is never a password hash; changing it would split audit history. */
@@ -326,6 +343,20 @@ function administrationDetails(
   return details;
 }
 
+/** What the host does without a user: installing a plugin update, restarting for it and reporting how it activated. */
+const SYSTEM_ACTIONS: readonly string[] = [
+  'plugin.replaced',
+  'plugin.restart_requested',
+  'plugin.activation_completed',
+];
+
+function validActor(input: AdministrationAuditInput): boolean {
+  if (input.actorId !== null) return positive(input.actorId);
+  return (
+    SYSTEM_ACTIONS.includes(input.action) && input.authenticationMethod === undefined && input.apiTokenId === undefined
+  );
+}
+
 export function projectAdministrationAuditEvent(input: AdministrationAuditInput): AdministrationAuditInput | null {
   try {
     const source = administrationEventFields(input);
@@ -337,8 +368,7 @@ export function projectAdministrationAuditEvent(input: AdministrationAuditInput)
     )
       return null;
     const rule = rules[input.action];
-    if (!rule || input.subjectType !== rule.subject || !positive(input.actorId) || !positive(input.subjectId))
-      return null;
+    if (!rule || input.subjectType !== rule.subject || !validActor(input) || !positive(input.subjectId)) return null;
     const method = input.authenticationMethod ?? 'session';
     if (
       !isAuthenticationMethod(method) ||
@@ -366,12 +396,26 @@ export function projectAdministrationAuditEvent(input: AdministrationAuditInput)
   }
 }
 
+/** Audit values of the network restriction: IP ranges, a header name and role action lists, never free text. */
+function safeNetworkRestrictionValue(key: string, value: string): boolean {
+  if (key === 'networkRestriction.ipSource') return value === 'client' || value === 'header';
+  if (key === 'networkRestriction.headerName') return NETWORK_RESTRICTION_HEADER_NAME_PATTERN.test(value);
+  // A list too long for one value is recorded as what was removed and what was added; long values end in an ellipsis.
+  if (key === 'networkRestriction.allowedRanges') return /^(?:(?:removed|added): )?[0-9A-Za-z:./%_,-]*…?$/.test(value);
+  if (key === 'networkRestriction.roleActions') return /^[A-Za-z0-9_.-]+: [a-z.,]*…?$/.test(value);
+  return false;
+}
+
 function safeSettingValue(key: string, value: unknown): boolean {
   if (typeof value !== 'string') return false;
   if (key === 'app.defaultLanguage') return value === 'en' || value === 'de';
   if (key === 'resources.activityVisibility') return value === 'all' || value === 'introduced';
-  if (key === 'attractap.cardWriterMode') return value === 'all' || value === 'selected';
+  if (key === 'resources.listVisibility') return value === 'authenticated' || value === 'permitted-only';
+  if (key === 'attractap.cardWriterMode') return ['all', 'selected', 'secured'].includes(value);
+  if (key === 'attractap.allowUidOnlyCards') return value === 'true' || value === 'false';
   if (key === 'attractap.cardWriterReaders') return /^(?:\d+(?:,\d+)*)?$/.test(value);
+  if (key.startsWith('networkRestriction.') && !key.endsWith('.enabled'))
+    return safeNetworkRestrictionValue(key, value);
   if (value === '') return true;
   if (['app.url', 'app.publicInternetUrl'].includes(key)) return value === safeAuditOrigin(value);
   if (key === 'smtp.host') return value === safeAuditHost(value);

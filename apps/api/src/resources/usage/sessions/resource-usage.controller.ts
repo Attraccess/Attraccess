@@ -7,6 +7,8 @@ import { Controller, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, 
 
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
+import { NetworkRestrictedAction } from '@attraccess/application-models';
+import { NetworkRestrictionService } from '../../../network-restriction/network-restriction.service';
 import { CanControlResponseDto } from '../dtos/canControl.response.dto';
 
 import { StartBlockedResponseDto } from '../dtos/startBlocked.response.dto';
@@ -22,6 +24,7 @@ import { PreStartService } from '../pre-start/pre-start.service';
 import { SessionEndNotifier } from '../pre-start/session-end-notifier.service';
 import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';
 import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
+import { ExtendUsageSessionDto } from '../dtos/extendUsageSession.dto';
 
 import { GetActiveUsageSessionDto } from '../dtos/getActiveUsageSession.dto';
 import { toUsageSessionResponse, type UsageSessionResponse } from '../dtos/usage-session-response';
@@ -29,8 +32,10 @@ import { toUsageSessionResponse, type UsageSessionResponse } from '../dtos/usage
 import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 
 import { UpdateUsageSessionProjectDto } from '../dtos/updateUsageSessionProject.dto';
+import { ResourceListVisible } from '../../visibility/resource-list-visible.interceptor';
 
 @ApiTags('Resources')
+@ResourceListVisible()
 @Controller('resources/:resourceId/usage')
 export class ResourceUsageController {
   constructor(
@@ -38,6 +43,7 @@ export class ResourceUsageController {
     protected readonly activityVisibility: ResourceActivityVisibilityService,
     protected readonly preStart: PreStartService,
     protected readonly sessionEnd: SessionEndNotifier,
+    protected readonly networkRestriction: NetworkRestrictionService,
   ) {}
 
   @Post('lock')
@@ -64,6 +70,7 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
+    await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.DoorLock, resourceId);
     return toUsageSessionResponse(await this.resourceUsageService.lockDoor(resourceId, req.user));
   }
 
@@ -91,6 +98,11 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
+    // On an access-only door an unlock opens it, so it needs what Open needs.
+    const action = (await this.resourceUsageService.isAccessOnlyDoor(resourceId))
+      ? NetworkRestrictedAction.DoorOpen
+      : NetworkRestrictedAction.DoorUnlock;
+    await this.networkRestriction.assertAllowed(req, action, resourceId);
     return toUsageSessionResponse(await this.resourceUsageService.unlockDoor(resourceId, req.user));
   }
 
@@ -118,6 +130,7 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
+    await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.DoorUnlatch, resourceId);
     return toUsageSessionResponse(await this.resourceUsageService.unlatchDoor(resourceId, req.user));
   }
 
@@ -145,6 +158,7 @@ export class ResourceUsageController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
+    await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.DoorOpen, resourceId);
     return toUsageSessionResponse(await this.resourceUsageService.openDoor(resourceId, req.user));
   }
 
@@ -266,6 +280,12 @@ export class ResourceUsageController {
     @Body() dto: StartUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
+    // Before the plugin pre-start gate: a refused request must not trigger any side effect.
+    await this.networkRestriction.assertAllowed(
+      req,
+      dto.forceTakeOver ? NetworkRestrictedAction.UsageTakeover : NetworkRestrictedAction.UsageStart,
+      resourceId,
+    );
     // Only a browser session is "web"; API-token and MCP clients are programmatic.
     const origin =
       req.user.authenticationMethod === undefined || req.user.authenticationMethod === 'session' ? 'web' : 'api';
@@ -278,6 +298,7 @@ export class ResourceUsageController {
       auditOrigin: auditActorOf(req.user),
       origin,
       confirmedStepKeys,
+      canAskDuration: true,
     });
     return toUsageSessionResponse(started);
   }
@@ -308,6 +329,7 @@ export class ResourceUsageController {
     @Body() dto: EndUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<UsageSessionResponse> {
+    await this.networkRestriction.assertAllowed(req, NetworkRestrictedAction.UsageEnd, resourceId);
     const ended = await this.resourceUsageService.endSession(resourceId, req.user, dto, {
       auditOrigin: auditActorOf(req.user),
     });
@@ -320,6 +342,31 @@ export class ResourceUsageController {
       );
     }
     return ended && toUsageSessionResponse(ended);
+  }
+
+  @Post('extend')
+  @Auth()
+  @ApiOperation({
+    summary: 'Extend the automatic end of a running session',
+    description:
+      'Moves the automatic end of your own session (or of one you may end) later by 60, 120, 240, 360, 720 or 1440 minutes, or to the maximum with `toMax`. Refused with a machine-readable `code` when the session has no automatic end (SESSION_EXTENSION_NOT_POSSIBLE), would exceed the maximum session time (SESSION_EXTENSION_EXCEEDS_MAXIMUM) or the request names no permitted step (SESSION_EXTENSION_INVALID). Nothing is clipped.',
+    operationId: 'resourceUsageExtendSession',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'The session with its new automatic end (`autoEndAt`).',
+    type: ResourceUsageResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Bad Request - the extension is not possible; see `code`' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  @ApiResponse({ status: 403, description: 'Forbidden - You may not end this session' })
+  async extendSession(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Body() dto: ExtendUsageSessionDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<UsageSessionResponse> {
+    const extended = await this.resourceUsageService.extendSession(resourceId, req.user, dto, auditActorOf(req.user));
+    return toUsageSessionResponse(extended);
   }
 
   @Put('sessions/:usageId/project')

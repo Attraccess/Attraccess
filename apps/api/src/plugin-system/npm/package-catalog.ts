@@ -1,6 +1,7 @@
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 
-import { resolveAppVersion } from '../../config/app.config';
+import { resolveAppVersion, resolvePluginChannel } from '../../config/app.config';
+import * as semver from 'semver';
 import { existsSync } from 'fs';
 
 import { mkdir, rename, rm } from 'fs/promises';
@@ -26,6 +27,7 @@ import {
 import { pluginRemovalClosure } from '../runtime/dependencies';
 
 import { PluginService } from '../plugin.service';
+import { markPluginRestartRequired } from '../runtime/restart-required';
 
 import { parseNpmPluginPackage } from './contract-validation';
 
@@ -47,7 +49,7 @@ export class NpmPackageCatalog {
     return pluginRemovalClosure(name, this.state.listInstalled());
   }
 
-  async removeInstalled(name: string, deferRestart = false, approvedDependants: string[] = []): Promise<void> {
+  async removeInstalled(name: string, approvedDependants: string[] = []): Promise<void> {
     await this.state.mutateInstalls(async () => {
       const removing = this.removalPlan(name);
       const dependants = removing.filter((plugin) => plugin.name !== name).map((plugin) => plugin.name);
@@ -100,7 +102,7 @@ export class NpmPackageCatalog {
         }
       }
       // Keep plugin data and secrets, as in the existing npm removal lifecycle.
-      if (!deferRestart) new PluginService().requestRestart();
+      markPluginRestartRequired();
     });
   }
 
@@ -159,17 +161,47 @@ export class NpmPackageCatalog {
     const registry = await this.registry.registry(registryId);
     const metadata = (await this.packageMetadata(name, registry.id)) as {
       name?: string;
-      'dist-tags'?: { latest?: string };
+      'dist-tags'?: Record<string, string>;
       versions?: Record<string, unknown>;
     };
     if (metadata.name && metadata.name !== name)
       throw new BadRequestException('Registry metadata identity does not match the requested package');
-    const version = metadata['dist-tags']?.latest;
+    const version = this.channelVersion(metadata);
     const pkg = version ? metadata.versions?.[version] : undefined;
-    if (!pkg) throw new NotFoundException('Package has no latest version');
+    if (!pkg) throw new NotFoundException('Package has no version to install');
     if (packageName(pkg) !== name)
       throw new BadRequestException('Registry metadata identity does not match the requested package');
     return this.marketplacePlugin(pkg, registry, registryPublisher(pkg) ?? registryPublisher(metadata), name);
+  }
+
+  /**
+   * The version a host offers when nobody asked for one: `latest` on a `latest` host. On a `next` host the semver-higher
+   * of the `next` and `latest` builds this host can install, so a package without `next`, or with an incompatible one,
+   * stays on `latest`.
+   */
+  channelVersion(metadata: {
+    versions?: Record<string, unknown>;
+    'dist-tags'?: Record<string, string>;
+  }): string | undefined {
+    const tags = metadata['dist-tags'] ?? {};
+    if (resolvePluginChannel() !== 'next') return tags.latest;
+    const installable = [tags.next, tags.latest].filter(
+      (version): version is string =>
+        typeof version === 'string' &&
+        semver.valid(version) !== null &&
+        metadata.versions?.[version] !== undefined &&
+        this.isInstallable(metadata.versions[version]),
+    );
+    return installable.sort(semver.rcompare)[0] ?? tags.latest;
+  }
+
+  private isInstallable(pkg: unknown): boolean {
+    try {
+      parseNpmPluginPackage(pkg, this.hostVersion());
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async searchRegistries(): Promise<Registry[]> {

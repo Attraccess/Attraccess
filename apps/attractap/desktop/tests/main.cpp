@@ -71,6 +71,11 @@ int main()
     assert(detected == 2);
     assert(detectedCard == 2);
 
+    // The reader reports the card's SAK and ATQA: ISO 14443-4 (0x20) for the secure cards.
+    uint8_t sak = 0xFF;
+    uint16_t atqa = 0;
+    assert(nfc.lastDetectionInfo(sak, atqa) && sak == 0x20 && atqa == 0x0344);
+
     // NTAG 424: GetVersion over three frames, then the ISO select, then an authentication challenge.
     assert((exchange(nfcContract, getVersion) == std::vector<uint8_t>{0x04, 0x04, 0x02, 0x30, 0x00, 0x11, 0x05, 0x91, 0xAF}));
     assert(exchange(nfcContract, nextFrame).size() == 9 && exchange(nfcContract, nextFrame).back() == 0x00);
@@ -84,6 +89,13 @@ int main()
     assert((exchange(nfcContract, bogus) == std::vector<uint8_t>{0x91, 0xAE}));
     assert(!nfc.card(1).applicationExists || nfc.card(1).type == VirtualNfc::CardType::Ntag424);
     assert(exchange(nfcContract, std::vector<uint8_t>(63, 0x00)).empty()); // does not fit the PN532
+
+    // The last card is a cheap UID-only card (NTAG213 style): SAK 0x00, no ISO 14443-4, so it answers no APDU.
+    assert(nfc.card(VirtualNfc::UidOnlyCardIndex).type == VirtualNfc::CardType::UidOnly);
+    nfc.setPresent(VirtualNfc::UidOnlyCardIndex, true);
+    assert(nfc.lastDetectionInfo(sak, atqa) && sak == 0x00 && atqa == 0x0044);
+    assert(exchange(nfcContract, getVersion).empty());
+    nfc.setPresent(1, true);
 
     // The card refuses to authenticate when the fault is set.
     nfc.setFaults(true, false);

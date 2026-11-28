@@ -398,5 +398,5 @@ export const MATTER_STORAGE = definePluginStorage({
       steps: Object.entries(NODE_V3_FIELDS).map(([field, definition]) => step.addColumn('nodes', field, definition)),
     },
   ],
-  adoption: { legacyMigrations: LEGACY_MIGRATIONS },
+  adoption: { legacyMigrations: LEGACY_MIGRATIONS, namespace: 'matter' },
 });

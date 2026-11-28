@@ -13,6 +13,11 @@ uint16_t DemoWebsocket::maxParallelSessionsFor(uint32_t resourceId)
     return resourceId == 2 ? 3 : 1;
 }
 
+uint32_t DemoWebsocket::maxSessionMinutesFor(uint32_t resourceId)
+{
+    return resourceId == 2 ? 480 : 0;
+}
+
 void DemoWebsocket::addSessionJson(JsonObject target, const DemoSession &session) const
 {
     target["id"] = session.id;
@@ -20,6 +25,17 @@ void DemoWebsocket::addSessionJson(JsonObject target, const DemoSession &session
     target["user"]["displayName"] = session.user;
     target["startTime"] = toIso8601(session.startEpoch);
     target["startTimeUtcOffsetMinutes"] = DemoClock::utcOffsetMinutes(session.startEpoch);
+    if (session.autoEndEpoch != 0)
+    {
+        // Relative seconds, like the real server: the reader counts down without a wall clock.
+        const time_t now = time(nullptr);
+        const auto seconds = [now](time_t at) { return static_cast<uint32_t>(at > now ? at - now : 0); };
+        target["autoEndAt"] = toIso8601(session.autoEndEpoch);
+        target["autoEndUtcOffsetMinutes"] = DemoClock::utcOffsetMinutes(session.autoEndEpoch);
+        target["autoEndInSeconds"] = seconds(session.autoEndEpoch);
+        target["hasMaxSessionTime"] = session.maxEndEpoch != 0;
+        target["extendLimitInSeconds"] = seconds(session.maxEndEpoch != 0 ? session.maxEndEpoch : session.startEpoch + 30 * 24 * 3600);
+    }
 }
 
 void DemoWebsocket::respondActionError(const std::string &type, const char *error)
@@ -34,8 +50,12 @@ void DemoWebsocket::respondActionError(const std::string &type, const char *erro
     enqueue(out);
 }
 
-void DemoWebsocket::handleStartSession(uint32_t resourceId, uint32_t projectId, bool forceTakeOver)
+void DemoWebsocket::handleStartSession(JsonObjectConst payload)
 {
+    const uint32_t resourceId = payload["resourceId"] | 0u;
+    const uint32_t projectId = payload["projectId"] | 0u;
+    const bool forceTakeOver = payload["forceTakeOver"] | false;
+    const uint32_t estimateMinutes = payload["estimatedDurationMinutes"] | 0u;
     (void)projectId; // recorded implicitly via the owner; not surfaced back in demo
     int idx = sessionIndexForResource(resourceId);
     if (idx < 0)
@@ -80,6 +100,15 @@ void DemoWebsocket::handleStartSession(uint32_t resourceId, uint32_t projectId, 
         return;
     }
 
+    // A machine with a maximum refuses an estimate above it. Without an estimate the start still goes through
+    // with the maximum, like a start from a reader that cannot ask.
+    const uint32_t maxMinutes = maxSessionMinutesFor(resourceId);
+    if (maxMinutes != 0 && estimateMinutes > maxMinutes)
+    {
+        respondActionError("START_RESOURCE_USAGE_SESSION", "SESSION_DURATION_ESTIMATE_EXCEEDS_MAXIMUM");
+        return;
+    }
+
     // Takeover only exists at limit 1 and replaces the running session.
     if (limit <= 1)
         sessions.clear();
@@ -87,10 +116,58 @@ void DemoWebsocket::handleStartSession(uint32_t resourceId, uint32_t projectId, 
     session.id = _nextSessionId++;
     session.user = _currentUser;
     session.startEpoch = time(nullptr);
+    if (maxMinutes != 0)
+    {
+        session.autoEndEpoch = session.startEpoch + static_cast<time_t>(estimateMinutes != 0 ? estimateMinutes : maxMinutes) * 60;
+        session.maxEndEpoch = session.startEpoch + static_cast<time_t>(maxMinutes) * 60;
+    }
     sessions.push_back(session);
     _cncDraft.clear();
+    _cncImageCount = 0;
 
     respondActionSuccess("START_RESOURCE_USAGE_SESSION");
+    respondResourceList();
+}
+
+void DemoWebsocket::addDurationSettings(JsonObject resource, uint32_t resourceId) const
+{
+    resource["requireSessionDurationEstimate"] = requiresEstimateFor(resourceId);
+    resource["maxSessionDurationMinutes"] = maxSessionMinutesFor(resourceId);
+}
+
+void DemoWebsocket::handleExtendSession(JsonObjectConst payload)
+{
+    const uint32_t resourceId = payload["resourceId"] | 0u;
+    const uint32_t extendByMinutes = payload["extendByMinutes"] | 0u;
+    const bool toMax = payload["toMax"] | false;
+    int idx = sessionIndexForResource(resourceId);
+    DemoSession *own = nullptr;
+    if (idx >= 0)
+        for (DemoSession &session : _sessions[idx])
+            if (isOwnSession(session))
+                own = &session;
+    if (!own || own->autoEndEpoch == 0)
+    {
+        respondActionError("EXTEND_RESOURCE_USAGE_SESSION", "SESSION_EXTENSION_NOT_POSSIBLE");
+        return;
+    }
+    const time_t cap = own->maxEndEpoch != 0 ? own->maxEndEpoch : own->startEpoch + 30 * 24 * 3600;
+    time_t next = own->autoEndEpoch + static_cast<time_t>(extendByMinutes) * 60;
+    if (toMax)
+        next = cap;
+    else if (extendByMinutes != 60 && extendByMinutes != 120 && extendByMinutes != 240 && extendByMinutes != 360 &&
+             extendByMinutes != 720 && extendByMinutes != 1440)
+    {
+        respondActionError("EXTEND_RESOURCE_USAGE_SESSION", "SESSION_EXTENSION_INVALID");
+        return;
+    }
+    if (next > cap || next <= own->autoEndEpoch)
+    {
+        respondActionError("EXTEND_RESOURCE_USAGE_SESSION", "SESSION_EXTENSION_EXCEEDS_MAXIMUM");
+        return;
+    }
+    own->autoEndEpoch = next;
+    respondActionSuccess("EXTEND_RESOURCE_USAGE_SESSION");
     respondResourceList();
 }
 

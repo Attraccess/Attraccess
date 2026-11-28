@@ -9,11 +9,12 @@ import { projectAdministrationAuditEvent } from '../audit/policies/administratio
 import { CardWriterSettingsController } from './card-writer-settings.controller';
 import { AttractapService } from './attractap.service';
 import { CardWriterPolicyService, cardWriterSettingChanges } from './websockets/card-writer-policy.service';
+import { ATTRACTAP_READER_STORE } from './reader-store.port';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { ATTRACTAP_KEYS, ATTRACTAP_PARENT } from '../settings/constants';
 import { CardWriterSettingsDto } from './dtos/card-writer-settings.dto';
 
-const guardFor = (method: 'get' | 'update') => {
+const guardFor = (method: 'get' | 'update' | 'updateUidOnlyCards') => {
   const handler = CardWriterSettingsController.prototype[method];
   expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual(
     expect.arrayContaining([DualAuthGuard, EffectivePermissionsGuard]),
@@ -31,8 +32,8 @@ describe('CardWriterSettingsController', () => {
       expect(check()).toBe(true);
     });
 
-    it('requires system.settings.manage to change the setting', () => {
-      const { request, check } = guardFor('update');
+    it.each(['update', 'updateUidOnlyCards'] as const)('requires system.settings.manage for %s', (method) => {
+      const { request, check } = guardFor(method);
       expect(() => check()).toThrow('Unauthorized');
       request.user = { id: 1, effectivePermissions: new Set(['users.rfid-cards.manage']) };
       expect(() => check()).toThrow('Insufficient permissions');
@@ -84,6 +85,7 @@ describe('CardWriterSettingsController', () => {
   // The policy service records the change; the controller only names the actor.
   describe('PUT audit', () => {
     let current: CardWriterSettingsDto;
+    let uidOnly: string | null;
     let controller: CardWriterSettingsController;
     const record = jest.fn().mockResolvedValue({ status: 'recorded' });
     const req = { user: { id: 42, authenticationMethod: 'session' } } as AuthenticatedRequest;
@@ -91,6 +93,7 @@ describe('CardWriterSettingsController', () => {
     beforeEach(async () => {
       record.mockClear();
       current = { mode: 'all', readerIds: [] };
+      uidOnly = null;
       const moduleRef = await Test.createTestingModule({
         controllers: [CardWriterSettingsController],
         providers: [
@@ -99,10 +102,18 @@ describe('CardWriterSettingsController', () => {
             provide: SettingsStoreService,
             useValue: {
               getPlainSetting: jest.fn(async (_parent: string, key: string) =>
-                key === ATTRACTAP_KEYS.cardWriterMode ? current.mode : JSON.stringify(current.readerIds),
+                key === ATTRACTAP_KEYS.allowUidOnlyCards
+                  ? uidOnly
+                  : key === ATTRACTAP_KEYS.cardWriterMode
+                    ? current.mode
+                    : JSON.stringify(current.readerIds),
               ),
               setPlainSetting: jest.fn(async (parent: string, key: string, value: string) => {
                 expect(parent).toBe(ATTRACTAP_PARENT);
+                if (key === ATTRACTAP_KEYS.allowUidOnlyCards) {
+                  uidOnly = value;
+                  return;
+                }
                 current =
                   key === ATTRACTAP_KEYS.cardWriterMode
                     ? { ...current, mode: value as CardWriterSettingsDto['mode'] }
@@ -112,6 +123,7 @@ describe('CardWriterSettingsController', () => {
           },
           { provide: AttractapService, useValue: { getPairedReaders: jest.fn(async () => [{ id: 2 }, { id: 5 }]) } },
           { provide: AUDIT_RECORDER, useValue: { record } },
+          { provide: ATTRACTAP_READER_STORE, useValue: { findSecurity: jest.fn(async () => undefined) } },
           { provide: LicenseService, useValue: {} },
         ],
       }).compile();
@@ -150,11 +162,29 @@ describe('CardWriterSettingsController', () => {
       ]);
     });
 
+    it('switches UID-only cards without touching the stored reader list, and audits only that change', async () => {
+      // Reader 3 was selected, then its pairing was revoked: the switch must not drop it from the stored list.
+      current = { mode: 'selected', readerIds: [2, 3, 5] };
+
+      await expect(controller.updateUidOnlyCards({ allowUidOnlyCards: true }, req)).resolves.toEqual({
+        mode: 'selected',
+        readerIds: [2, 5],
+        allowUidOnlyCards: true,
+      });
+
+      expect(current).toEqual({ mode: 'selected', readerIds: [2, 3, 5] });
+      expect(uidOnly).toBe('true');
+      expect(record.mock.calls.map(([event]) => event.details)).toEqual([
+        { settingKey: 'attractap.allowUidOnlyCards', before: 'false', after: 'true' },
+      ]);
+    });
+
     it('still returns the saved setting when the audit record is dropped', async () => {
       record.mockResolvedValueOnce({ status: 'unavailable' });
       await expect(controller.update({ mode: 'selected', readerIds: [2] }, req)).resolves.toEqual({
         mode: 'selected',
         readerIds: [2],
+        allowUidOnlyCards: false,
       });
     });
   });

@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { ResourceFlowVariableScope } from '@attraccess/application-models';
 import { ResourceFlowVariablesController } from './resource-flow-variables.controller';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
+import { ResourceListVisibilityService } from '../../visibility/resource-list-visibility.service';
 
 describe('ResourceFlowVariablesController', () => {
   let controller: ResourceFlowVariablesController;
@@ -30,7 +31,8 @@ describe('ResourceFlowVariablesController', () => {
 
     const moduleRef = await Test.createTestingModule({
       controllers: [ResourceFlowVariablesController],
-      providers: [{ provide: ResourceFlowVariablesService, useValue: service }],
+      providers: [
+        { provide: ResourceListVisibilityService, useValue: { canSee: jest.fn(async () => true) } },{ provide: ResourceFlowVariablesService, useValue: service }],
     }).compile();
 
     controller = moduleRef.get(ResourceFlowVariablesController);

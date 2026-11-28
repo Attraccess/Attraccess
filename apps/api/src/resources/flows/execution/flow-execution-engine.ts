@@ -4,7 +4,7 @@ import { FlowNodeRecord, ResourceFlowNodeType } from '@attraccess/application-mo
 
 import type { TransactionContext } from '../../../database/transaction-context';
 
-import type { FlowTriggerStore } from '../flow-trigger-store.port';
+import { DEFAULT_OUTPUT_HANDLE, type FlowTriggerStore } from '../flow-trigger-store.port';
 
 import { FlowLogRecorderService } from '../logs/flow-log-recorder.service';
 
@@ -74,9 +74,10 @@ export class FlowExecutionEngine {
     this.logger.debug(`Looking for outgoing edges from node ID: ${node.id} (Type: ${node.type})`);
 
     // Edges and targets must belong to the same canvas; another owner's nodes (e.g. a disabled flow) never run.
+    // A result without a handle continues on the default output only, never on `failure` or another branch.
     const edgesFromThisNode = await this.flowStore.findOutgoingEdges(
       node,
-      resultOfPreviousNode.outputHandle,
+      resultOfPreviousNode.outputHandle ?? DEFAULT_OUTPUT_HANDLE,
       transactionManager,
     );
 
@@ -225,7 +226,7 @@ export class FlowExecutionEngine {
           : resultOfPreviousNode.payload;
       responseOfNode = {
         payload,
-        outputHandle: failureBehavior === 'failure-output' ? 'failure' : 'output',
+        outputHandle: failureBehavior === 'failure-output' ? 'failure' : DEFAULT_OUTPUT_HANDLE,
       };
     }
 
@@ -266,13 +267,18 @@ export class FlowExecutionEngine {
     const pluginNode = getPluginFlowNode(node.type);
     if (pluginNode) {
       if (pluginNode.isInput) {
-        return { payload: input, outputHandle: 'output' };
+        return { payload: input, outputHandle: DEFAULT_OUTPUT_HANDLE };
       }
-      return pluginNode.execute(
+      const result = await pluginNode.execute(
         { id: node.id, type: node.type, data: node.data as Record<string, unknown> },
         input,
         this.context.buildExecutionContext(flowRunId, transactionManager, options, runResourceId),
       );
+      // A plugin node with one declared output (e.g. ['done']) continues on it when it names no handle.
+      if (result.outputHandle === undefined && pluginNode.outputs.length === 1) {
+        return { ...result, outputHandle: pluginNode.outputs[0] };
+      }
+      return result;
     }
 
     throw new Error(`No executor found for flow node type: ${node.type}`);

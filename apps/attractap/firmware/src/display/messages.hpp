@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include "../state/language.hpp"
-#include "messages.catalog.bt-setup.hpp"
+#include "messages.catalog.secure-conversion.hpp"
 
 // Firmware-owned text is identified independently of its displayed wording.
 namespace FirmwareI18n {
@@ -19,11 +19,17 @@ inline const char *messageText(Message id, const std::string &locale) {
     constexpr size_t cardRelayEnd = mainEntries + sizeof(cardRelayCatalog) / sizeof(cardRelayCatalog[0]);
     constexpr size_t networkStatusEnd = cardRelayEnd + sizeof(networkStatusCatalog) / sizeof(networkStatusCatalog[0]);
     constexpr size_t sessionUsersEnd = networkStatusEnd + sizeof(sessionUsersCatalog) / sizeof(sessionUsersCatalog[0]);
+    constexpr size_t btSetupEnd = sessionUsersEnd + sizeof(btSetupCatalog) / sizeof(btSetupCatalog[0]);
+    constexpr size_t sessionDurationEnd = btSetupEnd + sizeof(sessionDurationCatalog) / sizeof(sessionDurationCatalog[0]);
+    constexpr size_t formImagesEnd = sessionDurationEnd + sizeof(formImagesCatalog) / sizeof(formImagesCatalog[0]);
     const auto &entry = index < mainEntries        ? catalog[index]
                         : index < cardRelayEnd     ? cardRelayCatalog[index - mainEntries]
                         : index < networkStatusEnd ? networkStatusCatalog[index - cardRelayEnd]
                         : index < sessionUsersEnd  ? sessionUsersCatalog[index - networkStatusEnd]
-                                                   : btSetupCatalog[index - sessionUsersEnd];
+                        : index < btSetupEnd       ? btSetupCatalog[index - sessionUsersEnd]
+                        : index < sessionDurationEnd ? sessionDurationCatalog[index - btSetupEnd]
+                        : index < formImagesEnd    ? formImagesCatalog[index - sessionDurationEnd]
+                                                   : secureConversionCatalog[index - formImagesEnd];
     return Language::text(entry.en, entry.de, locale);
 }
 
@@ -101,6 +107,8 @@ inline Text knownReaderError(const std::string &code) {
     if (code == "MASS_INTRODUCTION_FAILED") return Message::ErrorMassIntroductionFailed;
     if (code == "CARD_AUTHENTICATION_FAILED") return Message::ErrorCardAuthenticationFailed;
     if (code == "CARD_NOT_SUPPORTED") return Message::ErrorCardNotSupported;
+    if (code == "UID_ONLY_CARDS_DISABLED") return Message::ErrorUidOnlyCardsDisabled;
+    if (code == "RANDOM_UID_NOT_SUPPORTED") return Message::ErrorRandomUidNotSupported;
     if (code == "BUSY") return Message::ErrorServerBusy;
     if (code == "CARD_REMOVED") return Message::ErrorCardRemoved;
     if (code == "CARD_TIMEOUT") return Message::ErrorCardTimeout;
@@ -113,6 +121,10 @@ inline Text knownReaderError(const std::string &code) {
     if (code == "CARD_MASTER_KEY_UNKNOWN") return Message::ErrorCardKeyUnavailable;
     if (code == "FIRMWARE_UPDATE_REQUIRED") return Message::ErrorFirmwareUpdateRequired;
     if (code == "READER_NOT_ALLOWED_TO_WRITE_CARDS") return Message::ErrorReaderNotAllowedToWriteCards;
+    if (code == "SESSION_EXTENSION_EXCEEDS_MAXIMUM") return Message::ErrorExtensionExceedsMaximum;
+    if (code == "SESSION_EXTENSION_NOT_POSSIBLE" || code == "SESSION_EXTENSION_INVALID") return Message::ErrorExtensionNotPossible;
+    if (code == "SESSION_DURATION_ESTIMATE_EXCEEDS_MAXIMUM") return Message::ErrorEstimateExceedsMaximum;
+    if (code == "SESSION_DURATION_ESTIMATE_REQUIRED") return Message::ErrorEstimateRequired;
     if (code == "ENROLLMENT_EXPIRED" || code == "RESET_EXPIRED") return Message::ErrorCardOperationExpired;
     return Text();
 }

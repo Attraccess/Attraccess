@@ -4,8 +4,10 @@ import { Auth, AuthenticatedRequest, ResourceFlowVariableScope } from '@attracce
 import { auditActorOf } from '../../../audit/recorder/audit-event';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { FlowVariableDto, FlowVariableUpsertDto } from '../dto/flow-variable.dto';
+import { ResourceListVisible } from '../../visibility/resource-list-visible.interceptor';
 
 @ApiTags('Flow Variables')
+@ResourceListVisible()
 @Controller('resources/:resourceId/flow-variables')
 @Auth('resources.update')
 export class ResourceFlowVariablesController {

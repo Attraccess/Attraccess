@@ -1177,9 +1177,9 @@ const sessionEndHook: SessionEndHook = async (ctx) => ({
   confirmation with a bad step key) all count as a hook failure. The default is **fail closed**: the start is
   blocked with "Temporarily unavailable".
 - A `block` whose `reason` is invalid (missing, spoofing a core status, or using a host code such as
-  `CONFIRMATION_REQUIRED`, `CONFIRMATION_UNAVAILABLE`, `HOOK_UNAVAILABLE`, `STEP_EXPIRED` or `STEP_UNKNOWN`) still
-  blocks, even under fail open, with "Temporarily unavailable". It is audited and does not count towards the
-  circuit breaker.
+  `CONFIRMATION_REQUIRED`, `CONFIRMATION_UNAVAILABLE`, `HOOK_UNAVAILABLE`, `STEP_EXPIRED`, `STEP_UNKNOWN` or
+  `FORM_PHOTO_UNSUPPORTED`) still blocks, even under fail open, with "Temporarily unavailable". It is audited and
+  does not count towards the circuit breaker.
 - After 5 consecutive failures a circuit breaker opens for that plugin: the failure policy is applied without
   calling the hook, after 60 s the next call goes through as a probe and closes the breaker when it succeeds, and
   an admin alert is raised. Session-end hooks have their own breaker. Admins can clear the alert early, or choose
@@ -1920,6 +1920,15 @@ so they share the workspace toolchain, caching and CI.
     above the released version.
   - Nothing publishes to `alpha` any more; existing `alpha` tags are frozen. See
     [Release channels](plugins/installing-plugins.md#release-channels).
+  - **Plugin load guard:** the `plugins` job of pull requests, nightlies and releases also runs
+    `pnpm nx run api:verify-packed-plugins` after packing. It installs every packed plugin tarball under its npm
+    package name (`@attraccess/plugin-<name>`) through the host's npm install path, boots a real API host on PostgreSQL
+    (core and plugin migrations, plugin discovery, `AppModule`) and fails if any plugin does not reach the loaded
+    state. License-gated plugins load because the guard grants the license modules they declare, so their storage
+    compilation and migrations still run. `pack-test` only inspects the tarball, so it cannot see what a host refuses
+    at install or load time. The nightly `publish-plugins` job and the release's publish step run only after it passed.
+    Run it locally after `pnpm nx run-many --target=pack --projects=tag:type:plugin`; it needs PostgreSQL and an
+    administrative `TEST_DATABASE_URL`.
   - Preview the plan locally against the real registry with
     `node apps/plugins/scripts/plugin-publish-plan.mjs --channel=next --dry-run` (or `--channel=latest`); add
     `--out=plan.json` for the machine-readable plan.

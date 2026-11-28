@@ -9,6 +9,7 @@ import { LiveTopicsService } from '../live-updates/live-topics.service';
 import { ResourceEventsService } from './sse/resource-events.service';
 import { FlowLogRecorderService } from './flows/logs/flow-log-recorder.service';
 import { ResourceActivityVisibilityService } from './usage/authorization/resource-activity-visibility.service';
+import { ResourceListVisibilityService } from './visibility/resource-list-visibility.service';
 
 @Injectable()
 export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleInit {
@@ -23,6 +24,7 @@ export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleIn
     private readonly resourceEvents: ResourceEventsService,
     private readonly flowLogs: FlowLogRecorderService,
     private readonly activityVisibility: ResourceActivityVisibilityService,
+    private readonly listVisibility: ResourceListVisibilityService,
   ) {}
 
   onModuleInit(): void {
@@ -35,7 +37,8 @@ export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleIn
   ): Promise<ReadonlyMap<string, string>> {
     // Both resource topics share one lookup per set/renewal, even for overlapping IDs.
     const ids = [...new Set(subscriptions.map((subscription) => subscription.resourceId))];
-    const existingIds = new Set(await this.resources.existingIds(ids));
+    // A machine the viewer may not see is answered like one that does not exist (ATT-843).
+    const existingIds = new Set(await this.listVisibility.filterVisible(user, await this.resources.existingIds(ids)));
     const rejected = new Map<string, string>();
     const access = await this.activityVisibility.resolveMany(user, [...existingIds]);
     for (const subscription of subscriptions) {
@@ -60,8 +63,11 @@ export class ResourceLiveTopicsProvider implements LiveTopicProvider, OnModuleIn
   async source(subscription: LiveSubscription, user: AuthenticatedUser) {
     if (subscription.topic === 'resource') {
       // `authorize` refused hidden viewers; each event is checked again so later changes apply to open subscriptions.
-      const stream = await this.resourceEvents.subscribeResource(subscription.resourceId);
-      return this.activityVisibility.viewLiveStream(stream, user, subscription.resourceId);
+      const resourceId = subscription.resourceId;
+      const stream = await this.resourceEvents.subscribeResource(resourceId);
+      // The list rule is applied first, activity visibility on what remains.
+      const visible = this.listVisibility.followVisible(stream, user, resourceId);
+      return this.activityVisibility.viewLiveStream(visible, user, resourceId);
     }
     if (subscription.topic === 'flow-logs') {
       return defer(() => this.flowLogs.subjectFor(subscription.resourceId).asObservable()).pipe(

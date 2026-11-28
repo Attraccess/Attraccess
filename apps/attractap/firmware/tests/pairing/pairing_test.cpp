@@ -41,6 +41,8 @@ int failures = 0;
         }                                                                                  \
     } while (0)
 
+using heap_guard::TestBudget;
+
 Bytes bytes(const char *base64)
 {
     Bytes out;
@@ -620,11 +622,73 @@ void testSessionTls()
         // ATT-1315: received bytes without the heap for them fail the session; they never abort the reader.
         {
             Bytes record(64, 0x17);
-            heap_guard::setTestBudget(heap_guard::CRITICAL_RESERVE_BYTES + 16);
+            TestBudget budget(heap_guard::CRITICAL_RESERVE_BYTES + 16);
             SessionTls::Status after = client.feed(record.data(), record.size(), nullptr);
-            heap_guard::setTestBudget(SIZE_MAX);
             CHECK(after == SessionTls::Status::Failed && client.lastError() == MBEDTLS_ERR_SSL_ALLOC_FAILED);
         }
+    }
+
+    // ATT-1394: received bytes grow the inbound buffer only after a check of the size that growth allocates. A record
+    // split across two feeds. receive() hands mbedtls every byte it has (mbedtls keeps a partial record itself), so
+    // inbound is empty when a feed starts and only its capacity stays; the growth of a buffer that still holds bytes
+    // is covered by heap_guard_test.cpp.
+    {
+        SessionPki pki;
+        TestServer server(*pki.serverKey, pki.serverCertificate);
+        SessionTls client;
+        SessionTls::Config config{pki.readerKey.get(), pki.readerCertificate, pki.caKey->publicKeySpki(), "inst-1",
+                                  TimeFloor::FIRMWARE_FLOOR_SECONDS};
+        CHECK(handshake(client, server, config) == SessionTls::Status::Open);
+        server.toClient.clear();
+        constexpr size_t PAYLOAD = 4000;
+        auto splitRecord = [&](size_t cut, Bytes &first, Bytes &second) {
+            Bytes payload(PAYLOAD, 0x33), frame;
+            SessionFraming::encode(SessionFraming::FrameType::BINARY, payload.data(), payload.size(), frame);
+            CHECK(mbedtls_ssl_write(&server.ssl, frame.data(), frame.size()) == static_cast<int>(frame.size()));
+            Bytes record;
+            record.swap(server.toClient);
+            CHECK(record.size() > cut);
+            first.assign(record.begin(), record.begin() + static_cast<std::ptrdiff_t>(cut));
+            second.assign(record.begin() + static_cast<std::ptrdiff_t>(cut), record.end());
+        };
+        size_t delivered = 0;
+        auto onFrame = [&](SessionFraming::FrameType, const uint8_t *, size_t length) { delivered += length; };
+
+        // The first piece leaves about 1.6 KiB of capacity, the second needs 2.4 KiB. Exactly that much heap: taken,
+        // and the frame arrives.
+        Bytes first, second;
+        splitRecord(1600, first, second);
+        CHECK(client.feed(first.data(), first.size(), onFrame) == SessionTls::Status::Open && delivered == 0);
+        size_t kept = client.inboundCapacity();
+        CHECK(second.size() > kept); // the second piece has to grow the buffer
+        {
+            TestBudget budget(heap_guard::CRITICAL_RESERVE_BYTES + second.size());
+            CHECK(client.feed(second.data(), second.size(), onFrame) == SessionTls::Status::Open);
+        }
+        CHECK(delivered == PAYLOAD);
+        // Grown to exactly what was checked. On macOS (libc++) a plain `insert` doubles the kept capacity, past the
+        // budget; on the reader (libstdc++) it doubles the size, which is 0 here.
+        CHECK(client.inboundCapacity() == second.size());
+
+        // With heap to spare, inbound still takes only what the record needs: it is empty when the feed starts, so
+        // doubling would only cost headroom for the work after it (decoding the frame).
+        splitRecord(1100, first, second);
+        kept = client.inboundCapacity();
+        CHECK(first.size() <= kept && second.size() > kept && second.size() < 2 * kept);
+        CHECK(client.feed(first.data(), first.size(), onFrame) == SessionTls::Status::Open);
+        CHECK(client.feed(second.data(), second.size(), onFrame) == SessionTls::Status::Open);
+        CHECK(delivered == 2 * PAYLOAD && client.inboundCapacity() == second.size());
+
+        // The second piece (3.4 KiB) needs more than the buffer kept (2.9 KiB), and the heap has no room for it: the
+        // session fails cleanly instead of the reader aborting.
+        splitRecord(600, first, second);
+        CHECK(second.size() > client.inboundCapacity());
+        CHECK(client.feed(first.data(), first.size(), onFrame) == SessionTls::Status::Open);
+        {
+            TestBudget budget(heap_guard::CRITICAL_RESERVE_BYTES + second.size() - 1);
+            CHECK(client.feed(second.data(), second.size(), onFrame) == SessionTls::Status::Failed);
+        }
+        CHECK(client.lastError() == MBEDTLS_ERR_SSL_ALLOC_FAILED && delivered == 2 * PAYLOAD);
     }
 
     // Bootstrap: no installation known yet, learned from the verified certificate.

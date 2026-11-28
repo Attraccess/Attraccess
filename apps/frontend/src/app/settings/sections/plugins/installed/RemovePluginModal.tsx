@@ -17,8 +17,10 @@ import {
 } from '@heroui/react';
 import { useState } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
+import { reloadPage } from '../../../../../utils/reloadPage';
 import { dependencyError } from '../dependencies/dependencyError';
 import { usePluginsTranslations } from '../usePluginsTranslations';
+import { rememberPluginRemoval } from './removalNotice';
 import { useInstalledNpmPlugins } from './useInstalledNpmPlugins';
 
 interface Props {
@@ -44,13 +46,11 @@ export function RemovePluginModal({ pluginId, onClose }: Props) {
   const { mutate: deletePlugin, isPending: isDeleting } = useDeletePlugin(undefined, {
     onSuccess: () => {
       // The server drops the plugin's bundle from the served asset set, so the running frontend is
-      // holding modules that no longer exist — a reload is the only way back to a consistent app.
-      setTimeout(() => window.location.reload(), 5000);
+      // holding modules that no longer exist: one page reload (not a server restart) gets back to a
+      // consistent app, and the restart banner and the success toast (see rememberPluginRemoval) show after it.
       dismiss();
-      toast.success({
-        title: t('success.delete.title'),
-        description: t('success.delete.description'),
-      });
+      rememberPluginRemoval();
+      reloadPage();
     },
     onError: () => {
       toast.error({ title: t('error.delete.title'), description: t('error.delete.description') });
@@ -92,11 +92,8 @@ export function RemovePluginModal({ pluginId, onClose }: Props) {
         body: { approvedDependants: dependantsToRemove.map(({ name }) => name) },
       });
       dismiss();
-      toast.success({
-        title: t('success.delete.title'),
-        description: t('success.delete.description'),
-      });
-      setTimeout(() => window.location.reload(), 5000);
+      rememberPluginRemoval();
+      reloadPage();
     } catch (error) {
       setRemoveFailure(dependencyError(error));
     }

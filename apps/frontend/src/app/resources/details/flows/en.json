@@ -4,6 +4,8 @@
   "loading": "Loading flow…",
   "loadError": "Failed to load flow. Please try again.",
   "actions": {
+    "save": "Save",
+    "layout": "Arrange nodes",
     "export": "Export",
     "import": "Import",
     "addNode": "Add node",
@@ -49,5 +51,16 @@
     "description": "Your changes to this flow have not been saved. If you leave now, they will be lost.",
     "leave": "Leave without saving",
     "stay": "Stay"
+  },
+  "logKeepAlive": {
+    "warning": {
+      "title": "Are you still there?",
+      "description": "Flow logging for this page stops in 15 minutes unless you're active.",
+      "action": "I'm still here"
+    },
+    "timedOut": {
+      "title": "Flow logging paused for this page",
+      "description": "You were inactive, so this page no longer keeps flow logging on. It continues only if someone else is working on this flow. Move the mouse or press a key to resume."
+    }
   }
 }

@@ -9,6 +9,21 @@ Unter **Zähler → Zähler erstellen** in der Ressourcenübersicht reicht ein N
 
 Die Übersicht zeigt den **Gesamtverbrauch**, einschließlich Messungen außerhalb von Sitzungen, sowie den Verbrauch der **aktuellen Sitzung**. Die laufende Abrechnung zeigt die einzelnen Zähler und ihre bisherigen Kosten.
 
+## Zähler archivieren oder löschen
+
+Wer die Ressource bearbeiten darf, kann einen Zähler in der Karte **Zähler** außer Betrieb nehmen. Jeder Zähler hat ein **⋮**-Menü mit seinen Aktionen, auch **Umbenennen**:
+
+- **Archivieren** ist für Zähler gedacht, die du nicht mehr brauchst, und fragt vorher nach. Der Zähler kommt unter **Archivierte Zähler** und verschwindet aus den Abrechnungseinstellungen und der Zählerauswahl der Flow-Knoten. Neue Sitzungen messen ihn nicht mehr und rechnen ihn nicht mehr ab, und die regelmäßige Abfrage endet. Nichts geht verloren: Gesamtverbrauch, Messwerte, Sitzungen und Rechnungen bleiben erhalten. Du kannst ihn jederzeit wiederherstellen.
+- **Löschen** entfernt einen Zähler nach einer Rückfrage endgültig, zum Beispiel einen versehentlich angelegten. Der Menüeintrag erscheint nur bei einem Zähler ohne Verlauf: Er hat nie einen Wert erfasst, keine Sitzung, keine Messanfrage und kein geteilter Zeitabschnitt verweist auf ihn, und keine laufende Sitzung hat ihn übernommen. Einen Zähler mit Verlauf kannst du nur archivieren.
+
+Solange eine laufende Sitzung (auch eine, die gerade beginnt oder endet) einen Zähler verwendet, kannst du ihn weder archivieren noch löschen. Versuche es nach dem Ende der Sitzung erneut.
+
+Ausstehende und fehlgeschlagene Kosten verhindern das Archivieren nicht. Sie bleiben in der Liste der offenen Zählerkosten, wo du weiterhin **Zähler erneut abfragen** oder **Zählerkosten erlassen** kannst. Ein erneuter Versuch führt wie bisher den Zweig **Messwert abfragen** des Zählers aus. Wenn du diesen Zweig entfernt hast, schlägt der Versuch fehl, und du kannst stattdessen **Zählerkosten erlassen** verwenden.
+
+Flow-Knoten verhindern weder das Archivieren noch das Löschen, und Attraccess ändert sie nicht. Ein Knoten, der einen solchen Zähler noch auswählt, zeigt **Zähler archiviert oder gelöscht** und wird mit der englischen Meldung „Choose a meter belonging to this resource“ markiert (wähle einen Zähler dieser Ressource). Du kannst den Flow trotzdem speichern, der Knoten bleibt aber markiert. Bis du einen anderen Zähler wählst oder den Knoten entfernst, schlägt jede Ausführung eines Knotens **Zähler melden** für einen archivierten Zähler mit dem Flow-Fehler `METER_ARCHIVED` fehl und erfasst nichts. Passe diese Flows an, um wiederholte Fehler zu vermeiden.
+
+Archivierte Zähler stehen in der Karte **Zähler** unter **Archivierte Zähler**. Nur wer die Ressource bearbeiten darf, sieht sie. Ihr **⋮**-Menü bietet **Wiederherstellen**, **Umbenennen** und, wenn sie keinen Verlauf haben, **Löschen**. Ein neuer Zähler darf den Namen eines archivierten tragen. Solange ein aktiver Zähler denselben Namen hat, wird das Wiederherstellen abgelehnt; benenne zuerst einen der beiden um. Nach dem Wiederherstellen funktionieren Flow-Knoten, die den Zähler auswählen, wieder. Archivieren, Wiederherstellen und Löschen werden im Audit-Log erfasst.
+
 ## Werte melden
 
 **Zähler melden** akzeptiert eine Zahl oder eine Handlebars-Vorlage wie `{{reading.value}}`:

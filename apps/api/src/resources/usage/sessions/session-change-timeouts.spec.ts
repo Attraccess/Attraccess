@@ -1,3 +1,4 @@
+import { NetworkRestrictionService } from '../../../network-restriction/network-restriction.service';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { createServer } from 'node:http';
@@ -19,6 +20,7 @@ import {
   CARD_SESSION_MAX_HOLD_MS,
   UNLOCKED_TIMEOUT_MS,
 } from '../../../attractap/websockets/handlers/ui/card-session.service';
+import { ResourceListVisibilityService } from '../../visibility/resource-list-visibility.service';
 
 class FakeAuth implements CanActivate {
   canActivate(context: ExecutionContext) {
@@ -50,10 +52,12 @@ describe('waiting for a shared machine over the web API', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [ResourceUsageController],
       providers: [
+        { provide: ResourceListVisibilityService, useValue: { canSee: jest.fn(async () => true) } },
         { provide: ResourceUsageService, useValue: { startSession: waitForMachine, endSession: waitForMachine } },
         { provide: ResourceActivityVisibilityService, useValue: {} },
         { provide: PreStartService, useValue: { gateHttp: jest.fn().mockResolvedValue({ kind: 'proceed' }) } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+        { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
       ],
     })
       .overrideGuard(DualAuthGuard)

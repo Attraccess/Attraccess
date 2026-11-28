@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-console -- Command-line tool: its output is the point. */
 // Self-test of the replay comparison: the repo's own reference recordings, turned into a wiretap
 // file, must compare as MATCH (the recordings are what the 1.7.x code sent against a virtual card),
 // and a tampered server APDU must be reported as a MISMATCH at the right exchange.

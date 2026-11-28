@@ -188,6 +188,8 @@ int main() {
   assert(RefusedCardGuard::isCardVerdict("CARD_NOT_ACTIVE"));
   assert(RefusedCardGuard::isCardVerdict("CARD_AUTHENTICATION_FAILED"));
   assert(RefusedCardGuard::isCardVerdict("CARD_NOT_SUPPORTED"));
+  assert(RefusedCardGuard::isCardVerdict("UID_ONLY_CARDS_DISABLED"));
+  assert(RefusedCardGuard::isCardVerdict("RANDOM_UID_NOT_SUPPORTED"));
   assert(!RefusedCardGuard::isCardVerdict("CARD_REMOVED"));
   assert(!RefusedCardGuard::isCardVerdict("BUSY"));
   assert(!RefusedCardGuard::isCardVerdict("TIMEOUT"));

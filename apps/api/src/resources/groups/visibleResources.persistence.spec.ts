@@ -6,6 +6,7 @@ import { ResourceGroupsController } from './resourceGroups.controller';
 import { TypeOrmResourceGroupStore } from '../../database/adapters/resources/resource-group-store.adapter';
 import type { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { createTestDataSource, closeTestDataSource } from '../../test-utils/test-database';
+import { ResourceListVisibilityService } from '../visibility/resource-list-visibility.service';
 
 describe('visible resource existence', () => {
   let source: DataSource;
@@ -99,15 +100,22 @@ describe('visible resource existence', () => {
   });
 
   it('derives visibility from the authenticated caller rather than request parameters', async () => {
-    const controller = new ResourceGroupsController(service);
+    const controller = new ResourceGroupsController(
+      service,
+      new ResourceListVisibilityService(
+        { getResourceListVisibility: async () => 'authenticated' } as never,
+        {} as never,
+      ),
+    );
     const check = jest.spyOn(service, 'hasVisibleResources').mockResolvedValue(true);
     const request = {
       user: { id: 7, effectivePermissions: new Set(['resources.update']) },
     } as unknown as AuthenticatedRequest;
     expect(await controller.resourcesExist(request)).toEqual({ hasResources: true });
-    expect(check).toHaveBeenCalledWith({ userId: 7, canUpdateResources: true });
+    expect(check).toHaveBeenCalledWith({ userId: 7, canUpdateResources: true, permittedOnly: false });
     request.user.effectivePermissions = new Set();
     await controller.resourcesExist(request);
-    expect(check).toHaveBeenLastCalledWith({ userId: 7, canUpdateResources: false });
+    // Without Read Resources the account gets the narrowed view even in "authenticated" mode (ATT-843).
+    expect(check).toHaveBeenLastCalledWith({ userId: 7, canUpdateResources: false, permittedOnly: true });
   });
 });

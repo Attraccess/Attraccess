@@ -1,3 +1,4 @@
+import { NetworkRestrictionModule } from '../../network-restriction/network-restriction.module';
 import { Module } from '@nestjs/common';
 import { ResourceUsageController } from './sessions/resource-usage.controller';
 import { ResourceUsageService } from './sessions/resource-usage.service';
@@ -29,14 +30,18 @@ import { SessionEndNotifier } from './pre-start/session-end-notifier.service';
 import { WebStartStepStore } from './pre-start/web-start-step.store';
 import { RESOURCE_USAGE_COLLABORATORS } from './resource-usage.collaborators';
 import { ResourceUsageFlowsBridge } from './sessions/resource-usage-flows.bridge';
+import { ResourceListVisibilityModule } from '../visibility/resource-list-visibility.module';
+import { SessionAutoEndService } from './session-duration/session-auto-end.service';
 
 @Module({
   imports: [
+    ResourceListVisibilityModule,
     ResourceTransactionsModule,
     UsagePersistenceModule,
     HealthPersistenceModule,
     RbacModule,
     SettingsModule,
+    NetworkRestrictionModule,
     NotificationsModule,
     ResourceIntroducersModule,
     ResourceIntroductionsModule,
@@ -64,6 +69,7 @@ import { ResourceUsageFlowsBridge } from './sessions/resource-usage-flows.bridge
     WebStartStepStore,
     SessionEndNotifier,
     ResourceUsageFlowsBridge,
+    SessionAutoEndService,
   ],
   exports: [ResourceUsageService, ResourceActivityVisibilityService, PreStartService, SessionEndNotifier],
 })

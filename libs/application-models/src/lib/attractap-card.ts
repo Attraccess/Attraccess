@@ -15,13 +15,18 @@ export interface AttractapCardOwner {
   deletedAt?: Date | null;
 }
 
+/** How a card is checked: `aes` proves a key the server holds, `uid-only` is accepted on its UID alone (insecure). */
+export type AttractapNfcCardType = 'aes' | 'uid-only';
+
 /** An NFC card. `key` and `keyNo` are secrets of the card; they never belong in a response. */
 export interface AttractapNfcCard {
   id: number;
   uid: string;
-  keyNo: number;
-  /** Stored encrypted; the card service decrypts it for use. */
-  key: string;
+  type: AttractapNfcCardType;
+  /** Null for a UID-only card. */
+  keyNo: number | null;
+  /** Stored encrypted; the card service decrypts it for use. Null for a UID-only card. */
+  key: string | null;
   createdAt: Date;
   updatedAt: Date;
   lastSeen: Date;
@@ -32,9 +37,12 @@ export interface AttractapNfcCard {
 
 export interface NewAttractapNfcCard {
   uid: string;
-  keyNo: number;
-  /** Already encrypted. */
-  key: string;
+  /** `aes` when not given. */
+  type?: AttractapNfcCardType;
+  /** Null for a UID-only card. */
+  keyNo: number | null;
+  /** Already encrypted. Null for a UID-only card. */
+  key: string | null;
 }
 
 /** A key change the server started but has not seen confirmed yet. */

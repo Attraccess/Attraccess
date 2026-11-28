@@ -256,6 +256,7 @@ void ResourceDetailsScreen::createSessionControls()
    lv_obj_remove_flag(this->otherSessionsContainer, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_add_flag(this->otherSessionsContainer, LV_OBJ_FLAG_HIDDEN);
 
+   this->createAutoEnd();
 }
 
 void ResourceDetailsScreen::createSessionDetails()

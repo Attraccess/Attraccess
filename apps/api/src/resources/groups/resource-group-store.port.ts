@@ -11,10 +11,15 @@ export const RESOURCE_GROUP_INTRODUCER_STORE = Symbol.for('attraccess.resources.
 /** A group, with the ids of its resources when the read asked for them. */
 export type ResourceGroupDetail = ResourceGroupRecord & { resources?: Array<{ id: number }> };
 
-/** Who may see hidden groups: managers, and users that are part of the group. */
+/**
+ * Who may see hidden groups: managers, and users that are part of the group. With `permittedOnly` (machine-list
+ * visibility "permitted-only", ATT-843) a non-manager also sees only groups that contain a machine they may see, or
+ * that they are part of, and only machines they may see count as visible.
+ */
 export interface GroupVisibilityContext {
   userId: number;
   canUpdateResources: boolean;
+  permittedOnly?: boolean;
 }
 
 export interface NewResourceGroup {
@@ -40,6 +45,9 @@ export type ResourceGroupPatch = Pick<
 export interface ResourceGroupStore {
   /** The groups the visibility context may see (all of them without one, or for managers). */
   listVisible(visibility?: GroupVisibilityContext): Promise<ResourceGroupRecord[]>;
+
+  /** Whether the visibility context may see this group (hidden-group and permitted-only rules). */
+  isVisible(groupId: number, visibility: GroupVisibilityContext): Promise<boolean>;
 
   /** Whether the visibility context may see at least one resource (ungrouped, or in a visible group). */
   hasVisibleResources(visibility: GroupVisibilityContext): Promise<boolean>;

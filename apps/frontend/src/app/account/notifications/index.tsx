@@ -49,6 +49,7 @@ export function NotificationPreferencesForm() {
         categories: [
           NotificationCategory.MESSAGES,
           NotificationCategory.RESOURCE_TAKEOVER,
+          NotificationCategory.RESOURCE_SESSION_ENDING_SOON,
           NotificationCategory.RESOURCE_SESSION_ENDED,
           NotificationCategory.NFC_CARDS,
           NotificationCategory.PROJECT_INVITATIONS,

@@ -43,6 +43,14 @@ directories, and the vendored OpenSCAD WebAssembly runtime are excluded. Maintai
 public scripts and firmware headers remain covered. The directory exclusions are
 shared with the import-cycle check in `scripts/lib/repo-files.mjs`.
 
+## File names that differ only by case
+
+`pnpm lint:files` (and `--staged`) rejects paths that differ only by letter
+case, for files, folders and extensionless imports. macOS and Windows treat
+`RangeSuggestions.tsx` and `rangeSuggestions.ts` as the same import
+`./RangeSuggestions`, so the dev server can load the wrong one. Give the files
+different names.
+
 ## Import cycles
 
 `pnpm lint:files` (and `--staged`) also rejects runtime import cycles between

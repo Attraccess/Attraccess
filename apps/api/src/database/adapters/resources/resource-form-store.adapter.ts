@@ -117,6 +117,13 @@ export class TypeOrmResourceFormStore implements ResourceFormStore {
     return (await this.dataSource.getRepository(Resource).findOne({ where: { id: resourceId } })) !== null;
   }
 
+  async findResourceName(resourceId: number): Promise<string | null> {
+    const resource = await this.dataSource
+      .getRepository(Resource)
+      .findOne({ where: { id: resourceId }, select: { id: true, name: true } });
+    return resource?.name ?? null;
+  }
+
   async groupExists(groupId: number): Promise<boolean> {
     return (await this.dataSource.getRepository(ResourceGroup).findOne({ where: { id: groupId } })) !== null;
   }

@@ -4,6 +4,8 @@ import { ResourceUsageSessionEndedEvent, ResourceUsageSessionTakenOverEvent } fr
 import { ResourceSessionNotificationListener } from './session.listener';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../../notifications/notification-types';
+import * as durationEn from '../session-duration/session-duration.en.json';
+import * as durationDe from '../session-duration/session-duration.de.json';
 
 describe('ResourceSessionNotificationListener', () => {
   let listener: ResourceSessionNotificationListener;
@@ -178,5 +180,52 @@ describe('ResourceSessionNotificationListener', () => {
     const request = notifications.dispatch.mock.calls[0][0];
     expect(request.category).toBe(NotificationCategory.RESOURCE_SESSION_ENDED);
     expect(request.body(owner)).toBe('The system ended your active resource session.');
+  });
+
+  describe('when the server stopped the session at its deadline', () => {
+    const owner = { id: 2, username: 'bob', email: 'bob@example.com', locale: 'en' } as UsageSessionUser;
+    const resource = { id: 4, name: 'Laser cutter' } as unknown as UsageSessionResource;
+    const endTime = new Date('2026-01-01T12:00:00.000Z');
+
+    async function endAutomatically(reason: 'maximum' | 'estimate') {
+      await listener.handleSessionEnded(
+        new ResourceUsageSessionEndedEvent(
+          { id: 10, user: owner, userId: owner.id, resource, resourceId: resource.id, endTime } as never,
+          null,
+          reason,
+        ),
+      );
+      return notifications.dispatch.mock.calls[0][0];
+    }
+
+    const texts = { en: durationEn, de: durationDe };
+    const fill = (text: string) => text.replace('{resourceName}', 'Laser cutter');
+
+    it.each([
+      { reason: 'maximum' as const, key: 'Maximum' as const, locale: 'en' as const },
+      { reason: 'maximum' as const, key: 'Maximum' as const, locale: 'de' as const },
+      { reason: 'estimate' as const, key: 'Estimate' as const, locale: 'en' as const },
+      { reason: 'estimate' as const, key: 'Estimate' as const, locale: 'de' as const },
+    ])('says the $reason was reached ($locale) instead of "the system ended"', async ({ reason, key, locale }) => {
+      const request = await endAutomatically(reason);
+      const recipient = { ...owner, locale };
+      const actor = texts[locale][`autoEndedActor${key}`];
+
+      expect(request.actorId).toBeUndefined();
+      expect(request.title(recipient)).toBe(fill(texts[locale].autoEndedTitle));
+      expect(request.body(recipient)).toBe(fill(texts[locale][`autoEndedBody${key}`]));
+      expect(request.body(recipient)).toContain('Laser cutter');
+      expect(request.body(recipient)).not.toMatch(/system ended|System hat/i);
+
+      await request.sendEmail(recipient, locale);
+      expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(
+        recipient,
+        NotificationCategory.RESOURCE_SESSION_ENDED,
+        {
+          resource: { id: 4, name: 'Laser cutter' },
+          session: { id: 10, endedAt: endTime, endedBy: actor },
+        },
+      );
+    });
   });
 });

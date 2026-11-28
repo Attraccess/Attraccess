@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const defaultRoot = fileURLToPath(new URL('../', import.meta.url));
@@ -159,6 +159,6 @@ function main(rawArgs) {
   return 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (import.meta.main) {
   process.exitCode = main(process.argv.slice(2));
 }

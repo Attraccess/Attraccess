@@ -1,0 +1,173 @@
+import { useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
+import { useCallback, useEffect, useRef } from 'react';
+import { QrCodeAction } from './qrcode/action';
+import {
+  useResourceUsageEndSession,
+  UseResourceUsageGetActiveSessionKeyFn,
+  UseResourceUsageGetHistoryKeyFn,
+  ApiError,
+} from '@attraccess/react-query-client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useToastMessage } from '../../../components/toastProvider';
+import { useStartSessionWithConfirmation } from '../usage/hooks/useStartSessionWithConfirmation';
+import { useSessionDurationEstimate } from '../usage/hooks/useSessionDurationEstimate';
+import de from './useQrCodeAction.de.json';
+import en from './useQrCodeAction.en.json';
+import { useNavigate } from 'react-router-dom';
+import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
+
+interface Props {
+  resourceId: number;
+}
+
+export function useQrCodeAction(props: Props) {
+  const { resourceId } = props;
+  const urlSearchParams = useUrlQuery();
+  const queryClient = useQueryClient();
+  const toast = useToastMessage();
+  const navigate = useNavigate();
+  const actionExecutedRef = useRef<string | null>(null);
+
+  const { t, tExists } = useTranslations({
+    en: {
+      ...en,
+      api: API_ERROR_TRANSLATIONS_EN,
+    },
+    de: {
+      ...de,
+      api: API_ERROR_TRANSLATIONS_DE,
+    },
+  });
+
+  // QR starts follow the same plugin confirmation and block handling as the start button.
+  const { start: startResourceMutate, dialog: confirmationDialog } = useStartSessionWithConfirmation(resourceId, {
+    onSuccess: (requestBody) => {
+      queryClient.invalidateQueries({
+        queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId } }),
+      });
+
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const baseHistoryKey = UseResourceUsageGetHistoryKeyFn({ path: { resourceId } });
+          return (
+            query.queryKey[0] === baseHistoryKey[0] &&
+            query.queryKey.length > 1 &&
+            JSON.stringify(query.queryKey[1]).includes(`"resourceId":${resourceId}`)
+          );
+        },
+      });
+
+      toast.success({
+        title: requestBody.forceTakeOver
+          ? t('actions.startAndTakeover.success.title')
+          : t('actions.start.success.title'),
+        description: requestBody.forceTakeOver
+          ? t('actions.startAndTakeover.success.description')
+          : t('actions.start.success.description'),
+      });
+    },
+    onError: (err) => {
+      toast.apiError({
+        error: err,
+        t,
+        tExists,
+        baseTranslationKey: 'api',
+      });
+    },
+  });
+
+  const { ask: askDuration, dialog: durationDialog } = useSessionDurationEstimate(resourceId);
+
+  const { mutate: endResourceMutate } = useResourceUsageEndSession(undefined, {
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const baseHistoryKey = UseResourceUsageGetHistoryKeyFn({ path: { resourceId } });
+          return (
+            query.queryKey[0] === baseHistoryKey[0] &&
+            query.queryKey.length > 1 &&
+            JSON.stringify(query.queryKey[1]).includes(`"resourceId":${resourceId}`)
+          );
+        },
+      });
+
+      queryClient.resetQueries({
+        queryKey: UseResourceUsageGetActiveSessionKeyFn({ path: { resourceId } }),
+      });
+
+      toast.success({
+        title: t('actions.stop.success.title'),
+        description: t('actions.stop.success.description'),
+      });
+    },
+    onError: (err) => {
+      toast.apiError({
+        error: err as ApiError,
+        t,
+        tExists,
+        baseTranslationKey: 'api',
+      });
+    },
+  });
+
+  const startResource = useCallback(
+    async (forceTakeOver: boolean) => {
+      // A machine that requires an estimate asks first, also for QR starts.
+      const estimate = await askDuration();
+      if (estimate === null) return;
+      startResourceMutate({
+        notes: '-- by QR-Code --',
+        forceTakeOver,
+        ...(estimate === undefined ? {} : { estimatedDurationMinutes: estimate }),
+      });
+    },
+    [askDuration, startResourceMutate],
+  );
+
+  const stopResource = useCallback(() => {
+    endResourceMutate({
+      path: { resourceId },
+      body: {
+        notes: '-- by QR-Code --',
+      },
+    });
+  }, [endResourceMutate, resourceId]);
+
+  useEffect(() => {
+    const action = urlSearchParams.get('action') as QrCodeAction | undefined;
+
+    if (!action || actionExecutedRef.current === action) {
+      return;
+    }
+
+    // Store the current action to prevent double execution
+    actionExecutedRef.current = action;
+
+    // remove the action from the url
+    navigate(`/resources/${resourceId}`, { replace: true });
+
+    switch (action) {
+      case QrCodeAction.Start:
+        void startResource(false);
+        break;
+      case QrCodeAction.StartAndTakeover:
+        void startResource(true);
+        break;
+      case QrCodeAction.Stop:
+        stopResource();
+        break;
+      case QrCodeAction.View:
+        break;
+    }
+  }, [urlSearchParams, startResource, stopResource, navigate, resourceId]);
+
+  return {
+    confirmationDialog: (
+      <>
+        {confirmationDialog}
+        {durationDialog}
+      </>
+    ),
+  };
+}

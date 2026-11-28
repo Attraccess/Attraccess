@@ -3,5 +3,7 @@
     "subtitle": "Bearbeiten Sie die Details der Gruppe"
   },
   "loadError": "Fehler beim Laden der Gruppe",
-  "loadErrorDescription": "Es gab einen Fehler beim Laden der Gruppendetails. Bitte versuchen Sie, die Seite zu aktualisieren."
+  "loadErrorDescription": "Es gab einen Fehler beim Laden der Gruppendetails. Bitte versuchen Sie, die Seite zu aktualisieren.",
+  "notFound": "Gruppe nicht gefunden",
+  "notFoundDescription": "Die Gruppe existiert nicht oder du darfst sie nicht sehen."
 }

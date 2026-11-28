@@ -250,5 +250,49 @@
   "MISSING_HEADER_ROW": {
     "title": "CSV-Datei ohne Daten",
     "description": "Die CSV-Datei hat keine Kopfzeile oder keine Zeilen darunter. Die erste Zeile muss die Spaltennamen enthalten, danach folgt eine Zeile pro Benutzer."
+  },
+  "NETWORK_RESTRICTED": {
+    "title": "Nur aus dem lokalen Netzwerk verfügbar",
+    "description": "Diese Aktion ist nur aus dem lokalen Netzwerk verfügbar. Verbinde dich mit dem lokalen Netzwerk und versuche es erneut."
+  },
+  "SESSION_DURATION_ESTIMATE_REQUIRED": {
+    "title": "Dauerschätzung erforderlich",
+    "description": "Diese Maschine fragt, wie lange du sie nutzen wirst. Lade die Seite neu und gib deine geschätzte Zeit an."
+  },
+  "SESSION_DURATION_ESTIMATE_EXCEEDS_MAXIMUM": {
+    "title": "Schätzung zu lang",
+    "description": "Deine geschätzte Zeit ist länger als die maximale Sitzungsdauer dieser Maschine. Wähle eine kürzere Zeit."
+  },
+  "SESSION_EXTENSION_EXCEEDS_MAXIMUM": {
+    "title": "Keine weitere Verlängerung möglich",
+    "description": "Die Verlängerung würde die maximale Sitzungsdauer dieser Maschine überschreiten."
+  },
+  "SESSION_EXTENSION_NOT_POSSIBLE": {
+    "title": "Verlängern nicht möglich",
+    "description": "Diese Sitzung kann nicht verlängert werden, zum Beispiel weil sie schon beendet ist oder kein automatisches Ende hat."
+  },
+  "SESSION_EXTENSION_INVALID": {
+    "title": "Ungültige Verlängerung",
+    "description": "Wähle eine der angebotenen Verlängerungen."
+  },
+  "CARD_IS_UID_ONLY": {
+    "title": "UID-only-Karte",
+    "description": "Eine UID-only-Karte muss nicht zurückgesetzt werden. Lösche sie stattdessen in der Kartenliste."
+  },
+  "CARD_NOT_UID_ONLY": {
+    "title": "Sichere Karte",
+    "description": "Nur UID-only-Karten werden ohne Lesegerät gelöscht. Setze diese Karte über ein Lesegerät zurück."
+  },
+  "UID_ONLY_CARDS_DISABLED": {
+    "title": "UID-only-Karten sind deaktiviert",
+    "description": "Ein Administrator hat UID-only-Karten ausgeschaltet. Schalte die Einstellung in den Einstellungen wieder ein, um sie zu nutzen."
+  },
+  "RANDOM_UID_NOT_SUPPORTED": {
+    "title": "Wechselnde UID nicht unterstützt",
+    "description": "Diese Karte ändert ihre UID bei jedem Auflegen, lässt sich daher nicht wiedererkennen und kann nicht als UID-only-Karte genutzt werden."
+  },
+  "CARD_NOT_SUPPORTED": {
+    "title": "Karte nicht unterstützt",
+    "description": "Dieser Kartentyp kann hier nicht verwendet werden."
   }
 }

@@ -211,6 +211,7 @@ struct ReaderWorkflow
     void testNetworkStatus();
     void testButtonErrors();
     void testFormErrors();
+    void testFormImageField();
     void testTransientRouting();
     void testRefusedCardSuppression();
     void testRefusedCardVariants();
@@ -226,6 +227,7 @@ struct ReaderWorkflow
     void testSessionSummary();
     void testScreenOwnedUi();
     void testParallelSessions();
+    void testSessionDuration();
     void testWallClock();
     void testTimeouts();
     void testUiPlugins();

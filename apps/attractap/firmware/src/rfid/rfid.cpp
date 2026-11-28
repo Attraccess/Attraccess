@@ -109,6 +109,15 @@ bool NFC::isCardPresent()
     return this->foundCard;
 }
 
+bool NFC::lastDetectionInfo(uint8_t &sak, uint16_t &atqa) const
+{
+    if (!this->cardDetectedInfoKnown)
+        return false;
+    sak = this->cardDetectedSak;
+    atqa = this->cardDetectedAtqa;
+    return true;
+}
+
 void NFC::setCardRemovalCallback(std::function<void(uint32_t presentationTimeMs)> callback)
 {
     this->cardRemovalCallback = callback;
@@ -174,18 +183,7 @@ void NFC::handleCardDetection()
             return;
         }
 
-        // Key-independent presence probe: one plain command on both card families. Any answer,
-        // even an error status, means a card is in the field; only silence means it is gone.
-        bool authSuccess = false;
-        {
-            I2CBusGuard busGuard;
-            static const uint8_t probe[] = {0x90, 0x5A, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00};
-            uint8_t command[sizeof(probe)];
-            memcpy(command, probe, sizeof(probe));
-            uint8_t answer[MAX_APDU_RESPONSE_LENGTH];
-            uint8_t answerLength = sizeof(answer);
-            authSuccess = this->pn532.inDataExchange(command, sizeof(probe), answer, &answerLength);
-        }
+        const bool authSuccess = this->cardStillPresent();
         if (!authSuccess)
         {
             // card removed, call callback
@@ -216,6 +214,9 @@ void NFC::handleCardDetection()
     {
         this->foundCard = true;
         this->foundCardTimeMs = millis();
+        this->cardDetectedSak = this->pn532.lastSak();
+        this->cardDetectedAtqa = this->pn532.lastAtqa();
+        this->cardDetectedInfoKnown = true;
         this->logger.debug("Card detected");
 
         if (this->cardDetectionCallback != nullptr)
@@ -223,6 +224,50 @@ void NFC::handleCardDetection()
             this->cardDetectionCallback(cardDetectedUid, cardDetectedUidLength);
         }
     }
+}
+
+bool NFC::cardStillPresent()
+{
+    I2CBusGuard busGuard;
+    if (this->cardDetectedSak & NFC::sakIsoDep)
+    {
+        // Key-independent presence probe: one plain command on both card families. Any answer,
+        // even an error status, means a card is in the field; only silence means it is gone.
+        static const uint8_t probe[] = {0x90, 0x5A, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00};
+        uint8_t command[sizeof(probe)];
+        memcpy(command, probe, sizeof(probe));
+        uint8_t answer[MAX_APDU_RESPONSE_LENGTH];
+        uint8_t answerLength = sizeof(answer);
+        return this->pn532.inDataExchange(command, sizeof(probe), answer, &answerLength);
+    }
+    if (this->cardDetectedSak == 0x00)
+    {
+        // MIFARE Ultralight / NTAG21x: READ page 0 needs no authentication and leaves the card selected.
+        uint8_t command[] = {0x30, 0x00};
+        uint8_t answer[MAX_APDU_RESPONSE_LENGTH];
+        uint8_t answerLength = sizeof(answer);
+        return this->pn532.inDataExchange(command, sizeof(command), answer, &answerLength);
+    }
+    return this->reselectCard();
+}
+
+// MIFARE Classic has no command that works without a key and leaves the card alone: release it and look
+// for the same UID again. The card is selected again, as it was before.
+bool NFC::reselectCard()
+{
+    if (!this->pn532.inRelease())
+        return false;
+    uint8_t uid[PN532_MAX_UID_LENGTH] = {0};
+    uint8_t uidLength = 0;
+    if (!this->pn532.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, NFC::detectionPollTimeoutMs))
+        return false;
+    if (uidLength != this->cardDetectedUidLength || memcmp(uid, this->cardDetectedUid, uidLength) != 0)
+    {
+        // Another card took its place. Release it too, so the next detection poll sees it.
+        this->pn532.inRelease();
+        return false;
+    }
+    return true;
 }
 
 bool NFC::waitForCard(uint32_t timeoutMs)

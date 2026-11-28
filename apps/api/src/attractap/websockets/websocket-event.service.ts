@@ -1,9 +1,11 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { remoteEvent } from './reader-event-relay';
 import { AttractapGateway } from './websocket.gateway';
 import { ReaderDeletedEvent, ReaderTimeZoneChangedEvent, ReaderUpdatedEvent } from '../events';
 import {
   ResourceSessionStartedEvent,
+  ResourceUsageSessionExtendedEvent,
   ResourceUsageSessionEndedEvent,
   ResourceUsageSessionTakenOverEvent,
 } from '../../resources/usage/events/resource-usage.events';
@@ -28,6 +30,7 @@ export class WebSocketEventService {
   private readonly resourceGroupsService: ResourceGroupsService;
 
   @OnEvent(ReaderUpdatedEvent.EVENT_NAME)
+  @OnEvent(remoteEvent(ReaderUpdatedEvent.EVENT_NAME))
   public async onReaderUpdated(event: ReaderUpdatedEvent) {
     this.logger.debug('Got reader updated event');
     this.attractapGateway.sendResourceList(event.reader.id);
@@ -42,6 +45,7 @@ export class WebSocketEventService {
   }
 
   @OnEvent(ReaderDeletedEvent.EVENT_NAME)
+  @OnEvent(remoteEvent(ReaderDeletedEvent.EVENT_NAME))
   public async onReaderDeleted(event: ReaderDeletedEvent) {
     this.logger.debug('Got reader deleted event');
     this.attractapGateway.disconnectReader(event.readerId);
@@ -55,6 +59,12 @@ export class WebSocketEventService {
 
   @OnEvent(ResourceUsageSessionEndedEvent.EVENT_NAME)
   public async onResourceUsageEnded(event: ResourceUsageSessionEndedEvent) {
+    this.attractapGateway.sendResourceListToReadersWithResources([event.usage.resourceId]);
+  }
+
+  /** The reader shows the remaining time, so an extension (from the web or another reader) needs a new list. */
+  @OnEvent(ResourceUsageSessionExtendedEvent.EVENT_NAME)
+  public async onResourceUsageExtended(event: ResourceUsageSessionExtendedEvent) {
     this.attractapGateway.sendResourceListToReadersWithResources([event.usage.resourceId]);
   }
 

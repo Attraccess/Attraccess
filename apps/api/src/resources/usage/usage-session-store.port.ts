@@ -25,6 +25,11 @@ export interface PendingSessionDraft {
   meterRates: UsageMeterRate[];
   supervisorUserId?: number;
   projectId?: number;
+  /** The deadline fixed at the start; absent when nothing limits the session. */
+  autoEndAt?: Date | null;
+  maxAutoEndAt?: Date | null;
+  estimatedDurationMinutes?: number | null;
+  autoEndWarnedOffsetMinutes?: number | null;
 }
 
 /** A door action is stored as an already ended session record. */
@@ -39,6 +44,14 @@ export class MissingBillingTransactionError extends Error {
   constructor() {
     super('The usage billing transaction is missing');
     this.name = 'MissingBillingTransactionError';
+  }
+}
+
+/** A submission references an image that is gone, already attached elsewhere or not the submitter's (ATT-879). */
+export class FormImageUnavailableError extends Error {
+  constructor() {
+    super('A form image is no longer available. Add it again.');
+    this.name = 'FormImageUnavailableError';
   }
 }
 

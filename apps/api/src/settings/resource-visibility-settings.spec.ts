@@ -93,4 +93,93 @@ describe('resource activity visibility setting (ATT-1149)', () => {
       expect(audit.record).toHaveBeenCalled();
     });
   });
+
+  describe('machine list visibility (ATT-843)', () => {
+    const serviceWith = (stored: unknown) => {
+      const store = { getPlainSetting: jest.fn(async () => stored), setPlainSetting: jest.fn() };
+      return { store, service: new SettingsService({} as never, store as never, {} as never) };
+    };
+
+    it.each([undefined, null, '', 'public', 'garbage'])(
+      'falls back to the restrictive "permitted-only" when the stored value is %p',
+      async (stored) => {
+        const { service, store } = serviceWith(stored);
+        expect(await service.getResourceListVisibility()).toBe('permitted-only');
+        expect(store.getPlainSetting).toHaveBeenCalledWith(RESOURCES_PARENT, RESOURCES_KEYS.listVisibility);
+      },
+    );
+
+    it('reads "authenticated" when it is stored', async () => {
+      expect(await serviceWith('authenticated').service.getResourceListVisibility()).toBe('authenticated');
+    });
+
+    it('stores only the field that was sent', async () => {
+      const { service, store } = serviceWith('permitted-only');
+      await service.updateResourceVisibilitySettings({ listVisibility: 'authenticated' });
+      expect(store.setPlainSetting).toHaveBeenCalledTimes(1);
+      expect(store.setPlainSetting).toHaveBeenCalledWith(RESOURCES_PARENT, 'list_visibility', 'authenticated');
+    });
+
+    it('stores both fields when both are sent', async () => {
+      const { service, store } = serviceWith('permitted-only');
+      await service.updateResourceVisibilitySettings({
+        activityVisibility: 'introduced',
+        listVisibility: 'authenticated',
+      });
+      expect(store.setPlainSetting).toHaveBeenCalledTimes(2);
+      expect(store.setPlainSetting).toHaveBeenCalledWith(RESOURCES_PARENT, 'activity_visibility', 'introduced');
+      expect(store.setPlainSetting).toHaveBeenCalledWith(RESOURCES_PARENT, 'list_visibility', 'authenticated');
+    });
+
+    it('rejects "public" and other values over HTTP, and accepts the two modes on their own', async () => {
+      const settingsService = {
+        getResourceVisibilitySettings: jest.fn(async () => ({
+          activityVisibility: 'all',
+          listVisibility: 'permitted-only',
+        })),
+        updateResourceVisibilitySettings: jest.fn(async () => ({
+          activityVisibility: 'all',
+          listVisibility: 'authenticated',
+        })),
+      };
+      const moduleRef = await Test.createTestingModule({
+        controllers: [SettingsController],
+        providers: [
+          { provide: SettingsService, useValue: settingsService },
+          SettingsAdministrationService,
+          { provide: AUDIT_RECORDER, useValue: { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } },
+        ],
+      })
+        .overrideGuard(DualAuthGuard)
+        .useClass(HeaderAuthGuard)
+        .compile();
+      const app = moduleRef.createNestApplication();
+      app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
+      await app.init();
+      try {
+        const patch = (body: object) =>
+          supertest(app.getHttpServer())
+            .patch('/settings/resources/visibility')
+            .set('x-test-permissions', JSON.stringify(['system.settings.manage']))
+            .send(body);
+        expect((await patch({ listVisibility: 'public' })).status).toBe(400);
+        // "all" is a value of the activity setting, not of the list setting.
+        expect((await patch({ listVisibility: 'all' })).status).toBe(400);
+        expect((await patch({ activityVisibility: 'introduced', listVisibility: 'all' })).status).toBe(400);
+        expect(settingsService.updateResourceVisibilitySettings).not.toHaveBeenCalled();
+        expect((await patch({ listVisibility: 'authenticated' })).status).toBe(200);
+        expect(settingsService.updateResourceVisibilitySettings).toHaveBeenCalledWith({
+          listVisibility: 'authenticated',
+        });
+        const both = await patch({ activityVisibility: 'introduced', listVisibility: 'permitted-only' });
+        expect(both.status).toBe(200);
+        expect(settingsService.updateResourceVisibilitySettings).toHaveBeenLastCalledWith({
+          activityVisibility: 'introduced',
+          listVisibility: 'permitted-only',
+        });
+      } finally {
+        await app.close();
+      }
+    });
+  });
 });

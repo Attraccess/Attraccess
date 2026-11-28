@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EmulatedCard } from '../card-crypto/card-emulator.test-fixture';
 import { AttractapService } from '../attractap.service';
+import { CardAlreadyEnrolledError } from '../card-store.port';
+import { normalizeCardUid } from '../card-uid';
 import { CardConversationService } from './card-conversation.service';
 import { CardOperationsService } from './card-operations.service';
 import { AttractapEventType, CardDetection } from './websocket.types';
@@ -82,14 +84,20 @@ export function createServices() {
   const pending: any[] = [];
   let nextId = 1;
   const attractapService: any = {
-    getNFCCardByUID: jest.fn(async (uid: string) => cards.find((card) => card.uid === uid)),
+    getNFCCardByUID: jest.fn(async (uid: string) =>
+      cards.find((card) => normalizeCardUid(card.uid) === normalizeCardUid(uid)),
+    ),
     getNFCCardByID: jest.fn(async (id: number) => cards.find((card) => card.id === id)),
     createNFCCard: jest.fn(async (user: any, data: any, options: { activate?: boolean } = {}) => {
       const activate = options.activate ?? true;
+      // The unique index on lower(uid): the failed insert changes nothing.
+      if (cards.some((card) => normalizeCardUid(card.uid) === normalizeCardUid(data.uid))) {
+        throw new CardAlreadyEnrolledError();
+      }
       if (activate) for (const other of cards) if (other.user?.id === user.id) other.isActive = false;
-      const card = { id: nextId++, ...data, user, isActive: activate };
+      const card = { id: nextId++, type: 'aes', ...data, user, isActive: activate };
       cards.push(card);
-      return { ...card, key: `encrypted:${data.key}` };
+      return { ...card, key: card.key == null ? null : `encrypted:${data.key}` };
     }),
     userHasActiveNFCCard: jest.fn(async (userId: number) =>
       cards.some((card) => card.user?.id === userId && card.isActive),
@@ -121,6 +129,7 @@ export function createServices() {
         if (pending[i].uid === uid && pending[i].kind === kind) pending.splice(i, 1);
     }),
   };
+  const settings = { uidOnlyAllowed: false };
   const user = { id: 5, username: 'alice' };
   const conversations = new CardConversationService();
   const operations = Object.assign(new CardOperationsService(), {
@@ -133,17 +142,18 @@ export function createServices() {
     },
     usersService: { findOne: jest.fn().mockResolvedValue(user) },
     audit: { record: jest.fn().mockResolvedValue(undefined) },
+    policy: { isUidOnlyAllowed: jest.fn(async () => settings.uidOnlyAllowed) },
   });
   // Mirrors the real service: stored card keys come back decrypted.
   const originalGet = attractapService.getNFCCardByUID;
   attractapService.getNFCCardByUID = jest.fn(async (uid: string) => {
     const card = await originalGet(uid);
-    return card ? { ...card, key: String(card.key).replace('encrypted:', '') } : card;
+    return card && card.key != null ? { ...card, key: String(card.key).replace('encrypted:', '') } : card;
   });
   const originalGetById = attractapService.getNFCCardByID;
   attractapService.getNFCCardByID = jest.fn(async (id: number) => {
     const card = await originalGetById(id);
-    return card ? { ...card, key: String(card.key).replace('encrypted:', '') } : card;
+    return card && card.key != null ? { ...card, key: String(card.key).replace('encrypted:', '') } : card;
   });
-  return { cards, pending, attractapService, conversations, operations, user };
+  return { cards, pending, cardStore, attractapService, conversations, operations, user, settings };
 }

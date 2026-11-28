@@ -1,7 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 import { Redis } from 'ioredis';
 
+import type { ValkeyConfigType } from '../../../config/valkey.config';
 import { VALKEY_CLIENT } from '../../../valkey/valkey.module';
 
 import { USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.port';
@@ -9,6 +11,7 @@ import { USAGE_SESSION_STORE, UsageSessionStore } from '../usage-session-store.p
 import {
   LocalSessionChangeCoordination,
   SessionChangeCoordination,
+  resolveInstanceName,
   ValkeySessionChangeCoordination,
 } from './session-change-coordination';
 
@@ -27,6 +30,7 @@ export class SessionChangeTurns {
   constructor(
     @Inject(USAGE_SESSION_STORE) private readonly sessions: UsageSessionStore,
     @Inject(VALKEY_CLIENT) private readonly valkeyClient: Redis | null,
+    @Optional() private readonly config?: ConfigService,
   ) {}
 
   /** Whether other API instances share the machines through Valkey. */
@@ -37,7 +41,10 @@ export class SessionChangeTurns {
   /** Valkey makes the turn per machine hold across API instances; without it this instance's queue is enough. */
   get coordination(): SessionChangeCoordination {
     this.sessionChangeCoordinationInstance ??= this.valkeyClient
-      ? new ValkeySessionChangeCoordination(this.valkeyClient)
+      ? new ValkeySessionChangeCoordination(
+          this.valkeyClient,
+          resolveInstanceName(this.config?.get<ValkeyConfigType>('valkey')?.ATTRACCESS_INSTANCE_NAME),
+        )
       : new LocalSessionChangeCoordination();
     return this.sessionChangeCoordinationInstance;
   }

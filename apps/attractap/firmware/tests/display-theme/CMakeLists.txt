@@ -49,7 +49,9 @@ add_executable(display-theme-host
     wall_clock.cpp
     resource_details.cpp
     parallel_sessions.cpp
+    session_duration.cpp
     demo_form_options.cpp
+    forms_screen.cpp
     host_shims.cpp
     "${CMAKE_CURRENT_BINARY_DIR}/logos.S"
     "${FIRMWARE_DIR}/src/display/theme.cpp"
@@ -67,9 +69,12 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/firmwareUpdate/firmwareUpdateScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsSession.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsAutoEnd.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsProjects.cpp"
     "${FIRMWARE_DIR}/src/display/screens/projectSelect/projectSelectScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/projectSelect/projectSelectSearch.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/duration/durationInputScreen.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/extend/extendSessionScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/forms/navigation.cpp"
     "${FIRMWARE_DIR}/src/display/screens/status/statusScreen.cpp"
     "${FIRMWARE_DIR}/src/display/screens/confirm/confirmScreen.cpp"
@@ -80,6 +85,7 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/layout.cpp"
     "${FIRMWARE_DIR}/src/display/screens/forms/fields.cpp"
     "${FIRMWARE_DIR}/src/display/screens/forms/editor.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/forms/imageField.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsUiSlots.cpp"
     "${FIRMWARE_DIR}/src/display/ui/ui_builder.cpp"
     "${FIRMWARE_DIR}/src/display/ui/ui_slot_cache.cpp"

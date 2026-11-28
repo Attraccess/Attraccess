@@ -9,6 +9,7 @@ import { UsageSessionNotifications } from './sessions/usage-session-notification
 import { UsageSessionRecords } from './sessions/usage-session-records';
 import { UsageSessionStartPreparation } from './sessions/usage-session-start-preparation';
 import { UsageSessionStarts } from './sessions/usage-session-starts';
+import { UsageSessionExtensions } from './session-duration/usage-session-extensions';
 
 /** The collaborators behind ResourceUsageService; registered next to it wherever it is provided for real. */
 export const RESOURCE_USAGE_COLLABORATORS = [
@@ -23,4 +24,5 @@ export const RESOURCE_USAGE_COLLABORATORS = [
   UsageSessionStartPreparation,
   UsageSessionEnds,
   UsageSessionStarts,
+  UsageSessionExtensions,
 ];

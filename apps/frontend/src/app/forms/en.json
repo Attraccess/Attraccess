@@ -70,13 +70,19 @@
       },
       "boolean": {
         "description": "Boolean fields use a yes/no switch and do not have additional options."
+      },
+      "image": {
+        "maxImages": "Max. images",
+        "maxImagesInvalid": "Enter a whole number from {{min}} to {{max}}",
+        "description": "Users can attach up to this many photos."
       }
     },
     "types": {
       "text": "Text",
       "number": "Number",
       "select": "Single choice",
-      "boolean": "Yes / No"
+      "boolean": "Yes / No",
+      "image": "Image"
     }
   },
   "preview": {

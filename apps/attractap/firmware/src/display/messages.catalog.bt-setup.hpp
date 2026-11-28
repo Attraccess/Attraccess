@@ -14,9 +14,4 @@ inline constexpr Entry btSetupCatalog[] = {
     // NimBLE could not start (not enough memory); a restart opens the setup again on an unpaired reader.
     {Message::BluetoothSetupUnavailable, "Start fehlgeschlagen, neu starten", "Could not start, restart"},
 };
-static_assert(sizeof(catalog) / sizeof(Entry) + sizeof(cardRelayCatalog) / sizeof(Entry) +
-                      sizeof(networkStatusCatalog) / sizeof(Entry) + sizeof(sessionUsersCatalog) / sizeof(Entry) +
-                      sizeof(btSetupCatalog) / sizeof(Entry) ==
-                  static_cast<size_t>(Message::Count),
-              "every firmware message needs a catalog entry, in enum order");
 } // namespace FirmwareI18n

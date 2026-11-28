@@ -35,7 +35,6 @@ import {
 } from '@attraccess/application-models';
 import { In, LessThan, MoreThan, Not } from 'typeorm';
 import {
-  MeterNameTakenError,
   MeteringBillRef,
   MeteringStore,
   PendingSessionFilter,
@@ -43,8 +42,16 @@ import {
 } from '../../../resources/metering/metering-store.port';
 import { sessionLimitOf } from '../../../resources/usage/sessions/active-usage';
 import type { TransactionContext } from '../../transaction-context';
-import { isUniqueViolation } from '../../persistence-errors';
-import { segmentsOfUsage, usageBoundarySince } from './metering-queries';
+import {
+  activeMeterRows,
+  insertMeterRow,
+  lockedMeterRow,
+  meterHasRecords,
+  meterRows,
+  updateMeterRow,
+} from './meter-rows';
+import { clearPendingShareMarkers, insertCorrection } from './metering-bill-queries';
+import { openUsageRows, segmentsOfUsage, usageBoundarySince } from './metering-queries';
 import { toAttempt, toMeter, toOperation, toSegment, toSession, toUsage } from './metering-mappers';
 import { EntityManagerResolver } from '../entity-manager-resolver';
 import { findActiveUsages } from '../usage/active-usage-queries';
@@ -67,15 +74,16 @@ export class TypeOrmMeteringStore implements MeteringStore {
     };
   }
 
-  async listMeters(resourceId: number, context?: TransactionContext): Promise<ResourceMeterRecord[]> {
-    const rows = await this.managers
-      .resolve(context)
-      .find(ResourceMeter, { where: { resourceId }, order: { id: 'ASC' } });
-    return rows.map(toMeter);
+  async listMeters(
+    resourceId: number,
+    context?: TransactionContext,
+    options: { includeArchived?: boolean } = {},
+  ): Promise<ResourceMeterRecord[]> {
+    return (await meterRows(this.managers.resolve(context), resourceId, options.includeArchived)).map(toMeter);
   }
 
   async listAllMeters(context?: TransactionContext): Promise<ResourceMeterRecord[]> {
-    return (await this.managers.resolve(context).find(ResourceMeter)).map(toMeter);
+    return (await activeMeterRows(this.managers.resolve(context))).map(toMeter);
   }
 
   /** In a unit of work the meter row is locked (FOR NO KEY UPDATE): counter read-modify-writes queue instead of racing. */
@@ -104,23 +112,32 @@ export class TypeOrmMeteringStore implements MeteringStore {
   }
 
   async createMeter(resourceId: number, name: string): Promise<ResourceMeterRecord> {
-    const manager = this.managers.resolve();
-    try {
-      const saved = await manager.save(ResourceMeter, { resourceId, name });
-      return toMeter(await manager.findOneByOrFail(ResourceMeter, { id: saved.id }));
-    } catch (error) {
-      if (isUniqueViolation(error)) throw new MeterNameTakenError();
-      throw error;
-    }
+    return toMeter(await insertMeterRow(this.managers.resolve(), resourceId, name));
   }
 
-  async renameMeter(resourceId: number, meterId: number, name: string): Promise<void> {
-    try {
-      await this.managers.resolve().update(ResourceMeter, { id: meterId, resourceId }, { name });
-    } catch (error) {
-      if (isUniqueViolation(error)) throw new MeterNameTakenError();
-      throw error;
-    }
+  renameMeter(resourceId: number, meterId: number, name: string): Promise<void> {
+    return updateMeterRow(this.managers.resolve(), { id: meterId, resourceId }, { name });
+  }
+
+  setMeterArchivedAt(meterId: number, archivedAt: Date | null, context: TransactionContext): Promise<void> {
+    return updateMeterRow(this.managers.resolve(context), { id: meterId }, { archivedAt });
+  }
+
+  async lockMeterForDeletion(
+    resourceId: number,
+    meterId: number,
+    context: TransactionContext,
+  ): Promise<ResourceMeterRecord | null> {
+    const row = await lockedMeterRow(this.managers.resolve(context), resourceId, meterId);
+    return row ? toMeter(row) : null;
+  }
+
+  hasMeterRecords(meterId: number, context?: TransactionContext): Promise<boolean> {
+    return meterHasRecords(this.managers.resolve(context), meterId);
+  }
+
+  async deleteMeter(meterId: number, context: TransactionContext): Promise<void> {
+    await this.managers.resolve(context).delete(ResourceMeter, meterId);
   }
 
   async setMeterRate(meterId: number, creditsPerUnit: number): Promise<void> {
@@ -159,6 +176,14 @@ export class TypeOrmMeteringStore implements MeteringStore {
   async findUsage(usageId: number, context?: TransactionContext): Promise<MeteringUsageRecord | null> {
     const row = await this.managers.resolve(context).findOne(ResourceUsage, { where: { id: usageId } });
     return row ? toUsage(row) : null;
+  }
+
+  async findOpenUsages(resourceId: number, context?: TransactionContext): Promise<MeteringUsageRecord[]> {
+    return (await openUsageRows(this.managers.resolve(context), resourceId)).map(toUsage);
+  }
+
+  lockUsageLifecycle(resourceId: number, context: TransactionContext): Promise<void> {
+    return lockResource(this.managers.resolve(context), RESOURCE_LOCK.usageLifecycle, resourceId);
   }
 
   async findUsages(usageIds: number[], context?: TransactionContext): Promise<MeteringUsageRecord[]> {
@@ -415,7 +440,7 @@ export class TypeOrmMeteringStore implements MeteringStore {
       { id: In(sessionIds) },
       { status: ResourceMeteringSessionStatus.Failed, failureReason: reason },
     );
-    await this.clearPendingShareMarkers(sessionIds, context);
+    await clearPendingShareMarkers(manager, sessionIds);
   }
 
   async waiveSession(
@@ -435,23 +460,8 @@ export class TypeOrmMeteringStore implements MeteringStore {
       { status: ResourceMeteringSessionStatus.Waived, settledAt: at },
     );
     if (!result.affected) return null;
-    await this.clearPendingShareMarkers([sessionId], context);
+    await clearPendingShareMarkers(manager, [sessionId]);
     return toSession(await manager.findOneByOrFail(ResourceMeteringSession, { id: sessionId }));
-  }
-
-  /**
-   * A pending share that will never be charged (the session failed or was waived) no longer says it is charged
-   * later: its line reads like any meter line without a final reading. Only display data of the item changes.
-   */
-  private async clearPendingShareMarkers(sessionIds: string[], context?: TransactionContext): Promise<void> {
-    if (!sessionIds.length) return;
-    await this.managers
-      .resolve(context)
-      .update(
-        BillingTransactionItem,
-        { externalReference: In(sessionIds.map((id) => `metering:${id}:unavailable`)) },
-        { allocation: null },
-      );
   }
 
   // ---- operation ledger -------------------------------------------------------------------------
@@ -584,17 +594,7 @@ export class TypeOrmMeteringStore implements MeteringStore {
     await this.managers.resolve(context).save(BillingTransactionItem, { billingTransactionId: billId, ...item });
   }
 
-  async createCorrection(
-    draft: MeteringCorrectionDraft,
-    context?: TransactionContext,
-  ): Promise<MeteringCorrectionRecord> {
-    const saved = await this.managers.resolve(context).save(BillingTransaction, {
-      userId: draft.userId,
-      initiatorId: draft.initiatorId,
-      correctionOfId: draft.correctionOfId,
-      amount: draft.amount,
-      status: BillingTransactionStatus.Completed,
-    });
-    return { id: saved.id, userId: saved.userId, amount: saved.amount, status: saved.status };
+  createCorrection(draft: MeteringCorrectionDraft, context?: TransactionContext): Promise<MeteringCorrectionRecord> {
+    return insertCorrection(this.managers.resolve(context), draft);
   }
 }

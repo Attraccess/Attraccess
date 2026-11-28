@@ -28,6 +28,21 @@ describe('audit storage safe snapshot', () => {
     expect(projectResourceAuditEvent({ ...deletion, details: { password: 'raw-secret' } })).toBeNull();
   });
 
+  it.each(['meter.archived', 'meter.restored', 'meter.deleted'] as const)(
+    'keeps the meter and its name for %s and nothing else',
+    (action) => {
+      const event = {
+        action,
+        operationId: randomUUID(),
+        actorId: 42,
+        subjectId: 7,
+        details: { meterId: 3, meterName: 'Power' },
+      };
+      expect(projectResourceAuditEvent(event)).toEqual(event);
+      expect(projectResourceAuditEvent({ ...event, details: { ...event.details, secret: 'x' } })).toBeNull();
+    },
+  );
+
   it('allows the flow events with their reviewed fields and subject types only', () => {
     const base = { operationId: randomUUID(), actorId: 42, subjectId: 7 };
     const canvas = {
@@ -176,6 +191,27 @@ describe('audit storage safe snapshot', () => {
     expect(
       projectAttractapAuditEvent({ ...crash, details: { ...crash.details, resetReason: 'raw-secret' } }),
     ).toBeNull();
+  });
+
+  it('keeps the UID-only card details on card link and unlink events, and drops anything else', () => {
+    const linked = {
+      action: 'card.linked' as const,
+      actorId: 5,
+      authenticationMethod: 'session' as const,
+      subjectId: 7,
+      details: { source: 'reader-enrollment', cardType: 'uid-only' },
+    };
+    const unlinked = {
+      ...linked,
+      action: 'card.unlinked' as const,
+      details: { source: 'uid-only-delete' },
+    };
+    expect(projectAttractapAuditEvent(linked)).toEqual(linked);
+    expect(projectAttractapAuditEvent(unlinked)).toEqual(unlinked);
+    expect(
+      projectAttractapAuditEvent({ ...linked, details: { ...linked.details, cardType: 'raw-secret' } }),
+    ).toBeNull();
+    expect(projectAttractapAuditEvent({ ...unlinked, details: { source: 'raw-secret' } })).toBeNull();
   });
 
   it('allows system-origin lifecycle events but rejects mixed origins', () => {

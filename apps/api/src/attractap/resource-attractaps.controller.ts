@@ -5,9 +5,11 @@ import { LicenseModuleType } from '../license/license.service';
 import { RequiresLicense } from '../license/require-license.decorator';
 import { AttractapService } from './attractap.service';
 import { AttractapReaderDto, toReaderDto } from './dtos/reader.dto';
+import { ResourceListVisible } from '../resources/visibility/resource-list-visible.interceptor';
 
 /** Readers seen from the resource side; visible to every signed-in user, like `GET /attractap/readers`. */
 @ApiTags('Attractap')
+@ResourceListVisible()
 @Controller()
 @RequiresLicense(LicenseModuleType.ATTRACTAP)
 export class ResourceAttractapsController {

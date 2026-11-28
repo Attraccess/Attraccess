@@ -2,9 +2,9 @@ import { Logger, ServiceUnavailableException } from '@nestjs/common';
 
 export const VALKEY_UNAVAILABLE_MESSAGE = 'Session storage (Valkey) is unavailable; try again shortly';
 
-// ioredis' own messages for a command that could not reach Valkey, and the ones this API raises itself when it gives
+// ioredis' own messages for a command that could not reach Valkey or got no answer (`commandTimeout`), and the ones this API raises itself when it gives
 // up waiting (session-change-coordination.ts). Other ioredis errors (e.g. a Lua script failing) are real bugs.
-const UNAVAILABLE_MESSAGES = new Set(['Connection is closed.', 'Valkey did not answer in time']);
+const UNAVAILABLE_MESSAGES = new Set(['Connection is closed.', 'Command timed out', 'Valkey did not answer in time']);
 const WARNING_INTERVAL_MS = 60_000;
 
 const logger = new Logger('ValkeyUnavailable');

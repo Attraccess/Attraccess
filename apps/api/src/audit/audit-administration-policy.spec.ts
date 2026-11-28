@@ -105,6 +105,65 @@ describe('administration audit policy', () => {
       expect(projectAdministrationAuditEvent({ ...setting, details })).toBeNull();
   });
 
+  it.each([
+    ['networkRestriction.allowedRanges', '10.0.0.0/8,fc00::/7,127.0.0.0/8', '10.0.0.0/8,203.0.113.5,2001:db8::/32…'],
+    ['networkRestriction.allowedRanges', 'removed: 10.0.0.0/8', 'added: 0.0.0.0/0,::/0'],
+    ['networkRestriction.enabled', 'false', 'true'],
+    ['networkRestriction.ipSource', 'client', 'header'],
+    ['networkRestriction.headerName', 'X-Real-Ip', 'X-Client-Ip'],
+    ['networkRestriction.roleActions', 'user: ', 'user: door.open,usage.start'],
+    ['attractap.allowUidOnlyCards', 'false', 'true'],
+    ['attractap.allowUidOnlyCards', 'true', 'false'],
+  ])('accepts %s changes', (settingKey, before, after) => {
+    expect(
+      projectAdministrationAuditEvent({
+        ...event,
+        action: 'settings.updated',
+        subjectType: 'setting',
+        details: { settingKey, before, after },
+      }),
+    ).not.toBeNull();
+  });
+
+  it.each([
+    ['networkRestriction.allowedRanges', 'https://user:secret@example.com'],
+    ['networkRestriction.ipSource', 'secret-marker'],
+    ['networkRestriction.headerName', 'X Real\nInjected'],
+    ['networkRestriction.roleActions', 'user: {"password":"secret-marker"}'],
+    ['attractap.allowUidOnlyCards', 'yes'],
+  ])('rejects free text in %s changes', (settingKey, after) => {
+    expect(
+      projectAdministrationAuditEvent({
+        ...event,
+        action: 'settings.updated',
+        subjectType: 'setting',
+        details: { settingKey, before: '', after },
+      }),
+    ).toBeNull();
+  });
+
+  it.each(['all', 'selected', 'secured'])('accepts the card writer mode %s', (after) => {
+    expect(
+      projectAdministrationAuditEvent({
+        ...event,
+        action: 'settings.updated',
+        subjectType: 'setting',
+        details: { settingKey: 'attractap.cardWriterMode', before: 'all', after },
+      }),
+    ).not.toBeNull();
+  });
+
+  it('rejects an unknown card writer mode', () => {
+    expect(
+      projectAdministrationAuditEvent({
+        ...event,
+        action: 'settings.updated',
+        subjectType: 'setting',
+        details: { settingKey: 'attractap.cardWriterMode', before: 'all', after: 'secret-marker' },
+      }),
+    ).toBeNull();
+  });
+
   it.each(['en', 'de'])('accepts canonical %s language changes', (after) => {
     expect(
       projectAdministrationAuditEvent({
@@ -158,5 +217,15 @@ describe('administration audit policy', () => {
       'x'.repeat(300),
     ])
       expect(templateEvent(rejected)).toBeNull();
+  });
+
+  it('accepts the system actor only for what the host does on its own', () => {
+    const system = { actorId: null, subjectType: 'plugin-package', subjectId: 7, details: { packageName: 'p' } };
+    for (const action of ['plugin.replaced', 'plugin.activation_completed'])
+      expect(projectAdministrationAuditEvent({ ...system, action })).toMatchObject({ actorId: null });
+    for (const action of ['plugin.installed', 'plugin.removed', 'plugin.update_override_updated'])
+      expect(projectAdministrationAuditEvent({ ...system, action })).toBeNull();
+    for (const credential of [{ authenticationMethod: 'session' as const }, { apiTokenId: 9 }])
+      expect(projectAdministrationAuditEvent({ ...system, action: 'plugin.replaced', ...credential })).toBeNull();
   });
 });

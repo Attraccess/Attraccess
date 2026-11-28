@@ -7,6 +7,7 @@ import en from './UploadPluginModal.en.json';
 import de from './UploadPluginModal.de.json';
 import { useToastMessage } from '../../components/toastProvider';
 import { installFailureReason } from '../settings/sections/plugins/marketplace/describeInstallFailure';
+import { useRefreshAfterPluginChange } from '../settings/sections/plugins/useRefreshAfterPluginChange';
 
 interface UploadPluginModalProps {
   isOpen: boolean;
@@ -20,11 +21,11 @@ export function UploadPluginModal({ isOpen, onClose }: UploadPluginModalProps) {
   const toast = useToastMessage();
   const { t } = useTranslations({ en, de });
 
+  const refreshAfterPluginChange = useRefreshAfterPluginChange();
+
   const { mutate: uploadPlugin, isPending } = useUploadPlugin(undefined, {
     onSuccess: () => {
-      setTimeout(() => {
-        window.location.reload();
-      }, 5000);
+      void refreshAfterPluginChange();
       onClose();
       toast.success({
         title: t('success.title'),

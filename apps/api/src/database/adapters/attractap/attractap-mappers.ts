@@ -37,6 +37,9 @@ export function toLinkedResource(resource: Resource): AttractapLinkedResource {
     metadata: resource.metadata,
     allowTakeOver: resource.allowTakeOver,
     maxParallelSessions: resource.maxParallelSessions,
+    maxSessionDurationMinutes: resource.maxSessionDurationMinutes,
+    requireSessionDurationEstimate: resource.requireSessionDurationEstimate,
+    defaultSessionDurationEstimateMinutes: resource.defaultSessionDurationEstimateMinutes,
     retrainingMaxAgeDays: resource.retrainingMaxAgeDays,
     retrainingMaxInactivityDays: resource.retrainingMaxInactivityDays,
     retrainingBlocksAccess: resource.retrainingBlocksAccess,
@@ -137,6 +140,7 @@ export function toNfcCard(card: NFCCard): AttractapNfcCard {
   return {
     id: card.id,
     uid: card.uid,
+    type: card.type,
     keyNo: card.keyNo,
     key: card.key,
     createdAt: card.createdAt,

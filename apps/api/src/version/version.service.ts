@@ -52,7 +52,7 @@ export class VersionService {
     const appConfig = this.configService.get<AppConfigType>('app');
     const raw = appConfig?.VERSION ?? '0.0.0-dev';
     const normalized = semver.valid(semver.clean(raw)) ?? raw;
-    const commitHash = appConfig?.COMMIT_SHA ?? null;
+    const commitHash = appConfig?.COMMIT_SHA?.trim() || null;
     return { version: normalized, commitHash };
   }
 

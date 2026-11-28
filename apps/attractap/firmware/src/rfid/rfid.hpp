@@ -47,6 +47,7 @@ public:
 
     // True while a card is physically on the reader (tracked by handleCardDetection).
     bool isCardPresent() override;
+    bool lastDetectionInfo(uint8_t &sak, uint16_t &atqa) const override;
 
 private:
     Logger logger;
@@ -55,6 +56,9 @@ private:
 
     uint8_t cardDetectedUid[7] = {0};
     uint8_t cardDetectedUidLength = 0;
+    uint8_t cardDetectedSak = 0;
+    uint16_t cardDetectedAtqa = 0;
+    bool cardDetectedInfoKnown = false;
 
     // Written by the NFC task, read from the main loop.
     volatile bool foundCard = false;
@@ -73,6 +77,10 @@ private:
     std::function<void(uint8_t *, uint8_t)> cardDetectionCallback;
     std::function<void(uint32_t presentationTimeMs)> cardRemovalCallback;
     void handleCardDetection();
+    // True while the card still answers. Cards that speak ISO 14443-4 get one keyless DESFire command; cards
+    // that do not (NTAG21x, MIFARE Classic) cannot, so they are read or re-selected instead.
+    bool cardStillPresent();
+    bool reselectCard();
 
     uint32_t lastHardwareCheckMs = 0;
     void checkHardware(bool logHardwareInfo = false);
@@ -105,4 +113,6 @@ private:
     // cutting the worst-case bus hold per loop pass by ~3x
     // (PERFORMANCE_ANALYSIS.md quick win Q4).
     static const uint16_t detectionPollTimeoutMs = 30;
+    // SAK bit 0x20: the card speaks ISO 14443-4 and answers APDUs.
+    static const uint8_t sakIsoDep = 0x20;
 };

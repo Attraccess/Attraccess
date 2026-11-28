@@ -1,3 +1,4 @@
+import { AuditLog } from '@attraccess/database-entities';
 import { EmailTemplateType } from '@attraccess/application-models';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { EmailLayoutController } from '../email-layout/email-layout.controller';
@@ -11,6 +12,8 @@ import { PluginAdministrationService } from '../plugin-system/plugin-administrat
 import { InstalledNpmPlugin, NpmPluginAuditState } from '../plugin-system/npm-plugin.service';
 import { PluginController } from '../plugin-system/plugin.controller';
 import { PluginService } from '../plugin-system/plugin.service';
+import { clearPluginRestartRequired, markPluginRestartRequired } from '../plugin-system/runtime/restart-required';
+import { setupAuditDatabase } from '../database/adapters/audit/audit.test-fixture';
 import { SettingsController } from '../settings/settings.controller';
 import { SettingsAdministrationService } from '../settings/settings-administration.service';
 import { projectAuditRow } from './recorder/audit-row';
@@ -242,6 +245,29 @@ describe('administration lifecycle hooks', () => {
     ]);
   });
 
+  it('records a machine list visibility change with its before and after values (ATT-843)', async () => {
+    const audit = recorder();
+    const service = {
+      getResourceVisibilitySettings: jest
+        .fn()
+        .mockResolvedValue({ activityVisibility: 'all', listVisibility: 'authenticated' }),
+      updateResourceVisibilitySettings: jest
+        .fn()
+        .mockResolvedValue({ activityVisibility: 'all', listVisibility: 'permitted-only' }),
+    };
+    const controller = new SettingsController(
+      service as never,
+      new SettingsAdministrationService(service as never, audit as never),
+    );
+    await controller.updateResourceVisibilitySettings({ listVisibility: 'permitted-only' }, req);
+    expect(service.updateResourceVisibilitySettings).toHaveBeenCalledWith({ listVisibility: 'permitted-only' });
+    expect(recorded(audit)).toEqual([
+      expect.objectContaining({
+        details: { settingKey: 'resources.listVisibility', before: 'authenticated', after: 'permitted-only' },
+      }),
+    ]);
+  });
+
   it('records ZIP upload/deletion and retry without archive content or raw errors', async () => {
     const audit = recorder();
     const manifest = { id: 'zip-plugin', name: 'Example', version: '1.0.0', pluginDirectory: 'example' };
@@ -295,7 +321,8 @@ describe('administration lifecycle hooks', () => {
       setUpdatePolicy: jest.fn().mockResolvedValue({
         checksEnabled: true,
         mode: 'minor',
-        maintenanceWindow: { startMinute: 180, durationMinutes: 60 },
+        automaticUpdates: true,
+        schedule: { weekdays: [1, 5], startMinute: 180, durationMinutes: 60, timeZone: 'Europe/Berlin' },
         prerelease: false,
       }),
     };
@@ -320,6 +347,16 @@ describe('administration lifecycle hooks', () => {
     });
     expect(events[3].details).not.toHaveProperty('migrationOutcome');
     expect(events[3].details).not.toHaveProperty('restartRequested');
+    expect(events.find((event) => event.action === 'plugin.update_policy_updated')?.details).toEqual({
+      checksEnabled: 1,
+      automaticUpdates: 1,
+      updateMode: 'minor',
+      maintenanceWeekdays: '1,5',
+      maintenanceStartMinute: 180,
+      maintenanceDurationMinutes: 60,
+      maintenanceTimeZone: 'Europe/Berlin',
+      prerelease: 0,
+    });
   });
 
   it('records observed install/replacement outcomes and preserves failed-operation errors without persisting their text', async () => {
@@ -344,7 +381,8 @@ describe('administration lifecycle hooks', () => {
         throw new Error(secret);
       }),
     };
-    const controller = pluginController({ requestRestart: jest.fn() }, npm, audit);
+    const pluginService = { requestRestart: jest.fn() };
+    const controller = pluginController(pluginService, npm, audit);
     await controller.installPackage(plugin.name, '2.0.0', { registryId: 'default' }, req);
     await expect(
       controller.replaceInstalledPackage(
@@ -362,6 +400,43 @@ describe('administration lifecycle hooks', () => {
     expect(events[1]).toMatchObject({
       outcome: 'failed',
       details: { oldVersion: '1.0.0', newVersion: '2.0.0', rollbackOutcome: 'succeeded' },
+    });
+    // Package changes only mark a restart as required; the administrator restarts separately.
+    expect(pluginService.requestRestart).not.toHaveBeenCalled();
+  });
+
+  describe('plugin system restart', () => {
+    const fixture = setupAuditDatabase();
+
+    beforeEach(async () => {
+      await fixture.store.setPlainSetting('audit', 'domains', JSON.stringify(['administration']));
+    });
+
+    afterEach(() => clearPluginRestartRequired());
+
+    it('persists the restart request with its pending changes before restarting', async () => {
+      const pluginService = { requestRestart: jest.fn() };
+      const controller = new PluginController(
+        {} as never,
+        new PluginAdministrationService(pluginService as never, {} as never, {} as never, fixture.service),
+      );
+      markPluginRestartRequired();
+
+      await expect(controller.restartPluginSystem(req)).resolves.toEqual({ ok: true });
+
+      expect(pluginService.requestRestart).toHaveBeenCalledTimes(1);
+      expect(await fixture.source.getRepository(AuditLog).find()).toEqual([
+        expect.objectContaining({
+          domain: 'administration',
+          action: 'plugin.restart_requested',
+          actorId: 42,
+          authenticationMethod: 'api-token',
+          apiTokenId: 9,
+          outcome: 'succeeded',
+          subjectType: 'plugin-system',
+          details: { pendingChanges: 1, restartRequested: 1 },
+        }),
+      ]);
     });
   });
 });

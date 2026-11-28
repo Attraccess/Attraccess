@@ -31,8 +31,13 @@ export function namespaceMatch(name: string, namespace: string): number {
  * The namespace among `others` that `name` of the plugin with namespace `own` lies in, or undefined. A name lies in
  * another namespace when one of that namespace's prefixes matches it at least as long as the own namespace does.
  */
-export function foreignNamespaceOf(name: string, own: string, others: Iterable<string>): string | undefined {
-  const ownMatch = namespaceMatch(name, own);
+export function foreignNamespaceOf(
+  name: string,
+  own: string,
+  others: Iterable<string>,
+  legacyOwn?: string,
+): string | undefined {
+  const ownMatch = Math.max(namespaceMatch(name, own), legacyOwn === undefined ? 0 : namespaceMatch(name, legacyOwn));
   for (const other of others) {
     if (other === own) continue;
     const match = namespaceMatch(name, other);

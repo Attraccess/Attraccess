@@ -89,6 +89,25 @@ describe('SumUpService', () => {
     });
   });
 
+  describe('getReaders when SumUp is not configured', () => {
+    it('returns an empty list without calling SumUp', async () => {
+      fixture.credentialStore.getEncryptedApiKey.mockResolvedValue(null);
+
+      await expect(fixture.service.getReaders()).resolves.toEqual([]);
+      expect(fixture.mockReadersList).not.toHaveBeenCalled();
+    });
+
+    it('still fails when a stored API key cannot be decrypted', async () => {
+      fixture.credentialStore.getEncryptedApiKey.mockResolvedValue('enc');
+      fixture.encryptionService.decrypt.mockImplementation(() => {
+        throw new Error('bad key');
+      });
+
+      await expect(fixture.service.getReaders()).rejects.toThrow('bad key');
+      expect(fixture.mockReadersList).not.toHaveBeenCalled();
+    });
+  });
+
   describe('pairReader', () => {
     it('creates reader with uppercase pairing code', async () => {
       fixture.withApiKey();

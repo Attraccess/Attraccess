@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url';
 import { assertUsageIntegrity } from './usage-integrity.mjs';
 import bcrypt from 'bcrypt';
 import { loadEnvFile } from 'node:process';
-import { pathToFileURL } from 'node:url';
 import { describeLocation, isLocalHost, postgresProvider, resolveDatabaseProvider } from './lib/database-provider.mjs';
 
 // The provider main() selects through DATABASE_TYPE; the helpers below delegate to it.
@@ -302,7 +301,7 @@ export async function main(
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+if (import.meta.main) {
   main().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;

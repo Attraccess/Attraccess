@@ -106,6 +106,17 @@ Stopping from the list, details or after submitting a required end form produces
 
 The device currently uses German labels, including **Bis bald!**. Future English equivalents are **Thanks, {name}!**, **Duration**, **Charged**, and **See you soon!**.
 
+## Session duration and extending
+
+On a machine that [requires a duration estimate](resources/creating-resources.md#max-session-time-and-duration-estimate), touch readers with firmware that supports it (the capability **sessionDuration**) open a full-screen input after the project selection and before the start request, so before any forms. Set hours and minutes with the steppers or use a quick pick. The screen shows the max session time, if the machine has one, and does not accept more. It also says that the machine stops automatically after this time at the latest. **Cancel** aborts the start. The same applies to takeover and to a supervised start.
+
+While you use the machine, the details show the remaining time and the time it stops automatically, with **+1 h**, **+2 h**, **+4 h**, **+6 h**, **+12 h**, **+24 h** and **Extend to maximum**. Buttons that would pass the max session time are disabled. You need the same card identity as for stopping: the session owner, or a manager who may end that session (where the reader offers to stop someone else's session, it also offers to extend it). On a machine shared by several people, the reader only extends your own session; managers extend other sessions in the web app. Extensions made in the web app update the reader live.
+
+Readers that cannot ask never refuse a start for a missing estimate: Attractap Lite Ethernet, the GL-S10 bridge, plugin readers and touch readers with older firmware. Your session starts normally and ends at the max session time. Without a max, it ends at the machine's default estimate (60 minutes if the admin did not set one). Extend it in the web app.
+
+> [!WARNING]
+> At the end time the server stops the machine itself, even without a reader and even in the middle of a job such as a 3D print. Flows run, so power may be cut. You get a warning 15 and 5 minutes before (in the app, as push or by email, not on the reader).
+
 ## Shared machines
 
 Some machines allow several people to work at the same time (see [Using Resources](end-user/using-resources.md#use-a-shared-machine)). On the touch reader:
@@ -130,6 +141,16 @@ Your organization may ask for information before a machine starts or stops, such
 ![End-of-use form with a required visual inspection field and Absenden button](../../_media/attractap/usage-end-form.png)
 
 To cancel, tap the **×** in the top-right corner. You return to the list or details where you began. Cancelling a required form cancels the start or stop request; it does not complete it.
+
+### Add photos with your phone
+
+A photo field shows a QR code, the instruction **Mit dem Handy scannen, um Fotos hinzuzufügen** (Scan with your phone to add photos) and a count such as **0 von 3 Fotos** (0 of 3 photos).
+
+1. Scan the QR code with your phone. The page opens without signing in.
+2. Take photos or upload them from your phone.
+3. The count on the reader updates within a few seconds. Then tap **Weiter** or **Absenden** as usual.
+
+If the field is required and no photo has arrived, the reason appears on the button. Anyone who scans the QR code while the link is valid can add or remove photos in this field, so the link is short-lived: it stops working after 15 minutes, or earlier when you submit or cancel the form, sign out or someone else signs in. It takes no more photos once the maximum number is uploaded (removing a photo makes room for another). If it has expired, open the form on the reader again. A reader with older firmware cannot show photo fields: it skips optional ones, and for a required one it shows **Form with photo** (German: **Formular mit Foto**) and asks you to complete the form in the web app.
 
 ## Ask for supervision
 

@@ -7,6 +7,7 @@ import {
   isUniqueViolation,
   persistenceErrorCode,
   registerPersistenceErrorClassifier,
+  uniqueViolationConstraint,
 } from './persistence-errors';
 import { POOL_ACQUIRE_TIMEOUT_MESSAGE, postgresErrorClassifier } from './postgres/postgres-errors';
 
@@ -22,6 +23,14 @@ describe('persistence error categories', () => {
     expect(classifyPersistenceError({ code: '40P01' })).toBe('conflict');
     expect(classifyPersistenceError({ code: '08006' })).toBe('busy');
     expect(classifyPersistenceError({ code: '23502' })).toBeUndefined();
+  });
+
+  it('names the constraint of a unique violation only, wherever the driver put it', () => {
+    expect(uniqueViolationConstraint({ code: '23505', constraint: 'UQ_a' })).toBe('UQ_a');
+    expect(uniqueViolationConstraint({ driverError: { code: '23505', constraint: 'UQ_b' } })).toBe('UQ_b');
+    expect(uniqueViolationConstraint({ code: '23505' })).toBeUndefined();
+    expect(uniqueViolationConstraint({ code: '23503', constraint: 'FK_c' })).toBeUndefined();
+    expect(uniqueViolationConstraint(new Error('UQ_a'))).toBeUndefined();
   });
 
   it('classifies a read-only transaction by code', () => {

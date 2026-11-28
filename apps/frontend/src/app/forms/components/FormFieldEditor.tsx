@@ -19,6 +19,7 @@ const FIELD_TYPE_OPTIONS: { value: FormFieldType; labelKey: string }[] = [
   { value: FormFieldType.NUMBER, labelKey: 'fields.types.number' },
   { value: FormFieldType.SELECT, labelKey: 'fields.types.select' },
   { value: FormFieldType.BOOLEAN, labelKey: 'fields.types.boolean' },
+  { value: FormFieldType.IMAGE, labelKey: 'fields.types.image' },
 ];
 
 export function FormFieldEditor(props: FormFieldEditorProps) {

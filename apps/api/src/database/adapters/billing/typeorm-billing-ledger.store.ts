@@ -1,5 +1,6 @@
 import {
   BillingTransactionStatus,
+  ResourceMeteringSessionStatus,
   type BillingTransactionDetail,
   type BillingTransactionRecord,
   type UsageReceiptSource,
@@ -149,7 +150,8 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
             completed: BillingTransactionStatus.Completed,
           })
           .execute();
-        if (!updated.affected) throw new BadRequestException('Billing transaction already exists for this resource usage');
+        if (!updated.affected)
+          throw new BadRequestException('Billing transaction already exists for this resource usage');
         settled = { ...input.existing, amount: input.amount, status: BillingTransactionStatus.Completed };
       } else {
         // ON CONFLICT DO NOTHING: a failed INSERT would abort the PostgreSQL transaction. A concurrent settlement of
@@ -177,6 +179,35 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
       }
       return settled;
     });
+  }
+
+  async discardPendingUsageBill(usageId: number, context: BillingTransactionContext): Promise<boolean> {
+    const manager = this.contexts.manager(context);
+    await this.lockBillOfUsage(manager, usageId);
+    // The items go with the bill (ON DELETE CASCADE). A bill another transaction refers to is never deleted: those
+    // references cascade too, and would take a refund or correction with them.
+    const deleted = await manager
+      .createQueryBuilder()
+      .delete()
+      .from(BillingTransaction)
+      .where('"resourceUsageId" = :usageId AND "status" <> :completed', {
+        usageId,
+        completed: BillingTransactionStatus.Completed,
+      })
+      .andWhere(
+        `NOT EXISTS (SELECT 1 FROM "resource_metering_session" "meter" WHERE "meter"."usageId" = :usageId
+          AND "meter"."status" = :pendingMeter AND "meter"."creditsPerUnit" > 0)`,
+        { pendingMeter: ResourceMeteringSessionStatus.Pending },
+      )
+      .andWhere(
+        `NOT EXISTS (SELECT 1 FROM "billing_transaction" "refund" WHERE "refund"."refundOfId" = "billing_transaction"."id")`,
+      )
+      .andWhere(
+        `NOT EXISTS (SELECT 1 FROM "billing_transaction" "correction"
+          WHERE "correction"."correctionOfId" = "billing_transaction"."id")`,
+      )
+      .execute();
+    return Boolean(deleted.affected);
   }
 
   async findTransactionByExternalReference(reference: string): Promise<BillingTransactionRecord | null> {

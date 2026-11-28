@@ -11,14 +11,30 @@
   },
   "selfRegistered": "The app registered itself, so Attraccess cannot confirm its name.",
   "permissions": {
-    "title": "Requested permissions",
+    "title": "Permissions to allow",
+    "hint": "Choose what the app may do. You can allow more or less than it asked for, but never more than you are allowed to do yourself.",
     "all": "The app did not name specific permissions, so it asks for everything you can do today ({{count}} permissions).",
     "none": "You currently hold no permissions that the app could use.",
-    "other": "Other"
+    "label": "Permissions",
+    "placeholder": "Select permissions",
+    "searchPlaceholder": "Search permissions...",
+    "empty": "No permissions found",
+    "picker": {
+      "title": "Choose what the app may do",
+      "description": "Select the minimum access the app needs. It can use only permissions you currently hold.",
+      "selectedCount": "{{selected}} of {{total}} permissions selected",
+      "previewLabel": "Access scope",
+      "emptyPreview": "No access selected",
+      "edit": "Edit",
+      "selectCategory": "Select all",
+      "clearCategory": "Clear all",
+      "apply": "Save permissions",
+      "cancel": "Cancel"
+    }
   },
   "unavailable": {
     "title": "Not allowed for your account",
-    "message": "The app asks for permissions you do not have: {{permissions}}. Allowing it sends an error back to the app."
+    "message": "The app asks for permissions you do not have: {{permissions}}. The app only gets the permissions you select below."
   },
   "approve": "Allow",
   "deny": "Deny",
@@ -39,5 +55,14 @@
     "invalid_client": "This app is not registered with Attraccess. Start the connection again from your app.",
     "invalid_redirect_uri": "The app asked to return to an address it did not register. Start the connection again from your app.",
     "request": "The app sent an invalid sign-in request ({{code}}). Start the connection again from your app or contact its developer."
-  }
+  },
+  "tools": {
+    "title": {
+      "one": "{{count}} tool enabled",
+      "many": "{{count}} tools enabled"
+    },
+    "description": "The app can use these tools with the permissions you selected. Each call is still checked against your permissions.",
+    "none": "No tools are enabled by this selection."
+  },
+  "selectionError": "This selection could not be allowed. Check it and try again, or start the connection again from your app."
 }

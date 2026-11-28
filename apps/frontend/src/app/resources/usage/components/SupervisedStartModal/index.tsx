@@ -1,6 +1,7 @@
 import { DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading } from '@heroui/react';
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRefreshNetworkRestrictionOnError } from '../../../../../hooks/useRefreshNetworkRestrictionOnError';
 import { Button, StandardDrawer, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
@@ -45,6 +46,7 @@ export function SupervisedStartModal({
     de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
   });
   const toast = useToastMessage();
+  const refreshNetworkRestriction = useRefreshNetworkRestrictionOnError();
   const { user } = useAuth();
 
   const [phase, setPhase] = useState<Phase>('select');
@@ -118,7 +120,9 @@ export function SupervisedStartModal({
             // 403 covers both an explicit rejection and an unauthorized supervisor. Everything else
             // — offline, busy or unsupported reader, and anything unexpected — is the request
             // failing to land, which is a different story from a supervisor saying no.
-            if (status === 403) {
+            // A network restriction is a 403 too, but nobody was asked: it is an error of the request itself.
+            const isNetworkRestricted = refreshNetworkRestriction(error);
+            if (status === 403 && !isNetworkRestricted) {
               setPhase('rejected');
               return;
             }
@@ -129,7 +133,7 @@ export function SupervisedStartModal({
         },
       );
     },
-    [onApproved, requestBody, requestSupervisedSession, resourceId, t, tExists, toast],
+    [onApproved, refreshNetworkRestriction, requestBody, requestSupervisedSession, resourceId, t, tExists, toast],
   );
 
   const handleSelectSupervisor = useCallback(

@@ -190,7 +190,7 @@ export function validatePackageContract(pkg, hostVersion) {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+if (import.meta.main) {
   const [packageDir, ...entries] = process.argv.slice(2);
   await verifyPackedPlugin(packageDir, entries, undefined, process.env.ATTRACCESS_PLUGIN_TEST_HOST_VERSION);
 }

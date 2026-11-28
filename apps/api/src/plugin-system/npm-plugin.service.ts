@@ -1,6 +1,6 @@
-import { Inject, Injectable, OnApplicationBootstrap, OnModuleInit, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleInit, Optional } from '@nestjs/common';
 
-import { AUDIT_RECORDER, auditActorOf, AuditRecorder } from '../audit/recorder/audit-event';
+import { AUDIT_RECORDER, auditActorOf, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '../audit/recorder/audit-event';
 import { AuditQueryService } from '../audit/audit-query.service';
 
 import { readAuditSettings } from '../audit/audit.config';
@@ -88,6 +88,11 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
   }
 
   async onApplicationBootstrap(): Promise<void> {
+    try {
+      await this.installation.persistUpdateOptIn();
+    } catch (error) {
+      new Logger(NpmPluginService.name).warn(`Could not store the opt-in update settings: ${String(error)}`);
+    }
     if (!this.audit || !this.auditQuery) return;
     const manifests = PluginService.getPluginsWithLoadStatus();
     for (const installed of readInstalledNpmPlugins()) {
@@ -113,7 +118,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
               domain: 'administration',
               action: 'plugin.activation_completed',
               operationId: pending.operationId,
-              actor: auditActorOf({ ...pending, id: pending.actorId }),
+              actor: pending.actorId === null ? SYSTEM_AUDIT_ACTOR : auditActorOf({ ...pending, id: pending.actorId }),
               subject: { type: 'plugin-package', id: auditSubjectKeyId(installed.name) },
               outcome: loaded ? 'succeeded' : 'failed',
               details: {
@@ -160,8 +165,8 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     return this.catalog.removalPlan(name);
   }
 
-  async removeInstalled(name: string, deferRestart = false, approvedDependants: string[] = []): Promise<void> {
-    return this.catalog.removeInstalled(name, deferRestart, approvedDependants);
+  async removeInstalled(name: string, approvedDependants: string[] = []): Promise<void> {
+    return this.catalog.removeInstalled(name, approvedDependants);
   }
 
   async packageMetadata(name: string, registryId?: string): Promise<unknown> {
@@ -184,18 +189,19 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     return this.plan.installedVersionCandidates(name);
   }
 
-  async installPlan(name: string, spec: string, registryId?: string): Promise<PluginInstallPlan> {
+  async installPlan(name: string, spec: string | undefined, registryId?: string): Promise<PluginInstallPlan> {
     return this.plan.installPlan(name, spec, registryId);
   }
 
   async install(
     name: string,
-    spec: string,
+    spec: string | undefined,
     registryId?: string,
     audit?: NpmPluginAuditState,
     planToken?: string,
+    recordAs?: string,
   ): Promise<InstalledNpmPlugin> {
-    return this.installation.install(name, spec, registryId, audit, planToken);
+    return this.installation.install(name, spec, registryId, audit, planToken, recordAs);
   }
 
   async checkInstalled(name: string): Promise<InstalledNpmPlugin> {
@@ -204,6 +210,10 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
 
   async checkAllInstalled(): Promise<InstalledNpmPlugin[]> {
     return this.installation.checkAllInstalled();
+  }
+
+  async recordAutoUpdateFailure(name: string, version: string, failedAt: Date): Promise<void> {
+    return this.installation.recordAutoUpdateFailure(name, version, failedAt);
   }
 
   async replaceInstalled(
@@ -247,7 +257,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
     return this.installation.getUpdatePolicy();
   }
 
-  async setUpdatePolicy(patch: Partial<PluginUpdatePolicy>): Promise<PluginUpdatePolicy> {
+  async setUpdatePolicy(patch: unknown): Promise<PluginUpdatePolicy> {
     return this.installation.setUpdatePolicy(patch);
   }
 
