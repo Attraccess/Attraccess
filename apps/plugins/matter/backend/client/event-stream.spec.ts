@@ -1,4 +1,4 @@
-import { CLOSE_CODES, DEFAULT_REPLAY_MAX_EVENTS, parseCursor } from '@attraccess/matter-contract';
+import { CLOSE_CODES, DEFAULT_REPLAY_MAX_EVENTS, formatCursor, parseCursor } from '@attraccess/matter-contract';
 import type { WebSocket } from 'ws';
 import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar.test-utils';
 import {
@@ -77,11 +77,11 @@ describe('SidecarEventStream', () => {
     await fake.stop();
   });
 
-  it('starts fresh without a cursor, then resumes with the last cursor after a disconnect', async () => {
+  it('starts at the beginning of an empty stream, then resumes with the last cursor after a disconnect', async () => {
     open();
     await until(() => hellos === 1);
     await until(() => fake.resumes.length === 1);
-    expect(fake.resumes[0].cursor).toBeUndefined();
+    expect(fake.resumes[0].cursor).toBe(formatCursor(fake.streamInstanceId, 0));
     fake.broadcast(fake.nextEvent());
     fake.broadcast(fake.nextEvent());
     await until(() => events.length === 2);
@@ -140,15 +140,42 @@ describe('SidecarEventStream', () => {
     expect(closes[0]).toMatchObject({ reconcile: true, error: null });
     stream.connect(fake.url);
     await until(() => fake.resumes.length === 2);
-    expect(fake.resumes[1].cursor).toBeUndefined();
+    // Fresh: the old cursor is gone, and the new position is the head of this hello.
+    expect(fake.resumes[1].cursor).toBe(formatCursor(fake.streamInstanceId, fake.seq));
   });
 
-  it('does not call a new stream instance without a cursor a gap', async () => {
+  it('starts a fresh stream at the head named in hello, so a long-running sidecar is not a gap', async () => {
+    fake.seq = 39;
     open();
-    await until(() => hellos === 1);
-    fake.broadcast(fake.eventAt(40)); // first event of a fresh start may have any sequence
+    await until(() => fake.resumes.length === 1);
+    // Not without a cursor: the sidecar would then skip what it published between `hello` and this `resume`.
+    expect(fake.resumes[0].cursor).toBe(formatCursor(fake.streamInstanceId, 39));
+    fake.broadcast(fake.nextEvent());
     await until(() => events.length === 1);
+    expect(events[0].event.sequence).toBe(40);
     expect(reconciliations).toEqual([]);
+  });
+
+  it('keeps its position when the link drops before the first event', async () => {
+    fake.seq = 7;
+    open();
+    await until(() => fake.resumes.length === 1);
+    fake.killSockets();
+    await until(() => closes.length === 1);
+    fake.nextEvent(); // 8, published while disconnected
+    stream.connect(fake.url);
+    await until(() => fake.resumes.length === 2);
+    expect(fake.resumes[1].cursor).toBe(formatCursor(fake.streamInstanceId, 7));
+  });
+
+  it('calls a first event that skips past the head a gap', async () => {
+    fake.seq = 7;
+    open();
+    await until(() => fake.resumes.length === 1);
+    fake.broadcast(fake.eventAt(9)); // 8 never arrived
+    await until(() => reconciliations.length === 1);
+    expect(reconciliations).toEqual(['sequence-gap']);
+    expect(events).toHaveLength(0);
   });
 
   it('passes on a reconciliation-required message from the sidecar and starts fresh afterwards', async () => {
@@ -176,7 +203,7 @@ describe('SidecarEventStream', () => {
     fake.onResume = null;
     stream.connect(fake.url);
     await until(() => fake.resumes.length === 3);
-    expect(fake.resumes[2].cursor).toBeUndefined();
+    expect(fake.resumes[2].cursor).toBe(formatCursor(fake.streamInstanceId, fake.seq));
   });
 
   it('reports a rejected credential on the upgrade as unauthorized', async () => {

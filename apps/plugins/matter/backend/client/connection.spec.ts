@@ -2,6 +2,7 @@ import {
   CLOSE_CODES,
   FEATURE_FAMILIES,
   UNAUTHORIZED_MESSAGE,
+  formatCursor,
   type CapabilityReport,
 } from '@attraccess/matter-contract';
 import { randomUUID } from 'node:crypto';
@@ -167,7 +168,7 @@ describe('SidecarConnection', () => {
     for (const socket of fake.sockets) socket.close(CLOSE_CODES.tryAgainLater, 'slow');
     await until(() => logs.some((line) => line.includes('reconnecting in 1000 ms')));
     await until(() => connection.status().state === 'connected');
-    expect(fake.resumes.at(-1)?.cursor).toBeUndefined(); // no events yet, so nothing to resume from
+    expect(fake.resumes.at(-1)?.cursor).toBe(formatCursor(fake.streamInstanceId, 0)); // no events yet
     // Only the event stream reconnected: the REST request is still waiting, and stop() still aborts it.
     expect(settled).toBe(false);
     connection.stop();
@@ -211,7 +212,8 @@ describe('SidecarConnection', () => {
     await until(() => signals.length === 1);
     expect(signals).toEqual(['sequence-gap']);
     await until(() => fake?.resumes.length === 2);
-    expect(fake.resumes[1].cursor).toBeUndefined();
+    // Fresh: not the cursor of the last delivered event by way of memory, but the head this `hello` named.
+    expect(fake.resumes[1].cursor).toBe(formatCursor(fake.streamInstanceId, fake.seq));
     await until(() => connection.status().state === 'connected');
   });
 
