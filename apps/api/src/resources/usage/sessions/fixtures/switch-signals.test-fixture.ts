@@ -1,4 +1,3 @@
-import type { DataSource } from 'typeorm';
 import type { SessionChangeQueue } from '../session-change-queue';
 import type { ResourceUsageService } from '../resource-usage.service';
 import { usageInternals } from './compose.test-fixture';
@@ -12,8 +11,11 @@ export async function until(check: () => boolean | Promise<boolean>, what: strin
   }
 }
 
+/** Anything that runs SQL on the test database, such as its data source. */
+type SqlRunner = { query(sql: string): Promise<unknown> };
+
 /** Whether some transaction of the test database waits for a lock (a row) another one holds. */
-export async function someoneWaitsForALock(source: DataSource): Promise<boolean> {
+export async function someoneWaitsForALock(source: SqlRunner): Promise<boolean> {
   const [{ waiting }] = (await source.query(
     `SELECT count(*)::int AS waiting FROM pg_stat_activity
      WHERE datname = current_database() AND wait_event_type = 'Lock'`,
