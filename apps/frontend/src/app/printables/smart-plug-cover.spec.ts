@@ -8,6 +8,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { parseBinaryStl, type Mesh, boundingBox } from './stl';
 import {
   DEFAULT_PLUG_CONFIG,
+  DEFAULT_STRAIGHT_HEIGHT_ABOVE_PLUG,
   MIN_HEIGHT_ABOVE_PLUG,
   PLUG_CABLES,
   PLUG_DEVICES,
@@ -109,7 +110,9 @@ const renders = new Map<string, Promise<Mesh | null>>();
 
 /** Renders one part the way the worker does, through `toScadDefines`. Cached: renders are slow. */
 async function render(part: 'body' | 'cover', config: Partial<PlugConfig> = {}): Promise<Mesh> {
-  const defines = toScadDefines({ ...DEFAULT_PLUG_CONFIG, ...config });
+  // Switch cable the way the UI does, so an angled cable starts from its own height defaults.
+  const base = config.cable ? withCable(DEFAULT_PLUG_CONFIG, config.cable) : DEFAULT_PLUG_CONFIG;
+  const defines = toScadDefines({ ...base, ...config });
   const key = JSON.stringify([part, defines]);
   if (!renders.has(key)) renders.set(key, renderRaw(part, defines));
   const mesh = await renders.get(key);
@@ -250,15 +253,42 @@ describe('smart-plug-cover.scad', () => {
     expect(cutFloor.length).toBeGreaterThan(0);
   }, 60_000);
 
-  it('ignores angled heights for a straight cable, even when passed directly', async () => {
+  it('ignores the angled cutout height for a straight cable, even when passed directly', async () => {
     const defaults = await render('body');
     const leaked = await renderRaw('body', {
       ...toScadDefines(DEFAULT_PLUG_CONFIG),
-      HEIGHT_ABOVE_PLUG: 30,
       CABLE_CUT_H: 35,
     });
     expect(boundingBox(leaked as Mesh)).toEqual(boundingBox(defaults));
     expect(volume(leaked as Mesh)).toBeCloseTo(volume(defaults), 3);
+  }, 60_000);
+
+  it('makes the straight cover a hollow cap the whole plug fits under', async () => {
+    // A test print at the STEP's 17.8 mm rode on a straight Schuko plug's strain relief.
+    const body = await render('body');
+    const cover = await render('cover');
+    const top = 43 + DEFAULT_STRAIGHT_HEIGHT_ABOVE_PLUG;
+    expect(boundingBox(body).max[2]).toBeCloseTo(top, 2);
+    expect(boundingBox(cover).min[2]).toBeCloseTo(43, 2);
+    expect(boundingBox(cover).max[2]).toBeCloseTo(top, 2);
+    // The 40.5 mm cavity runs up to the 5.8 mm top ring...
+    const cavityRoof = vertices(
+      cover,
+      (x, y, z) => Math.abs(z - (top - 5.8)) < 1e-3 && Math.abs(Math.hypot(x, y) - 40.5 / 2) < 0.05,
+    );
+    expect(cavityRoof.length).toBeGreaterThan(0);
+    // ...and the ring closes down to the 12 mm cable opening, so a pulled plug stays inside.
+    const ring = vertices(
+      cover,
+      (x, y, z) => Math.abs(z - top) < 1e-3 && Math.abs(Math.hypot(x, y) - 6) < 0.05 && y > 0,
+    );
+    expect(ring.length).toBeGreaterThan(0);
+  }, 60_000);
+
+  it('follows the configured height for a straight cable', async () => {
+    const cover = await render('cover', { heightAbovePlug: 35 });
+    expect(boundingBox(cover).max[2]).toBeCloseTo(78, 2);
+    expect(boundingBox(await render('body', { heightAbovePlug: 35 })).max[2]).toBeCloseTo(78, 2);
   }, 60_000);
 
   it('keeps the cover retaining ring at the minimum angled height', async () => {
@@ -273,6 +303,8 @@ describe('smart-plug-cover.scad', () => {
   it.each([
     ['a height below the cover skirt', { CABLE: '"angled_schuko"', HEIGHT_ABOVE_PLUG: 12 }],
     ['a height just below the minimum', { CABLE: '"angled_schuko"', HEIGHT_ABOVE_PLUG: MIN_HEIGHT_ABOVE_PLUG - 0.1 }],
+    ['a straight height below the STEP height', { HEIGHT_ABOVE_PLUG: 17.7 }],
+    ['a straight height above 80 mm', { HEIGHT_ABOVE_PLUG: 80.1 }],
     ['a straight Euro opening above 12 mm', { CABLE: '"straight_euro"', CORD_OPEN_D: 13 }],
     ['a straight Schuko opening above 16 mm', { CORD_OPEN_D: 17 }],
     ['an unknown device', { DEVICE: '"other"' }],

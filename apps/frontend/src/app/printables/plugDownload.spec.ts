@@ -36,9 +36,15 @@ describe('plugScadSource', () => {
     expect(source).toContain('PART = "body";');
   });
 
-  it('writes the fixed heights, not hidden angled values, for a straight cable', () => {
-    const source = plugScadSource(plugSource, { ...DEFAULT_PLUG_CONFIG, heightAbovePlug: 30, cordOpeningDiameter: 10 });
-    expect(source).toContain('HEIGHT_ABOVE_PLUG = 17.8;');
+  it('writes the height but not a hidden angled cutout for a straight cable', () => {
+    const source = plugScadSource(plugSource, {
+      ...DEFAULT_PLUG_CONFIG,
+      heightAbovePlug: 30,
+      cableCutoutHeight: 35,
+      cordOpeningDiameter: 10,
+    });
+    expect(source).toContain('HEIGHT_ABOVE_PLUG = 30;');
+    expect(source).toContain('CABLE_CUT_H = 24.2;');
     expect(source).toContain('CORD_OPEN_D = 10;');
   });
 
@@ -53,7 +59,7 @@ describe('plugFileSlug', () => {
       'attraccess-smart-plug-cover-shelly-plus-gen3-angled-euro-clearance-1.5mm-opening-30.9mm-height-25mm-cutout-30mm',
     );
     expect(plugFileSlug(DEFAULT_PLUG_CONFIG)).toBe(
-      'attraccess-smart-plug-cover-nous-a1-straight-schuko-clearance-0mm-opening-12mm-height-17.8mm-cutout-24.2mm',
+      'attraccess-smart-plug-cover-nous-a1-straight-schuko-clearance-0mm-opening-12mm-height-50mm-cutout-24.2mm',
     );
   });
 });

@@ -59,15 +59,16 @@ async function chooseCable(name: string) {
   fireEvent.click(await screen.findByRole('option', { name }));
 }
 
-it('renders the defaults and shows the opening field for a straight cable', () => {
+it('renders the defaults and shows the opening and height fields for a straight cable', () => {
   render(<Cover />);
   expect(state.render).toHaveBeenLastCalledWith(DEFAULT_PLUG_CONFIG);
   expect(screen.getByRole('textbox', { name: 'cordOpeningDiameter' })).toHaveValue('12 mm');
-  expect(screen.queryByRole('textbox', { name: 'heightAbovePlug' })).toBeNull();
+  expect(screen.getByRole('textbox', { name: 'heightAbovePlug' })).toHaveValue('50.0 mm');
+  expect(screen.queryByRole('textbox', { name: 'cableCutoutHeight' })).toBeNull();
   expect(screen.getByRole('button', { name: 'download' })).toBeDisabled();
 });
 
-it('swaps the opening for the two heights on an angled cable and resets them on a straight one', async () => {
+it('swaps the opening for the cutout on an angled cable and resets the heights on a straight one', async () => {
   render(<Cover />);
   await chooseCable('cableAngledSchuko');
   expect(screen.queryByRole('textbox', { name: 'cordOpeningDiameter' })).toBeNull();
@@ -83,7 +84,7 @@ it('swaps the opening for the two heights on an angled cable and resets them on 
     expect.objectContaining({
       cable: 'straight_euro',
       cordOpeningDiameter: 9,
-      heightAbovePlug: 17.8,
+      heightAbovePlug: 50,
       cableCutoutHeight: 24.2,
     }),
   );
@@ -106,7 +107,7 @@ it('downloads the configured source before a mesh exists, and the mesh once read
   fireEvent.click(screen.getByRole('button', { name: 'download' }));
   expect(state.sourceDownload).toHaveBeenCalledWith(
     expect.stringContaining('CORD_OPEN_D = 12;'),
-    'attraccess-smart-plug-cover-nous-a1-straight-schuko-clearance-0mm-opening-12mm-height-17.8mm-cutout-24.2mm.scad',
+    'attraccess-smart-plug-cover-nous-a1-straight-schuko-clearance-0mm-opening-12mm-height-50mm-cutout-24.2mm.scad',
   );
 
   state.status = 'ready';

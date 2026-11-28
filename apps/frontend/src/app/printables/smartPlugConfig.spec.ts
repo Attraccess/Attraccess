@@ -5,6 +5,7 @@ import {
   DEFAULT_PLUG_CONFIG,
   effectivePlugConfig,
   HEIGHT_ABOVE_PLUG_LIMITS,
+  heightAbovePlugLimits,
   MIN_HEIGHT_ABOVE_PLUG,
   toScadDefines,
   withCable,
@@ -27,14 +28,25 @@ describe('cordOpeningLimits', () => {
 });
 
 describe('withCable', () => {
-  it('resets the angled-only heights when switching to a straight cable', () => {
+  it('resets both heights to the straight defaults when switching from an angled cable', () => {
     expect(withCable(angled, 'straight_schuko')).toMatchObject({
       cable: 'straight_schuko',
       cordOpeningDiameter: 12,
+      heightAbovePlug: 50,
+      cableCutoutHeight: 24.2,
+    });
+    expect(withCable(angled, 'straight_euro')).toMatchObject({ cordOpeningDiameter: 9, heightAbovePlug: 50 });
+  });
+
+  it('resets the height to the angled default when switching from a straight cable', () => {
+    expect(withCable({ ...DEFAULT_PLUG_CONFIG, heightAbovePlug: 60 }, 'angled_schuko')).toMatchObject({
       heightAbovePlug: 17.8,
       cableCutoutHeight: 24.2,
     });
-    expect(withCable(angled, 'straight_euro')).toMatchObject({ cordOpeningDiameter: 9, heightAbovePlug: 17.8 });
+  });
+
+  it('keeps the height between straight cables', () => {
+    expect(withCable({ ...DEFAULT_PLUG_CONFIG, heightAbovePlug: 42 }, 'straight_euro').heightAbovePlug).toBe(42);
   });
 
   it('keeps the heights between angled cables and fixes the opening to the 30.9 mm slot', () => {
@@ -54,9 +66,9 @@ describe('withCable', () => {
 });
 
 describe('effectivePlugConfig', () => {
-  it('ignores hidden angled heights for a straight cable', () => {
+  it('ignores a hidden cutout height for a straight cable but keeps its height', () => {
     const leaked = { ...DEFAULT_PLUG_CONFIG, heightAbovePlug: 30, cableCutoutHeight: 35 };
-    expect(effectivePlugConfig(leaked)).toEqual(DEFAULT_PLUG_CONFIG);
+    expect(effectivePlugConfig(leaked)).toEqual({ ...DEFAULT_PLUG_CONFIG, heightAbovePlug: 30 });
   });
 
   it('pins the opening of an angled cable to the 30.9 mm slot', () => {
@@ -79,6 +91,12 @@ describe('toScadDefines', () => {
       CABLE_CUT_H: 30,
     });
   });
+});
+
+it('limits the height per cable kind, with the plug-sized default for straight cables', () => {
+  expect(heightAbovePlugLimits('angled_euro')).toMatchObject({ min: 14, max: 40, default: 17.8 });
+  expect(heightAbovePlugLimits('straight_schuko')).toMatchObject({ min: 17.8, max: 80, default: 50 });
+  expect(DEFAULT_PLUG_CONFIG.heightAbovePlug).toBe(50);
 });
 
 it('never allows an angled height that would cut away the cover retaining ring', () => {

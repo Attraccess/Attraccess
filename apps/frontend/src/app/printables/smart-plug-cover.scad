@@ -24,8 +24,9 @@ CABLE = "straight_schuko";
 DEVICE_EXTRA_D = 0;
 // Straight cables only: central cord opening and cover slot, 5-16 mm (Schuko) or 5-12 mm (Euro).
 CORD_OPEN_D = 12;
-// Angled cables only: cover height above the plug face, and height of the body's cable cutout.
-HEIGHT_ABOVE_PLUG = 17.8;
+// Cover height above the plug face: 14-40 mm for angled cables, 17.8-80 mm for straight ones,
+// whose plug sits inside the cover. Angled cables only: height of the body's cable cutout.
+HEIGHT_ABOVE_PLUG = 50;
 CABLE_CUT_H = 24.2;
 FONT = "Sansation";
 BRAND = "Attraccess";
@@ -52,10 +53,12 @@ assert(ANGLED || (CORD_OPEN_D >= 5 && CORD_OPEN_D <= (EURO ? 12 : 16)),
   str("Cable opening must be 5-", EURO ? 12 : 16, " mm."));
 assert(!ANGLED || (HEIGHT_ABOVE_PLUG >= MIN_HEIGHT_ABOVE_PLUG && HEIGHT_ABOVE_PLUG <= 40),
   str("Height above plug must be ", MIN_HEIGHT_ABOVE_PLUG, "-40 mm."));
+assert(ANGLED || (HEIGHT_ABOVE_PLUG >= STEP_HEIGHT_ABOVE_PLUG && HEIGHT_ABOVE_PLUG <= 80),
+  str("Height above plug must be ", STEP_HEIGHT_ABOVE_PLUG, "-80 mm."));
 assert(!ANGLED || (CABLE_CUT_H >= 10 && CABLE_CUT_H <= 40), "Cable cutout height must be 10-40 mm.");
 
 // Straight cables ignore the angled-only heights, and angled ones the straight opening.
-HEIGHT = ANGLED ? HEIGHT_ABOVE_PLUG : STEP_HEIGHT_ABOVE_PLUG;
+HEIGHT = HEIGHT_ABOVE_PLUG;
 CUT_H = ANGLED ? CABLE_CUT_H : STEP_CABLE_CUT_H;
 COVER_CABLE_OPEN_W = ANGLED ? ANGLED_COVER_SLOT_W : CORD_OPEN_D;
 
@@ -72,7 +75,11 @@ BODY_H = COVER_START_Z + HEIGHT;
 COVER_H = BODY_H - COVER_START_Z;
 COVER_INSERT_D = BODY_INSERT_D - 0.6;
 COVER_SKIRT_INNER_D = BODY_INSERT_D - 6;
-COVER_SKIRT_END_Z = COVER_START_Z + COVER_SKIRT_H;
+// A straight plug sticks out of the smart plug, so its cover is a hollow cap: the STEP's 5.8 mm
+// top ring over a cavity the whole plug fits in. Pulled out of the socket, the plug stays
+// trapped under the ring, because only the cable fits through the opening.
+STRAIGHT_TOP_RING_H = STEP_HEIGHT_ABOVE_PLUG - COVER_SKIRT_H;
+COVER_SKIRT_END_Z = COVER_START_Z + (ANGLED ? COVER_SKIRT_H : HEIGHT - STRAIGHT_TOP_RING_H);
 BODY_CABLE_OPEN_W = COVER_CABLE_OPEN_W + ANGLED_BODY_MOUTH_EXTRA;
 CABLE_CUT_START_Z = BODY_H - CUT_H;
 CABLE_OUTER_BLEND_Y = -sqrt(pow(BODY_OUTER_D / 2, 2) - pow(BODY_CABLE_OPEN_W / 2, 2)) - 0.2292;

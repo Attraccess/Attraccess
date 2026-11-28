@@ -52,7 +52,7 @@ describe('usePlugRender', () => {
     });
   });
 
-  it('neither re-renders nor sends hidden angled heights for a straight cable', () => {
+  it('neither re-renders nor sends a hidden angled cutout height for a straight cable', () => {
     const { rerender, result } = renderHook(({ config }: { config: PlugConfig }) => usePlugRender(config), {
       initialProps: { config: DEFAULT_PLUG_CONFIG },
     });
@@ -67,7 +67,7 @@ describe('usePlugRender', () => {
     });
     expect(result.current.status).toBe('ready');
 
-    rerender({ config: { ...DEFAULT_PLUG_CONFIG, heightAbovePlug: 30, cableCutoutHeight: 35 } });
+    rerender({ config: { ...DEFAULT_PLUG_CONFIG, cableCutoutHeight: 35 } });
     act(() => {
       vi.advanceTimersByTime(500);
     });
