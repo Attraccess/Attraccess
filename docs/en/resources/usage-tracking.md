@@ -93,28 +93,51 @@ If you have active [projects](projects/overview.md), you can link a usage sessio
 
 The project association is set when starting the session. After a session has ended, its owner can move it to another of their projects in the usage history.
 
-### Switching the project of a running session
+### Changing the project of a running session
 
 While your machine session is running, you can move it to another project without stopping the machine:
 
 1. Open the resource detail page
 2. In the running session, click **Change project**
-3. Pick another of your projects, or **No project**, and click **Change project**
-4. Fill in any [forms](forms/overview.md) required for a project switch
+3. Pick another of your projects, or **No project**
+4. Choose what the change applies to (**Whole session** is preselected), then confirm
+5. Fill in any [forms](forms/overview.md) required for your choice
 
-Everything up to the switch is booked to the old project, everything after it to the new one: minutes, machine running time, [metered consumption](flows/energy-metering.md), credits and the [project statistics](projects/overview.md#usage-statistics). The elapsed time shown for your session still counts from its original start.
+There are two choices:
 
-- **One record per project.** A switch ends the current usage record and starts a **continuation** at the same instant. The history shows them as consecutive rows; each later row is marked **Continues after a project change**. Every row has its own duration and charge. The [CSV export](resources/csv-export.md) contains the ID of the previous part (`previousUsageId`).
-- **The machine keeps running.** A switch does not run the **Usage Started**, **Usage Stopped** or **Usage Takeover** [flows](flows/node-types.md#resource-usage-project-switched), asks for no start, end or takeover forms and sends no start, stop or takeover notifications. To react to a switch, use the **Project switched** flow trigger and the **Project switch** form action. No end note is asked.
-- **Charging** follows the resource's [Charging on project switch](billing/configuration.md#charging-on-project-switch) setting. The previous part is billed at the switch.
-- **Meters** are read at the switch. If a billed meter cannot be read, or a project switch flow fails, the whole switch is refused: the session keeps running under the old project.
-- **Carried over:** the prices and billing factor saved at the start, the supervisor, the [automatic stop](#automatic-stop-and-extending-a-session) and its extensions, and on a shared machine your slot (a full machine does not block a switch).
-- **Ending and extending while a switch runs:** an **End Usage Session** node of another flow run (for example an emergency stop or an idle shutdown) is not lost. It waits for the switch, then ends the session: under the new project, or under the old one if the switch is refused. You can extend the session meanwhile, and the new stop time stays after the switch.
-- **Who can switch:** only the person whose session it is. Administrators and resource managers cannot switch somebody else's running session; they can still change ended parts as before. Doors have no sessions to switch.
-- If your installation [restricts actions to the local network](settings/security.md), switching follows the rule for starting a session on the web and in the API.
+|                              | **Whole session** (default)                                       | **Split from now**                                                                                                                                                       |
+| ---------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Use it when                  | the wrong project was chosen                                      | you start working on something else                                                                                                                                      |
+| Booked to the new project    | everything the running session has used so far, and from now on   | only the usage from now on                                                                                                                                               |
+| Usage history                | the same single row, under the new project                        | two consecutive rows; the later one is marked **Continues after a project change**                                                                                       |
+| Billing                      | unchanged: nothing is billed now, no new fee and no balance check | the part so far is billed now, as set by [Charging when a session is split between projects](billing/configuration.md#charging-when-a-session-is-split-between-projects) |
+| Meters                       | not read; their consumption stays on the session                  | read at the split                                                                                                                                                        |
+| Flow trigger and form action | **Project changed (whole session)**                               | **Project switched (split)**                                                                                                                                             |
+
+With both choices the machine keeps running, the elapsed time shown for your session still counts from its original start, and no **Usage Started**, **Usage Stopped** or **Usage Takeover** [flows](flows/node-types.md#resource-usage-project-switched) run. No start, end or takeover forms and no end note are asked, and no start, stop or takeover notifications are sent. Only the flows and forms of your choice take part. If one of them fails, or a required form is missing, the project stays as it was.
+
+#### Whole session
+
+The running usage record only gets the new project. When it ends, all its minutes, machine running time, [metered consumption](flows/energy-metering.md) and credits count in the new project's [statistics](projects/overview.md#usage-statistics), history and exports; the old project gets nothing from it. A meter that cannot be read or a low balance does not block this choice.
+
+If the session was split before, **Whole session** covers only the running record, that is, everything since the last split. The dialog says since when. Earlier parts keep their projects and bills; you can still move each of them in the usage history, like any ended session.
+
+#### Split from now
+
+Everything up to the split stays with the old project, everything after it goes to the new one: minutes, machine running time, metered consumption, credits and the project statistics.
+
+- **One record per part.** A split ends the current usage record and starts a **continuation** at the same instant. Every row has its own duration and charge. The [CSV export](resources/csv-export.md) contains the ID of the previous part (`previousUsageId`).
+- **Meters** are read at the split. If a billed meter cannot be read, the split is refused: the session keeps running under the old project.
+- **Carried over:** the prices and billing factor saved at the start, the supervisor, the [automatic stop](#automatic-stop-and-extending-a-session) and its extensions, and on a shared machine your slot (a full machine does not block a split).
 - A session counts once for the **number of uses** maintenance schedule, for supervised-use promotion and in the session counts of the resource hours report. Project statistics count each part for its project.
 
-You can also switch on a [Touch reader](attractap/using-the-reader.md#change-the-project-of-a-running-session), or through the REST API with `POST /api/resources/{resourceId}/usage/sessions/active/project` and the body `{ "projectId": 12 }` (`null` for no project; `usageId` optionally names the running session, so a session that ended meanwhile is not mistaken for its successor).
+#### Rules for both choices
+
+- **Ending and extending while a change runs:** an **End Usage Session** node of another flow run (for example an emergency stop or an idle shutdown) is not lost. It waits for the change, then ends the session: under the new project, or under the old one if the change is refused. You can extend the session meanwhile, and the new stop time stays after the change.
+- **Who can change it:** only the person whose session it is. Administrators and resource managers cannot change somebody else's running session; they can still change ended sessions as before. Doors have no sessions to change.
+- If your installation [restricts actions to the local network](settings/security.md), the change follows the rule for starting a session on the web and in the API.
+
+You can also change the project on a [Touch reader](attractap/using-the-reader.md#change-the-project-of-a-running-session), or through the [REST API](developer/api-reference.md#change-the-project-of-a-running-session) with `POST /api/resources/{resourceId}/usage/sessions/active/project` and the body `{ "mode": "whole-session", "projectId": 12 }`.
 
 ## Usage History
 

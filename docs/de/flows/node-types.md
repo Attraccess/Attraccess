@@ -44,11 +44,21 @@ Läuft bei Übernahme einer aktiven Sitzung. Keine Einstellungen. Die Payload en
 
 Typ: `input.resource.usage.project-switched` · Maschinen
 
-Läuft, wenn jemand [das Projekt der eigenen laufenden Sitzung wechselt](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln). Keine Einstellungen. Die Maschine läuft weiter: **Nutzung gestartet**, **Nutzung beendet** und **Nutzung übernommen** laufen bei einem Wechsel nicht. Ein Flow, der auch auf einen Projektwechsel reagieren soll, braucht daher diesen Trigger. Schalten Sie hier nicht den Strom ab.
+Im Editor heißt der Trigger **Projekt gewechselt (Aufteilung)**. Läuft, wenn jemand die eigene laufende Sitzung mit **Ab jetzt aufteilen** [auf Projekte aufteilt](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln). Keine Einstellungen. Die Maschine läuft weiter: **Nutzung gestartet**, **Nutzung beendet** und **Nutzung übernommen** laufen dabei nicht. Ein Flow, der auf jeden Projektwechsel reagieren soll, braucht daher diesen Trigger und **Projekt geändert (ganze Sitzung)**. Schalten Sie hier nicht den Strom ab.
 
 Die Payload enthält den Abschnitt, der endet (`id` ist seine ID), sowie `previousUsageId` (dieselbe), `newUsageId` (die Fortsetzung), `previousProjectId` und `newProjectId` (`null` ohne Projekt), `previousProject`, `newProject`, `switchTime`, `activeSessions` (vorher und nachher gleich) und `formSubmissions` mit den Antworten der [Formulare zum Projektwechsel](forms/overview.md). [**Abrechnungs Position hinzufügen**](flows/node-types.md#abrechnungsposten-setzen) ergänzt den Abschnitt, der endet.
 
 Schlägt dieser Flow fehl, wird der gesamte Wechsel abgelehnt und die Sitzung läuft unter dem alten Projekt weiter. [**Nutzungssitzung beenden**](flows/node-types.md#nutzungssitzung-beenden) mit **Die auslösende Sitzung** wird aus demselben Grund abgelehnt (es würde eine weiterlaufende Maschine stoppen); **Die Sitzung eines Benutzers** und **Alle Sitzungen** beenden die gewählten Sitzungen nach dem Wechsel, die gewechselte als ihre Fortsetzung.
+
+### Projekt geändert (ganze Sitzung)
+
+Typ: `input.resource.usage.project-reassigned` · Maschinen
+
+Läuft, wenn jemand [die ganze eigene laufende Sitzung](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln) einem anderen Projekt zuordnet. Keine Einstellungen. Der Nutzungseintrag läuft weiter; nichts wird gestartet, beendet oder abgerechnet. **Projekt gewechselt (Aufteilung)** läuft dabei nicht. Schalten Sie hier nicht den Strom ab.
+
+Die Payload enthält die laufende Sitzung (Stand vor der Änderung) sowie `usageId`, `previousProjectId` und `newProjectId` (`null` ohne Projekt), `previousProject`, `newProject`, `changeTime`, `activeSessions` (vorher und nachher gleich) und `formSubmissions` mit den Antworten der [Formulare zur Projektänderung (ganze Sitzung)](forms/overview.md). [**Abrechnungs Position hinzufügen**](flows/node-types.md#abrechnungsposten-setzen) ergänzt die laufende Sitzung.
+
+Schlägt dieser Flow fehl, wird die Änderung abgelehnt und die Sitzung behält ihr Projekt. [**Nutzungssitzung beenden**](flows/node-types.md#nutzungssitzung-beenden) mit **Die auslösende Sitzung** wird aus demselben Grund abgelehnt; **Die Sitzung eines Benutzers** und **Alle Sitzungen** beenden die gewählten Sitzungen nach der Änderung.
 
 ### Tür entriegelt
 

@@ -378,26 +378,28 @@ server that put `autoEndInSeconds` in the list.
 
 ## Project switch protocol (2.16.0)
 
-The card holder can move their own running machine session to another project without stopping the machine
+The card holder can change the project of their own running machine session without stopping the machine
 (ATT-1421): **Projekt wechseln** in the session area of the details screen opens the project picker (search, paging,
-**Kein Projekt**; the current choice is disabled), then any required project switch forms. Touch and Touch V2 readers
-(also their demo variants) announce this with `capabilities.projectSwitch: true` in their firmware info; the server
-refuses the event from readers without it.
+**Kein Projekt**; the current choice is disabled), then the choice of what the change applies to
+(`ProjectChangeModeScreen`: **Ganze Sitzung**, first and highlighted, or **Ab jetzt**; each says where the usage
+goes), then any required forms of that choice. Touch and Touch V2 readers (also their demo variants) announce this
+with `capabilities.projectSwitch: true` in their firmware info; the server refuses the event from readers without it.
 
-| Direction       | Event                    | Payload                                                                                                                                                                                                                                                                                                         |
-| --------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Reader → server | `READER_FIRMWARE_INFO`   | `capabilities.projectSwitch: true`                                                                                                                                                                                                                                                                              |
-| Server → reader | `RESOURCE_LIST`          | per machine with the card holder's running session: `canSwitchProject: true`, `ownProjectId` (int or `null`), `ownProjectName` (string or `null`); absent when there is nothing to switch to                                                                                                                    |
-| Reader → server | `SWITCH_SESSION_PROJECT` | `resourceId`, `usageId` (the running session shown), `projectId` (int, or `null` for no project), `cardSessionId`, `requestId`                                                                                                                                                                                  |
-| Server → reader | `SWITCH_SESSION_PROJECT` | `success: true` with `usageId` (the continuation) and `projectName` (or `null`), or `error` (`PROJECT_SWITCH_NOT_SUPPORTED`, `INVALID_PROJECT_ID`, `INSUFFICIENT_BALANCE`, `METER_SWITCH_FAILED`, `FLOW_EXECUTION_ERROR`, `PROJECT_SWITCH_SESSION_CHANGED`, `NoOwnActiveSessionError`, or the server's message) |
+| Direction       | Event                    | Payload                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reader → server | `READER_FIRMWARE_INFO`   | `capabilities.projectSwitch: true`                                                                                                                                                                                                                                                                                                                                                                            |
+| Server → reader | `RESOURCE_LIST`          | per machine with the card holder's running session: `canSwitchProject: true`, `ownProjectId` (int or `null`), `ownProjectName` (string or `null`), `ownSessionContinued` (the running record continues a split); absent when there is nothing to switch to                                                                                                                                                    |
+| Reader → server | `SWITCH_SESSION_PROJECT` | `resourceId`, `usageId` (the running session shown), `mode` (`whole-session` or `split`, required), `projectId` (int, or `null` for no project), `cardSessionId`, `requestId`                                                                                                                                                                                                                                 |
+| Server → reader | `SWITCH_SESSION_PROJECT` | `success: true` with `usageId` (the running record: unchanged for `whole-session`, the continuation for `split`) and `projectName` (or `null`), or `error` (`PROJECT_SWITCH_NOT_SUPPORTED`, `INVALID_PROJECT_ID`, `INVALID_PROJECT_CHANGE_MODE`, `INSUFFICIENT_BALANCE`, `METER_SWITCH_FAILED`, `FLOW_EXECUTION_ERROR`, `PROJECT_SWITCH_SESSION_CHANGED`, `NoOwnActiveSessionError`, or the server's message) |
 
-Forms required for the project switch action go through the same `RESOURCE_USAGE_FORM_REQUEST` exchange as a start
-(action `project-switch`). After a refusal the server resends the resource's row; after a switch, made on the reader or
-elsewhere, the whole list. A switch does not run start, stop or takeover flows, so the machine keeps running and the
-reader shows the original start time.
+Required forms of the chosen mode go through the same `RESOURCE_USAGE_FORM_REQUEST` exchange as a start (action
+`project-reassign` for `whole-session`, `project-switch` for `split`). After a refusal the server resends the
+resource's row; after a change, made on the reader or elsewhere, the whole list. The picker, the choice and the forms
+close when their session ends, is split or is moved to another project elsewhere. Neither choice runs start, stop or
+takeover flows, so the machine keeps running and the reader shows the original start time.
 
 Compatibility: an older reader never announces the capability and gets none of the list fields; an older server sends
-none of them, so the reader offers no switch.
+none of them, so the reader offers no switch. `mode` has no default; the payload without it was never released.
 
 ## Bluetooth setup (2.11.0)
 

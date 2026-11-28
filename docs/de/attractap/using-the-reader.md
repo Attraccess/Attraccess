@@ -48,15 +48,21 @@ An einem Touch-Leser mit aktueller Firmware (Fähigkeit **projectSwitch**) zeige
 
 1. Öffnen Sie über den Namen der Maschine deren Details und tippen Sie auf **Projekt wechseln**
 2. Wählen Sie ein Projekt aus der Liste (sie lässt sich durchsuchen und blättern), oder tippen Sie neben der Überschrift auf **Kein Projekt**. Die aktuelle Auswahl ist nicht wählbar.
-3. Füllen Sie die für einen Projektwechsel erforderlichen Formulare aus
-4. Der Leser bestätigt mit **Projekt gewechselt** und dem neuen Projekt
+3. Wählen Sie, worauf sich der Wechsel bezieht. Jede Schaltfläche sagt, wohin Ihre Nutzung geht:
+   - **Ganze Sitzung**, zuerst aufgeführt und hervorgehoben: Alles, was in der Sitzung bisher genutzt wurde, und alles ab jetzt geht an das neue Projekt. Wurde die Sitzung zuvor aufgeteilt, gilt das nur für die Zeit seit der letzten Aufteilung.
+   - **Ab jetzt**: Die Zeit bisher bleibt beim aktuellen Projekt und wird jetzt abgerechnet; die Sitzung läuft unter dem neuen weiter.
 
-Die Maschine läuft weiter, und die angezeigte Startzeit bleibt die Ihrer Sitzung. Endet Ihre Sitzung oder wird ihr Projekt anderswo geändert, während die Projektliste oder ein Wechselformular geöffnet ist, schließt der Leser diese und zeigt den aktuellen Stand.
+   **Abbrechen** ändert nichts.
+
+4. Füllen Sie die für Ihre Wahl erforderlichen Formulare aus
+5. Der Leser bestätigt mit **Projekt gewechselt** und dem neuen Projekt
+
+Die Maschine läuft weiter, und die angezeigte Startzeit bleibt die Ihrer Sitzung. Endet Ihre Sitzung oder wird ihr Projekt anderswo geändert, während die Projektliste, die Auswahl oder ein Formular geöffnet ist, schließt der Leser diese und zeigt den aktuellen Stand.
 
 Wird der Wechsel abgelehnt, behält die Sitzung ihr Projekt:
 
-- Ein Zähler ist nicht lesbar: Die Schaltfläche zeigt **⚠ Zähler nicht lesbar. Projekt unverändert.**
-- Das Guthaben reicht nicht für eine neue Sitzung, wenn die Ressource [den Wechsel wie eine solche abrechnet](billing/configuration.md#abrechnung-beim-projektwechsel): Der Leser meldet [zu geringes Guthaben](#ergebnisse-meldungen-und-niedriges-guthaben)
+- Nur **Ab jetzt**: Ein Zähler ist nicht lesbar. Die Schaltfläche zeigt **⚠ Zähler nicht lesbar. Projekt unverändert.**
+- Nur **Ab jetzt**: Das Guthaben reicht nicht für eine neue Sitzung, wenn die Ressource [eine Aufteilung wie eine solche abrechnet](billing/configuration.md#abrechnung-beim-aufteilen-einer-sitzung-auf-projekte). Der Leser meldet [zu geringes Guthaben](#ergebnisse-meldungen-und-niedriges-guthaben)
 - Ihre Sitzung wurde genau während Ihrer Auswahl beendet: Ein Warnbildschirm mit der Überschrift **Projekt nicht gewechselt** meldet **Ihre Sitzung läuft nicht mehr.** Tippen Sie auf **OK** oder warten Sie.
 - Andere Ablehnungen, etwa ein fehlgeschlagener Ablauf, nennen keinen genauen Grund: Die Schaltfläche zeigt **⚠ Fehlgeschlagen – erneut tippen**
 

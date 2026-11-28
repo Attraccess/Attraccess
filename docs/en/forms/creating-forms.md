@@ -12,11 +12,11 @@ All forms are managed under **Devices** → **Forms** in the sidebar (`/forms`).
 2. Click **New form**
 3. Fill in the form settings:
 
-| Setting                                  | Required | Description                                                                                                                  |
-| ---------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| **Form name**                            | Yes      | A descriptive name for the form (e.g. "Material Usage")                                                                      |
-| **Defaults: when this form is required** | No       | Switches for session start, takeover, session end and project switch. A resource can override these defaults.                |
-| **Scope**                                | Yes      | Where the form applies: **Resource** (pick the resource), **Group** (pick the resource group) or **Global** (every resource) |
+| Setting                                  | Required | Description                                                                                                                                           |
+| ---------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Form name**                            | Yes      | A descriptive name for the form (e.g. "Material Usage")                                                                                               |
+| **Defaults: when this form is required** | No       | Switches for session start, takeover, session end, project switch (split) and project change (whole session). A resource can override these defaults. |
+| **Scope**                                | Yes      | Where the form applies: **Resource** (pick the resource), **Group** (pick the resource group) or **Global** (every resource)                          |
 
 4. Add at least one field (see below)
 5. Click **Save form**

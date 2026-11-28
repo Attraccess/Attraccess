@@ -48,21 +48,27 @@ On a Touch reader with current firmware (the capability **projectSwitch**), the 
 
 1. Tap the machine's name to open its details, then tap **Projekt wechseln**
 2. Pick a project from the list (it can be searched and paged), or tap **Kein Projekt** (No project) next to the title. The current choice cannot be picked.
-3. Complete any form required for a project switch
-4. The reader confirms with **Projekt gewechselt** (Project changed) and the new project
+3. Choose what the change applies to. Each button says where your usage goes:
+   - **Ganze Sitzung** (Whole session), listed first and highlighted: everything used in the session so far, and from now on, goes to the new project. If the session was split before, this covers only the time since the last split.
+   - **Ab jetzt** (From now on): the time so far stays on the current project and is billed now; the session continues under the new one.
 
-The machine keeps running, and the start time shown stays that of your session. If your session ends or its project changes elsewhere while the project list or a switch form is open, the reader closes it and shows the current status.
+   **Abbrechen** (Cancel) changes nothing.
 
-If the switch is refused, the session keeps its project:
+4. Complete any form required for your choice
+5. The reader confirms with **Projekt gewechselt** (Project changed) and the new project
 
-- A meter cannot be read: the button shows **⚠ Zähler nicht lesbar. Projekt unverändert.** (Meter not readable. Project unchanged.)
-- The balance does not cover a new session where the resource [charges the switch like one](billing/configuration.md#charging-on-project-switch): the reader reports [insufficient balance](#results-messages-and-low-balance)
+The machine keeps running, and the start time shown stays that of your session. If your session ends or its project changes elsewhere while the project list, the choice or a form is open, the reader closes it and shows the current status.
+
+If the change is refused, the session keeps its project:
+
+- **Ab jetzt** only: a meter cannot be read. The button shows **⚠ Zähler nicht lesbar. Projekt unverändert.** (Meter not readable. Project unchanged.)
+- **Ab jetzt** only: the balance does not cover a new session where the resource [charges a split like one](billing/configuration.md#charging-when-a-session-is-split-between-projects). The reader reports [insufficient balance](#results-messages-and-low-balance)
 - Your session ended just as you made your choice: a warning screen titled **Projekt nicht gewechselt** (Project not changed) says **Ihre Sitzung läuft nicht mehr.** (Your session is no longer running.) Tap **OK** or wait.
 - Other refusals, such as a failed flow, show no specific reason: the button shows **⚠ Fehlgeschlagen – erneut tippen** (⚠ Failed – tap to retry)
 
 If **Projekt wechseln** is already gone when the reloaded status appears, for example because the session ended meanwhile, any other reason a button would show moves to the [**Etwas ist schiefgelaufen** (Something went wrong) screen](#results-messages-and-low-balance).
 
-Older firmware, Attractap Lite, the BLE Bridge and plugin readers do not offer this. See [Switching the project of a running session](resources/usage-tracking.md#switching-the-project-of-a-running-session).
+Older firmware, Attractap Lite, the BLE Bridge and plugin readers do not offer this. See [Changing the project of a running session](resources/usage-tracking.md#changing-the-project-of-a-running-session).
 
 ### Results, messages and low balance
 
