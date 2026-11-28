@@ -1,4 +1,4 @@
-import { ResourceFormAction } from '@attraccess/application-models';
+import { ProjectChangeMode, ResourceFormAction } from '@attraccess/application-models';
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { InsufficientBalanceError } from '../../../../billing/errors/insufficient-balance.error';
 import { MachineBusyError } from '../../../../resources/usage/errors/machine-busy.error';
@@ -36,7 +36,15 @@ describe('AttractapProjectSwitchHandler', () => {
     } as unknown as AuthenticatedWebSocket;
     const request = (payload: Record<string, unknown> = {}) =>
       handler.handleSwitchSessionProject(socket, {
-        payload: { resourceId: 10, usageId: 11, projectId: 7, requestId: 3, cardSessionId: 'card', ...payload },
+        payload: {
+          resourceId: 10,
+          usageId: 11,
+          projectId: 7,
+          mode: ProjectChangeMode.SPLIT,
+          requestId: 3,
+          cardSessionId: 'card',
+          ...payload,
+        },
       } as never);
     const replies = () =>
       (socket.sendMessage as jest.Mock).mock.calls.map((call) => ({
@@ -72,7 +80,7 @@ describe('AttractapProjectSwitchHandler', () => {
     expect(services.resourceUsageService.switchSessionProject).toHaveBeenCalledWith(
       10,
       user,
-      { projectId: 7, usageId: 11, formSubmissions: forms },
+      { mode: ProjectChangeMode.SPLIT, projectId: 7, usageId: 11, formSubmissions: forms },
       { auditOrigin: { id: 5, authenticationMethod: null } },
     );
     expect(services.formsHandler.clearFormDraft).toHaveBeenCalledWith(
@@ -83,6 +91,31 @@ describe('AttractapProjectSwitchHandler', () => {
     expect(replies()).toEqual([
       expect.objectContaining({ success: true, usageId: 12, projectName: 'Rocket', requestId: 3 }),
     ]);
+  });
+
+  it('moves the whole session with the forms of that choice only', async () => {
+    const { services, request } = setUp();
+
+    await request({ mode: ProjectChangeMode.WHOLE_SESSION });
+
+    const action = ResourceFormAction.PROJECT_REASSIGN;
+    expect(services.formsHandler.ensureFormsSatisfied).toHaveBeenCalledTimes(1);
+    expect(services.formsHandler.ensureFormsSatisfied).toHaveBeenCalledWith(expect.objectContaining({ action }));
+    expect(services.resourceUsageService.switchSessionProject.mock.calls[0][2]).toMatchObject({
+      mode: ProjectChangeMode.WHOLE_SESSION,
+      projectId: 7,
+    });
+    expect(services.formsHandler.clearFormDraft).toHaveBeenCalledWith(expect.anything(), 10, action);
+  });
+
+  it.each([[undefined], [null], ['whole'], ['toString']])('refuses the mode %p', async (mode) => {
+    const { services, request, replies } = setUp();
+
+    await request({ mode });
+
+    expect(replies()[0]).toMatchObject({ error: 'INVALID_PROJECT_CHANGE_MODE' });
+    expect(services.formsHandler.ensureFormsSatisfied).not.toHaveBeenCalled();
+    expect(services.resourceUsageService.switchSessionProject).not.toHaveBeenCalled();
   });
 
   it('leaves the answer to the resource-action guard when it refuses the resource', async () => {
@@ -152,6 +185,7 @@ describe('AttractapProjectSwitchHandler', () => {
     await request();
 
     expect(services.resourceUsageService.assertSessionProjectSwitchable).toHaveBeenCalledWith(10, user, {
+      mode: ProjectChangeMode.SPLIT,
       projectId: 7,
       usageId: 11,
     });

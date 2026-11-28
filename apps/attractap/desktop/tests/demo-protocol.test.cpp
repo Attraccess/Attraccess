@@ -182,12 +182,13 @@ int main(int argc, char **argv)
     startPrinter(); // already has one
     assert(startError() == "AlreadyHasActiveSessionError");
     assert(printer()["activeSessionCount"] == 1);
-    // ATT-1421: the running session moves to another project and back to none, as a new usage record.
-    const auto switchProject = [&](uint32_t usageId, const char *projectId) {
+    // ATT-1421: the running session is split between projects: it continues as a new usage record.
+    const auto changeProject = [&](const char *mode, uint32_t usageId, const char *projectId) {
         switchReply.clear();
         exchange((R"({"data":{"type":"SWITCH_SESSION_PROJECT","payload":{"resourceId":2,"requestId":9,"usageId":)" +
-                  std::to_string(usageId) + ",\"projectId\":" + projectId + "}}}").c_str());
+                  std::to_string(usageId) + ",\"projectId\":" + projectId + ",\"mode\":" + mode + "}}}").c_str());
     };
+    const auto switchProject = [&](uint32_t usageId, const char *projectId) { changeProject("\"split\"", usageId, projectId); };
     assert(printer()["canSwitchProject"] == true && printer()["ownProjectId"] == 0 && printer()["ownProjectName"].isNull());
     const auto unbookedId = printer()["ownUsageSession"]["id"].as<uint32_t>();
     const std::string startedAt = printer()["ownUsageSession"]["startTime"].as<std::string>();
@@ -205,6 +206,17 @@ int main(int argc, char **argv)
     switchProject(printer()["ownUsageSession"]["id"].as<uint32_t>(), "null");
     assert(switchReply["data"]["payload"]["success"] == true && switchReply["data"]["payload"]["projectName"].isNull());
     assert(printer()["ownProjectId"] == 0 && printer()["activeSessionCount"] == 1);
+    assert(printer()["ownSessionContinued"] == true);
+    // Moving the whole session keeps its record; a request without a known mode changes nothing.
+    const auto runningId = printer()["ownUsageSession"]["id"].as<uint32_t>();
+    changeProject("\"whole-session\"", runningId, "2");
+    assert(switchReply["data"]["payload"]["success"] == true && switchReply["data"]["payload"]["usageId"] == runningId);
+    assert(printer()["ownProjectId"] == 2 && printer()["ownUsageSession"]["id"].as<uint32_t>() == runningId);
+    for (const char *mode : {"\"whole\"", "null"}) {
+        changeProject(mode, runningId, "1");
+        assert(switchReply["data"]["payload"]["error"] == "INVALID_PROJECT_CHANGE_MODE");
+        assert(printer()["ownProjectId"] == 2);
+    }
     const auto annId = printer()["ownUsageSession"]["id"].as<uint32_t>();
     tap("B2B2B2B2"); startPrinter();
     assert(printer()["activeSessionCount"] == 2 && printer()["canStart"] == false);

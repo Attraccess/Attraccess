@@ -35,6 +35,7 @@ interface ReaderSessionSource {
   sessionStartTime?: Date | null;
   projectId?: number | null;
   project?: { name: string } | null;
+  previousUsageId?: number | null;
   autoEndAt?: Date | null;
   maxAutoEndAt?: Date | null;
   /** Always loaded for the active sessions the reader lists. */
@@ -116,7 +117,13 @@ async function projectSwitchOffer(
 ) {
   const projectId = own.projectId ?? null;
   if (projectId === null && !(await context.projectsService.getTotalCount(userId, { search: '' }))) return {};
-  return { canSwitchProject: true, ownProjectId: projectId, ownProjectName: own.project?.name ?? null };
+  return {
+    canSwitchProject: true,
+    ownProjectId: projectId,
+    ownProjectName: own.project?.name ?? null,
+    // The running record continues a split: moving it as a whole leaves the earlier parts where they are.
+    ownSessionContinued: own.previousUsageId != null,
+  };
 }
 
 /**

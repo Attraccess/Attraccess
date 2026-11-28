@@ -90,14 +90,15 @@ void API::extendResourceUsageSession(uint32_t resourceId, uint32_t usageId, uint
     this->sendResourceAction("EXTEND_RESOURCE_USAGE_SESSION", payload);
 }
 
-void API::switchSessionProject(uint32_t resourceId, uint32_t usageId, uint32_t projectId)
+void API::switchSessionProject(uint32_t resourceId, uint32_t usageId, uint32_t projectId, ProjectChangeMode mode)
 {
     this->logger.info("Switching the project of the running session");
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["resourceId"] = resourceId;
     if (usageId != 0) payload["usageId"] = usageId;
-    // Null books the rest of the session to no project.
+    payload["mode"] = mode == ProjectChangeMode::SPLIT ? "split" : "whole-session";
+    // Null books the session, or the rest of it, to no project.
     if (projectId != 0) payload["projectId"] = projectId;
     else payload["projectId"] = nullptr;
     CardSessionIdBuf cardSession;
@@ -365,6 +366,7 @@ void API::onResourceList(JsonObject data)
         dst.ownProjectId = dst.canSwitchProject ? (resource["ownProjectId"] | 0u) : 0u;
         const char *ownProjectName = dst.canSwitchProject ? resource["ownProjectName"].as<const char *>() : nullptr;
         dst.ownProjectName = ownProjectName ? ownProjectName : "";
+        dst.ownSessionContinued = dst.canSwitchProject && (resource["ownSessionContinued"] | false);
         dst.activeSessions.clear();
         for (JsonObject session : resource["activeUsageSessions"].as<JsonArray>())
         {

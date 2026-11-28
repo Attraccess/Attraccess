@@ -1,4 +1,4 @@
-import { ResourceFormAction } from '@attraccess/application-models';
+import { ProjectChangeMode, ResourceFormAction } from '@attraccess/application-models';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InsufficientBalanceError } from '../../../../billing/errors/insufficient-balance.error';
 import { NoSessionToSwitchError } from '../../../../resources/usage/errors/no-session-to-switch.error';
@@ -17,7 +17,13 @@ import { CardSessionService } from '../ui/card-session.service';
  */
 const CODED_REFUSAL = /^(METER_SWITCH_FAILED|FLOW_EXECUTION_ERROR)\b/;
 
-/** `capabilities.projectSwitch` readers: the card holder moves their running session to another project. */
+/** The forms each way of changing the project asks for. */
+const FORM_ACTION: Record<ProjectChangeMode, ResourceFormAction> = {
+  [ProjectChangeMode.WHOLE_SESSION]: ResourceFormAction.PROJECT_REASSIGN,
+  [ProjectChangeMode.SPLIT]: ResourceFormAction.PROJECT_SWITCH,
+};
+
+/** `capabilities.projectSwitch` readers: the card holder changes the project of their running session. */
 @Injectable()
 export class AttractapProjectSwitchHandler {
   private readonly logger = new Logger(AttractapProjectSwitchHandler.name);
@@ -46,11 +52,13 @@ export class AttractapProjectSwitchHandler {
   public async handleSwitchSessionProject(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
     const userId = socket.state.verifiedUserId;
-    const { resourceId, usageId, projectId, cardSessionId } = (data.payload ?? {}) as {
+    const { resourceId, usageId, projectId, mode, cardSessionId } = (data.payload ?? {}) as {
       resourceId: number;
+      /** Whether the whole session moves, or only what is used from now on. */
+      mode: ProjectChangeMode;
       /** The running session shown on the reader. */
       usageId?: number;
-      /** Null books the rest of the session to no project. */
+      /** Null books the session, or the rest of it, to no project. */
       projectId: number | null;
       cardSessionId?: string;
     };
@@ -77,13 +85,18 @@ export class AttractapProjectSwitchHandler {
       return;
     }
 
+    if (!Object.values(ProjectChangeMode).includes(mode)) {
+      await reply({ error: 'INVALID_PROJECT_CHANGE_MODE' });
+      return;
+    }
+
     const user = userId == null ? null : await this.usersService.findOne({ id: userId });
     if (!user) {
       await reply({ error: 'USER_NOT_FOUND' });
       return;
     }
 
-    const target = { projectId, ...(Number.isInteger(usageId) ? { usageId } : {}) };
+    const target = { projectId, mode, ...(Number.isInteger(usageId) ? { usageId } : {}) };
     const refuse = async (error: unknown) => {
       await this.replyRefusal(resourceId, user.id, reply, error);
       // The refreshed row shows what still runs, and under which project.
@@ -97,7 +110,7 @@ export class AttractapProjectSwitchHandler {
       return;
     }
 
-    const action = ResourceFormAction.PROJECT_SWITCH;
+    const action = FORM_ACTION[mode];
     const formSubmissions = await this.formsHandler.ensureFormsSatisfied({
       socket,
       resourceId,

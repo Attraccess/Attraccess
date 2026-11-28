@@ -17,6 +17,15 @@ inline constexpr Entry projectSwitchCatalog[] = {
     {Message::ProjectNotChanged, "Projekt nicht gewechselt", "Project not changed"},
     // A switch refused because the card holder's session ended meanwhile.
     {Message::ErrorSwitchSessionGone, "Ihre Sitzung läuft nicht mehr.", "Your session is no longer running."},
+    // The choice of what a project change applies to, and under each choice where the usage goes. {0}: a project.
+    {Message::WholeSession, "Ganze Sitzung", "Whole session"},
+    {Message::FromNowOn, "Ab jetzt", "From now on"},
+    {Message::EverythingGoesTo, "Alles bisher geht an {0}", "Everything so far goes to {0}"},
+    {Message::EverythingGoesToNoProject, "Alles bisher bleibt ohne Projekt", "Everything so far goes to no project"},
+    {Message::SinceLastChangeGoesTo, "Alles seit dem letzten Wechsel geht an {0}", "All since the last change goes to {0}"},
+    {Message::SinceLastChangeGoesToNoProject, "Alles seit dem letzten Wechsel ohne Projekt", "All since the last change goes to no project"},
+    {Message::TimeSoFarStaysOn, "Zeit bisher bleibt bei {0}", "Time so far stays on {0}"},
+    {Message::TimeSoFarStaysWithoutProject, "Zeit bisher bleibt ohne Projekt", "Time so far stays without a project"},
 };
 static_assert(sizeof(catalog) / sizeof(Entry) + sizeof(cardRelayCatalog) / sizeof(Entry) +
                       sizeof(networkStatusCatalog) / sizeof(Entry) + sizeof(sessionUsersCatalog) / sizeof(Entry) +

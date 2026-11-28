@@ -5,6 +5,7 @@ import { AttractapGateway } from './websocket.gateway';
 import { ReaderDeletedEvent, ReaderTimeZoneChangedEvent, ReaderUpdatedEvent } from '../events';
 import {
   ResourceSessionStartedEvent,
+  ResourceUsageProjectReassignedEvent,
   ResourceUsageProjectSwitchedEvent,
   ResourceUsageSessionExtendedEvent,
   ResourceUsageSessionEndedEvent,
@@ -72,6 +73,12 @@ export class WebSocketEventService {
   /** The running session has a new id and project. */
   @OnEvent(ResourceUsageProjectSwitchedEvent.EVENT_NAME)
   public async onResourceUsageProjectSwitched(event: ResourceUsageProjectSwitchedEvent) {
+    this.attractapGateway.sendResourceListToReadersWithResources([event.resourceId]);
+  }
+
+  /** The running session shows another project. */
+  @OnEvent(ResourceUsageProjectReassignedEvent.EVENT_NAME)
+  public async onResourceUsageProjectReassigned(event: ResourceUsageProjectReassignedEvent) {
     this.attractapGateway.sendResourceListToReadersWithResources([event.resourceId]);
   }
 

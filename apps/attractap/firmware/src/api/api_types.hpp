@@ -53,6 +53,13 @@ struct ActiveSession
         char displayName[MAX_DISPLAY_NAME_LEN] = {};
     };
 
+// What changing the project of a running session applies to: the whole session, or only the time from now on.
+enum class ProjectChangeMode : uint8_t
+{
+    WHOLE_SESSION,
+    SPLIT,
+};
+
 struct ResourceBrief
     {
         uint32_t id;
@@ -100,6 +107,8 @@ struct ResourceBrief
         bool canSwitchProject = false;
         uint32_t ownProjectId = 0;
         std::string ownProjectName;
+        // The running record continues an earlier split, so moving it leaves the earlier parts where they are.
+        bool ownSessionContinued = false;
         // Every active session (bounded) so managers can end a chosen one.
         std::vector<ActiveSession> activeSessions;
         // Parallel UI: a limit lowered to 1 while several sessions run still lists them so each can be stopped.
@@ -199,6 +208,7 @@ enum class ResourceUsageFormActionType : uint8_t
         END,
         TAKEOVER,
         PROJECT_SWITCH,
+        PROJECT_REASSIGN,
     };
 
 enum class ResourceUsageFormFieldType : uint8_t

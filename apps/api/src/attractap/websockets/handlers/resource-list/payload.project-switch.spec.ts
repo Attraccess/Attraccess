@@ -33,6 +33,15 @@ describe('resource list payload: project switch', () => {
     expect(row).toMatchObject({ canSwitchProject: true, ownProjectId: 7, ownProjectName: 'Rocket' });
   });
 
+  it.each([
+    [null, false],
+    [98, true],
+  ])('says whether the running record continues a split (previous record %p)', async (previousUsageId, continued) => {
+    const row = await ownRow({ projectSwitch: true }, { projectId: 7, previousUsageId });
+
+    expect(row.ownSessionContinued).toBe(continued);
+  });
+
   it('never offers it to a reader that did not announce the capability', async () => {
     const row = await ownRow({}, { projectId: 7, project: { name: 'Rocket' } });
 

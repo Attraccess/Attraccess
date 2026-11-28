@@ -39,6 +39,11 @@ bool pendingActionIsTakeover = false;
 // The project picker is open to switch this running session (0: the picker chooses the project of a start).
 uint32_t projectSwitchUsageId = 0;
 uint32_t projectSwitchResourceId = 0;
+// The project it was booked to when the picker opened, and the picked one while the choice screen is open.
+uint32_t projectSwitchFromProjectId = 0;
+uint32_t projectSwitchToProjectId = 0;
+// What the change being sent applies to.
+API::ProjectChangeMode pendingProjectChangeMode = API::ProjectChangeMode::WHOLE_SESSION;
 #endif
 
 #if defined(HAS_LVGL_DISPLAY)

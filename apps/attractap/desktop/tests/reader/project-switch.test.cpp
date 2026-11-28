@@ -15,6 +15,7 @@ void ReaderWorkflow::testProjectSwitch()
         uint32_t usageId = 9;
         bool timed = false; // an automatic end adds "Extend" above the project
         bool running = true; // false: the session has ended
+        bool continued = false; // the record continues an earlier split
     };
     const auto runningList = [&](const Running &running) {
         JsonDocument doc;
@@ -49,6 +50,7 @@ void ReaderWorkflow::testProjectSwitch()
             r["ownProjectId"] = running.projectId;
             if (running.projectName) r["ownProjectName"] = running.projectName;
             else r["ownProjectName"] = nullptr;
+            r["ownSessionContinued"] = running.continued;
         }
         push();
     };
@@ -71,6 +73,12 @@ void ReaderWorkflow::testProjectSwitch()
         assert(lv_screen_active() == Display::projectSelectScreen.getScreen());
         projects();
         assert(label(lv_screen_active(), "Kein Projekt"));
+    };
+    // After the project, the card holder says what the change applies to.
+    const auto pick = [&](const char *project, const char *scope = "Ab jetzt") {
+        click(project);
+        assert(label(lv_screen_active(), "Ganze Sitzung") && label(lv_screen_active(), "Ab jetzt"));
+        click(scope);
     };
     const auto disabled = [](const char *caption) {
         return lv_obj_has_state(buttonOf(lv_screen_active(), caption), LV_STATE_DISABLED);
@@ -100,15 +108,90 @@ void ReaderWorkflow::testProjectSwitch()
     assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
     assert(server.count("SWITCH_SESSION_PROJECT") == sent);
 
-    // Another project: the request names the running session; the confirmation names the new project.
+    // The choice follows the picker: the whole session comes first, and each choice says where the usage goes.
+    // Cancelling it sends nothing.
     openPicker();
     click("Zweitprojekt");
+    assert(server.count("SWITCH_SESSION_PROJECT") == sent);
+    assert(label(lv_screen_active(), "Alles bisher geht an Zweitprojekt"));
+    assert(label(lv_screen_active(), "Zeit bisher bleibt bei Werkstattprojekt"));
+    assert(areaOf(buttonOf(lv_screen_active(), "Ganze Sitzung")).y1 < areaOf(buttonOf(lv_screen_active(), "Ab jetzt")).y1);
+    display.capture(output, "project-switch-09-choice");
+    click("Abbrechen");
+    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+    assert(server.count("SWITCH_SESSION_PROJECT") == sent);
+
+    // For a session that was split before, the whole session only reaches back to that split; "no project" has its
+    // own wording on both sides.
+    {
+        Running continued;
+        continued.continued = true;
+        runningList(continued);
+        openPicker();
+        click("Kein Projekt");
+        assert(label(lv_screen_active(), "Alles seit dem letzten Wechsel ohne Projekt"));
+        display.capture(output, "project-switch-10-choice-continuation");
+        click("Abbrechen");
+        openPicker();
+        click("Zweitprojekt");
+        assert(label(lv_screen_active(), "Alles seit dem letzten Wechsel geht an Zweitprojekt"));
+        click("Abbrechen");
+        runningList({true, 0, nullptr});
+        openPicker();
+        click("Zweitprojekt");
+        assert(label(lv_screen_active(), "Zeit bisher bleibt ohne Projekt"));
+        click("Abbrechen");
+        runningList({});
+    }
+
+    // The whole session: the same record moves, the required forms are those of this choice.
+    openPicker();
+    pick("Zweitprojekt", "Ganze Sitzung");
     assert(server.count("SWITCH_SESSION_PROJECT") == sent + 1);
+    {
+        const auto request = server.last("SWITCH_SESSION_PROJECT");
+        assert(std::string(request["data"]["payload"]["mode"].as<const char *>()) == "whole-session");
+        assert(request["data"]["payload"]["projectId"].as<int>() == 43 && request["data"]["payload"]["usageId"].as<int>() == 9);
+    }
+    server.push("RESOURCE_USAGE_FORM_REQUEST",
+                "{\"requestId\":" + std::to_string(requestIdOf("SWITCH_SESSION_PROJECT")) +
+                    R"(,"resourceId":1,"action":"project-reassign","forms":[{"id":7,"name":"Projektkorrektur","fieldCount":1}]})");
+    pump();
+    assert(lv_screen_active() == Display::formsScreen.getScreen());
+    {
+        const auto fields = server.last("RESOURCE_USAGE_FORM_GET_FIELDS");
+        assert(std::string(fields["data"]["payload"]["action"].as<const char *>()) == "project-reassign");
+    }
+    server.push("RESOURCE_USAGE_FORM_FIELDS", R"({"resourceId":1,"action":"project-reassign","formId":7,"offset":0,"totalFieldCount":1,"fields":[{"id":6,"name":"Grund","type":"text","isRequired":true,"value":"Vertippt"}]})");
+    pump();
+    assert(label(lv_screen_active(), "Bitte vor dem Wechsel ausfüllen"));
+    click("Absenden");
+    server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", R"({"resourceId":1,"action":"project-reassign","formId":7,"offset":0,"valid":true,"errors":[]})");
+    pump();
+    assert(server.count("SWITCH_SESSION_PROJECT") == sent + 2);
+    {
+        const auto request = server.last("SWITCH_SESSION_PROJECT");
+        assert(std::string(request["data"]["payload"]["mode"].as<const char *>()) == "whole-session");
+        assert(request["data"]["payload"]["projectId"].as<int>() == 43 && request["data"]["payload"]["usageId"].as<int>() == 9);
+    }
+    reply(R"("success":true,"usageId":9,"projectName":"Zweitprojekt")");
+    runningList({true, 43, "Zweitprojekt"});
+    assert(label(lv_screen_active(), "Projekt gewechselt") && label(lv_screen_active(), "Zweitprojekt"));
+    clearStatus();
+    runningList({});
+    // The journeys below count from here.
+    const auto splitsFrom = server.count("SWITCH_SESSION_PROJECT");
+
+    // Another project: the request names the running session; the confirmation names the new project.
+    openPicker();
+    pick("Zweitprojekt");
+    assert(server.count("SWITCH_SESSION_PROJECT") == splitsFrom + 1);
     {
         const auto request = server.last("SWITCH_SESSION_PROJECT");
         const auto payload = request["data"]["payload"];
         assert(payload["resourceId"].as<int>() == 1 && payload["usageId"].as<int>() == 9);
         assert(payload["projectId"].as<int>() == 43);
+        assert(std::string(payload["mode"].as<const char *>()) == "split");
     }
     reply(R"("success":true,"usageId":10,"projectName":"Zweitprojekt")");
     runningList({true, 43, "Zweitprojekt"});
@@ -119,8 +202,8 @@ void ReaderWorkflow::testProjectSwitch()
 
     // No project: the request carries an explicit null.
     openPicker();
-    click("Kein Projekt");
-    assert(server.count("SWITCH_SESSION_PROJECT") == sent + 2);
+    pick("Kein Projekt");
+    assert(server.count("SWITCH_SESSION_PROJECT") == splitsFrom + 2);
     {
         const auto request = server.last("SWITCH_SESSION_PROJECT");
         const auto payload = request["data"]["payload"].as<JsonObjectConst>();
@@ -138,8 +221,8 @@ void ReaderWorkflow::testProjectSwitch()
     assert(disabled("Kein Projekt") && !disabled("Werkstattprojekt"));
 
     // Required forms: shown with the reader's usage form flow, then the same switch is sent again.
-    click("Werkstattprojekt");
-    assert(server.count("SWITCH_SESSION_PROJECT") == sent + 3);
+    pick("Werkstattprojekt");
+    assert(server.count("SWITCH_SESSION_PROJECT") == splitsFrom + 3);
     const auto formRequestId = server.last("SWITCH_SESSION_PROJECT")["data"]["payload"]["requestId"].as<uint32_t>();
     server.push("RESOURCE_USAGE_FORM_REQUEST",
                 "{\"requestId\":" + std::to_string(formRequestId) +
@@ -157,7 +240,7 @@ void ReaderWorkflow::testProjectSwitch()
     click("Absenden");
     server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", R"({"resourceId":1,"action":"project-switch","formId":8,"offset":0,"valid":true,"errors":[]})");
     pump();
-    assert(server.count("SWITCH_SESSION_PROJECT") == sent + 4);
+    assert(server.count("SWITCH_SESSION_PROJECT") == splitsFrom + 4);
     {
         const auto request = server.last("SWITCH_SESSION_PROJECT");
         assert(request["data"]["payload"]["projectId"].as<int>() == 42 && request["data"]["payload"]["usageId"].as<int>() == 9);
@@ -168,7 +251,7 @@ void ReaderWorkflow::testProjectSwitch()
 
     // A refused switch says why on the button; the session keeps its project.
     openPicker();
-    click("Zweitprojekt");
+    pick("Zweitprojekt");
     reply(R"("error":"METER_SWITCH_FAILED")");
     runningList({});
     pump();
@@ -180,7 +263,7 @@ void ReaderWorkflow::testProjectSwitch()
 
     // A resource that charges a switch like a new session can refuse it for the balance.
     openPicker();
-    click("Zweitprojekt");
+    pick("Zweitprojekt");
     reply(R"("error":"INSUFFICIENT_BALANCE","sumUpEnabled":false)");
     runningList({});
     assert(label(lv_screen_active(), "Unzureichendes Guthaben"));
@@ -307,10 +390,23 @@ void ReaderWorkflow::testProjectSwitch()
     assert(onDetails() && label(lv_screen_active(), "Projekt: Zweitprojekt"));
     assert(server.count("SWITCH_SESSION_PROJECT") == switchesBefore);
 
+    // The choice closes like the picker, also when its session was moved as a whole elsewhere: it would name the
+    // project the session is no longer booked to.
+    for (const Running &changed : {Running{false}, Running{true, 43, "Zweitprojekt", 20}, Running{true, 43, "Zweitprojekt", 9}}) {
+        runningList({});
+        openPicker();
+        click("Zweitprojekt");
+        runningList({});
+        assert(label(lv_screen_active(), "Ganze Sitzung"));
+        runningList(changed);
+        assert(onDetails());
+    }
+    assert(server.count("SWITCH_SESSION_PROJECT") == switchesBefore);
+
     // So do the usage forms of a switch: the draft is cancelled and the switch is not sent again.
     runningList({});
     openPicker();
-    click("Zweitprojekt");
+    pick("Zweitprojekt");
     server.push("RESOURCE_USAGE_FORM_REQUEST",
                 "{\"requestId\":" + std::to_string(requestIdOf("SWITCH_SESSION_PROJECT")) +
                     R"(,"resourceId":1,"action":"project-switch","forms":[{"id":8,"name":"Wechselprotokoll","fieldCount":1}]})");
@@ -333,7 +429,7 @@ void ReaderWorkflow::testProjectSwitch()
 
     // A switch already sent is left alone: the refreshed row may arrive before its answer.
     openPicker();
-    click("Werkstattprojekt");
+    pick("Werkstattprojekt");
     runningList({true, 42, "Werkstattprojekt", 22});
     reply(R"("success":true,"usageId":22,"projectName":"Werkstattprojekt")");
     runningList({true, 42, "Werkstattprojekt", 22});
@@ -346,7 +442,7 @@ void ReaderWorkflow::testProjectSwitch()
     for (const bool rowFirst : {false, true}) {
         runningList({});
         openPicker();
-        click("Zweitprojekt");
+        pick("Zweitprojekt");
         if (rowFirst) runningList(ended);
         reply(R"("error":"NoOwnActiveSessionError")");
         runningList(ended);
@@ -364,7 +460,7 @@ void ReaderWorkflow::testProjectSwitch()
     for (const bool rowFirst : {false, true}) {
         runningList({});
         openPicker();
-        click("Zweitprojekt");
+        pick("Zweitprojekt");
         if (rowFirst) runningList(ended);
         reply(R"("error":"METER_SWITCH_FAILED")");
         runningList(ended);
@@ -381,7 +477,7 @@ void ReaderWorkflow::testProjectSwitch()
                                          std::pair{"FLOW_EXECUTION_ERROR", Running{}}}) {
         runningList({});
         openPicker();
-        click("Zweitprojekt");
+        pick("Zweitprojekt");
         reply((std::string(R"("error":")") + code + R"(")").c_str());
         runningList(rowAfter);
         assert(onDetails());
@@ -393,7 +489,7 @@ void ReaderWorkflow::testProjectSwitch()
     // Once the refreshed row kept the button, the reason was readable there: a later end just takes both away.
     runningList({});
     openPicker();
-    click("Zweitprojekt");
+    pick("Zweitprojekt");
     reply(R"("error":"METER_SWITCH_FAILED")");
     runningList({});
     assert(label(lv_screen_active(), warned("Zähler nicht lesbar. Projekt unverändert.").c_str()));

@@ -155,8 +155,11 @@ private:
     void openProjectSwitch();
     void handleProjectPicked(uint32_t projectId, const std::string &projectName);
     void cancelProjectPicker();
+    // The picker of a switch is followed by the choice of what the change applies to.
+    void openProjectChangeModes(const std::string &newProjectName);
+    void handleProjectChangeMode(API::ProjectChangeMode mode);
     void closeStaleProjectSwitch(const API::ResourceBrief &resource);
-    void startProjectSwitch(uint32_t resourceId, uint32_t usageId, uint32_t projectId);
+    void startProjectSwitch(uint32_t resourceId, uint32_t usageId, uint32_t projectId, API::ProjectChangeMode mode);
     // Duration estimate and extension (ATT-43)
     bool needsDurationEstimate(uint32_t resourceId, uint32_t &maxMinutes) const;
     void openDurationInput(uint32_t maxMinutes);

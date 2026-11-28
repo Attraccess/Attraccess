@@ -57,6 +57,8 @@ private:
         time_t maxEndEpoch = 0;
         // The project the session is booked to; 0: none.
         uint32_t projectId = 0;
+        // Whether this record continues a split.
+        bool continuation = false;
     };
     std::vector<DemoSession> _sessions[DemoStore::RESOURCE_COUNT];
     uint32_t _nextSessionId = 1;

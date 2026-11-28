@@ -15,7 +15,9 @@ API::ResourceUsageFormActionType Application::pendingFormAction() const {
   case PENDING_ACTION_STOP_SESSION:
     return API::ResourceUsageFormActionType::END;
   case PENDING_ACTION_SWITCH_PROJECT:
-    return API::ResourceUsageFormActionType::PROJECT_SWITCH;
+    return this->pendingProjectChangeMode == API::ProjectChangeMode::SPLIT
+               ? API::ResourceUsageFormActionType::PROJECT_SWITCH
+               : API::ResourceUsageFormActionType::PROJECT_REASSIGN;
   default:
     return API::ResourceUsageFormActionType::UNKNOWN;
   }
@@ -407,7 +409,8 @@ void Application::finishFormFlow() {
   } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
     this->api.stopResourceUsageSession(this->pendingActionResourceId, this->pendingActionUsageId);
   } else if (this->pendingActionType == PENDING_ACTION_SWITCH_PROJECT) {
-    this->api.switchSessionProject(this->pendingActionResourceId, this->pendingActionUsageId, this->pendingActionProjectId);
+    this->api.switchSessionProject(this->pendingActionResourceId, this->pendingActionUsageId, this->pendingActionProjectId,
+                                   this->pendingProjectChangeMode);
   } else {
     this->handleFormsCancel();
   }
