@@ -4,6 +4,7 @@ import {
   EVENTS_PATH,
   MAX_MESSAGE_BYTES,
   WIRE_VERSION,
+  formatCursor,
   parseCursor,
   serverMessageSchema,
   type EventEnvelope,
@@ -81,7 +82,7 @@ export class SidecarEventStream {
   private lastCursor: string | null = null;
   private readonly seen = new SeenEventIds();
   private streamInstanceId: string | null = null;
-  /** Sequence the next event must have, once known. Per stream instance: a new instance never counts as a gap. */
+  /** Sequence the next event must have, known from `hello` on. A fresh start takes it from the new head, so no gap. */
   private expectedSequence: number | null = null;
   private pingTimer: NodeJS.Timeout | undefined;
   private watchdog: NodeJS.Timeout | undefined;
@@ -209,10 +210,12 @@ export class SidecarEventStream {
 
   private onHello(link: Link, hello: Extract<ServerMessage, { type: 'hello' }>): void {
     this.streamInstanceId = hello.streamInstanceId;
-    const cursor = this.lastCursor;
-    // The expected sequence only exists when resuming a known cursor. Without one this is a fresh start.
-    this.expectedSequence = cursor ? (parseCursor(cursor)?.sequence ?? 0) + 1 : null;
-    link.socket.send(JSON.stringify({ type: 'resume', wireVersion: WIRE_VERSION, ...(cursor ? { cursor } : {}) }));
+    // A fresh start begins at the head the sidecar named in `hello`, not at whatever is newest when `resume` arrives:
+    // the sidecar subscribes this client only then, so a resume without a cursor loses what it publishes in between.
+    // Keeping that position also covers a link that drops before the first event.
+    const cursor = (this.lastCursor ??= hello.headCursor ?? formatCursor(hello.streamInstanceId, 0));
+    this.expectedSequence = (parseCursor(cursor)?.sequence ?? 0) + 1;
+    link.socket.send(JSON.stringify({ type: 'resume', wireVersion: WIRE_VERSION, cursor }));
     this.startPing(link.socket);
     link.handlers.onHello();
   }
