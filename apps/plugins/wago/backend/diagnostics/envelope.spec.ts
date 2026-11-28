@@ -135,6 +135,22 @@ describe('canonical diagnostic consumer', () => {
     expect(store.read(1).rejection).toBeUndefined();
     expect(store.read(1).cumulativeMeasurements).toEqual({});
   });
+  it('takes a stream it first hears mid-way as the baseline, but counts gaps from 1 after a controller restart', () => {
+    // The API restarted while the controller kept its stream: earlier traffic is not missing.
+    expect(state(231_000)).toBe(true);
+    expect(measurement(5_000)).toBe(true);
+    expect(measurement(5_002)).toBe(true);
+    expect(store.read(1).sequenceGaps).toBe(1);
+    // The controller restarted: its new stream starts at 1, so a first measurement at 3 missed two.
+    now++;
+    expect(send('heartbeat', envelope(1, 2))).toBe(true);
+    expect(state(1, 2)).toBe(true);
+    now++;
+    expect(
+      send('measurements', { channelId: 'meter', kind: 'live', unit: 'milliwatt', value: 1, ...envelope(3, 2) }),
+    ).toBe(true);
+    expect(store.read(1).sequenceGaps).toBe(3);
+  });
   it('deduplicates by boot/category without renewing receipt or source freshness', () => {
     state();
     measurement();

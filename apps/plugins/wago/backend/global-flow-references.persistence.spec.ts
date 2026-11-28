@@ -76,7 +76,7 @@ describe('global-flow references over the plugin storage', () => {
       protocolVersion: '1.0.0',
       runtimeVersion: '0.1.0',
       capabilities: '[]',
-      lastSequence: 0,
+      lastSequence: '0',
       lastHeartbeatAt: now,
       lastSeenAt: now,
       createdAt: now,

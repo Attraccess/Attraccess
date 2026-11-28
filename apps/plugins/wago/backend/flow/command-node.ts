@@ -26,7 +26,8 @@ export function createWagoCommandNode(service: () => WagoService): PluginFlowExe
     getFailureKind: (error) => service().commandFailureKind(error),
     execute: async (node, input) => {
       await service().executeCommand(node.data);
-      return { payload: input };
+      // Without a handle the host follows every edge, the failure output included.
+      return { payload: input, outputHandle: 'output' };
     },
   };
 }

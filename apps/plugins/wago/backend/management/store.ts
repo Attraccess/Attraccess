@@ -10,12 +10,23 @@ export class RepositoryManagementStore implements ManagementStore {
   constructor(private readonly table: ManagementTable) {}
   async acquire(controllerId: number, owner: string, now: number, until: number): Promise<boolean> {
     // Ensure the lease row exists (insert-or-ignore), then take it with a compare-and-set.
-    await this.table.insert({ controllerId, leaseUntil: 0 }).catch((error) => {
+    await this.table.insert({ controllerId }).catch((error) => {
       if (!(error instanceof PluginStorageUniqueViolation)) throw error;
     });
     const affected = await this.table.update(
-      { and: [{ controllerId }, { or: [{ leaseOwner: { isNull: true } }, { leaseUntil: { lt: now } }] }] },
-      { leaseOwner: owner, leaseUntil: until },
+      {
+        and: [
+          { controllerId },
+          {
+            or: [
+              { leaseOwner: { isNull: true } },
+              { leaseUntil: { isNull: true } },
+              { leaseUntil: { lt: new Date(now) } },
+            ],
+          },
+        ],
+      },
+      { leaseOwner: owner, leaseUntil: new Date(until) },
     );
     return affected === 1;
   }
@@ -30,13 +41,13 @@ export class RepositoryManagementStore implements ManagementStore {
     const metadataJson = JSON.stringify(metadata);
     if (metadataJson.length > 16384) throw new Error('invalid_metadata');
     const affected = await this.table.update(
-      { controllerId, leaseOwner: owner, leaseUntil: { gte: now } },
+      { controllerId, leaseOwner: owner, leaseUntil: { gte: new Date(now) } },
       { metadataJson, encryptedPrivateKey },
     );
     if (affected !== 1) throw new Error('lease_lost');
   }
   async release(controllerId: number, owner: string): Promise<void> {
-    await this.table.update({ controllerId, leaseOwner: owner }, { leaseOwner: null, leaseUntil: 0 });
+    await this.table.update({ controllerId, leaseOwner: owner }, { leaseOwner: null, leaseUntil: null });
   }
 }
 

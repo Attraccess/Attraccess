@@ -19,7 +19,7 @@ export const controller = (): WagoController => ({
   protocolVersion: '1.0.0',
   runtimeVersion: '1.0.0',
   capabilities: '["claim","heartbeat","configuration-v1"]',
-  lastSequence: 4,
+  lastSequence: '4',
   lastHeartbeatAt: null,
   lastSeenAt: '2026-01-01T00:00:00.000Z',
   compatibilityError: null,

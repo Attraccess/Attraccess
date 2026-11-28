@@ -16,7 +16,7 @@ describe('createWagoTestStorage', () => {
       createdAt: 'now',
       updatedAt: 'now',
     });
-    expect(controller).toMatchObject({ id: 1, lastSequence: 0, name: null });
+    expect(controller).toMatchObject({ id: 1, lastSequence: '0', name: null });
     await test.tables.networkChanges.insert({
       controllerId: 1,
       sessionId: 1,

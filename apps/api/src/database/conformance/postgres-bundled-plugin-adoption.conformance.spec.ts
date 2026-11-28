@@ -56,6 +56,19 @@ describe.each(BUNDLED_PLUGINS)('adoption of existing tables by the bundled plugi
     return written;
   }
 
+  /**
+   * The part of a seeded row that the later versions keep. A version may replace a column (drop it and add it with a
+   * new definition, as WAGO does for its overflowing integer columns); that field starts over, every other one must
+   * read back unchanged.
+   */
+  function kept(logical: string, row: Row): Row {
+    const before = baseline.tables.get(logical)?.fields;
+    const after = compiled.tables.get(logical)?.fields;
+    return Object.fromEntries(
+      Object.entries(row).filter(([field]) => JSON.stringify(before?.get(field)) === JSON.stringify(after?.get(field))),
+    );
+  }
+
   /** Leaves the tables as a pre-existing installation has them: no version bookkeeping, the legacy history instead. */
   async function becomeLegacy(db: StorageDatabase, applied: readonly string[]): Promise<void> {
     const legacy = `"${legacyMigrationsTableName(plugin.name)}"`;
@@ -122,7 +135,7 @@ describe.each(BUNDLED_PLUGINS)('adoption of existing tables by the bundled plugi
 
     const tables = await tablesOf(db, compiled);
     for (const [logical, row] of expected)
-      expect([logical, await tables[logical].find()]).toEqual([logical, [expect.objectContaining(row)]]);
+      expect([logical, await tables[logical].find()]).toEqual([logical, [expect.objectContaining(kept(logical, row))]]);
     // Writes of this release land in the adopted columns: clear the rows (children first), then write them again.
     const ordered = tablesInOrder(compiled, compiled.tables);
     for (const table of [...ordered].reverse()) {
@@ -149,7 +162,7 @@ describe.each(BUNDLED_PLUGINS)('adoption of existing tables by the bundled plugi
     const side = await db.connect();
     const tables = side.contexts(npmName, asNpm).storage.open(plugin.storage as never) as never as Tables;
     for (const [logical, row] of expected)
-      expect([logical, await tables[logical].find()]).toEqual([logical, [expect.objectContaining(row)]]);
+      expect([logical, await tables[logical].find()]).toEqual([logical, [expect.objectContaining(kept(logical, row))]]);
   });
 
   it('refuses a partial existing history and changes nothing', async () => {

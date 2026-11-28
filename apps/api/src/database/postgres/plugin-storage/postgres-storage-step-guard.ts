@@ -48,6 +48,8 @@ async function checkDropIndex(query: SchemaQuery, step: Extract<ResolvedStep, { 
  * PostgreSQL drops the indexes and constraints that use a dropped column along with it. The host refuses instead:
  * dropping a column must not silently remove a key, a UNIQUE or CHECK constraint, or a foreign key of a table
  * adopted in place. Declared indexes are refused when the declaration is compiled; this finds what remains.
+ * PostgreSQL 18 also lists a column's NOT NULL as a constraint (`contype` 'n'); it belongs to the column alone, so it
+ * does not stop the drop.
  */
 async function checkDropColumn(query: SchemaQuery, step: Extract<ResolvedStep, { op: 'dropColumn' }>): Promise<void> {
   const { table, field } = step;
@@ -75,6 +77,7 @@ async function checkDropColumn(query: SchemaQuery, step: Extract<ResolvedStep, {
        JOIN pg_namespace n ON n.oid = t.relnamespace
        JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY (c.conkey)
       WHERE n.nspname = current_schema() AND t.relname = $1 AND a.attname = $2 AND NOT a.attisdropped
+        AND c.contype <> 'n'
       LIMIT 1`,
     [table.physical, field.column],
   );

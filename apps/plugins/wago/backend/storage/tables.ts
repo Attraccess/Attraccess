@@ -12,7 +12,11 @@ import { f, table } from '@attraccess/plugins-backend-sdk';
  *   without a length check) is declared `f.text`; the legacy `varchar` columns are unbounded and the 1.x SQLite database gave both
  *   the same TEXT affinity, so adoption is unaffected.
  * - Core identifiers (MQTT server ids, user ids) are plain integers. Only plugin tables are referenced.
- * - Lease deadlines are epoch milliseconds in integer columns (`bigint` in the 1.x layout).
+ * - Controller sequences are `decimal(15, 0)` strings: a runtime announces `Date.now()`, beyond PostgreSQL's 32-bit
+ *   `integer` that baseline version 1 declared (storage version 3 replaces the column).
+ * - Lease deadlines are `f.timestamp` (null when no lease is held). Baseline version 1 declared them as epoch
+ *   milliseconds in `f.integer` columns, which PostgreSQL creates as 32-bit `integer`, too small for a deadline;
+ *   version 2 replaces those columns (see `wagoBaselineTables` and the storage definition).
  */
 export const wagoTables = {
   controllers: table(
@@ -35,7 +39,8 @@ export const wagoTables = {
       runtimeVersion: f.text({ column: 'runtime_version' }),
       /** JSON array of capability names. */
       capabilities: f.text(),
-      lastSequence: f.integer({ column: 'last_sequence' }).withDefault(0),
+      /** Discovery announces epoch milliseconds (see storage version 3); larger values are refused (`MAX_STORED_SEQUENCE`). */
+      lastSequence: f.decimal(15, 0, { column: 'last_sequence' }).withDefault('0'),
       lastHeartbeatAt: f.string({ column: 'last_heartbeat_at' }).optional(),
       lastSeenAt: f.string({ column: 'last_seen_at' }),
       compatibilityError: f.text({ column: 'compatibility_error' }).optional(),
@@ -182,7 +187,7 @@ export const wagoTables = {
     {
       fingerprint: f.string(),
       owner: f.string().optional(),
-      leaseUntil: f.integer({ column: 'lease_until' }).withDefault(0),
+      leaseUntil: f.timestamp({ column: 'lease_until' }).optional(),
     },
     { physicalName: 'plugin_wago_device_operations', primaryKey: ['fingerprint'] },
   ),
@@ -193,7 +198,7 @@ export const wagoTables = {
       metadataJson: f.text({ column: 'metadata_json' }).optional(),
       encryptedPrivateKey: f.text({ column: 'encrypted_private_key' }).optional(),
       leaseOwner: f.string({ column: 'lease_owner' }).optional(),
-      leaseUntil: f.integer({ column: 'lease_until' }).withDefault(0),
+      leaseUntil: f.timestamp({ column: 'lease_until' }).optional(),
     },
     { physicalName: 'plugin_wago_management', primaryKey: ['controllerId'] },
   ),
@@ -255,5 +260,48 @@ export const wagoTables = {
         { fields: ['controllerId'], references: 'controllers', referencedFields: ['id'], onDelete: 'cascade' },
       ],
     },
+  ),
+};
+
+/** The largest controller sequence `lastSequence` (`decimal(15, 0)`) stores; epoch milliseconds stay far below it. */
+export const MAX_STORED_SEQUENCE = 999_999_999_999_999;
+
+/** The lease deadline column that storage version 2 puts in place of the baseline's integer one. */
+export const wagoLeaseDeadlineField = wagoTables.deviceOperations.fields.leaseUntil;
+
+/** The controller sequence column that storage version 3 puts in place of the baseline's integer one. */
+export const wagoControllerSequenceField = wagoTables.controllers.fields.lastSequence;
+
+/**
+ * Baseline version 1 exactly as released: both lease deadlines and the controller sequence were integers with default
+ * 0. Adoption of a 1.x database and fresh installs create this layout first; versions 2 and 3 then replace those
+ * columns.
+ */
+export const wagoBaselineTables = {
+  ...wagoTables,
+  controllers: {
+    ...wagoTables.controllers,
+    fields: {
+      ...wagoTables.controllers.fields,
+      lastSequence: f.integer({ column: 'last_sequence' }).withDefault(0),
+    },
+  },
+  deviceOperations: table(
+    {
+      fingerprint: f.string(),
+      owner: f.string().optional(),
+      leaseUntil: f.integer({ column: 'lease_until' }).withDefault(0),
+    },
+    { physicalName: 'plugin_wago_device_operations', primaryKey: ['fingerprint'] },
+  ),
+  management: table(
+    {
+      controllerId: f.integer({ column: 'controller_id' }),
+      metadataJson: f.text({ column: 'metadata_json' }).optional(),
+      encryptedPrivateKey: f.text({ column: 'encrypted_private_key' }).optional(),
+      leaseOwner: f.string({ column: 'lease_owner' }).optional(),
+      leaseUntil: f.integer({ column: 'lease_until' }).withDefault(0),
+    },
+    { physicalName: 'plugin_wago_management', primaryKey: ['controllerId'] },
   ),
 };

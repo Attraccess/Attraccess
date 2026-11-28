@@ -30,6 +30,11 @@ export interface DiagnosticStream {
   watermarks: Record<string, { sequence: number; timestamp: number }>;
   sequenceGaps: number;
   trackingExhausted: boolean;
+  /**
+   * The active stream was already running when this process first heard from the controller (the API restarted, the
+   * controller did not), so the first sequence of each category is a baseline, not a gap from 0.
+   */
+  joinedMidStream?: boolean;
 }
 export function emptyStream(): DiagnosticStream {
   return { lastSourceTime: 0, retiredStreams: [], watermarks: {}, sequenceGaps: 0, trackingExhausted: false };
@@ -75,14 +80,13 @@ export function admitEnvelope(
   const previous = restart ? undefined : state.watermarks[category];
   if (previous && (sequence <= previous.sequence || timestamp < previous.timestamp)) return 'rejected';
   if (restart) {
+    state.joinedMidStream = state.activeStream === undefined;
     if (state.activeStream) state.retiredStreams.push(state.activeStream);
     state.activeStream = stream;
     state.watermarks = {};
   }
-  state.sequenceGaps = Math.min(
-    Number.MAX_SAFE_INTEGER,
-    state.sequenceGaps + Math.max(0, sequence - (previous?.sequence ?? 0) - 1),
-  );
+  const expected = previous ? previous.sequence + 1 : state.joinedMidStream ? sequence : 1;
+  state.sequenceGaps = Math.min(Number.MAX_SAFE_INTEGER, state.sequenceGaps + Math.max(0, sequence - expected));
   state.watermarks[category] = { sequence, timestamp };
   state.lastSourceTime = Math.max(state.lastSourceTime, timestamp);
   return restart ? 'restart' : 'accepted';
