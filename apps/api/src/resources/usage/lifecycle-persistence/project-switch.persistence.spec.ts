@@ -2,6 +2,7 @@ import {
   BillingTransaction,
   FormSubmission,
   Project,
+  ResourceOperatingInterval,
   Resource,
   ResourceUsage,
   ResourceUsageLifecycleAttempt,
@@ -15,6 +16,8 @@ import {
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
 import { FlowExecutionError } from '../../flows/errors/flow-execution.error';
+import { ResourceOperatingAttributionService } from '../../operating-intervals/resource-operating-attribution.service';
+import { createOperatingTimelineStore } from '../../../database/adapters/operating-intervals/typeorm-operating-timeline.store';
 import {
   closeLifecycleFixture,
   resetTestFixture,
@@ -166,6 +169,34 @@ describe('Switching the project of a running session', () => {
       [1, second.id, false],
     ]);
     expect(third.sessionStartTime).toEqual(parts[0].startTime);
+  });
+
+  it('splits operating time at the switch: before it to the old part, after it to the continuation', async () => {
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 5)); // distinct instants, nothing to wait for
+    await startInProject();
+    await scope.operating.transition(1, 'operating');
+    await tick();
+    await switchTo(2);
+    await tick();
+    await scope.operating.transition(1, 'idle');
+    await scope.usage.endSession(1, scope.users[0], {});
+
+    const [interval] = await scope.source.getRepository(ResourceOperatingInterval).find();
+    const [previous, continuation] = await usages();
+    const switchTime = previous.endTime as Date;
+    const attribution = new ResourceOperatingAttributionService(createOperatingTimelineStore(scope.source));
+    const shareOf = async (part: ResourceUsage) => (await attribution.getShareForUsage(part))?.shareMs;
+
+    expect(interval.startTime.getTime()).toBeLessThan(switchTime.getTime());
+    expect((interval.endTime as Date).getTime()).toBeGreaterThan(switchTime.getTime());
+    expect(await shareOf(previous)).toBe(switchTime.getTime() - interval.startTime.getTime());
+    expect(await shareOf(continuation)).toBe((interval.endTime as Date).getTime() - switchTime.getTime());
+    // Neither part counts the other as a session it shared the machine with.
+    expect((await attribution.getShareForUsage(previous))?.shared).toBe(false);
+    expect((await attribution.getShareForUsage(continuation))?.shared).toBe(false);
+    // Together exactly the running time of the unsplit session, which ran through the whole interval.
+    const unsplitMs = (interval.endTime as Date).getTime() - interval.startTime.getTime();
+    expect(((await shareOf(previous)) ?? 0) + ((await shareOf(continuation)) ?? 0)).toBe(unsplitMs);
   });
 
   it('refuses the current project, other people, and sessions that do not run', async () => {

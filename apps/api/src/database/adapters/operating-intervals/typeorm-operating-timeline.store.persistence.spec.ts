@@ -119,7 +119,7 @@ describe('TypeOrmOperatingTimelineStore reads', () => {
     expect(await store.findResourcesWithIntervals([1, 2])).toEqual(new Set([1]));
   });
 
-  it('reports the stops and takeovers that are requested but not stored yet', async () => {
+  it('reports the stops, takeovers and project switches that are requested but not stored yet', async () => {
     const repository = source.getRepository(ResourceUsageLifecycleAttempt);
     const base = { formSubmissions: [], billingItems: [], transitionTime: at('10:30:00') };
     await repository.save({ id: 'a', resourceId: 1, kind: 'end', previousUsageId: 7, candidateUsageId: null, ...base });
@@ -139,6 +139,16 @@ describe('TypeOrmOperatingTimelineStore reads', () => {
       candidateUsageId: 10,
       ...base,
     });
+    // A switch ends the old part at its transition time, like a stop: that instant is the boundary.
+    await repository.save({
+      id: 'e',
+      resourceId: 1,
+      kind: 'project-switch',
+      previousUsageId: 12,
+      candidateUsageId: 13,
+      ...base,
+      transitionTime: at('10:40:00'),
+    });
     await repository.save({
       id: 'd',
       resourceId: 2,
@@ -152,6 +162,7 @@ describe('TypeOrmOperatingTimelineStore reads', () => {
       new Map([
         [7, at('10:30:00')],
         [8, at('10:30:00')],
+        [12, at('10:40:00')],
       ]),
     );
   });
