@@ -1,8 +1,9 @@
-import { IsEmail, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class AcceptInvitationDto {
   @IsString()
+  @IsNotEmpty()
   @ApiProperty({
     description: 'The token to accept the invitation',
     example: '1234567890',

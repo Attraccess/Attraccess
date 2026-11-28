@@ -1,8 +1,9 @@
-import { IsEmail, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class VerifyEmailDto {
   @IsString()
+  @IsNotEmpty()
   @ApiProperty({
     description: 'The token to verify the email',
     example: '1234567890',
