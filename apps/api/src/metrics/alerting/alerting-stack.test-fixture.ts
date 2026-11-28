@@ -47,6 +47,18 @@ export function scaledRules(rules: string, pending: string, interval: string): s
     .replace(/^ {8}for: 5m$/gm, `        for: ${pending}`);
 }
 
+/** Reads until `done` accepts the value, every 2 seconds for up to `seconds`; returns the accepted value. */
+export async function eventually<T>(read: () => Promise<T>, done: (value: T) => boolean, seconds: number): Promise<T> {
+  const deadline = Date.now() + seconds * 1000;
+  let value = await read();
+  while (!done(value)) {
+    if (Date.now() > deadline) throw new Error(`Timed out waiting; last value: ${JSON.stringify(value)}`);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    value = await read();
+  }
+  return value;
+}
+
 export interface Notification {
   status: string;
   title: string;
@@ -56,6 +68,8 @@ export interface Notification {
 
 interface Rule {
   name: string;
+  /** "0001-01-01T00:00:00Z" until Grafana has evaluated the rule once. */
+  lastEvaluation?: string;
   alerts?: Array<{ state: string; activeAt: string; annotations: { description: string } }>;
 }
 type Rules = { data?: { groups: Array<{ rules: Rule[] }> } };
@@ -318,6 +332,12 @@ policies:
       if (rule) return rule;
     }
     throw new Error(`Grafana did not return the alert rule ${alertname}`);
+  }
+
+  /** True once Grafana has evaluated the rule after the given time (milliseconds since the epoch). */
+  async evaluatedSince(alertname: string, since: number): Promise<boolean> {
+    const rule = await this.rule(alertname);
+    return Date.parse(rule.lastEvaluation ?? '') > since;
   }
 
   async instances(alertname: string): Promise<AlertInstance[]> {

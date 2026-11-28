@@ -11,7 +11,7 @@ const file = process.argv[2] ?? 'docker-compose.balena.yml';
 try {
   // Our own file, read like `balena push` reads it on the pushing machine: env_file is followed. Since v1.0.0 the
   // parser only does that when asked to trust the file.
-  await parse(file, { hostEnvironment: true });
+  const { services } = await parse(file, { hostEnvironment: true });
   // Rules the parser cannot see: balena does not interpolate ${VAR:-default} (ATT-593), and the stack must carry its
   // own PostgreSQL and backup sidecar instead of the retired Duplicati.
   const source = readFileSync(file, 'utf8');
@@ -28,9 +28,49 @@ try {
   if (!/^ {2}attraccess:[\s\S]*?depends_on:\s*\n\s+- postgres/m.test(code)) {
     problems.push('the attraccess service must depend on postgres (short form)');
   }
+  problems.push(...backupGateProblems(services, code));
   if (problems.length) throw new Error(problems.join('\n  '));
   console.log(`✓ ${file} is balena-compatible`);
 } catch (err) {
   console.error(`✗ ${file} is not balena-compatible:\n  ${err.message}`);
   process.exit(1);
+}
+
+// The backup gate (docker/backup/README.md): attraccess waits for the status file of the backup service, and
+// node-exporter publishes the backup metrics next to it. Each piece fails quietly when it goes missing.
+function backupGateProblems(services, code) {
+  const problems = [];
+  const mounts = (name) =>
+    (services[name]?.volumes ?? []).map((v) => (typeof v === 'string' ? v : `${v.source}:${v.target}`));
+  const mounted = (name, target) =>
+    mounts(name).some((v) => v === `backup-status:${target}` || v.startsWith(`backup-status:${target}:`));
+  const attraccess = services.attraccess ?? {};
+  if (!mounted('backup', '/var/lib/backup-status')) {
+    problems.push('the backup service must mount the backup-status volume at /var/lib/backup-status');
+  }
+  if (!mounted('attraccess', '/backup-status')) {
+    problems.push(
+      'the attraccess service must mount the backup-status volume at /backup-status (its start waits for it)',
+    );
+  }
+  if (!(attraccess.depends_on ?? []).includes('backup')) problems.push('the attraccess service must depend on backup');
+  // The source, not the parsed command: the parser has already filled in $VAR from this machine's environment.
+  const attraccessSource = code.match(/^ {2}attraccess:\n(?: {4}.*\n|\s*\n)*/m)?.[0] ?? '';
+  if (attraccessSource.includes('$')) {
+    problems.push('the attraccess service must not contain $ (balena does not interpolate)');
+  }
+  const command = [attraccess.command ?? []].flat().join(' ');
+  // Overriding the entrypoint drops the image's ENTRYPOINT and CMD, so the command repeats them.
+  const dockerfile = readFileSync('Dockerfile', 'utf8');
+  const last = (instruction) =>
+    JSON.parse([...dockerfile.matchAll(new RegExp(`^${instruction} (\\[.*\\])$`, 'gm'))].at(-1)?.[1] ?? '[]');
+  const start = `exec ${[...last('ENTRYPOINT'), ...last('CMD')].join(' ')}`;
+  if (!command.trimEnd().endsWith(start)) problems.push(`the attraccess start command must end with: ${start}`);
+  if (!mounted('node-exporter', '/backup-status')) {
+    problems.push('node-exporter must mount the backup-status volume at /backup-status (backup metrics)');
+  }
+  if (!(services['node-exporter']?.command ?? []).includes('--collector.textfile.directory=/backup-status')) {
+    problems.push('node-exporter must read the backup metrics with --collector.textfile.directory=/backup-status');
+  }
+  return problems;
 }

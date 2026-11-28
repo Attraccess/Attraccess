@@ -1,19 +1,8 @@
-import { AlertInstance, AlertingStack, SHIPPED_RULES, scaledRules } from './alerting-stack.test-fixture';
+import { AlertInstance, AlertingStack, SHIPPED_RULES, eventually, scaledRules } from './alerting-stack.test-fixture';
 
 // The balena backup sidecar (docker/backup) writes these metrics to backup.prom; node-exporter publishes them.
 const BACKUP_ALERTS = ['BackupNotConfigured', 'BackupFailed', 'BackupTooOld', 'BackupsDisabled'] as const;
 type BackupAlert = (typeof BACKUP_ALERTS)[number];
-
-async function eventually<T>(read: () => Promise<T>, done: (value: T) => boolean, seconds: number): Promise<T> {
-  const deadline = Date.now() + seconds * 1000;
-  let value = await read();
-  while (!done(value)) {
-    if (Date.now() > deadline) throw new Error(`Timed out waiting; last value: ${JSON.stringify(value)}`);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    value = await read();
-  }
-  return value;
-}
 
 describe('backup alerts against real Prometheus and Grafana', () => {
   let stack: AlertingStack;
@@ -24,6 +13,16 @@ describe('backup alerts against real Prometheus and Grafana', () => {
     for (const alert of BACKUP_ALERTS) result[alert] = (await state(alert))?.state ?? 'none';
     return result;
   };
+  /** Waits until Grafana has evaluated every backup rule after the given time, so a quiet state is a real result. */
+  const evaluatedSince = (since: number) =>
+    eventually(
+      async () => {
+        for (const alert of BACKUP_ALERTS) if (!(await stack.evaluatedSince(alert, since))) return false;
+        return true;
+      },
+      (done) => done,
+      120,
+    );
   /** Waits until exactly the given alerts fire and every other backup alert is quiet. */
   const onlyFiring = (...firing: BackupAlert[]) =>
     eventually(states, (s) => BACKUP_ALERTS.every((a) => (s[a] === 'Alerting') === firing.includes(a)), 120);
@@ -47,7 +46,7 @@ describe('backup alerts against real Prometheus and Grafana', () => {
   });
 
   it('stays quiet without backup metrics (stacks without the sidecar) and with a recent successful backup', async () => {
-    await new Promise((resolve) => setTimeout(resolve, 20000));
+    await evaluatedSince(Date.now());
     expect(Object.values(await states()).every((s) => s !== 'Alerting')).toBe(true);
     stack.setBackupMetrics(healthy());
     await eventually(
@@ -55,7 +54,7 @@ describe('backup alerts against real Prometheus and Grafana', () => {
       (v) => v === 1,
       60,
     );
-    await new Promise((resolve) => setTimeout(resolve, 20000));
+    await evaluatedSince(Date.now());
     await onlyFiring();
   });
 
@@ -68,6 +67,27 @@ describe('backup alerts against real Prometheus and Grafana', () => {
 
   it('fires BackupTooOld when the last success is older than the allowed age', async () => {
     stack.setBackupMetrics({ ...healthy(), backup_last_success_timestamp_seconds: now() - 31 * 3600 });
+    await onlyFiring('BackupTooOld');
+  });
+
+  it('uses the allowed age the sidecar reports (BACKUP_MAX_AGE_HOURS)', async () => {
+    stack.setBackupMetrics({
+      ...healthy(),
+      backup_max_age_seconds: 48 * 3600,
+      backup_last_success_timestamp_seconds: now() - 31 * 3600,
+    });
+    await eventually(
+      () => stack.query('backup_max_age_seconds'),
+      (v) => v === 48 * 3600,
+      60,
+    );
+    await evaluatedSince(Date.now());
+    await onlyFiring();
+    stack.setBackupMetrics({
+      ...healthy(),
+      backup_max_age_seconds: 2 * 3600,
+      backup_last_success_timestamp_seconds: now() - 3 * 3600,
+    });
     await onlyFiring('BackupTooOld');
   });
 

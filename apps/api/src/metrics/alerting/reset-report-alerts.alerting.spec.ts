@@ -1,4 +1,4 @@
-import { AlertInstance, AlertingStack, SHIPPED_RULES, scaledRules } from './alerting-stack.test-fixture';
+import { AlertInstance, AlertingStack, SHIPPED_RULES, eventually, scaledRules } from './alerting-stack.test-fixture';
 
 const CRASH = 'AttractapReaderCrashes';
 const POWER_ON = 'AttractapReaderPowerOnResets';
@@ -10,17 +10,6 @@ const PENDING = REAL_TIME ? '5m' : '90s';
 const INTERVAL = REAL_TIME ? '1m' : '10s';
 // The real-time waits (up to 180s x 8) are longer than the 15-minute default per-test limit.
 if (REAL_TIME) jest.setTimeout(30 * 60_000);
-
-async function eventually<T>(read: () => Promise<T>, done: (value: T) => boolean, seconds: number): Promise<T> {
-  const deadline = Date.now() + seconds * 1000;
-  let value = await read();
-  while (!done(value)) {
-    if (Date.now() > deadline) throw new Error(`Timed out waiting; last value: ${JSON.stringify(value)}`);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    value = await read();
-  }
-  return value;
-}
 
 const reports = (reader: number, reason: string, n: number) => Array.from({ length: n }, () => ({ reader, reason }));
 

@@ -1,17 +1,6 @@
-import { AlertInstance, AlertingStack, SHIPPED_RULES, scaledRules } from './alerting-stack.test-fixture';
+import { AlertInstance, AlertingStack, SHIPPED_RULES, eventually, scaledRules } from './alerting-stack.test-fixture';
 
 const ALERT = 'AuditRecordsDropped';
-
-async function eventually<T>(read: () => Promise<T>, done: (value: T) => boolean, seconds: number): Promise<T> {
-  const deadline = Date.now() + seconds * 1000;
-  let value = await read();
-  while (!done(value)) {
-    if (Date.now() > deadline) throw new Error(`Timed out waiting; last value: ${JSON.stringify(value)}`);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    value = await read();
-  }
-  return value;
-}
 
 describe('AuditRecordsDropped alert against real Prometheus and Grafana', () => {
   let stack: AlertingStack;
