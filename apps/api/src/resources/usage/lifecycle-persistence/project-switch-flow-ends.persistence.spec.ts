@@ -13,6 +13,7 @@ import type { ResourceUsageService } from '../sessions/resource-usage.service';
 import { forkUsageInstance, usageInternals } from '../sessions/fixtures/compose.test-fixture';
 import { FakeValkey } from '../sessions/fake-valkey.test-fixture';
 import { ValkeySessionChangeCoordination } from '../sessions/session-change-coordination';
+import { queueOf, until, watchSwitchHoldUps } from '../sessions/fixtures/switch-signals.test-fixture';
 
 jest.setTimeout(60_000);
 
@@ -27,7 +28,6 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
   const usages = () => scope.source.getRepository(ResourceUsage).find({ order: { id: 'ASC' } });
   const attempts = () => scope.source.getRepository(ResourceUsageLifecycleAttempt).count();
   const openUserIds = async () => (await usages()).filter((usage) => !usage.endTime).map((usage) => usage.userId);
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 400));
 
   /** Parks the switch flow; `release` lets it succeed, or fail when given an error. */
   const parkSwitchFlow = () => {
@@ -104,9 +104,11 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
     const parked = parkSwitchFlow();
     const switching = scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: own.id });
     await parked.entered;
+    const holdUps = watchSwitchHoldUps(scope.usage);
 
     const end = track(pressEnd(scope.usage, target, { usageId: own.id }));
-    await settle();
+    await holdUps.heldUp();
+    expect(end.state.done).toBe(false);
     parked.release();
     const continuation = await switching;
     await end.finished;
@@ -127,9 +129,11 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
     const switching = scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: own.id });
     const refused = expect(switching).rejects.toBeInstanceOf(FlowExecutionError);
     await parked.entered;
+    const holdUps = watchSwitchHoldUps(scope.usage);
 
     const end = track(pressEnd(scope.usage, target, { usageId: own.id }));
-    await settle();
+    await holdUps.heldUp();
+    expect(end.state.done).toBe(false);
     parked.release(new FlowExecutionError('relay offline'));
     await refused;
     await end.finished;
@@ -152,9 +156,11 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
     const parked = parkSwitchFlow();
     const switching = scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: own.id });
     await parked.entered;
+    const holdUps = watchSwitchHoldUps(other);
 
     const end = track(pressEnd(other, target, { usageId: own.id }));
-    await settle();
+    await holdUps.heldUp();
+    expect(end.state.done).toBe(false);
     parked.release();
     await switching;
     await end.finished;
@@ -180,9 +186,10 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
     const parked = parkSwitchFlow();
     const switching = scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: own.id });
     await parked.entered;
+    const holdUps = watchSwitchHoldUps(other, queueOf(other));
 
     const end = track(pressEnd(other, 'all'));
-    await settle();
+    await holdUps.retried();
     expect(end.state.done).toBe(false);
     parked.release();
     await switching;
@@ -203,9 +210,10 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
       const parked = parkSwitchFlow();
       const switching = scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: own.id });
       await parked.entered;
+      const holdUps = watchSwitchHoldUps(scope.usage);
 
       const end = track(pressEnd(scope.usage, target, { usageId: others.id }));
-      await settle();
+      await holdUps.retried();
       expect(end.state.done).toBe(false);
       parked.release();
       await switching;
@@ -223,7 +231,7 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
     Object.assign(turns, { sessionChangeWaitMs: 100 });
     let release!: () => void;
     const holding = turns.take(1, () => new Promise<void>((resolve) => (release = resolve)));
-    await settle();
+    await until(() => release !== undefined, 'the turn is held');
 
     await expect(pressEnd(scope.usage, 'user')).rejects.toBeInstanceOf(MachineBusyError);
 

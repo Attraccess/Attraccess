@@ -7,6 +7,7 @@ import {
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
 import { SessionExtensionNotPossibleException } from '../session-duration/session-duration.errors';
 import { usageInternals } from '../sessions/fixtures/compose.test-fixture';
+import { someoneWaitsForALock, until, watchSwitchHoldUps } from '../sessions/fixtures/switch-signals.test-fixture';
 
 jest.setTimeout(60_000);
 
@@ -15,7 +16,9 @@ describe('Extending a session whose project is being switched', () => {
   const scope = createUsageLifecyclePersistenceAroundExternalFlowsFixture();
 
   const usages = () => scope.source.getRepository(ResourceUsage).find({ order: { id: 'ASC' } });
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 400));
+  /** Some transaction waits for a row lock another one holds. */
+  const someoneWaitsForARow = () =>
+    until(() => someoneWaitsForALock(scope.source), 'a transaction waits for a row lock');
   const extendedBy = (autoEndAt: Date | null | undefined, minutes: number) =>
     new Date((autoEndAt as Date).getTime() + minutes * 60_000);
 
@@ -90,9 +93,13 @@ describe('Extending a session whose project is being switched', () => {
       const parked = parkSwitchFlow();
       const switching = switchOwn(own.id);
       await parked.entered;
+      const holdUps = watchSwitchHoldUps(scope.usage);
 
       const extension = track(extend(named ? own.id : undefined));
-      await settle();
+      // Alone on the machine it goes through at once; on a shared one it waits for the turn the switch holds.
+      if (limit === 1) await extension.finished;
+      else await holdUps.heldUp();
+      expect(extension.state.done).toBe(limit === 1);
       parked.release();
       const continuation = await switching;
       await extension.finished;
@@ -112,7 +119,8 @@ describe('Extending a session whose project is being switched', () => {
     await extensionOpen.entered;
 
     flow.release();
-    await settle();
+    // The switch's commit waits for the row the extension locked.
+    await someoneWaitsForARow();
     expect(switching.state.done).toBe(false);
     extensionOpen.release();
 
@@ -130,7 +138,8 @@ describe('Extending a session whose project is being switched', () => {
       await commit.entered;
 
       const extension = track(extend(named ? own.id : undefined));
-      await settle();
+      // The extension waits for the row the switch's commit changed.
+      await someoneWaitsForARow();
       expect(extension.state.done).toBe(false);
       commit.release();
 
@@ -151,6 +160,7 @@ describe('Extending a session whose project is being switched', () => {
       const parked = parkSwitchFlow();
       const switching = switchOwn(own.id);
       await parked.entered;
+      const holdUps = watchSwitchHoldUps(scope.usage);
 
       const extension = track(
         scope.usage.extendSession(1, scope.users[1], {
@@ -158,7 +168,8 @@ describe('Extending a session whose project is being switched', () => {
           ...(named ? { usageId: others.id } : {}),
         }),
       );
-      await settle();
+      // It gave up on the busy machine once and tries again, as the switch holds it.
+      await holdUps.retried();
       expect(extension.state.done).toBe(false);
       parked.release();
       await switching;

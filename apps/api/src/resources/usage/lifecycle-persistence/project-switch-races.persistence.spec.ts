@@ -7,6 +7,7 @@ import {
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../../../database/adapters/usage/lifecycle-fixtures/state.test-fixture';
 import type { ResourceUsageService } from '../sessions/resource-usage.service';
 import { forkUsageInstance, usageInternals } from '../sessions/fixtures/compose.test-fixture';
+import { someoneWaitsForALock } from '../sessions/fixtures/switch-signals.test-fixture';
 
 jest.setTimeout(60_000);
 
@@ -167,8 +168,7 @@ describe('Switching the project of a running session while other changes race it
     const settledOrBlocked = async (racing: Promise<unknown>) => {
       let settled = false;
       void racing.finally(() => (settled = true));
-      const blocked = async () =>
-        Number((await scope.source.query(`SELECT count(*) AS n FROM pg_locks WHERE NOT granted`))[0].n) > 0;
+      const blocked = () => someoneWaitsForALock(scope.source);
       for (let tries = 0; tries < 200 && !settled && !(await blocked()); tries++) {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
