@@ -59,8 +59,8 @@ export interface FlowGraphStore {
   /** The nodes of one global flow. */
   findGlobalFlowNodes(flowId: number): Promise<FlowNodeRecord[]>;
 
-  /** Every enabled global flow with its canvas, lowest id first. */
-  loadEnabledGlobalCanvases(): Promise<Array<{ flow: FlowRecord; canvas: FlowCanvas }>>;
+  /** Every enabled global flow with its canvas, lowest id first; with `scope`, read inside that transaction. */
+  loadEnabledGlobalCanvases(scope?: TransactionScope): Promise<Array<{ flow: FlowRecord; canvas: FlowCanvas }>>;
 
   /**
    * Replaces the canvas of a resource. Throws {@link FlowCanvasIdConflictError} (and changes nothing) when a node or

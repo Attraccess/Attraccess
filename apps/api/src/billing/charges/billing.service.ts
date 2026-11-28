@@ -96,14 +96,19 @@ export class BillingService {
     await this.openUsageBill(usage.id, user.id, context);
   }
 
-  /** Whether a flow of the resource can lower what a running usage costs, with a billing item priced below zero. */
+  /**
+   * Whether a flow can lower what a running usage of the resource costs, with a billing item priced below zero: the
+   * resource's own flow, or a global flow that a project switch runs.
+   */
   public async flowsMayLowerCharge(resourceId: number, context?: BillingTransactionContext): Promise<boolean> {
-    const nodes = await this.resourceFlowsService.getNodes(
-      resourceId,
-      ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+    const type = ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS;
+    const own = await this.resourceFlowsService.getNodes(resourceId, type, context);
+    const global = await this.resourceFlowsService.getGlobalNodesOfFlowsWith(
+      ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_SWITCHED,
+      type,
       context,
     );
-    return nodes.some((node) => Number((node.data as { unitPrice?: unknown } | null)?.unitPrice) < 0);
+    return [...own, ...global].some((node) => Number((node.data as { unitPrice?: unknown } | null)?.unitPrice) < 0);
   }
 
   /**
