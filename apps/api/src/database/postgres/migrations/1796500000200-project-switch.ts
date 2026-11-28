@@ -6,8 +6,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * own, every existing resource charges continuations in the default mode, and no existing form is required on a
  * switch.
  */
-export class ProjectSwitch1796500000000 implements MigrationInterface {
-  name = 'ProjectSwitch1796500000000';
+export class ProjectSwitch1796500000200 implements MigrationInterface {
+  name = 'ProjectSwitch1796500000200';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`ALTER TABLE "resource_usage" ADD "previousUsageId" integer`);

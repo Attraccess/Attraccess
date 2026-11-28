@@ -1,13 +1,13 @@
 import type { DataSource } from 'typeorm';
 import { closeTestDataSource, createTestDataSource } from '../../../test-utils/test-database';
-import { ProjectSwitch1796500000000 } from './1796500000000-project-switch';
+import { ProjectSwitch1796500000200 } from './1796500000200-project-switch';
 import { postgresMigrations } from './index';
 
 jest.setTimeout(120_000);
 
-describe('ProjectSwitch1796500000000 (persistence)', () => {
+describe('ProjectSwitch1796500000200 (persistence)', () => {
   let source: DataSource;
-  const migration = new ProjectSwitch1796500000000();
+  const migration = new ProjectSwitch1796500000200();
   const run = async (direction: 'up' | 'down') => {
     const runner = source.createQueryRunner();
     try {
@@ -18,7 +18,7 @@ describe('ProjectSwitch1796500000000 (persistence)', () => {
   };
 
   beforeEach(async () => {
-    const index = postgresMigrations.indexOf(ProjectSwitch1796500000000);
+    const index = postgresMigrations.indexOf(ProjectSwitch1796500000200);
     source = await createTestDataSource({ migrations: postgresMigrations.slice(0, index), migrationsRun: true });
     await source.query(`INSERT INTO "user" (id, username, email) VALUES (1, 'ada', 'ada@example.com')`);
     await source.query(`INSERT INTO "resource" (id, name, type) VALUES (1, 'Laser', 'machine')`);

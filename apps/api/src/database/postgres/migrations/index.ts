@@ -16,7 +16,7 @@ import { BillingTransactionReferenceIndexes1796400000000 } from './1796400000000
 import { DiscardZeroUsageBills1796400000001 } from './1796400000001-discard-zero-usage-bills';
 import { ResourceMeterArchive1796400000002 } from './1796400000002-resource-meter-archive';
 import { NfcCardUniqueUid1796500000100 } from './1796500000100-nfc-card-unique-uid';
-import { ProjectSwitch1796500000000 } from './1796500000000-project-switch';
+import { ProjectSwitch1796500000200 } from './1796500000200-project-switch';
 
 /** The released PostgreSQL migration track, in order. Later schema changes are appended here as new migrations. */
 export const postgresMigrations = [
@@ -38,5 +38,5 @@ export const postgresMigrations = [
   DiscardZeroUsageBills1796400000001,
   ResourceMeterArchive1796400000002,
   NfcCardUniqueUid1796500000100,
-  ProjectSwitch1796500000000,
+  ProjectSwitch1796500000200,
 ];
