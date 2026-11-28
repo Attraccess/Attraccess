@@ -6,10 +6,10 @@
   "loading": "Loading billing total",
   "loadError": "Could not load the billing currency.",
   "retry": "Try again",
-  "allParts": "This includes every part of the session, before and after each project switch.",
+  "allParts": "This includes every part of the session, before and after each project change.",
   "part": {
-    "title": "Project switched",
-    "total": "Charge for the part before the switch",
-    "continues": "Your session was not ended by the switch: it continued. This amount covers only the part that ended."
+    "title": "Project changed",
+    "total": "Charge for the part before the change",
+    "continues": "Your session was not ended by the change: it continued. This amount covers only the part that ended."
   }
 }

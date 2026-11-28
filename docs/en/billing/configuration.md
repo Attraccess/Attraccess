@@ -47,8 +47,8 @@ Prices and the billing factor stay those saved when the session started; the opt
 
 ### What the user sees
 
-- **At a switch** the web app shows **Project switched** with the charge for the part that ended, and says that the session continued. A part without a charge shows nothing.
-- **While the session runs**, the **Live session** billing view of a continuation covers only the part since the latest switch: **Time since project switch** and **Estimated bill since the switch**. The estimate follows the option above, so it does not include a fee per usage or a started minute that an earlier part already paid. Apart from the owner, only billing and resource managers get this estimate.
+- **At a switch** the web app shows **Project changed** with the charge for the part that ended, and says that the session continued. A part without a charge shows nothing.
+- **While the session runs**, the **Live session** billing view of a continuation covers only the part since the latest switch: **Time since project change** and **Estimated bill since the project change**. The estimate follows the option above, so it does not include a fee per usage or a started minute that an earlier part already paid. Apart from the owner, only billing and resource managers get this estimate.
 - **When the session ends**, the **Session billing summary** shows what all its parts cost together, also when the last part cost nothing.
 - **E-mail receipts** are sent for each charged part, like for a session of its own, with the times and the amount of that part.
 

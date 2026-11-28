@@ -99,7 +99,7 @@ While your machine session is running, you can move it to another project withou
 
 1. Open the resource detail page
 2. In the running session, click **Change project**
-3. Pick another of your projects, or **No project**, and click **Switch project**
+3. Pick another of your projects, or **No project**, and click **Change project**
 4. Fill in any [forms](forms/overview.md) required for a project switch
 
 Everything up to the switch is booked to the old project, everything after it to the new one: minutes, machine running time, [metered consumption](flows/energy-metering.md), credits and the [project statistics](projects/overview.md#usage-statistics). The elapsed time shown for your session still counts from its original start.

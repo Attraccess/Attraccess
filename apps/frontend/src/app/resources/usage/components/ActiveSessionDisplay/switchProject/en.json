@@ -8,7 +8,7 @@
     "select": "New project",
     "placeholder": "Choose a project",
     "cancel": "Cancel",
-    "confirm": "Switch project",
+    "confirm": "Change project",
     "replaced": {
       "title": "This session has changed",
       "description": "It ended or its project was changed elsewhere while this dialog was open. Close the dialog and check your session."
@@ -55,7 +55,7 @@
     },
     "Only the owner of a running session can switch its project": {
       "title": "Project not changed",
-      "description": "The project was not changed. Only the person who started a running session can switch its project."
+      "description": "The project was not changed. Only the person whose session it is can change its project."
     },
     "No active usage session found": {
       "title": "Project not changed",
@@ -75,7 +75,7 @@
     },
     "SessionChangeInterruptedError": {
       "title": "Project not changed",
-      "description": "The project was not changed because the server was restarted during the switch. Check the machine and try again."
+      "description": "The project was not changed because the server was restarted during the change. Check the machine and try again."
     },
     "Usage session changed during the project switch": {
       "title": "Project not changed",

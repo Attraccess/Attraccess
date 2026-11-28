@@ -55,7 +55,7 @@
     },
     "Only the owner of a running session can switch its project": {
       "title": "Projekt nicht gewechselt",
-      "description": "Das Projekt wurde nicht gewechselt. Nur wer eine laufende Sitzung gestartet hat, kann ihr Projekt wechseln."
+      "description": "Das Projekt wurde nicht gewechselt. Nur die Person, der die Sitzung gehört, kann ihr Projekt wechseln."
     },
     "No active usage session found": {
       "title": "Projekt nicht gewechselt",
