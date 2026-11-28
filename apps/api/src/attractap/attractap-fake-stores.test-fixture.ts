@@ -23,6 +23,7 @@ import type {
 } from '@attraccess/application-models';
 import type { TransactionScope, UnitOfWork } from '../database/unit-of-work';
 import { type AttractapCardStore, CardAlreadyEnrolledError } from './card-store.port';
+import { normalizeCardUid } from './card-uid';
 import type { AttractapCrashReportStore } from './crash-report-store.port';
 import type { AttractapReaderStore } from './reader-store.port';
 import type { AttractapSecureBootKeyStore } from './secure-boot/secure-boot-key-store.port';
@@ -185,7 +186,7 @@ export class FakeCardStore implements AttractapCardStore {
     return this.cards.find((card) => card.id === id);
   }
   async findByUid(uid: string) {
-    return this.cards.find((card) => card.uid === uid);
+    return this.cards.find((card) => normalizeCardUid(card.uid) === normalizeCardUid(uid));
   }
   async listForUser(userId: number) {
     return this.cards.filter((card) => card.user?.id === userId).map(({ user, ...card }) => ({ ...card, user }));
@@ -198,7 +199,7 @@ export class FakeCardStore implements AttractapCardStore {
   }
   async create(owner: AttractapCardOwner, card: NewAttractapNfcCard, activate: boolean): Promise<AttractapNfcCard> {
     // The unique index on lower(uid): the failed insert changes nothing.
-    if (this.cards.some((other) => other.uid.toLowerCase() === card.uid.toLowerCase())) {
+    if (this.cards.some((other) => normalizeCardUid(other.uid) === normalizeCardUid(card.uid))) {
       throw new CardAlreadyEnrolledError();
     }
     if (activate) for (const other of this.cards) if (other.user?.id === owner.id) other.isActive = false;

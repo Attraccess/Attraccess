@@ -61,7 +61,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('enrollment races on one UID (%s
   });
 
   it('a tap that finishes an interrupted enrollment another check recorded meanwhile answers CARD_NOT_FOUND once', async () => {
-    const { operations, conversations, cards, pending, user, recordedMeanwhile } = setup();
+    const { operations, conversations, cards, pending, audit, user, recordedMeanwhile } = setup();
     const card = new EmulatedCard(kind);
     const interrupted = createRelayReader(card, conversations);
     interrupted.dropAfterWrite();
@@ -75,8 +75,22 @@ describe.each<CardKind>(['desfire', 'ntag424'])('enrollment races on one UID (%s
     expect(first).toEqual({ ok: false, error: 'CARD_NOT_FOUND' });
     expect(pending).toEqual([]);
     expect(cards).toHaveLength(1);
+    expect(audit).not.toHaveBeenCalled();
     const next = await operations.verifyCard(createRelayReader(card, conversations).socket, 'tap', detect());
     expect(next).toMatchObject({ ok: true, card: { id: 100 } });
+  });
+
+  it('keeps its own record when storing the card fails for another reason', async () => {
+    const { operations, conversations, pending, attractapService } = setup();
+    const failure = new Error('database gone');
+    attractapService.createNFCCard.mockRejectedValueOnce(failure);
+
+    await expect(
+      operations.enroll(createRelayReader(new EmulatedCard(kind), conversations).socket, detect(), enrollment),
+    ).rejects.toBe(failure);
+
+    // The key is on the card: the record lets a later tap finish the enrollment.
+    expect(pending).toHaveLength(1);
   });
 });
 

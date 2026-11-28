@@ -246,8 +246,8 @@ export class CardOperationsService {
 
   /**
    * The card holds the key an earlier, interrupted enrollment was writing: record the card now. Null when it cannot
-   * be recorded, also when another check or enrollment recorded the UID at the same moment (that tap answers
-   * `CARD_NOT_FOUND`; the next one verifies against the recorded card).
+   * be recorded, also when another check or enrollment recorded the UID at the same moment: that tap answers
+   * `CARD_NOT_FOUND`, and the next one (once the card was lifted) verifies against the recorded card.
    */
   private async finishPendingEnroll(
     channel: CardChannel,
@@ -276,8 +276,8 @@ export class CardOperationsService {
 
   /**
    * Records the card the enrollment `pending` wrote its key to. Null when another record got the UID first (the
-   * unique index decides a race the lookup before cannot): this attempt's record is deleted, as the UID belongs to
-   * that card now, and nothing is audited. Its key stays in the card slot.
+   * unique index decides a race the lookup before cannot): nothing is audited and `pending` is deleted, as the UID
+   * belongs to that record now (removing it removes the UID's pending enrollments too). Its key stays in the card slot.
    */
   private async recordEnrollment(
     user: AttractapCardOwner,
@@ -290,10 +290,10 @@ export class CardOperationsService {
     origin?: { pluginId: string },
   ): Promise<AttractapNfcCard | null> {
     const card = await this.createCard(user, { key: keyHex, keyNo: pending.keyNo, uid }, activate);
-    // This UID now belongs to a card record (this one, or the one that got it first): no other enrollment may be
-    // recovered onto it later (e.g. after a reset). Records for other UIDs stay; their key may be on another card.
     await this.cardStore.deletePendingById(pending.id);
     if (!card) return null;
+    // This UID now belongs to this card record: no other enrollment may be recovered onto it later (e.g. after a
+    // reset). Records for other UIDs stay; their key may be on another card.
     await this.cardStore.deletePendingByUid(uid, 'enroll');
     await this.audit.record({
       domain: 'attractap',
