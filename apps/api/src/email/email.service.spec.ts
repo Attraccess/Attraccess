@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { ReceiptItem, ReceiptTransaction, ReceiptUsage } from './email-receipt.types';
 import { NotificationRecipient } from '@attraccess/application-models';
 import { EmailTemplateType } from '@attraccess/application-models';
@@ -166,7 +168,7 @@ describe('EmailService', () => {
 
     await service.sendAccessChangeEmail(user, {
       title: 'Your resource access changed',
-      body: 'You were made an introducer for resource Laser Cutter.',
+      body: 'You were made an introducer for resource "Laser Cutter".',
       url: '/resources/7',
     });
 
@@ -175,7 +177,7 @@ describe('EmailService', () => {
     expect(callArg.to).toBe('dana@example.com');
     expect(callArg.subject).toBe('Your resource access changed');
     expect(callArg.html).toContain('Hello dana');
-    expect(callArg.html).toContain('You were made an introducer for resource Laser Cutter.');
+    expect(callArg.html).toContain('You were made an introducer for resource &quot;Laser Cutter&quot;.');
     expect(callArg.html).toContain('https://frontend.example/resources/7');
   });
 
@@ -185,7 +187,7 @@ describe('EmailService', () => {
 
     await service.sendAccessChangeEmail({ id: 7 } as NotificationRecipient, {
       title: 'Your group access changed',
-      body: 'You received an introduction for group Wood shop.',
+      body: 'You received an introduction for group "Wood shop".',
       url: '/resource-groups/5',
     });
 
@@ -208,6 +210,16 @@ describe('EmailService', () => {
     const callArg = (sendMail as jest.Mock).mock.calls[0][0];
     expect(callArg.html).toContain('&quot;&lt;b&gt;Saw &amp; Co&lt;/b&gt;&quot;');
     expect(callArg.html).not.toContain('<b>Saw');
+  });
+
+  it('keeps the shipped access-change template on the escaping {{accessChange.body}} (#2313)', () => {
+    const template = readFileSync(
+      join(__dirname, '..', 'assets', 'email-defaults', 'templates', 'access-change.mjml'),
+      'utf8',
+    );
+
+    expect(template).toContain('{{accessChange.body}}');
+    expect(template).not.toContain('{{{accessChange.body}}}');
   });
 
   it('sends resource session ended email with resource URL and actor context', async () => {

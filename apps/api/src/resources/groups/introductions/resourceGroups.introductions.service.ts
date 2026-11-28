@@ -16,7 +16,7 @@ import { ResourceRetrainingService } from '../../retraining/resourceRetraining.s
 
 import { AuditActor } from '../../../audit/recorder/audit-event';
 
-import { dispatchAccessChange, nameForAccessChange } from '../../access-change-notification';
+import { notifyAccessChange } from '../../access-change-notification';
 
 import { createTranslator } from '../../../i18n/translate';
 
@@ -84,21 +84,18 @@ export class ResourceGroupsIntroductionsService {
   protected notifyIntroductionChange(groupId: number, userId: number, granted: boolean): void {
     const bodyKey = granted ? 'granted' : 'revoked';
 
-    void nameForAccessChange(groupId, (id) => this.store.findGroupName(id), this.logger)
-      .then((groupName) =>
-        dispatchAccessChange(this.notifications, {
-          userId,
-          title: (language) => t(language, 'title'),
-          body: (language) => t(language, bodyKey, { groupName }),
-          url: `/resource-groups/${groupId}`,
-          dedupeKey: `group-introduction-${groupId}-${userId}-${bodyKey}`,
-        }),
-      )
-      .catch((error) => {
-        this.logger.error(
-          `Failed to notify user ${userId} about group introduction changes: ${(error as Error).message}`,
-        );
-      });
+    notifyAccessChange(
+      this.notifications,
+      this.logger,
+      { kind: 'group', id: groupId, findName: (id) => this.store.findGroupName(id) },
+      {
+        userId,
+        title: (language) => t(language, 'title'),
+        body: (language, groupName) => t(language, bodyKey, { groupName }),
+        url: `/resource-groups/${groupId}`,
+        dedupeKey: `group-introduction-${groupId}-${userId}-${bodyKey}`,
+      },
+    );
   }
 
   protected async createOne(groupId: number, userId: number, tutorUserId?: number): Promise<IntroductionRecord> {

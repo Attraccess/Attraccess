@@ -77,7 +77,7 @@ describe('ResourceIntroductionsService notifications', () => {
     audit.record.mockClear();
   });
 
-  const texts = (locale: string) => {
+  const texts = (locale: string | null) => {
     const request = notifications.dispatchToUser.mock.calls[0][1];
     return { title: request.title({ locale }), body: request.body({ locale }) };
   };
@@ -124,6 +124,7 @@ describe('ResourceIntroductionsService notifications', () => {
       body: 'Du hast eine Einweisung für die Ressource „Laser Cutter“ erhalten.',
     });
     expect(texts('fr').body).toBe('You received an introduction for resource "Laser Cutter".');
+    expect(texts(null).body).toBe('You received an introduction for resource "Laser Cutter".');
   });
 
   it('falls back to #<id> when the resource name cannot be looked up, without failing the grant', async () => {
@@ -208,8 +209,10 @@ describe('ResourceIntroductionsService notifications', () => {
     store.lastHistoryItem.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });
 
     await service.grant(7, 3);
+    await flushNotifications();
 
     expect(notifications.dispatchToUser).not.toHaveBeenCalled();
+    expect(store.findResourceName).not.toHaveBeenCalled();
   });
 
   it('notifies the user when a resource introduction is revoked', async () => {
@@ -231,14 +234,18 @@ describe('ResourceIntroductionsService notifications', () => {
     store.lastHistoryItem.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.REVOKE });
 
     await service.revoke(7, 3);
+    await flushNotifications();
 
     expect(notifications.dispatchToUser).not.toHaveBeenCalled();
+    expect(store.findResourceName).not.toHaveBeenCalled();
   });
 
   it('does not notify when revoking a resource introduction that was never granted', async () => {
     await service.revoke(7, 3);
+    await flushNotifications();
 
     expect(notifications.dispatchToUser).not.toHaveBeenCalled();
+    expect(store.findResourceName).not.toHaveBeenCalled();
   });
 
   it('answers validity from the newest history item, inside the caller transaction when one is given', async () => {

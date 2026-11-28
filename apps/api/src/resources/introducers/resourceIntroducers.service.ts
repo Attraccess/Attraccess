@@ -9,7 +9,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 
-import { dispatchAccessChange, nameForAccessChange } from '../access-change-notification';
+import { notifyAccessChange } from '../access-change-notification';
 
 import { ResourceIntroducerChangedEvent } from './events/resource-introducer-changed.event';
 
@@ -116,19 +116,18 @@ export class ResourceIntroducersService {
           ? 'grantedIntroducer'
           : 'revokedIntroducer';
 
-    void nameForAccessChange(resourceId, (id) => this.store.findResourceName(id), this.logger)
-      .then((resourceName) =>
-        dispatchAccessChange(this.notifications, {
-          userId,
-          title: (language) => t(language, 'title'),
-          body: (language) => t(language, bodyKey, { resourceName }),
-          url: `/resources/${resourceId}`,
-          dedupeKey: `resource-access-${resourceId}-${userId}-${bodyKey}`,
-        }),
-      )
-      .catch((error) => {
-        this.logger.error(`Failed to notify user ${userId} about resource access changes: ${(error as Error).message}`);
-      });
+    notifyAccessChange(
+      this.notifications,
+      this.logger,
+      { kind: 'resource', id: resourceId, findName: (id) => this.store.findResourceName(id) },
+      {
+        userId,
+        title: (language) => t(language, 'title'),
+        body: (language, resourceName) => t(language, bodyKey, { resourceName }),
+        url: `/resources/${resourceId}`,
+        dedupeKey: `resource-access-${resourceId}-${userId}-${bodyKey}`,
+      },
+    );
   }
 
   public async grant(

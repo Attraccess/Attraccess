@@ -18,7 +18,7 @@ import { ResourceRetrainingService } from '../retraining/resourceRetraining.serv
 
 import { AuditActor } from '../../audit/recorder/audit-event';
 
-import { dispatchAccessChange, nameForAccessChange } from '../access-change-notification';
+import { notifyAccessChange } from '../access-change-notification';
 
 import { createTranslator } from '../../i18n/translate';
 
@@ -131,21 +131,18 @@ export class ResourceIntroductionsService {
   protected notifyIntroductionChange(resourceId: number, userId: number, granted: boolean): void {
     const bodyKey = granted ? 'granted' : 'revoked';
 
-    void nameForAccessChange(resourceId, (id) => this.store.findResourceName(id), this.logger)
-      .then((resourceName) =>
-        dispatchAccessChange(this.notifications, {
-          userId,
-          title: (language) => t(language, 'title'),
-          body: (language) => t(language, bodyKey, { resourceName }),
-          url: `/resources/${resourceId}`,
-          dedupeKey: `resource-introduction-${resourceId}-${userId}-${bodyKey}`,
-        }),
-      )
-      .catch((error) => {
-        this.logger.error(
-          `Failed to notify user ${userId} about resource introduction changes: ${(error as Error).message}`,
-        );
-      });
+    notifyAccessChange(
+      this.notifications,
+      this.logger,
+      { kind: 'resource', id: resourceId, findName: (id) => this.store.findResourceName(id) },
+      {
+        userId,
+        title: (language) => t(language, 'title'),
+        body: (language, resourceName) => t(language, bodyKey, { resourceName }),
+        url: `/resources/${resourceId}`,
+        dedupeKey: `resource-introduction-${resourceId}-${userId}-${bodyKey}`,
+      },
+    );
   }
 
   protected async createOne(resourceId: number, userId: number, tutorUserId?: number): Promise<IntroductionRecord> {

@@ -166,8 +166,10 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
     store.lastHistoryItem.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });
 
     await service.grant(5, 3);
+    await flushNotifications();
 
     expect(notifications.dispatchToUser).not.toHaveBeenCalled();
+    expect(store.findGroupName).not.toHaveBeenCalled();
   });
 
   it('notifies the user when a group introduction is revoked', async () => {
@@ -194,13 +196,17 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
     store.lastHistoryItem.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.REVOKE });
 
     await service.revoke(5, 3);
+    await flushNotifications();
 
     expect(notifications.dispatchToUser).not.toHaveBeenCalled();
+    expect(store.findGroupName).not.toHaveBeenCalled();
   });
 
   it('does not notify when revoking a group introduction that was never granted', async () => {
     await service.revoke(5, 3);
+    await flushNotifications();
 
     expect(notifications.dispatchToUser).not.toHaveBeenCalled();
+    expect(store.findGroupName).not.toHaveBeenCalled();
   });
 });

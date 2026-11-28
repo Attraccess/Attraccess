@@ -1,7 +1,7 @@
 {
   "title": "Dein Gruppenzugriff hat sich geändert",
-  "grantedMaintainer": "Du wurdest zum Betreuer für die Gruppe „{groupName}“ ernannt.",
+  "grantedMaintainer": "Du wurdest zum Wartenden für die Gruppe „{groupName}“ ernannt.",
   "grantedIntroducer": "Du wurdest zum Einweiser für die Gruppe „{groupName}“ ernannt.",
-  "revokedMaintainer": "Dein Betreuer-Status für die Gruppe „{groupName}“ wurde entzogen.",
+  "revokedMaintainer": "Dein Wartenden-Status für die Gruppe „{groupName}“ wurde entzogen.",
   "revokedIntroducer": "Dein Einweiser-Status für die Gruppe „{groupName}“ wurde entzogen."
 }

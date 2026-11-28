@@ -3,13 +3,18 @@ import { ResourceIntroducerType, type ResourceIntroducerRecord } from '@attracce
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceGroupIntroducerChangedEvent } from './events/resource-group-introducer-changed.event';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
-import { dispatchAccessChange, nameForAccessChange } from '../../access-change-notification';
+import { notifyAccessChange } from '../../access-change-notification';
 import { createTranslator } from '../../../i18n/translate';
 import * as de from './resourceGroups.introducers.de.json';
 import * as en from './resourceGroups.introducers.en.json';
 import { RESOURCE_GROUP_INTRODUCER_STORE, type ResourceGroupIntroducerStore } from '../resource-group-store.port';
 
 const t = createTranslator({ en, de });
+
+const BODY_KEYS = {
+  maintainer: { granted: 'grantedMaintainer', revoked: 'revokedMaintainer' },
+  introducer: { granted: 'grantedIntroducer', revoked: 'revokedIntroducer' },
+} as const satisfies Record<string, Record<'granted' | 'revoked', keyof typeof en>>;
 
 @Injectable()
 export class ResourceGroupsIntroducersService {
@@ -24,22 +29,21 @@ export class ResourceGroupsIntroducersService {
   ) {}
 
   private notifyAccessChange(groupId: number, userId: number, type: ResourceIntroducerType, granted: boolean): void {
-    const role = type === ResourceIntroducerType.MAINTAINER ? 'Maintainer' : 'Introducer';
-    const bodyKey = `${granted ? 'granted' : 'revoked'}${role}`;
+    const role = type === ResourceIntroducerType.MAINTAINER ? 'maintainer' : 'introducer';
+    const change = granted ? 'granted' : 'revoked';
 
-    void nameForAccessChange(groupId, (id) => this.store.findGroupName(id), this.logger)
-      .then((groupName) =>
-        dispatchAccessChange(this.notifications, {
-          userId,
-          title: (language) => t(language, 'title'),
-          body: (language) => t(language, bodyKey, { groupName }),
-          url: `/resource-groups/${groupId}`,
-          dedupeKey: `group-access-${groupId}-${userId}-${role.toLowerCase()}-${granted ? 'granted' : 'revoked'}`,
-        }),
-      )
-      .catch((error) => {
-        this.logger.error(`Failed to notify user ${userId} about group access changes: ${(error as Error).message}`);
-      });
+    notifyAccessChange(
+      this.notifications,
+      this.logger,
+      { kind: 'group', id: groupId, findName: (id) => this.store.findGroupName(id) },
+      {
+        userId,
+        title: (language) => t(language, 'title'),
+        body: (language, groupName) => t(language, BODY_KEYS[role][change], { groupName }),
+        url: `/resource-groups/${groupId}`,
+        dedupeKey: `group-access-${groupId}-${userId}-${role}-${change}`,
+      },
+    );
   }
 
   public async getMany(groupId: number): Promise<ResourceIntroducerRecord[]> {

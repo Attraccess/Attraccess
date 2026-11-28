@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceIntroducerType } from '@attraccess/application-models';
@@ -35,7 +36,7 @@ describe('ResourceGroupsIntroducersService notifications', () => {
     service = module.get(ResourceGroupsIntroducersService);
   });
 
-  const texts = (locale: string) => {
+  const texts = (locale: string | null) => {
     const request = notifications.dispatchToUser.mock.calls[0][1];
     return { title: request.title({ locale }), body: request.body({ locale }) };
   };
@@ -58,8 +59,58 @@ describe('ResourceGroupsIntroducersService notifications', () => {
     });
     expect(texts('de')).toEqual({
       title: 'Dein Gruppenzugriff hat sich geändert',
-      body: 'Du wurdest zum Betreuer für die Gruppe „Wood shop“ ernannt.',
+      body: 'Du wurdest zum Wartenden für die Gruppe „Wood shop“ ernannt.',
     });
+  });
+
+  it.each([
+    [
+      ResourceIntroducerType.MAINTAINER,
+      true,
+      'You were made a maintainer for group "Wood shop".',
+      'Du wurdest zum Wartenden für die Gruppe „Wood shop“ ernannt.',
+    ],
+    [
+      ResourceIntroducerType.INTRODUCER,
+      true,
+      'You were made an introducer for group "Wood shop".',
+      'Du wurdest zum Einweiser für die Gruppe „Wood shop“ ernannt.',
+    ],
+    [
+      ResourceIntroducerType.MAINTAINER,
+      false,
+      'Your maintainer status for group "Wood shop" was revoked.',
+      'Dein Wartenden-Status für die Gruppe „Wood shop“ wurde entzogen.',
+    ],
+    [
+      ResourceIntroducerType.INTRODUCER,
+      false,
+      'Your introducer status for group "Wood shop" was revoked.',
+      'Dein Einweiser-Status für die Gruppe „Wood shop“ wurde entzogen.',
+    ],
+  ])('names the group for %s (granted: %s) in English and German', async (type, granted, enBody, deBody) => {
+    repository.find.mockResolvedValue(granted ? null : { id: 8, userId: 3, type });
+
+    await (granted ? service.grant(5, 3, type) : service.revoke(5, 3, type));
+    await flushNotifications();
+
+    expect(texts('en').body).toBe(enBody);
+    expect(texts(null).body).toBe(enBody);
+    expect(texts('de').body).toBe(deBody);
+  });
+
+  it('falls back to #<id> and logs when the group name lookup fails, without failing the grant', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    repository.findGroupName.mockRejectedValue(new Error('database down'));
+
+    await expect(service.grant(5, 3, ResourceIntroducerType.INTRODUCER)).resolves.toEqual(
+      expect.objectContaining({ id: 1 }),
+    );
+    await flushNotifications();
+
+    expect(texts('en').body).toBe('You were made an introducer for group "#5".');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('group #5'));
+    warn.mockRestore();
   });
 
   it('names an introducer grant and falls back to #<id> when the group is gone', async () => {
@@ -107,9 +158,15 @@ describe('ResourceGroupsIntroducersService notifications', () => {
     await service.revoke(5, 3);
     expect(repository.remove).toHaveBeenCalledWith(8);
 
+    await flushNotifications();
     repository.remove.mockClear();
+    notifications.dispatchToUser.mockClear();
+    repository.findGroupName.mockClear();
     repository.find.mockResolvedValue(null);
     expect(await service.revoke(5, 3)).toBeUndefined();
+    await flushNotifications();
     expect(repository.remove).not.toHaveBeenCalled();
+    expect(repository.findGroupName).not.toHaveBeenCalled();
+    expect(notifications.dispatchToUser).not.toHaveBeenCalled();
   });
 });

@@ -155,10 +155,11 @@ describe('persisted resource introducer aggregation', () => {
   it('names the persisted resource in the access-change notification (#2313)', async () => {
     await service.grant(2, 99, ResourceIntroducerType.MAINTAINER);
     // The name is read from the database after the grant returns.
-    for (let attempt = 0; attempt < 100 && dispatchToUser.mock.calls.length === 0; attempt++) {
+    for (let attempt = 0; attempt < 500 && dispatchToUser.mock.calls.length === 0; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
 
+    expect(dispatchToUser).toHaveBeenCalledTimes(1);
     const request = dispatchToUser.mock.calls[0][1];
     expect(request.body({ locale: 'en' })).toBe('You were made a maintainer for resource "Mill".');
   });

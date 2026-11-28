@@ -280,8 +280,10 @@ describe('ResourceIntroducersService', () => {
       fixture.store.findDirect.mockResolvedValue(existing);
 
       expect(await fixture.service.grant(1, 2, ResourceIntroducerType.INTRODUCER)).toBe(existing);
+      await flushNotifications();
 
       expect(fixture.store.insert).not.toHaveBeenCalled();
+      expect(fixture.store.findResourceName).not.toHaveBeenCalled();
       expect(fixture.eventEmitter.emit).not.toHaveBeenCalled();
       expect(fixture.notifications.dispatchToUser).not.toHaveBeenCalled();
     });
@@ -321,7 +323,7 @@ describe('ResourceIntroducersService', () => {
         'Your maintainer status for resource "Laser Cutter" was revoked.',
       );
       expect(revokeReq.body({ locale: 'de' } as User)).toBe(
-        'Dein Betreuer-Status für die Ressource „Laser Cutter“ wurde entzogen.',
+        'Dein Wartenden-Status für die Ressource „Laser Cutter“ wurde entzogen.',
       );
     });
 
@@ -338,8 +340,54 @@ describe('ResourceIntroducersService', () => {
 
     it('does nothing when there is no grant', async () => {
       await fixture.service.revoke(1, 2);
+      await flushNotifications();
       expect(fixture.store.remove).not.toHaveBeenCalled();
       expect(fixture.eventEmitter.emit).not.toHaveBeenCalled();
+      expect(fixture.notifications.dispatchToUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('access-change texts', () => {
+    it.each([
+      [
+        ResourceIntroducerType.MAINTAINER,
+        true,
+        'You were made a maintainer for resource "Laser Cutter".',
+        'Du wurdest zum Wartenden für die Ressource „Laser Cutter“ ernannt.',
+      ],
+      [
+        ResourceIntroducerType.INTRODUCER,
+        true,
+        'You were made an introducer for resource "Laser Cutter".',
+        'Du wurdest zum Einweiser für die Ressource „Laser Cutter“ ernannt.',
+      ],
+      [
+        ResourceIntroducerType.MAINTAINER,
+        false,
+        'Your maintainer status for resource "Laser Cutter" was revoked.',
+        'Dein Wartenden-Status für die Ressource „Laser Cutter“ wurde entzogen.',
+      ],
+      [
+        ResourceIntroducerType.INTRODUCER,
+        false,
+        'Your introducer status for resource "Laser Cutter" was revoked.',
+        'Dein Einweiser-Status für die Ressource „Laser Cutter“ wurde entzogen.',
+      ],
+    ])('names the resource for %s (granted: %s) in English and German', async (type, granted, enBody, deBody) => {
+      fixture.store.findDirect.mockResolvedValue(granted ? null : grantRecord({ id: 8, userId: 2, type }));
+      fixture.store.insert.mockImplementation(async (resourceId, userId, insertedType) =>
+        grantRecord({ id: 5, resourceId, userId, type: insertedType }),
+      );
+
+      await (granted ? fixture.service.grant(1, 2, type) : fixture.service.revoke(1, 2, type));
+      await flushNotifications();
+
+      const request = fixture.notifications.dispatchToUser.mock.calls[0][1];
+      expect(request.title({ locale: 'en' } as User)).toBe('Your resource access changed');
+      expect(request.title({ locale: 'de' } as User)).toBe('Dein Ressourcenzugriff hat sich geändert');
+      expect(request.body({ locale: 'en' } as User)).toBe(enBody);
+      expect(request.body({ locale: null } as unknown as User)).toBe(enBody);
+      expect(request.body({ locale: 'de' } as User)).toBe(deBody);
     });
   });
 });

@@ -1,33 +1,39 @@
 import type { Logger } from '@nestjs/common';
 import type { NotificationRecipient } from '@attraccess/application-models';
 import { NotificationCategory } from '../notifications/notification-types';
-import { dispatchAccessChange, nameForAccessChange } from './access-change-notification';
+import { dispatchAccessChange, nameForAccessChange, notifyAccessChange } from './access-change-notification';
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
 
 describe('access-change notifications', () => {
-  const logger = { warn: jest.fn() } as unknown as Logger & { warn: jest.Mock };
+  const logger = { warn: jest.fn(), error: jest.fn() } as unknown as Logger & { warn: jest.Mock; error: jest.Mock };
 
-  beforeEach(() => logger.warn.mockClear());
+  beforeEach(() => {
+    logger.warn.mockClear();
+    logger.error.mockClear();
+  });
 
   describe('nameForAccessChange', () => {
     it('uses the looked-up name', async () => {
-      await expect(nameForAccessChange(8, async () => 'Laser Cutter', logger)).resolves.toBe('Laser Cutter');
+      await expect(
+        nameForAccessChange({ kind: 'resource', id: 8, findName: async () => 'Laser Cutter' }, logger),
+      ).resolves.toBe('Laser Cutter');
     });
 
     it('falls back to #<id> when the subject no longer exists', async () => {
-      await expect(nameForAccessChange(8, async () => null, logger)).resolves.toBe('#8');
+      await expect(nameForAccessChange({ kind: 'resource', id: 8, findName: async () => null }, logger)).resolves.toBe(
+        '#8',
+      );
       expect(logger.warn).not.toHaveBeenCalled();
     });
 
-    it('falls back to #<id> and logs when the lookup fails', async () => {
-      await expect(
-        nameForAccessChange(
-          8,
-          async () => {
-            throw new Error('database down');
-          },
-          logger,
-        ),
-      ).resolves.toBe('#8');
+    it('falls back to #<id> and logs which subject failed when the lookup fails', async () => {
+      const findName = async () => {
+        throw new Error('database down');
+      };
+
+      await expect(nameForAccessChange({ kind: 'group', id: 8, findName }, logger)).resolves.toBe('#8');
+      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('group #8'));
       expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('database down'));
     });
   });
@@ -61,6 +67,49 @@ describe('access-change notifications', () => {
       expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(recipient, NotificationCategory.ACCESS_CHANGES, {
         accessChange: { title: 'title:en', body: 'body:en', url: '/resources/8' },
       });
+    });
+  });
+
+  describe('notifyAccessChange', () => {
+    const notification = {
+      userId: 3,
+      title: () => 'title',
+      body: (language: string, name: string) => `${language}:${name}`,
+      url: '/resource-groups/5',
+      dedupeKey: 'key',
+    };
+
+    it('returns before the lookup and passes the looked-up name into the body', async () => {
+      const notifications = { dispatchToUser: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
+
+      notifyAccessChange(
+        notifications,
+        logger,
+        { kind: 'group', id: 5, findName: async () => 'Wood shop' },
+        notification,
+      );
+      expect(notifications.dispatchToUser).not.toHaveBeenCalled();
+      await flush();
+
+      const request = notifications.dispatchToUser.mock.calls[0][1];
+      expect(request.body({ id: 3, locale: 'de' } as NotificationRecipient)).toBe('de:Wood shop');
+    });
+
+    it('logs a failed dispatch instead of rejecting', async () => {
+      const notifications = {
+        dispatchToUser: jest.fn().mockRejectedValue(new Error('smtp down')),
+        sendEmailTemplate: jest.fn(),
+      };
+
+      notifyAccessChange(
+        notifications,
+        logger,
+        { kind: 'group', id: 5, findName: async () => 'Wood shop' },
+        notification,
+      );
+      await flush();
+
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('group #5: smtp down'));
     });
   });
 });
