@@ -342,8 +342,10 @@ describe('plugin resourceAccess', () => {
       const malformed = createResourceAccessContext(() => ({ ...deps, findUser }));
       for (const principal of [{ id: undefined as unknown as number }, 0, -1, 1.5]) {
         await expect(malformed.listResourceIdsIntroduced(principal)).resolves.toEqual([]);
+        await expect(malformed.hasPermission(principal, 'resources.update')).resolves.toBe(false);
       }
       expect(findUser).not.toHaveBeenCalled();
+      expect(scope.rbac.getEffectivePermissions).not.toHaveBeenCalled();
     });
 
     it('lists maintained resources through the core bulk lookup', async () => {

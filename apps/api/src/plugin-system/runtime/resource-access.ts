@@ -20,6 +20,8 @@ import type { PluginCoreLookupPort, PluginCoreUser } from '../persistence/plugin
 const LOOKUP_CONCURRENCY = 20;
 /** The largest id the database column holds; larger values name no resource and must not reach a query. */
 const MAX_ID = 2_147_483_647;
+/** A malformed principal names no user; it must never reach a lookup that could ignore an undefined condition. */
+const isUserId = (id: unknown): id is number => Number.isSafeInteger(id) && (id as number) > 0;
 const NO_START: PluginCanStartResult = { allowed: false, requiresSupervision: false, supervisionAllowed: false };
 
 /** Core services and lookups the plugin-facing access queries delegate to. */
@@ -62,8 +64,7 @@ export function createResourceAccessContext(getDeps: () => ResourceAccessDeps): 
   /** Loads the user and attaches the request scope, mirroring what core's auth strategy hands its services. */
   const resolveUser = async (principal: PluginAccessPrincipal): Promise<PluginCoreUser | AuthenticatedUser | null> => {
     const id = principalId(principal);
-    // A malformed principal names no user; it must never reach a lookup that could ignore an undefined condition.
-    if (!Number.isSafeInteger(id) || id <= 0) return null;
+    if (!isUserId(id)) return null;
     const user = await getDeps().findUser(id);
     if (!user) return null;
     const effectivePermissions = await scopedPermissions(principal);
@@ -162,6 +163,7 @@ export function createResourceAccessContext(getDeps: () => ResourceAccessDeps): 
     },
 
     async hasPermission(principal, permission) {
+      if (!isUserId(principalId(principal))) return false;
       const permissions =
         (await scopedPermissions(principal)) ?? (await getDeps().rbac.getEffectivePermissions(principalId(principal)));
       return permissions.has(permission);
