@@ -20,6 +20,9 @@ export class NfcCardUniqueUid1796500000100 implements MigrationInterface {
   name = 'NfcCardUniqueUid1796500000100';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // No write (e.g. from an API instance still running the old version) may add a duplicate between the cleanup and
+    // the index build. Reads go on; the index build takes this lock's weaker SHARE mode anyway.
+    await queryRunner.query(`LOCK TABLE "nfc_card" IN SHARE ROW EXCLUSIVE MODE`);
     const groups: ResolvedGroup[] = await queryRunner.query(
       `WITH "ranked" AS (
          SELECT "id", lower("uid") AS "uidKey",
@@ -39,16 +42,19 @@ export class NfcCardUniqueUid1796500000100 implements MigrationInterface {
         [deletedIds],
       );
       await queryRunner.query(`DELETE FROM "nfc_card" WHERE "id" = ANY($1::int[])`, [deletedIds]);
+    }
+    await queryRunner.query(`CREATE UNIQUE INDEX IF NOT EXISTS "UQ_nfc_card_uid_lower" ON "nfc_card" (lower("uid"))`);
+    // Logged once the index stands, so a failed build (rolled back, nothing deleted) does not report deletions.
+    if (deletedIds.length) {
       new Logger('NfcCardUniqueUid').warn(
         `Deleted ${deletedIds.length} duplicate card(s) of the same UID: ids ${deletedIds.join(', ')}. ` +
           `Kept per UID: ${groups.map((group) => `${group.keptId} (deleted ${group.deletedIds.join(', ')})`).join('; ')}`,
       );
     }
-    await queryRunner.query(`CREATE UNIQUE INDEX IF NOT EXISTS "UQ_nfc_card_uid_lower" ON "nfc_card" (lower("uid"))`);
   }
 
+  /** Drops the index only: the duplicates `up` deleted are not restored. */
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // Deleted duplicates are gone for good; only the index is removed.
     await queryRunner.query(`DROP INDEX IF EXISTS "UQ_nfc_card_uid_lower"`);
   }
 }

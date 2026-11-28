@@ -26,9 +26,15 @@ describe('NfcCardUniqueUid1796500000100 (persistence)', () => {
   });
 
   const run = async (direction: 'up' | 'down') => {
+    // In a transaction, as the migration track runs each migration (`LOCK TABLE` needs one).
     const runner = source.createQueryRunner();
     try {
+      await runner.startTransaction();
       await new NfcCardUniqueUid1796500000100()[direction](runner);
+      await runner.commitTransaction();
+    } catch (error) {
+      if (runner.isTransactionActive) await runner.rollbackTransaction();
+      throw error;
     } finally {
       await runner.release();
     }
@@ -85,15 +91,15 @@ describe('NfcCardUniqueUid1796500000100 (persistence)', () => {
 
   it('keeps the newest record among active duplicates of different users, then the highest id', async () => {
     await insertCards([
-      { id: 1, uid: '0c0c', isActive: true, userId: 1, createdAt: '2026-01-01T00:00:00Z' },
-      { id: 2, uid: '0C0C', isActive: true, userId: 2, createdAt: '2026-05-01T00:00:00Z' },
+      { id: 1, uid: '0c0c', isActive: true, userId: 1, createdAt: '2026-05-01T00:00:00Z' },
+      { id: 2, uid: '0C0C', isActive: true, userId: 2, createdAt: '2026-01-01T00:00:00Z' },
       { id: 3, uid: '0d0d', isActive: true, userId: 2, createdAt: '2026-01-01T00:00:00Z' },
       { id: 4, uid: '0D0D', isActive: true, userId: 1, createdAt: '2026-01-01T00:00:00Z' },
     ]);
 
     await run('up');
 
-    expect(await ids()).toEqual([2, 4]);
+    expect(await ids()).toEqual([1, 4]);
   });
 
   it('leaves one record of a larger group and does not touch cards with other UIDs', async () => {

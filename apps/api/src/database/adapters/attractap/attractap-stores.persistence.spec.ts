@@ -190,6 +190,28 @@ describe('Attractap persistence adapters on PostgreSQL', () => {
       expect((await cards.listForUser(user.id)).filter((card) => card.isActive)).toHaveLength(1);
     });
 
+    it('records one card when enrollments of different users race on the same UID', async () => {
+      const users = await source
+        .getRepository(User)
+        .save(['r1', 'r2', 'r3'].map((name) => ({ username: name, email: `${name}@example.test` })));
+      const cards = store();
+
+      // Different owners take no common row lock: the inserts meet only at the unique index.
+      const results = await Promise.allSettled(
+        users.map((owner, index) =>
+          cards.create(owner, { uid: ['04fe0001', '04FE0001', '04Fe0001'][index], keyNo: 1, key: 'k' }, true),
+        ),
+      );
+
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      for (const result of results.filter((result) => result.status === 'rejected')) {
+        expect((result as PromiseRejectedResult).reason).toBeInstanceOf(CardAlreadyEnrolledError);
+      }
+      expect(await source.query(`SELECT count(*)::int AS n FROM "nfc_card" WHERE lower(uid) = '04fe0001'`)).toEqual([
+        { n: 1 },
+      ]);
+    });
+
     it('lets other failures of a card insert through unchanged', async () => {
       const cards = store();
       const ghost = { id: 999_999, username: 'ghost', email: 'ghost@example.test' } as User;
