@@ -91,7 +91,53 @@ Die Werte finden Sie in der Karte **Betriebsdauer** auf der [Detailseite](resour
 
 Wenn Sie aktive [Projekte](projects/overview.md) haben, können Sie eine Nutzungssitzung mit einem Projekt verknüpfen. So lässt sich nachverfolgen, welche Ressourcen für welche Projekte verwendet werden.
 
-Die Projektzuordnung wird beim Starten der Sitzung festgelegt.
+Die Projektzuordnung wird beim Starten der Sitzung festgelegt. Nach dem Ende einer Sitzung kann die Person, der sie gehört, sie in der Nutzungshistorie einem anderen eigenen Projekt zuordnen.
+
+### Das Projekt einer laufenden Sitzung wechseln
+
+Während Ihre Maschinensitzung läuft, können Sie ihr Projekt ändern, ohne die Maschine anzuhalten:
+
+1. Öffnen Sie die Detailseite der Ressource
+2. Klicken Sie in der laufenden Sitzung auf **Projekt wechseln**
+3. Wählen Sie ein anderes Ihrer Projekte oder **Kein Projekt**
+4. Wählen Sie, worauf sich der Wechsel bezieht (**Ganze Sitzung** ist vorausgewählt), und bestätigen Sie
+5. Füllen Sie die für Ihre Wahl erforderlichen [Formulare](forms/overview.md) aus
+
+Es gibt zwei Möglichkeiten:
+
+|                                  | **Ganze Sitzung** (Standard)                                                                    | **Ab jetzt aufteilen**                                                                                                                                                                                   |
+| -------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Wofür                            | Sie haben das falsche Projekt gewählt                                                           | Sie beginnen mit etwas anderem                                                                                                                                                                           |
+| Dem neuen Projekt zugeordnet     | alles, was die laufende Sitzung bisher genutzt hat, und alles ab jetzt                          | nur die Nutzung ab jetzt                                                                                                                                                                                 |
+| Nutzungshistorie                 | weiterhin eine Zeile, unter dem neuen Projekt                                                   | zwei aufeinanderfolgende Zeilen; die spätere ist als **Fortsetzung nach Projektwechsel** markiert                                                                                                        |
+| Abrechnung                       | unverändert: jetzt wird nichts abgerechnet, es gibt keine neue Gebühr und keine Guthabenprüfung | der bisherige Abschnitt wird jetzt abgerechnet, wie in [Abrechnung beim Aufteilen einer Sitzung auf Projekte](billing/configuration.md#abrechnung-beim-aufteilen-einer-sitzung-auf-projekte) eingestellt |
+| Zähler                           | werden nicht abgelesen; ihr Verbrauch bleibt bei der Sitzung                                    | werden bei der Aufteilung abgelesen                                                                                                                                                                      |
+| Flow-Auslöser und Formularaktion | **Projekt geändert (ganze Sitzung)**                                                            | **Projekt gewechselt (Aufteilung)**                                                                                                                                                                      |
+
+Bei beiden Möglichkeiten läuft die Maschine weiter, die angezeigte Dauer Ihrer Sitzung zählt weiterhin ab dem ursprünglichen Start, und die [Flows](flows/node-types.md#projekt-gewechselt) **Nutzung gestartet**, **Nutzung beendet** und **Nutzung übernommen** werden nicht ausgeführt. Es werden keine Start-, End- oder Übernahmeformulare und keine Endnotiz verlangt und keine Start-, Stopp- oder Übernahme-Benachrichtigungen gesendet. Nur die Flows und Formulare Ihrer Wahl wirken mit. Schlägt einer davon fehl oder fehlt ein erforderliches Formular, bleibt das Projekt unverändert.
+
+#### Ganze Sitzung
+
+Nur das Projekt des laufenden Nutzungseintrags ändert sich. Endet er, zählen alle seine Minuten, die Betriebszeit der Maschine, der [Zählerverbrauch](flows/energy-metering.md) und die Credits in den [Statistiken](projects/overview.md#nutzungsstatistiken), der Historie und den Exporten des neuen Projekts; das alte Projekt erhält davon nichts. Ein nicht lesbarer Zähler oder zu wenig Guthaben verhindern diese Wahl nicht.
+
+Wurde die Sitzung zuvor aufgeteilt, umfasst **Ganze Sitzung** nur den laufenden Eintrag, also alles seit der letzten Aufteilung. Der Dialog nennt den Zeitpunkt. Frühere Abschnitte behalten ihre Projekte und Abrechnungen; Sie können jeden davon wie jede beendete Sitzung in der Nutzungshistorie umordnen.
+
+#### Ab jetzt aufteilen
+
+Alles bis zur Aufteilung bleibt beim alten Projekt, alles danach gehört zum neuen: Minuten, Betriebszeit der Maschine, Zählerverbrauch, Credits und die Projektstatistiken.
+
+- **Ein Eintrag pro Abschnitt.** Eine Aufteilung beendet den aktuellen Nutzungseintrag und beginnt im selben Augenblick eine **Fortsetzung**. Jede Zeile hat ihre eigene Dauer und Abrechnung. Der [CSV-Export](resources/csv-export.md) enthält die ID des vorherigen Abschnitts (`previousUsageId`).
+- **Zähler** werden bei der Aufteilung abgelesen. Lässt sich ein kostenpflichtiger Zähler nicht lesen, wird die Aufteilung abgelehnt: Die Sitzung läuft unter dem alten Projekt weiter.
+- **Übernommen werden:** die beim Start gespeicherten Preise und der Abrechnungsfaktor, die Aufsichtsperson, der [automatische Stopp](#automatisches-stoppen-und-sitzung-verlängern) samt Verlängerungen und auf einer gemeinsam genutzten Maschine Ihr Platz (eine volle Maschine verhindert keine Aufteilung).
+- Eine Sitzung zählt einmal für Wartungspläne nach **Anzahl der Nutzungen**, für die Freischaltung nach beaufsichtigten Nutzungen und bei den Sitzungszahlen im Bericht zu Ressourcenstunden. Die Projektstatistiken zählen jeden Abschnitt für sein Projekt.
+
+#### Regeln für beide Möglichkeiten
+
+- **Beenden und Verlängern während eines Wechsels:** Ein Knoten **Nutzungssitzung beenden** aus einem anderen Flow-Lauf (etwa ein Not-Aus oder eine Abschaltung bei Inaktivität) geht nicht verloren. Er wartet den Wechsel ab und beendet dann die Sitzung: unter dem neuen Projekt oder, falls der Wechsel abgelehnt wird, unter dem alten. Sie können die Sitzung währenddessen verlängern; die neue Stoppzeit bleibt nach dem Wechsel erhalten.
+- **Wer wechseln darf:** nur die Person, der die Sitzung gehört. Administratoren und Ressourcenverwaltende können fremde laufende Sitzungen nicht wechseln; beendete Sitzungen können wie bisher geändert werden. Türen haben keine Sitzungen zum Wechseln.
+- Wenn Ihre Installation [Aktionen auf das lokale Netzwerk beschränkt](settings/security.md), gilt für den Wechsel im Web und über die API die Regel für den Sitzungsstart.
+
+Sie können das Projekt auch an einem [Touch-Leser](attractap/using-the-reader.md#das-projekt-einer-laufenden-sitzung-wechseln) wechseln oder über die [REST-API](developer/api-reference.md#projektwechsel) mit `POST /api/resources/{resourceId}/usage/sessions/active/project` und dem Inhalt `{ "mode": "whole-session", "projectId": 12 }`.
 
 ## Nutzungshistorie
 

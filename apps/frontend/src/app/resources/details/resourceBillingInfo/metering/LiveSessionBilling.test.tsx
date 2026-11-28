@@ -7,6 +7,7 @@ import en from './en.json';
 
 vi.mock('@attraccess/react-query-client', () => ({
   useGetResourceMeteringLive: vi.fn(),
+  useGetRunningPartBilling: () => ({ data: undefined, isError: false }),
   useResourceUsageGetActiveSession: vi.fn(),
 }));
 vi.mock('../../../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 1 } }) }));

@@ -68,6 +68,8 @@ export function buildNodeExecutorRegistry(
     [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED]: passthrough,
     [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED]: passthrough,
     [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER]: passthrough,
+    [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_SWITCHED]: passthrough,
+    [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_REASSIGNED]: passthrough,
     [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED]: passthrough,
     [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED]: passthrough,
     [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED]: passthrough,

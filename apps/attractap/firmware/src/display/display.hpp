@@ -33,6 +33,7 @@
 #include "screens/topUp/topUpScreen.hpp"
 #include "screens/forms/formsScreen.hpp"
 #include "screens/projectSelect/projectSelectScreen.hpp"
+#include "screens/projectChange/projectChangeModeScreen.hpp"
 #include "screens/duration/durationInputScreen.hpp"
 #include "screens/extend/extendSessionScreen.hpp"
 #ifdef DEMO_MODE
@@ -83,6 +84,7 @@ public:
     static TopUpScreen topUpScreen;
     static FormsScreen formsScreen;
     static ProjectSelectScreen projectSelectScreen;
+    static ProjectChangeModeScreen projectChangeModeScreen;
     static DurationInputScreen durationInputScreen;
     static ExtendSessionScreen extendSessionScreen;
 #ifdef DEMO_MODE

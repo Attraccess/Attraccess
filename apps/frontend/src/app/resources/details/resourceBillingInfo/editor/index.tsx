@@ -18,10 +18,12 @@ import {
   NumberFieldInput,
   useOverlayState,
 } from '@heroui/react';
+import { ProjectSwitchChargingField } from './ProjectSwitchChargingField';
 import { MeterNameEditor } from '../../meters/MeterNameEditor';
 import { MeterSetupNotice } from '../metering/MeterNotices';
 import { formatCredits, parseCredits, dbCurrencyToUserCurrency, userCurrencyToDbCurrency } from '@attraccess/shared';
 import {
+  ProjectSwitchCharging,
   UseListResourceMetersKeyFn,
   useListResourceMeters,
   useSetResourceMeterRate,
@@ -107,6 +109,10 @@ export function ResourceBillingInfoEditor(props: Readonly<ResourceBillingInfoEdi
     ),
   );
 
+  const [projectSwitchCharging, setProjectSwitchCharging] = useState<ProjectSwitchCharging>(
+    resourceBillingConfiguration?.configuration.projectSwitchCharging ?? ProjectSwitchCharging.CONTINUE,
+  );
+
   const { data: meters = [] } = useListResourceMeters({ path: { resourceId } });
   const { mutateAsync: setMeterRate, isPending: ratesPending } = useSetResourceMeterRate();
   const { mutateAsync: setMeterAllocation, isPending: allocationsPending } = useSetResourceMeterAllocation();
@@ -139,6 +145,9 @@ export function ResourceBillingInfoEditor(props: Readonly<ResourceBillingInfoEdi
       return;
     }
 
+    setProjectSwitchCharging(
+      resourceBillingConfiguration?.configuration.projectSwitchCharging ?? ProjectSwitchCharging.CONTINUE,
+    );
     setCreditsPerUsage(
       dbCurrencyToUserCurrency(
         resourceBillingConfiguration?.configuration.creditsPerUsage ?? 0,
@@ -158,7 +167,8 @@ export function ResourceBillingInfoEditor(props: Readonly<ResourceBillingInfoEdi
         configuration.minorUnit,
       ),
     );
-  }, [resourceBillingConfiguration, configuration]);
+    // `isOpen`: what was changed but not saved must not come back, and be saved, the next time.
+  }, [resourceBillingConfiguration, configuration, isOpen]);
 
   const onSubmit = useCallback(async () => {
     if (!configuration) {
@@ -207,6 +217,7 @@ export function ResourceBillingInfoEditor(props: Readonly<ResourceBillingInfoEdi
         creditsPerUsage: userCurrencyToDbCurrency(creditsPerUsage, configuration.minorUnit),
         creditsPerMinute: userCurrencyToDbCurrency(creditsPerMinute, configuration.minorUnit),
         creditsPerOperatingMinute: userCurrencyToDbCurrency(creditsPerOperatingMinute, configuration.minorUnit),
+        projectSwitchCharging,
       },
     });
   }, [
@@ -215,6 +226,7 @@ export function ResourceBillingInfoEditor(props: Readonly<ResourceBillingInfoEdi
     creditsPerUsage,
     creditsPerMinute,
     creditsPerOperatingMinute,
+    projectSwitchCharging,
     meters,
     rates,
     setMeterRate,
@@ -285,6 +297,7 @@ export function ResourceBillingInfoEditor(props: Readonly<ResourceBillingInfoEdi
                 <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
               </NumberFieldGroup>
             </NumberField>
+            <ProjectSwitchChargingField value={projectSwitchCharging} onChange={setProjectSwitchCharging} />
             {meters.map((meter) => {
               const value =
                 rates[meter.id] ?? formatCredits(meter.creditsPerUnit, configuration.minorUnit, { useGrouping: false });

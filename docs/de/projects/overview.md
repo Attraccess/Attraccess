@@ -27,7 +27,7 @@ Die Seite **Projekte** in der Seitenleiste zeigt alle Projekte, auf die Sie Zugr
 
 ## Nutzung mit Projekten verknüpfen
 
-Beim Starten einer Nutzungssitzung an einer Ressource können Benutzer ein Projekt auswählen, dem die Sitzung zugeordnet wird. So lässt sich leicht nachverfolgen, welche Ressourcen für welches Projekt verwendet wurden.
+Beim Starten einer Nutzungssitzung an einer Ressource können Benutzer ein Projekt auswählen, dem die Sitzung zugeordnet wird. So lässt sich leicht nachverfolgen, welche Ressourcen für welches Projekt verwendet wurden. Die Person, der eine laufende Maschinensitzung gehört, kann deren Projekt auch mit **Projekt wechseln** ändern: für die **ganze Sitzung** (Standard) oder durch **Aufteilen**, sodass die Nutzung bis dahin beim bisherigen Projekt bleibt (siehe [Das Projekt einer laufenden Sitzung wechseln](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln)).
 
 > [!TIP]
 > Ermutigen Sie Ihre Teammitglieder, beim Starten einer Sitzung immer ein Projekt auszuwählen. So erhalten Sie einen vollständigen Überblick über die Ressourcennutzung pro Projekt.

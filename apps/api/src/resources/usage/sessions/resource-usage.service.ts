@@ -1,3 +1,4 @@
+import { ProjectChangeMode } from '@attraccess/application-models';
 import type { UsageBillingItemDraft, UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
@@ -26,11 +27,18 @@ import { UpdateUsageSessionProjectDto } from '../dtos/updateUsageSessionProject.
 
 import { EndSessionOptions, StartSessionOptions, UsageLifecycle } from '../lifecycle/usage-lifecycle';
 
+import { findLatestPartId } from './across-project-switches';
+
 import { UsageDoorActions } from './usage-door-actions';
 
 import { SessionEndTarget, UsageSessionEnds } from './usage-session-ends';
 
 import { UsageSessionRecords } from './usage-session-records';
+
+import { UsageSessionProjectReassign } from './usage-session-project-reassign';
+import { SwitchProjectOptions, UsageSessionProjectSwitch } from './usage-session-project-switch';
+
+import { SwitchUsageSessionProjectDto } from '../dtos/switchUsageSessionProject.dto';
 
 import { UsageSessionStartPreparation } from './usage-session-start-preparation';
 
@@ -61,6 +69,8 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     private readonly starts: UsageSessionStarts,
     private readonly ends: UsageSessionEnds,
     private readonly extensions: UsageSessionExtensions,
+    private readonly projectSwitch: UsageSessionProjectSwitch,
+    private readonly projectReassign: UsageSessionProjectReassign,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -94,6 +104,11 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     transactionalEntityManager?: TransactionScope,
   ): Promise<UsageSession[]> {
     return this.records.getActiveSessionsForResource(resourceId, transactionalEntityManager);
+  }
+
+  /** The record a session runs on as: the given one, unless its project was switched since. */
+  public findLatestPartId(usageId: number, context?: TransactionScope): Promise<number> {
+    return findLatestPartId(this.lifecycle.sessions, usageId, context);
   }
 
   public async getActiveSessions(resourceIds: number[]): Promise<Map<number, UsageSession[]>> {
@@ -195,6 +210,30 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     options: EndSessionOptions = {},
   ): Promise<UsageSession> {
     return this.ends.endSession(resourceId, user, dto, options);
+  }
+
+  /** Refuses a project change that can be told to fail before anything is asked of the person. */
+  public assertSessionProjectSwitchable(
+    resourceId: number,
+    user: UsageSessionUser,
+    dto: SwitchUsageSessionProjectDto,
+  ): Promise<void> {
+    return this.projectSwitch.assertSwitchable(resourceId, user, dto);
+  }
+
+  /**
+   * Changes the project of the caller's running session without stopping the machine: of the whole session, or by
+   * splitting it, as `dto.mode` says.
+   */
+  async switchSessionProject(
+    resourceId: number,
+    user: UsageSessionUser,
+    dto: SwitchUsageSessionProjectDto,
+    options: SwitchProjectOptions = {},
+  ): Promise<UsageSession> {
+    return dto.mode === ProjectChangeMode.WHOLE_SESSION
+      ? this.projectReassign.reassignProject(resourceId, user, dto, options)
+      : this.projectSwitch.switchProject(resourceId, user, dto, options);
   }
 
   /** Moves the automatic end of a running session later; refused past its cap. */

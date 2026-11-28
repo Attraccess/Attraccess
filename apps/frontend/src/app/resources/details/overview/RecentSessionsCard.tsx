@@ -8,6 +8,7 @@ import { FlatSection } from '../../../../components/flatSection';
 import { History, CheckCircle2, CircleDashed } from 'lucide-react';
 import { Spinner } from '@heroui/react';
 import { useResourceUsageGetHistory } from '@attraccess/react-query-client';
+import { ContinuationLabel } from '../../usage/components/ContinuationLabel';
 import en from './recentSessionsCard.en.json';
 import de from './recentSessionsCard.de.json';
 
@@ -57,6 +58,7 @@ export function RecentSessionsCard({ resourceId, className }: RecentSessionsCard
             <li key={session.id} data-cy="recent-sessions-row" className="flex items-center gap-3 py-2 text-sm">
               <span className="flex-1 text-foreground">
                 <DateTimeDisplay date={session.startTime} />
+                <ContinuationLabel previousUsageId={session.previousUsageId} />
               </span>
               <span className="text-muted">
                 <DurationDisplay

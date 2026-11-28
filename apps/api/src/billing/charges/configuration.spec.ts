@@ -364,6 +364,8 @@ describe('BillingService configuration and usage start', () => {
 
       expect(f.liveNotifications.notifyTransactionUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ id: 123, amount: -105 }),
+        // A session that was never switched is announced as it is.
+        null,
       );
       expect(f.email.sendResourceUsageBillingSummaryEmail).toHaveBeenCalledTimes(1);
       const [recipient, transaction, usage, minorUnit] = f.email.sendResourceUsageBillingSummaryEmail.mock.calls[0];

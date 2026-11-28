@@ -12,11 +12,11 @@ Alle Formulare verwalten Sie in der Seitenleiste unter **Geräte** → **Formula
 2. Klicken Sie auf **Neues Formular**
 3. Füllen Sie die Formulareinstellungen aus:
 
-| Einstellung                                              | Pflicht | Beschreibung                                                                                                                         |
-| -------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Formularname**                                         | Ja      | Ein beschreibender Name für das Formular (z.B. "Materialverbrauch")                                                                  |
-| **Standardwerte: wann dieses Formular erforderlich ist** | Nein    | Schalter für Sitzungsstart, Übernahme und Sitzungsende. Eine Ressource kann diese Standardwerte anpassen.                            |
-| **Geltungsbereich**                                      | Ja      | Wo das Formular gilt: **Ressource** (Ressource auswählen), **Gruppe** (Ressourcengruppe auswählen) oder **Global** (alle Ressourcen) |
+| Einstellung                                              | Pflicht | Beschreibung                                                                                                                                                            |
+| -------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Formularname**                                         | Ja      | Ein beschreibender Name für das Formular (z.B. "Materialverbrauch")                                                                                                     |
+| **Standardwerte: wann dieses Formular erforderlich ist** | Nein    | Schalter für Sitzungsstart, Übernahme, Sitzungsende, Projektwechsel (Aufteilung) und Projektänderung (ganze Sitzung). Eine Ressource kann diese Standardwerte anpassen. |
+| **Geltungsbereich**                                      | Ja      | Wo das Formular gilt: **Ressource** (Ressource auswählen), **Gruppe** (Ressourcengruppe auswählen) oder **Global** (alle Ressourcen)                                    |
 
 4. Fügen Sie mindestens ein Feld hinzu (siehe unten)
 5. Klicken Sie auf **Formular speichern**
@@ -126,7 +126,7 @@ Liegt eine Ressource nicht mehr im neuen Geltungsbereich, werden ihre Anpassunge
 
 1. Öffnen Sie bei der Ressource **Einstellungen** → **Formulare**
 2. Schalten Sie das Formular mit dem Schalter daneben für diese Ressource aus oder ein
-3. Um nur für diese Ressource zu ändern, wann das Formular verlangt wird, wählen Sie für Sitzungsstart, Sitzungsübernahme und Sitzungsende **Erben**, **Erforderlich** oder **Nicht erforderlich**
+3. Um nur für diese Ressource zu ändern, wann das Formular verlangt wird, wählen Sie für Sitzungsstart, Sitzungsübernahme, Sitzungsende, Projektwechsel (Aufteilung) und Projektänderung (ganze Sitzung) **Erben**, **Erforderlich** oder **Nicht erforderlich**
 
 ## Einreichungen ansehen
 

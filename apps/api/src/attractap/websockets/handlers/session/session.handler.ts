@@ -32,13 +32,15 @@ import { AttractapFormsHandler } from '../forms/forms.handler';
 
 import { ReaderStartGate } from './reader-start-gate.service';
 
+import { sessionEndSummary } from './session-end-summary';
+
 import { CardSessionService } from '../ui/card-session.service';
 
 import { ResourceActionGuard } from '../resource-action.guard';
 
 import { ResourceListService } from '../resource-list/resource-list.service';
 
-import { formatCredits, dbCurrencyToUserCurrency } from '@attraccess/shared';
+import { formatCredits } from '@attraccess/shared';
 
 import { ResourceFormAction } from '@attraccess/application-models';
 
@@ -554,33 +556,11 @@ export class AttractapSessionHandler {
         )
         .finally(releaseCardSession);
       this.formsHandler.clearFormDraft(socket, resourceId, ResourceFormAction.END);
-      const start = usage?.startTime ? new Date(usage.startTime).getTime() : NaN;
-      const end = usage?.endTime ? new Date(usage.endTime).getTime() : NaN;
-      const durationSeconds =
-        Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, Math.floor((end - start) / 1000)) : undefined;
-      // Billing lookup failures must not turn an already-ended session into a failed action.
-      let billingSummary: { amount: number; total: string } | undefined;
-      try {
-        if (usage?.userId === user.id) {
-          const charge = await this.billingService.getResourceUsageCharge(usage.id, user.id);
-          if (charge && charge.amount !== 0) {
-            const configuration = await this.billingService.getConfiguration();
-            const amount = -charge.amount;
-            const total = new Intl.NumberFormat('de-DE', {
-              minimumFractionDigits: configuration.minorUnit,
-              maximumFractionDigits: configuration.minorUnit,
-            }).format(dbCurrencyToUserCurrency(amount, configuration.minorUnit));
-            billingSummary = { amount, total: `${total} ${configuration.currency}` };
-          }
-        }
-      } catch (error) {
-        this.logger.warn(`Failed to load session billing summary: ${error.message}`);
-      }
+      const summary = await sessionEndSummary(this.billingService, this.logger, usage, user.id);
       await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, {
         success: true,
         endedOwnSession: usage?.userId === user.id,
-        ...(durationSeconds !== undefined ? { durationSeconds } : {}),
-        ...(billingSummary ? { billingSummary } : {}),
+        ...summary,
       } satisfies StopResourceUsageSessionPayload);
       if (usage?.userId === user.id) {
         void this.startGate.afterStop(socket, { resourceId, userId: user.id, sessionId: usage.id });

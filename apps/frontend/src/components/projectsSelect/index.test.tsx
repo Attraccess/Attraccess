@@ -41,8 +41,52 @@ it('supports clearing assignment through the legacy change callback', async () =
 });
 it('renders the placeholder before projects arrive and supports an optional change handler', async () => {
   state.projects = undefined;
-  render(<ProjectsSelect value={null} placeholder="Choose project" includeUnassignedOption />);
+  render(<ProjectsSelect value={undefined} placeholder="Choose project" includeUnassignedOption />);
   fireEvent.click(screen.getByRole('button', { name: /Choose project/ }));
   fireEvent.click(await screen.findByRole('option', { name: 'Unassigned' }));
   expect(state.query).toHaveBeenCalledWith({ query: { includeArchived: undefined } });
+});
+it('shows a chosen "unassigned" as the selected option, unlike nothing chosen yet', () => {
+  const view = render(
+    <ProjectsSelect
+      value={undefined}
+      placeholder="Choose project"
+      includeUnassignedOption
+      unassignedLabel="No project"
+    />,
+  );
+  expect(screen.getByRole('button', { name: /Choose project/ })).toBeTruthy();
+  view.rerender(
+    <ProjectsSelect value={null} placeholder="Choose project" includeUnassignedOption unassignedLabel="No project" />,
+  );
+  expect(screen.getByRole('button', { name: /No project/ })).toBeTruthy();
+});
+it('locks the select while disabled', () => {
+  render(<ProjectsSelect value={7} isDisabled label="Project" />);
+  expect(screen.getByRole('button', { name: /Workshop/ }).hasAttribute('disabled')).toBe(true);
+});
+it('is named by its visible label alone, once', () => {
+  render(<ProjectsSelect value={7} label="New project" />);
+  expect(screen.getByRole('button', { name: /^Workshop New project$|^New project Workshop$/ })).toBeTruthy();
+});
+it.each([
+  [8, 'Research'],
+  [null, 'No project'],
+])('lists a disabled project (%j) without letting it be picked', async (disabled, name) => {
+  const change = vi.fn();
+  render(
+    <ProjectsSelect
+      value={undefined}
+      placeholder="Choose project"
+      onChange={change}
+      includeUnassignedOption
+      unassignedLabel="No project"
+      disabledKeys={[disabled]}
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: /Choose project/ }));
+  const option = await screen.findByRole('option', { name });
+  expect(option.getAttribute('aria-disabled')).toBe('true');
+  fireEvent.click(option);
+  expect(change).not.toHaveBeenCalled();
 });

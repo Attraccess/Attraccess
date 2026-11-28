@@ -1,4 +1,5 @@
 # Abrechnungskonfiguration
+
 <!-- llms-description: So aktivieren Sie die Abrechnung pro Ressource, wählen Abrechnungsmodelle, rechnen Zählerverbrauch ab und verwalten Credit-Guthaben. -->
 
 Sie koennen die Abrechnung fuer jede Ressource einzeln aktivieren und konfigurieren. Die Abrechnungseinstellungen befinden sich auf der Detailseite der Ressource.
@@ -29,6 +30,29 @@ Sie können die folgenden Optionen pro Ressource kombinieren:
 Sitzungsdauer und Betriebsdauer werden unabhängig voneinander auf volle Minuten aufgerundet. Genau eine Minute bleibt eine abgerechnete Minute; eine aufgezeichnete Dauer von null bleibt null. Für die Betriebsdauer sind aufgezeichnete Betriebszustände aus [Flows](flows/node-types.md) erforderlich. Der Start einer Sitzung allein belegt keinen Maschinenbetrieb.
 
 Pauschale, beide zeitabhängigen Tarife und der Abrechnungsfaktor des Benutzers werden beim Sitzungsstart gespeichert. Spätere Konfigurationsänderungen gelten für neue Sitzungen. Der gespeicherte Faktor wird auf die Summe aller Sitzungsposten angewendet, einschließlich zusätzlicher Abrechnungsposten aus Flows. Bei einer übernommenen Sitzung stammen Posten, die Sie sonst beim Beenden ergänzen, aus dem Flow [Nutzung übernommen](flows/node-types.md#nutzung-übernommen), weil **Nutzung beendet** nicht läuft.
+
+## Abrechnung beim Aufteilen einer Sitzung auf Projekte
+
+Die Person, der eine laufende Sitzung gehört, kann [ihr Projekt wechseln](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln). Die **ganze Sitzung** zuzuordnen ändert nichts an der Abrechnung: keine neue Gebühr, keine neue Rundung und keine Guthabenprüfung, unabhängig von dieser Einstellung. Die Sitzung wird einmal abgerechnet, wenn sie endet, und zählt für das neue Projekt.
+
+Bei **Ab jetzt aufteilen** wird jeder Abschnitt auf einer eigenen Transaktion desselben Benutzers abgerechnet; „einem Projekt berechnet“ bedeutet, dass er in Nutzungsstatistik, Historie und Exporten dieses Projekts erscheint. **Abrechnung beim Aufteilen einer Sitzung auf Projekte** in den Abrechnungseinstellungen der Ressource legt fest, wie:
+
+| Option                              | Gebühr pro Nutzung              | Rundung von Sitzungs- und Betriebsminuten                                    | Guthabenprüfung beim Teilen |
+| ----------------------------------- | ------------------------------- | ---------------------------------------------------------------------------- | --------------------------- |
+| **Sitzung fortsetzen** (Standard)   | Nur einmal, im ersten Abschnitt | Fortlaufend ab dem ersten Start der Sitzung                                  | Nein                        |
+| **Fortsetzen, je Abschnitt runden** | Nur einmal, im ersten Abschnitt | Jeder Abschnitt rundet selbst auf: bis zu eine zusätzliche Minute je Teilung | Nein                        |
+| **Als neue Sitzung abrechnen**      | In jedem Abschnitt              | Jeder Abschnitt rundet selbst auf                                            | Ja, wie beim Start          |
+
+Bei **Sitzung fortsetzen** sind die berechneten Minuten eines Abschnitts die angefangenen Minuten vom ersten Start der Sitzung bis zum Ende des Abschnitts abzüglich derer bis zu seinem Beginn. Alle Abschnitte zusammen kosten daher so viele Zeit-Credits wie eine nicht aufgeteilte Sitzung; auch der Abrechnungsfaktor wird auf die laufende Summe gerundet. Beispiel mit 10 Credits pro Nutzung und 2 Credits pro Minute: Eine Aufteilung nach 2,5 Minuten einer 4-minütigen Sitzung berechnet 10 + 3 × 2 für den ersten und 1 × 2 für den zweiten Abschnitt: 18 Credits, genau wie ohne Aufteilung. Für aufgezeichnete Betriebsminuten gilt dieselbe Regel.
+
+Preise und Abrechnungsfaktor bleiben die beim Sitzungsstart gespeicherten; die geltende Option wird mit jeder Aufteilung gespeichert. Zählerverbrauch und von Flows ergänzte Posten werden in dem Abschnitt berechnet, in dem sie anfallen; jeder Zähleranteil wird je Abschnitt auf ganze Credits gerundet, wie bei zwei Sitzungen, und auf [gemeinsam genutzten Maschinen](#gemeinsam-genutzte-maschinen) werden Anteile einmal pro Zeitsegment gerundet, eine Aufteilung fügt also eine Segmentgrenze hinzu. Ein Abschnitt ohne Kosten hinterlässt keine Transaktion.
+
+### Was die Benutzer sehen
+
+- **Bei einer Aufteilung** zeigt die Web-App **Projekt gewechselt** mit den Kosten des beendeten Abschnitts und sagt, dass die Sitzung weiterlief. Bei einem Abschnitt ohne Kosten erscheint nichts.
+- **Während die Sitzung läuft**, bezieht sich die Abrechnungsansicht **Laufende Sitzung** einer Fortsetzung nur auf den Abschnitt seit der letzten Aufteilung: **Zeit seit dem Projektwechsel** und **Voraussichtliche Kosten seit dem Wechsel**. Die Schätzung folgt der Option oben, enthält also keine Gebühr pro Nutzung und keine angefangene Minute, die ein früherer Abschnitt schon bezahlt hat. Außer der Person, der die Sitzung gehört, erhalten nur Abrechnungs- und Ressourcenverwaltende diese Schätzung.
+- **Wenn die Sitzung endet**, zeigt die **Abrechnung deiner Sitzung**, was alle Abschnitte zusammen gekostet haben, auch wenn der letzte Abschnitt nichts gekostet hat.
+- **Belege per E-Mail** werden für jeden kostenpflichtigen Abschnitt verschickt, wie für eine eigene Sitzung, mit den Zeiten und dem Betrag dieses Abschnitts.
 
 ## Zählerverbrauch
 

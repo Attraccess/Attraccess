@@ -55,6 +55,10 @@ private:
         // Automatic end (ATT-43); 0 when the machine sets none. The cap is start plus the machine's maximum.
         time_t autoEndEpoch = 0;
         time_t maxEndEpoch = 0;
+        // The project the session is booked to; 0: none.
+        uint32_t projectId = 0;
+        // Whether this record continues a split.
+        bool continuation = false;
     };
     std::vector<DemoSession> _sessions[DemoStore::RESOURCE_COUNT];
     uint32_t _nextSessionId = 1;
@@ -93,6 +97,9 @@ private:
     void respondActionSuccess(const std::string &type);
 
     void respondProjects(uint32_t page, const std::string &search);
+    // ATT-1421: moves the card holder's running session to another project (demo/projects.cpp).
+    void handleSwitchProject(JsonObjectConst payload);
+    void addProjectSwitchOffer(JsonObject resource, const DemoSession &own, bool english) const;
     void handleStartSession(JsonObjectConst payload);
     void handleExtendSession(JsonObjectConst payload);
     // The shared 3D printer asks for an estimate and has a maximum session time (ATT-43).

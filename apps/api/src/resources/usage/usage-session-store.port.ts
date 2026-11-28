@@ -7,7 +7,7 @@ import type {
   UsageSessionResource,
   UsageSessionWithParties,
 } from '@attraccess/application-models';
-import type { SupervisionMode } from '@attraccess/application-models';
+import type { ProjectSwitchCharging, SupervisionMode } from '@attraccess/application-models';
 import type { ResourceUsageAction } from '@attraccess/application-models';
 import type { TransactionScope } from '../../database/unit-of-work';
 
@@ -30,6 +30,15 @@ export interface PendingSessionDraft {
   maxAutoEndAt?: Date | null;
   estimatedDurationMinutes?: number | null;
   autoEndWarnedOffsetMinutes?: number | null;
+}
+
+/** The part that continues a running session under another project. */
+export interface ContinuationDraft {
+  /** The part being switched away from; the continuation takes over its prices, billing factor and supervisor. */
+  previousUsageId: number;
+  startTime: Date;
+  projectId: number | null;
+  projectSwitchCharging: ProjectSwitchCharging;
 }
 
 /** A door action is stored as an already ended session record. */
@@ -121,8 +130,14 @@ export interface UsageSessionStore {
   isLifecycleBlocked(resourceId: number, sharedMachine: boolean, context?: TransactionScope): Promise<boolean>;
   /** The attempt; inside a unit of work it stays locked until commit, so attempt changes never interleave. */
   findAttempt(attemptId: string, resourceId: number, context?: TransactionScope): Promise<UsageLifecycleAttempt | null>;
-  /** Whether a stop or takeover attempt is already working on this running session. */
+  /** Whether a stop, takeover or project change attempt is already working on this running session. */
   isSessionBeingEnded(usageId: number, context?: TransactionScope): Promise<boolean>;
+  /** Whether a project change of this running session is pending: it still runs on, here or as its continuation. */
+  isSessionBeingSwitched(usageId: number, context?: TransactionScope): Promise<boolean>;
+  /** Whether a project change of any session of the resource is pending: on a shared machine it holds the turn. */
+  isProjectSwitchPending(resourceId: number): Promise<boolean>;
+  /** The published part that continues this one after a project switch, or null. */
+  findContinuationId(usageId: number, context?: TransactionScope): Promise<number | null>;
   saveAttempt(attempt: UsageLifecycleAttempt, context?: TransactionScope): Promise<UsageLifecycleAttempt>;
   deleteAttempt(attemptId: string, resourceId: number, context?: TransactionScope): Promise<void>;
   /** The attempt keeps its reservation, but it no longer has a tentative session. */
@@ -136,6 +151,13 @@ export interface UsageSessionStore {
 
   /** Reserves a session for a start or takeover: pending, never visible, with the owner's billing factor. */
   createPendingSession(draft: PendingSessionDraft, context?: TransactionScope): Promise<UsageSessionWithParties>;
+  /** Reserves the continuation of a running session: pending, never visible, with everything the session froze. */
+  createContinuationSession(draft: ContinuationDraft, context: TransactionScope): Promise<UsageSessionWithParties>;
+  /**
+   * Hands the automatic end of the previous part to its continuation. Read when the switch commits, so an extension
+   * made while it ran is not lost; the previous part's row stays locked until then.
+   */
+  inheritDeadline(previousUsageId: number, usageId: number, context: TransactionScope): Promise<void>;
   /** The tentative session with relations, or null when it no longer exists. */
   findPendingSession(usageId: number, context?: TransactionScope): Promise<UsageSessionWithParties | null>;
   /** Removes a tentative session. Reports whether one was removed; a published session is never touched. */
@@ -148,6 +170,8 @@ export interface UsageSessionStore {
     end: { endTime: Date; endNotes: string | null | undefined },
     context?: TransactionScope,
   ): Promise<boolean>;
+  /** Books a running session to another project. Reports `false` when it is not running (any more). */
+  assignRunningProject(usageId: number, projectId: number | null, context: TransactionScope): Promise<boolean>;
   /** Stores the running time attributed to an ended session. */
   setAttributedOperatingDuration(usageId: number, minutes: number, context?: TransactionScope): Promise<void>;
   /** A session with the relations a stop, takeover or start returns. */

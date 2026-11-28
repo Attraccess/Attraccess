@@ -235,7 +235,8 @@ void Application::setupActionCallbacks()
       // While a usage form is open the server refuses its fields or pages as a START error
       // without a request id, also in stop flows: that is the form failing, not the action.
       if (self->unlocked && self->hasPendingFormRequest && !result.success && self->api.isCurrentResourceAction(result.requestId) &&
-          (result.type == "START_RESOURCE_USAGE_SESSION" || result.type == "STOP_RESOURCE_USAGE_SESSION")) {
+          (result.type == "START_RESOURCE_USAGE_SESSION" || result.type == "STOP_RESOURCE_USAGE_SESSION" ||
+           result.type == "SWITCH_SESSION_PROJECT")) {
         self->handleFormFlowError(result);
         delete payload;
         return;
@@ -253,7 +254,12 @@ void Application::setupActionCallbacks()
         const bool returnToList = self->returnToListAfterAction;
         self->finishReaderAction(result.success);
         if (result.success) {
-          self->completedResourceName = resourceName;
+          self->completionSubject = resourceName;
+          // The confirmation of a switch names where the session is booked now.
+          if (result.type == "SWITCH_SESSION_PROJECT")
+            self->completionSubject = result.projectName.empty()
+                ? FirmwareI18n::messageText(FirmwareI18n::Message::NoProject, State::getActiveLanguage())
+                : result.projectName;
           self->onActionResult(result.type);
           if (!result.billingTotal.empty()) {
             self->restartSessionTimeout();
@@ -334,11 +340,8 @@ void Application::setupDisplayCallbacks()
   Display::projectSelectScreen.setProjectsPageRequestCallback(
       [this](uint32_t page, const std::string &search) { return this->requestProjectsPage(page, search); });
   Display::projectSelectScreen.setCallbacks(
-      [this](uint32_t projectId, const std::string &projectName) {
-        this->handleProjectSelection(projectId, projectName);
-        Display::returnFromTransient();
-      },
-      []() { Display::returnFromTransient(); });
+      [this](uint32_t projectId, const std::string &projectName) { this->handleProjectPicked(projectId, projectName); },
+      [this]() { this->cancelProjectPicker(); });
   Display::formsScreen.setFormPageNextCallback(
       [this](const API::FormPageSubmission &page) {
         this->handleFormPageNext(page);

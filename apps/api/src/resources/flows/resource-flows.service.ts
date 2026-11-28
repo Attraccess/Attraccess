@@ -205,6 +205,17 @@ export class ResourceFlowsService {
     return await this.graph.findResourceNodes(resourceId, type, scope);
   }
 
+  /** The `type` nodes of the enabled global flows with a `trigger` node: those that can act when `trigger` fires. */
+  public async getGlobalNodesOfFlowsWith(
+    trigger: ResourceFlowNodeType,
+    type: ResourceFlowNodeType,
+    scope?: TransactionScope,
+  ): Promise<FlowNodeRecord[]> {
+    return (await this.graph.loadEnabledGlobalCanvases(scope, { edges: false }))
+      .filter(({ canvas }) => canvas.nodes.some((node) => node.type === trigger))
+      .flatMap(({ canvas }) => canvas.nodes.filter((node) => node.type === type));
+  }
+
   public async getNodesForResources(
     resourceIds: number[],
     type: ResourceFlowNodeType,

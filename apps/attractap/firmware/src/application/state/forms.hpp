@@ -14,6 +14,7 @@ enum pending_action_t
         PENDING_ACTION_NONE,
         PENDING_ACTION_START_SESSION,
         PENDING_ACTION_STOP_SESSION,
+        PENDING_ACTION_SWITCH_PROJECT,
     };
 #endif
 
@@ -32,6 +33,17 @@ uint32_t pendingActionUsageId = 0; // force-stop of a chosen other session; 0 en
 
 #if defined(HAS_LVGL_DISPLAY)
 bool pendingActionIsTakeover = false;
+#endif
+
+#if defined(HAS_LVGL_DISPLAY)
+// The project picker is open to switch this running session (0: the picker chooses the project of a start).
+uint32_t projectSwitchUsageId = 0;
+uint32_t projectSwitchResourceId = 0;
+// The project it was booked to when the picker opened, and the picked one while the choice screen is open.
+uint32_t projectSwitchFromProjectId = 0;
+uint32_t projectSwitchToProjectId = 0;
+// What the change being sent applies to.
+API::ProjectChangeMode pendingProjectChangeMode = API::ProjectChangeMode::WHOLE_SESSION;
 #endif
 
 #if defined(HAS_LVGL_DISPLAY)

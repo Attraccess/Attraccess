@@ -14,6 +14,8 @@
     "resourceUsageStart": "Required by default at session start",
     "resourceUsageTakeover": "Required by default at takeover",
     "resourceUsageEnd": "Required by default at session end",
+    "resourceUsageProjectSwitch": "Required by default at project switch (split)",
+    "resourceUsageProjectReassign": "Required by default at project change (whole session)",
     "addField": "Add field",
     "reorderField": "Reorder field",
     "emptyFieldsTitle": "No fields",
@@ -94,7 +96,7 @@
   },
   "globalList": {
     "title": "Forms",
-    "subtitle": "Forms members fill in when they start, take over or end a session. A form applies to one resource, a resource group or every resource.",
+    "subtitle": "Forms members fill in when they start, take over or end a session or change its project. A form applies to one resource, a resource group or every resource.",
     "create": "New form",
     "tableLabel": "Forms",
     "empty": "No forms yet",
@@ -146,7 +148,9 @@
     "badges": {
       "start": "On start",
       "takeover": "On takeover",
-      "end": "On end"
+      "end": "On end",
+      "projectSwitch": "On project switch (split)",
+      "projectReassign": "On project change (whole session)"
     },
     "switchedOff": "{{count}} switched off"
   },
@@ -166,7 +170,9 @@
     "actions": {
       "start": "Start",
       "takeover": "Takeover",
-      "end": "End"
+      "end": "End",
+      "project-switch": "Project switch (split)",
+      "project-reassign": "Project change (whole session)"
     },
     "showAnswers": "Show answers",
     "hideAnswers": "Hide answers",
@@ -186,7 +192,9 @@
       "enabled": "Enabled",
       "start": "Start",
       "takeover": "Takeover",
-      "end": "End"
+      "end": "End",
+      "projectSwitch": "Project switch (split)",
+      "projectReassign": "Project change (whole session)"
     },
     "toggle": "Use {{name}} on this resource",
     "override": {

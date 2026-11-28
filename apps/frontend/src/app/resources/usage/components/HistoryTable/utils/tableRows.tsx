@@ -5,6 +5,7 @@ import { TFunction } from '@attraccess/plugins-frontend-ui';
 import { DurationDisplay, DateTimeDisplay } from '@attraccess/plugins-frontend-ui';
 import { DoorOpenIcon, LockIcon, MessageSquareText, UnlockIcon } from 'lucide-react';
 import { AttraccessUser } from '@attraccess/plugins-frontend-ui';
+import { ContinuationLabel } from '../../ContinuationLabel';
 
 /**
  * Generates table row cells based on session data and user permissions
@@ -35,6 +36,8 @@ export function generateRowCells(
     cells.push(
       <TableCell key={`start-${session.id}`} className="whitespace-nowrap">
         <DateTimeDisplay date={session.startTime} />
+        {/* Wraps below the date and adds nothing to the column's width, which would squeeze the others. */}
+        <ContinuationLabel previousUsageId={session.previousUsageId} className="w-0 min-w-full whitespace-normal" />
       </TableCell>,
       <TableCell key={`end-${session.id}`} className="hidden lg:table-cell whitespace-nowrap">
         <DateTimeDisplay date={session.endTime} />

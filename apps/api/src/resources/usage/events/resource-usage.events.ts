@@ -39,6 +39,41 @@ export class ResourceUsageSessionEndedEvent {
 }
 
 /**
+ * The owner moved their running session to another project: the previous usage ended and the new one continues it
+ * under the other project. The machine kept running, so no start, end or take-over event is emitted for it.
+ */
+export class ResourceUsageProjectSwitchedEvent {
+  public static readonly EVENT_NAME = 'resource.usage.project_switched';
+
+  constructor(
+    public readonly resourceId: number,
+    public readonly userId: number,
+    public readonly previousUsageId: number,
+    public readonly usageId: number,
+    public readonly previousProjectId: number | null,
+    public readonly projectId: number | null,
+    public readonly switchTime: Date,
+  ) {}
+}
+
+/**
+ * The owner moved their whole running session to another project: the same usage record, under another project.
+ * Nothing started or ended.
+ */
+export class ResourceUsageProjectReassignedEvent {
+  public static readonly EVENT_NAME = 'resource.usage.project_reassigned';
+
+  constructor(
+    public readonly resourceId: number,
+    public readonly userId: number,
+    public readonly usageId: number,
+    public readonly previousProjectId: number | null,
+    public readonly projectId: number | null,
+    public readonly changeTime: Date,
+  ) {}
+}
+
+/**
  * Emitted when a user attaches a note to a usage session (on start or end).
  * Drives notifications to the resource's introducers, maintainers and admins.
  */

@@ -27,7 +27,7 @@ The **Projects** page in the sidebar shows all projects you have access to. From
 
 ## Linking Usage to Projects
 
-When starting a usage session on a resource, users can select a project to link the session to. This makes it easy to track which resources were used for which project.
+When starting a usage session on a resource, users can select a project to link the session to. This makes it easy to track which resources were used for which project. The owner of a running machine session can also change its project with **Change project**: for the **whole session** (the default), or by **splitting** it, so that the usage up to then stays with the previous project (see [Changing the project of a running session](resources/usage-tracking.md#changing-the-project-of-a-running-session)).
 
 > [!TIP]
 > Encourage your team members to always select a project when starting a session. This gives you a complete overview of resource usage per project.

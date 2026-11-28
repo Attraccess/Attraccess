@@ -12,16 +12,26 @@ const state = vi.hoisted(() => ({
   setRate: vi.fn().mockResolvedValue(undefined),
   setAllocation: vi.fn().mockResolvedValue(undefined),
   updateConfiguration: vi.fn(),
+  billing: {} as Record<number, { data: { currency: string; minorUnit: number } }>,
+  resourceConfiguration: {
+    data: { configuration: { creditsPerUsage: 0, creditsPerMinute: 0, creditsPerOperatingMinute: 0 } },
+  },
 }));
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useGetBillingConfiguration: () => ({ data: { currency: 'EUR', minorUnit: state.minorUnit } }),
-  useGetResourceBillingConfiguration: () => ({
-    data: { configuration: { creditsPerUsage: 0, creditsPerMinute: 0, creditsPerOperatingMinute: 0 } },
-  }),
+  useGetBillingConfiguration: () => {
+    state.billing[state.minorUnit] ??= { data: { currency: 'EUR', minorUnit: state.minorUnit } };
+    return state.billing[state.minorUnit];
+  },
+  useGetResourceBillingConfiguration: () => state.resourceConfiguration,
   useUpdateResourceBillingConfiguration: () => ({ mutate: state.updateConfiguration, isPending: false }),
   useListResourceMeters: () => ({ data: state.meters }),
   useSetResourceMeterRate: () => ({ mutateAsync: state.setRate, isPending: false }),
+  ProjectSwitchCharging: {
+    CONTINUE: 'continue',
+    CONTINUE_PER_PART_ROUNDING: 'continue-per-part-rounding',
+    NEW_SESSION: 'new-session',
+  },
   useSetResourceMeterAllocation: () => ({
     mutateAsync: state.setAllocation,
     isPending: false,
@@ -110,4 +120,34 @@ it('saves a changed meter allocation and leaves unchanged ones alone', async () 
     path: { resourceId: 1, meterId: 2 },
     body: { allocation: 'per-session' },
   });
+});
+it('forgets unsaved choices when the editor is closed and opened again', async () => {
+  await openEditor();
+  fireEvent.click(screen.getByRole('radio', { name: 'inputs.projectSwitchCharging.options.new-session' }));
+  fireEvent.change(screen.getByRole('textbox', { name: /Free meter/ }), { target: { value: '5' } });
+  const fee = screen.getByRole('textbox', { name: 'inputs.creditsPerUsage.label' });
+  fireEvent.change(fee, { target: { value: '77' } });
+  fireEvent.blur(fee);
+
+  fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  fireEvent.click(screen.getByText('Edit billing'));
+  await screen.findByRole('dialog');
+
+  expect(screen.getByRole('radio', { name: 'inputs.projectSwitchCharging.options.continue' })).toBeChecked();
+  expect(screen.getByRole('textbox', { name: 'inputs.creditsPerUsage.label' })).toHaveValue('0');
+  fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
+  await waitFor(() => expect(state.updateConfiguration).toHaveBeenCalledOnce());
+  expect(state.updateConfiguration.mock.calls[0][0].body).toMatchObject({
+    creditsPerUsage: 0,
+    projectSwitchCharging: 'continue',
+  });
+});
+it('places the project switch charging with the session prices, before the meters', async () => {
+  const firstMeter = await openEditor();
+  const perMinute = screen.getByRole('textbox', { name: /inputs.creditsPerMinute.label/ });
+  const charging = screen.getByRole('radiogroup', { name: /inputs.projectSwitchCharging.label/ });
+
+  expect(perMinute.compareDocumentPosition(charging) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(charging.compareDocumentPosition(firstMeter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });

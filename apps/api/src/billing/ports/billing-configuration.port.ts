@@ -1,4 +1,4 @@
-import type { ResourceBillingConfigurationRecord } from '@attraccess/application-models';
+import type { ProjectSwitchCharging, ResourceBillingConfigurationRecord } from '@attraccess/application-models';
 import type { BillingTransactionContext } from './billing-ledger.port';
 
 export const BILLING_CONFIGURATION_STORE = Symbol.for('attraccess.billing.configuration-store');
@@ -7,6 +7,7 @@ export interface ResourceRates {
   creditsPerUsage: number;
   creditsPerMinute: number;
   creditsPerOperatingMinute: number;
+  projectSwitchCharging: ProjectSwitchCharging;
 }
 
 /** The instance-wide billing currency and the per-resource default prices. */

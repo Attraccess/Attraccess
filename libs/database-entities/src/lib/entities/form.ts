@@ -62,6 +62,16 @@ export class Form {
   @ApiProperty({ description: 'Whether the form is required on resource usage end' })
   isRequiredOnResourceUsageEnd!: boolean;
 
+  @Column({ type: 'boolean', default: false })
+  @ApiProperty({ description: 'Whether the form is required when a running session is split between projects' })
+  isRequiredOnResourceUsageProjectSwitch!: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  @ApiProperty({
+    description: 'Whether the form is required when a running session moves as a whole to another project',
+  })
+  isRequiredOnResourceUsageProjectReassign!: boolean;
+
   @OneToMany(() => FormField, (field) => field.form)
   @ApiProperty({ description: 'The fields of the form', type: () => FormField, isArray: true })
   fields!: FormField[];
@@ -133,6 +143,12 @@ export class FormResourceOverride {
 
   @Column({ type: 'boolean', nullable: true })
   isRequiredOnResourceUsageEnd!: boolean | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  isRequiredOnResourceUsageProjectSwitch!: boolean | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  isRequiredOnResourceUsageProjectReassign!: boolean | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;

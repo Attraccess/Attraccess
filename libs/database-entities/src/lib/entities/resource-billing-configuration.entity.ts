@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
+import { ProjectSwitchCharging } from '@attraccess/application-models';
 
 @Entity()
 export class ResourceBillingConfiguration {
@@ -38,4 +39,12 @@ export class ResourceBillingConfiguration {
   @Column({ type: 'bigint', default: 0 })
   @ApiProperty({ description: 'The credit cost per attributable operating minute' })
   creditsPerOperatingMinute!: number;
+
+  @Column({ type: 'varchar', default: ProjectSwitchCharging.CONTINUE })
+  @ApiProperty({
+    description: 'How a running session is charged when its owner splits it between projects',
+    enum: ProjectSwitchCharging,
+    enumName: 'ProjectSwitchCharging',
+  })
+  projectSwitchCharging!: ProjectSwitchCharging;
 }

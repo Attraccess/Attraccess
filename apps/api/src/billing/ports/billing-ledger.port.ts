@@ -3,6 +3,8 @@ import type {
   BillingTransactionDetail,
   BillingTransactionRecord,
   BillingTransactionStatus,
+  ProjectSwitchCharging,
+  SwitchedSessionCharge,
   UsageReceiptSource,
 } from '@attraccess/application-models';
 import type { TransactionScope } from '../../database/unit-of-work';
@@ -47,6 +49,31 @@ export interface SettleUsageChargeInput {
   audit: BillingAuditFactory;
 }
 
+/** An earlier part of a session whose project was switched, as far as billing a later part reads it. */
+export interface ContinuedUsagePart {
+  startTime: Date;
+  attributedOperatingDurationInMinutes: number | null;
+  /** Null on the part the session started with. */
+  projectSwitchCharging: ProjectSwitchCharging | null;
+  /**
+   * What the part's own bill charged before the billing factor: all its items (fee, minutes, meters, flow items) but
+   * the billing factor's. Late meter corrections of the part are not included.
+   */
+  grossCredits: bigint;
+}
+
+/** A usage that has not ended, with what pricing it reads. */
+export interface RunningUsagePricing {
+  userId: number | null;
+  resourceId: number;
+  startTime: Date;
+  previousUsageId: number | null;
+  projectSwitchCharging: ProjectSwitchCharging | null;
+  creditsPerUsage: number | null;
+  sessionDurationCreditsPerMinute: number | null;
+  operatingDurationCreditsPerMinute: number | null;
+}
+
 /**
  * The billing ledger as the application needs it. Balances live on the user row and are changed by database
  * triggers when a completed transaction is written, so every write below changes the balance atomically with the
@@ -58,6 +85,21 @@ export interface BillingLedgerStore {
 
   /** The id of the user's own transaction for a usage, if any. */
   findTransactionIdForUsage(usageId: number, userId: number): Promise<number | null>;
+
+  /**
+   * The usage `usageId` and the parts before it, newest first, as far as they round their minutes together: the
+   * walk ends at the first part that is not charged in the `continue` mode.
+   */
+  findContinuedUsageParts(usageId: number, context: BillingTransactionContext): Promise<ContinuedUsagePart[]>;
+
+  /** The running usage `usageId`, or null when it does not exist or has ended. */
+  findRunningUsagePricing(usageId: number, context: BillingTransactionContext): Promise<RunningUsagePricing | null>;
+
+  /**
+   * The user's charge of the session as far as the part `usageId`, and whether a later part continues it. Null when
+   * the session was never switched.
+   */
+  findSwitchedSessionCharge(usageId: number, userId: number): Promise<SwitchedSessionCharge | null>;
 
   /** Newest first. */
   listTransactionsForUser(

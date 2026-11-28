@@ -44,7 +44,7 @@ export function getTranslationKeyForApiError(props: Props) {
   let fullKey = props.baseTranslationKey + '.' + errorMessageTranslationKey;
 
   const prefixed =
-    /^(FLOW_EXECUTION_ERROR|METER_NOT_CONFIGURED|METER_INITIALIZATION_FAILED|METER_SETTLEMENT_FAILED|METER_SHARING_UNSUPPORTED): ([\s\S]*)$/.exec(
+    /^(FLOW_EXECUTION_ERROR|METER_NOT_CONFIGURED|METER_INITIALIZATION_FAILED|METER_SWITCH_FAILED|METER_SETTLEMENT_FAILED|METER_SHARING_UNSUPPORTED): ([\s\S]*)$/.exec(
       errorMessage,
     );
   if (prefixed) {

@@ -1,12 +1,16 @@
 import {
+  BillingTransactionItemCreateSchema,
   BillingTransactionDetail,
   BillingTransactionPage,
   BillingTransactionRecord,
   BillingTransactionStatus,
+  ProjectSwitchCharging,
   ResourceBillingConfigurationRecord,
   ResourceFlowNodeType,
+  RunningPartBilling,
+  SwitchedSessionCharge,
 } from '@attraccess/application-models';
-import { applyBillingFactor, toExactCredits } from '@attraccess/shared';
+import { applyPartBillingFactor, toExactCredits } from '@attraccess/shared';
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { billingTransactionAuditEvent } from '../../audit/policies/billing';
@@ -30,9 +34,19 @@ import {
   BILLING_LEDGER_STORE,
   BillingLedgerStore,
   BillingTransactionContext,
+  ContinuedUsagePart,
   NewBillingTransactionItem,
 } from '../ports/billing-ledger.port';
 import { BillablePriceSnapshot, BillableUsage } from './billable-usage';
+import {
+  roundsWithPreviousParts,
+  runningPartBilling,
+  usagePartCharges,
+  type UsagePartRates,
+} from './project-switch-charges';
+
+/** The price a flow's billing item node adds, as the node's schema reads it. */
+const BILLING_ITEM_PRICE = BillingTransactionItemCreateSchema.pick({ unitPrice: true });
 
 @Injectable()
 export class BillingService {
@@ -89,11 +103,47 @@ export class BillingService {
     context?: BillingTransactionContext,
   ) {
     await this.validateResourceUsageStart(resourceId, usage, user, context);
+    await this.openUsageBill(usage.id, user.id, context);
+  }
 
+  /**
+   * Whether a flow can lower what a running usage of the resource costs, with a billing item priced below zero: the
+   * resource's own flow, or a global flow that a project switch runs.
+   */
+  public async flowsMayLowerCharge(resourceId: number, context?: BillingTransactionContext): Promise<boolean> {
+    const type = ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS;
+    const own = await this.resourceFlowsService.getNodes(resourceId, type, context);
+    const global = await this.resourceFlowsService.getGlobalNodesOfFlowsWith(
+      ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_SWITCHED,
+      type,
+      context,
+    );
+    return [...own, ...global].some((node) => {
+      const item = BILLING_ITEM_PRICE.safeParse(node.data);
+      return item.success && item.data.unitPrice < 0;
+    });
+  }
+
+  /**
+   * The pending bill of the usage that continues a session after a project switch. Only a resource that charges the
+   * continuation like a new session checks the balance again.
+   */
+  public async handleResourceUsageContinuation(
+    resourceId: number,
+    usage: BillablePriceSnapshot & { id: number; projectSwitchCharging?: ProjectSwitchCharging | null },
+    user: { id: number },
+    context: BillingTransactionContext,
+  ) {
+    if (usage.projectSwitchCharging === ProjectSwitchCharging.NEW_SESSION)
+      await this.validateResourceUsageStart(resourceId, usage, user, context);
+    await this.openUsageBill(usage.id, user.id, context);
+  }
+
+  private async openUsageBill(usageId: number, userId: number, context?: BillingTransactionContext) {
     await this.ledgerStore.insertTransaction(
       {
-        userId: user.id,
-        resourceUsageId: usage.id,
+        userId,
+        resourceUsageId: usageId,
         amount: 0,
         status: BillingTransactionStatus.Pending,
       },
@@ -102,7 +152,7 @@ export class BillingService {
         audit: (transactionId) =>
           billingTransactionAuditEvent({
             transactionId,
-            userId: user.id,
+            userId,
             amount: 0,
             status: BillingTransactionStatus.Pending,
             source: 'resource-usage',
@@ -173,17 +223,19 @@ export class BillingService {
 
     const configuration = await this.getResourceBillingConfiguration(usage.resource.id, context);
 
-    const sessionDurationRate = usage.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute;
-    const operatingDurationRate = usage.operatingDurationCreditsPerMinute ?? 0;
-    const sessionDurationMs = usage.endTime ? Math.max(0, usage.endTime.getTime() - usage.startTime.getTime()) : 0;
-    // Attribution originates from integer-millisecond intervals; remove only minute-storage float noise.
-    const operatingDurationMs = Math.round((usage.attributedOperatingDurationInMinutes ?? 0) * 60_000);
-    const roundedMinutes = Math.ceil(sessionDurationMs / 60_000);
-    const roundedOperatingMinutes = Math.ceil(operatingDurationMs / 60_000);
+    const { rates, previous } = await this.partPricing(usage, configuration, context);
+    const { creditsPerMinute: sessionDurationRate, creditsPerOperatingMinute: operatingDurationRate } = rates;
+    // A part of a switched session may share the fee per use and the minute rounding with the parts before it.
+    const part = usagePartCharges(usage, rates, previous);
+    const {
+      durationMs: sessionDurationMs,
+      minutes: roundedMinutes,
+      operatingMs: operatingDurationMs,
+      operatingMinutes: roundedOperatingMinutes,
+      flatCredits: creditsForSession,
+    } = part;
     // Rounding a shared session's time up per person would create credit, so it is charged on exact shares.
     const sharedOperating = operatingShare?.shared ? operatingShare : null;
-    // Legacy sessions have no complete snapshot; preserve their existing configuration fallback.
-    const creditsForSession = usage.creditsPerUsage ?? configuration.creditsPerUsage;
     const existing = await this.ledgerStore.findUsageTransaction(usage.id, context);
     const components = [
       toExactCredits(sessionDurationRate) * toExactCredits(roundedMinutes),
@@ -202,13 +254,14 @@ export class BillingService {
     if (existing && components.every((credits) => credits === BigInt(0))) {
       if (await this.ledgerStore.discardPendingUsageBill(usage.id, context)) {
         // An open billing page still lists the pending bill; it has no receipt, so nothing else is published.
-        context.afterCommit(() => this.liveNotificationsService.notifyTransactionRemoved(existing));
+        context.afterCommit(() => this.publishRemovedBill(existing, usage));
         return undefined;
       }
     }
 
     const billingFactor = usage.billingFactor ?? usage.user.billingFactor;
-    const { amount: totalCredits, discount: billingFactorDiscountAmount } = applyBillingFactor(
+    const { amount: totalCredits, discount: billingFactorDiscountAmount } = applyPartBillingFactor(
+      part.priorCredits,
       grossCredits,
       billingFactor,
     );
@@ -276,6 +329,23 @@ export class BillingService {
     );
   }
 
+  /**
+   * The last part of a switched session may end without a charge while the session as a whole has one, so the removal
+   * of its pending bill says what the session cost.
+   */
+  private publishRemovedBill(bill: BillingTransactionRecord, usage: BillableUsage): void | Promise<void> {
+    if (usage.previousUsageId == null) return this.liveNotificationsService.notifyTransactionRemoved(bill);
+    return this.ledgerStore
+      .findSwitchedSessionCharge(usage.id, bill.userId)
+      .catch((error) => {
+        this.logger.warn(`Failed to read the switched session of usage ${usage.id}`, error);
+        return null;
+      })
+      .then((switchedSession) =>
+        this.liveNotificationsService.notifyTransactionRemoved(switchedSession ? { ...bill, switchedSession } : bill),
+      );
+  }
+
   /** Publish a completed charge only after its owning usage transaction has committed. */
   async notifyResourceUsageCharge(transactionId: number): Promise<void> {
     try {
@@ -283,8 +353,12 @@ export class BillingService {
       if (!receipt) return;
       const { transaction, recipient, usage } = receipt;
 
+      // A charge of one part must not read like the charge of the whole session.
+      const switchedSession = transaction.resourceUsageId
+        ? await this.ledgerStore.findSwitchedSessionCharge(transaction.resourceUsageId, transaction.userId)
+        : null;
       bestEffortPush(
-        this.liveNotificationsService.notifyTransactionUpdate(transaction),
+        this.liveNotificationsService.notifyTransactionUpdate(transaction, switchedSession),
         this.logger,
         `resource usage charge ${transactionId}`,
       );
@@ -321,6 +395,50 @@ export class BillingService {
 
   async getResourceUsageCharge(resourceUsageId: number, userId: number): Promise<BillingTransactionRecord | null> {
     return this.ledger.getResourceUsageCharge(resourceUsageId, userId);
+  }
+
+  /** The user's charge of a switched session as far as the part `usageId`; null when it was never switched. */
+  async getSwitchedSessionCharge(usageId: number, userId: number): Promise<SwitchedSessionCharge | null> {
+    return this.ledgerStore.findSwitchedSessionCharge(usageId, userId);
+  }
+
+  /** How a running usage will be billed, with its owner; null when it does not run. */
+  async getRunningPartBilling(usageId: number): Promise<(RunningPartBilling & { userId: number | null }) | null> {
+    return this.unitOfWork.run(async (scope) => {
+      const usage = await this.ledgerStore.findRunningUsagePricing(usageId, scope);
+      if (!usage) return null;
+      const configuration = await this.getResourceBillingConfiguration(usage.resourceId, scope);
+      const { rates, previous } = await this.partPricing(usage, configuration, scope);
+      return { userId: usage.userId, ...runningPartBilling(usage, rates, previous) };
+    });
+  }
+
+  /**
+   * The rates a usage part is billed at and the earlier parts it is rounded with, the same at settlement and for a
+   * running estimate. Legacy sessions have no complete snapshot; they keep the configuration fallback.
+   */
+  private async partPricing(
+    usage: Pick<
+      BillableUsage,
+      | 'previousUsageId'
+      | 'projectSwitchCharging'
+      | 'creditsPerUsage'
+      | 'sessionDurationCreditsPerMinute'
+      | 'operatingDurationCreditsPerMinute'
+    >,
+    configuration: ResourceBillingConfigurationRecord,
+    context: BillingTransactionContext,
+  ): Promise<{ rates: UsagePartRates; previous: ContinuedUsagePart[] }> {
+    return {
+      rates: {
+        creditsPerUsage: usage.creditsPerUsage ?? configuration.creditsPerUsage,
+        creditsPerMinute: usage.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute,
+        creditsPerOperatingMinute: usage.operatingDurationCreditsPerMinute ?? 0,
+      },
+      previous: roundsWithPreviousParts(usage)
+        ? await this.ledgerStore.findContinuedUsageParts(usage.previousUsageId as number, context)
+        : [],
+    };
   }
 
   async createManualTransaction(

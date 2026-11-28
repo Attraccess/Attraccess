@@ -24,7 +24,7 @@ export function OverrideSelect({ item, action, flag, isDisabled, onChange }: Rea
       onChange={(key) => onChange(key as OverrideChoice)}
       isDisabled={isDisabled}
       // Keeps the choice readable: on a narrow screen the table scrolls instead of squeezing the select.
-      className="min-w-36"
+      className="min-w-28"
       items={[
         { key: 'inherit', label: inherited, textValue: inherited },
         { key: 'required', label: t('resourceTab.override.required') },

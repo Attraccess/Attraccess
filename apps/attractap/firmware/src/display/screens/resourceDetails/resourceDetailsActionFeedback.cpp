@@ -46,6 +46,7 @@ lv_obj_t *ResourceDetailsScreen::buttonFor(button_click_type_t type, const std::
                button = lv_obj_get_child(this->otherSessionsContainer, static_cast<int32_t>(i) + 1); // child 0 is the title
       }
       break;
+   case BUTTON_CLICK_TYPE_SWITCH_PROJECT: button = this->switchProjectButton; break;
    case BUTTON_CLICK_TYPE_LOCK_DOOR: button = this->lockDoorButton; break;
    case BUTTON_CLICK_TYPE_UNLOCK_DOOR: button = this->unlockDoorButton; break;
    case BUTTON_CLICK_TYPE_UNLATCH_DOOR: button = this->unlatchDoorButton; break;
@@ -71,7 +72,7 @@ std::string ResourceDetailsScreen::roleOf(button_click_type_t type) const
           std::to_string(this->resourceCache.activeUsageId);
 }
 
-bool ResourceDetailsScreen::showActionError(const FirmwareI18n::Text &text)
+bool ResourceDetailsScreen::showActionError(const FirmwareI18n::Text &text, std::function<void()> onSwitchButtonGone)
 {
    if (!this->screen || !this->buttonFor(this->lastActionType, this->lastActionFlowId))
    {
@@ -80,6 +81,8 @@ bool ResourceDetailsScreen::showActionError(const FirmwareI18n::Text &text)
    this->actionErrorPending = true;
    this->actionErrorText = text;
    this->actionErrorDeadline = 0;
+   this->switchButtonGoneCallback =
+      this->lastActionType == BUTTON_CLICK_TYPE_SWITCH_PROJECT ? std::move(onSwitchButtonGone) : nullptr;
    this->applyActionError();
    return true;
 }
@@ -93,7 +96,9 @@ void ResourceDetailsScreen::applyActionError()
    lv_obj_t *button = this->buttonFor(this->lastActionType, this->lastActionFlowId);
    if (!button || this->roleOf(this->lastActionType) != this->lastActionRole)
    {
+      const std::function<void()> buttonGone = button ? nullptr : std::move(this->switchButtonGoneCallback);
       this->dropActionError();
+      if (buttonGone) buttonGone(); // last: it may leave this screen
       return;
    }
    const uint32_t now = millis();
@@ -121,5 +126,6 @@ void ResourceDetailsScreen::dropActionError()
 {
    this->actionErrorPending = false;
    this->actionErrorDeadline = 0;
+   this->switchButtonGoneCallback = nullptr;
    this->actionError.clear();
 }

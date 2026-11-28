@@ -39,6 +39,7 @@ const sideEffects = {
   gateHttp: jest.fn(),
   startSession: jest.fn(),
   endSession: jest.fn(),
+  switchSessionProject: jest.fn(),
   lockDoor: jest.fn(),
   unlockDoor: jest.fn(),
   unlatchDoor: jest.fn(),
@@ -133,6 +134,14 @@ describe('network restriction on the resource action endpoints', () => {
       path: '/resources/5/usage/end',
       body: {},
       effect: 'endSession',
+    },
+    {
+      // A project switch books further usage, so it follows the rule of starting a session.
+      action: NetworkRestrictedAction.UsageStart,
+      method: 'post',
+      path: '/resources/5/usage/sessions/active/project',
+      body: { mode: 'whole-session', projectId: null },
+      effect: 'switchSessionProject',
     },
     { action: NetworkRestrictedAction.DoorOpen, method: 'post', path: '/resources/5/usage/open', effect: 'openDoor' },
     {

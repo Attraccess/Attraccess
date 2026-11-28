@@ -99,6 +99,7 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
       creditsPerUsage: 0,
       creditsPerMinute: 0,
       creditsPerOperatingMinute: 0,
+      projectSwitchCharging: 'continue',
     })),
     validateResourceUsageStart: jest.fn().mockResolvedValue(undefined),
     handleResourceUsageStart: jest.fn(async (_id: number, session: ResourceUsage, user: User, tx: TransactionScope) =>
@@ -122,6 +123,15 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
       });
       return transaction;
     }),
+    handleResourceUsageContinuation: jest.fn(
+      async (_id: number, session: ResourceUsage, user: User, tx: TransactionScope) =>
+        unitOfWork.handleOf(tx).save(BillingTransaction, {
+          resourceUsageId: session.id,
+          userId: user.id,
+          amount: 0,
+          status: BillingTransactionStatus.Pending,
+        }),
+    ),
     notifyResourceUsageCharge: jest.fn().mockResolvedValue(undefined),
   };
   scope.usage = composeResourceUsageService(
@@ -141,7 +151,7 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
     billing as never,
     new ResourceOperatingAttributionService(createOperatingTimelineStore(scope.source)),
     scope.flows as never,
-    {} as never,
+    { findOneById: jest.fn(async (_userId: number, projectId: number) => ({ id: projectId })) } as never,
     { prepareRequiredSubmissions: jest.fn().mockResolvedValue([]) } as never,
     {
       authorizationCacheRequestsTotal: { inc: jest.fn() },

@@ -55,13 +55,20 @@ void Application::showActionFailure(uint32_t resourceId, const std::string &erro
   }
   FirmwareI18n::Text text = preferred.empty() ? FirmwareI18n::knownReaderError(errorCode) : preferred;
   if (text.empty()) text = FirmwareI18n::Message::ActionFailedTapToRetry;
-  bool shown = false;
-  if (Display::isActive(&Display::resourceDetailsScreen)) shown = Display::resourceDetailsScreen.showActionError(text);
-  else if (Display::isActive(&Display::resourceListScreen)) shown = Display::resourceListScreen.showActionError(resourceId, text);
-  if (!shown) {
+  const auto showFullScreen = [this, errorCode] {
     const FirmwareI18n::Text known = FirmwareI18n::knownReaderError(errorCode);
     this->showStatus(StatusScreen::generic(known.empty() ? FirmwareI18n::Text(FirmwareI18n::Message::PleaseTryAgain) : known, errorCode));
+  };
+  bool shown = false;
+  if (Display::isActive(&Display::resourceDetailsScreen)) {
+    shown = Display::resourceDetailsScreen.showActionError(text, [this, showFullScreen] {
+      // A sign-out or a lost connection also lifts the overlay: nobody is left to read the reason then.
+      if (this->unlocked && !this->waitingForResourceRefresh) showFullScreen();
+    });
+  } else if (Display::isActive(&Display::resourceListScreen)) {
+    shown = Display::resourceListScreen.showActionError(resourceId, text);
   }
+  if (!shown) showFullScreen();
 }
 
 void Application::reportActionFailure(const API::ActionResult &result, uint32_t resourceId, bool returnToList) {
@@ -71,6 +78,13 @@ void Application::reportActionFailure(const API::ActionResult &result, uint32_t 
   } else if (result.error == "INSUFFICIENT_BALANCE") {
     this->beeper.errorBeep();
     this->showStatus(StatusScreen::warning(FirmwareI18n::Message::InsufficientBalance, FirmwareI18n::readerError("INSUFFICIENT_BALANCE")), returnToList);
+  } else if (result.type == "SWITCH_SESSION_PROJECT" && result.error == "NoOwnActiveSessionError") {
+    // The session the switch meant is gone, and its button goes with the refreshed row, which may come before or
+    // after this answer. There is nothing to retry, so the reason gets a screen of its own in both orders.
+    this->logger.errorf("Action failed: %s", result.error.c_str());
+    this->beeper.errorBeep();
+    this->showStatus(StatusScreen::warning(FirmwareI18n::Message::ProjectNotChanged, FirmwareI18n::Message::ErrorSwitchSessionGone),
+                     returnToList);
   } else if (result.error == "START_BLOCKED" && !result.blockTitle.empty()) {
     // A plugin refused the start: its own words, and only those, as a full-screen warning.
     this->beeper.errorBeep();

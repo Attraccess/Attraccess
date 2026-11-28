@@ -1,4 +1,5 @@
 # Ressourcen nutzen
+
 <!-- llms-description: Wie Sie Ressourcen finden, eingewiesen werden, beaufsichtigte Sitzungen starten sowie Nutzungssitzungen starten und beenden. -->
 
 Ressourcen sind die Maschinen, Werkzeuge und Geräte, die in Attraccess verwaltet werden. Diese Seite erklärt, wie Sie diese finden, darauf zugreifen und sie nutzen können.
@@ -100,6 +101,8 @@ Wenn Sie an einem Projekt arbeiten, können Sie Ihre Nutzungssitzung damit verkn
 1. Wählen Sie beim Starten einer Nutzungssitzung ein **Projekt** aus dem Dropdown-Menü
 2. Die Sitzung wird mit dem ausgewählten Projekt verknüpft
 3. Dies hilft bei der Nachverfolgung der Ressourcennutzung pro Projekt
+
+Während eine Maschinensitzung läuft, ändert **Projekt wechseln** in Ihrer Sitzung deren Projekt oder entfernt es, ohne die Maschine anzuhalten. Wählen Sie **Ganze Sitzung** (vorausgewählt), um eine falsche Auswahl zu korrigieren, oder **Ab jetzt aufteilen**, wenn Sie mit etwas anderem beginnen. Siehe [Das Projekt einer laufenden Sitzung wechseln](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln).
 
 ## Nutzungsverlauf anzeigen
 

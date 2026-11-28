@@ -2,7 +2,7 @@ import { ResourceFlowNodeType, ResourceFormAction, ResourceType } from '@attracc
 import type { UsageFormSubmissionDraft, UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
 import { optionalUserDisplayName } from '@attraccess/shared';
-import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { randomUUID } from 'node:crypto';
 
@@ -26,6 +26,7 @@ import { SessionNoLongerDueError } from '../session-duration/session-no-longer-d
 import { SESSION_DEADLINE_STORE, SessionDeadlineStore } from '../session-duration/session-deadline-store.port';
 
 import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
+import { ProjectSwitchPendingError } from '../errors/project-switch-pending.error';
 
 import { MachineBusyError } from '../errors/machine-busy.error';
 
@@ -38,6 +39,7 @@ import {
 
 import { usageFlowPayload } from '../lifecycle/usage-flow-payload';
 
+import { acrossProjectSwitches } from './across-project-switches';
 import { pickSessionToEnd } from './active-usage';
 
 import { SessionChangeTurns } from './session-change-turns';
@@ -80,12 +82,18 @@ export class UsageSessionEnds {
     dto: EndUsageSessionDto,
     options: EndSessionOptions = {},
   ): Promise<UsageSession> {
-    const attemptId = randomUUID();
-    return this.runSessionChange(
-      resourceId,
-      attemptId,
-      () => this.endSessionNow(resourceId, user, dto, options, attemptId),
-      options.withinSessionChange,
+    const end = (named: EndUsageSessionDto) => {
+      const attemptId = randomUUID();
+      return this.runSessionChange(
+        resourceId,
+        attemptId,
+        () => this.endSessionNow(resourceId, user, named, options, attemptId),
+        options.withinSessionChange,
+      );
+    };
+    if (!options.followProjectSwitch || dto.usageId === undefined) return end(dto);
+    return acrossProjectSwitches(this.lifecycle.sessions, resourceId, dto.usageId, (usageId) =>
+      end({ ...dto, usageId }),
     );
   }
 
@@ -109,6 +117,14 @@ export class UsageSessionEnds {
     const prepared = await this.lifecycle.transaction(async (scope) => {
       const sessionLimit = await this.lifecycle.getSessionLimit(scope, resourceId);
       const sharedMachine = sessionLimit > 1;
+      // Under the machine's lock no switch can start any more, so this answer holds for the rest of the transaction.
+      if (
+        options.followProjectSwitch &&
+        dto.usageId !== undefined &&
+        (await this.lifecycle.sessions.isSessionBeingSwitched(dto.usageId, scope))
+      ) {
+        throw new ProjectSwitchPendingError();
+      }
       await this.lifecycle.assertLifecycleAvailable(scope, resourceId, sharedMachine);
       const activeSessions = await this.records.getActiveSessionsForResource(resourceId, scope);
       activeSession = pickSessionToEnd(activeSessions, user, dto.usageId, sessionLimit);
@@ -194,18 +210,15 @@ export class UsageSessionEnds {
       updatedUsage = await this.lifecycle.transaction(async (scope) => {
         const attempt = await this.lifecycle.getLifecycleAttempt(scope, attemptId, resourceId);
         await this.lifecycle.applyLifecycleDrafts(scope, attempt);
-        const ended = await this.lifecycle.sessions.endSessionIfOpen(
+        const settled = await this.lifecycle.endAndSettle(
+          scope,
           prepared.activeSession.id,
           prepared.updateData,
-          scope,
+          final,
+          'Usage session changed while ending',
         );
-        if (!ended) throw new ConflictException('Usage session changed while ending');
-        const endedSession = await this.lifecycle.sessions.findSessionWithRelations(
-          prepared.activeSession.id,
-          'ended',
-          scope,
-        );
-        chargeTransactionId = await this.lifecycle.settleEndedSession(scope, endedSession, final);
+        chargeTransactionId = settled.chargeTransactionId;
+        const endedSession = settled.ended;
         await this.lifecycle.sessions.deleteAttempt(attemptId, resourceId, scope);
         await this.audit.record(
           {
@@ -338,8 +351,9 @@ export class UsageSessionEnds {
   ): Promise<void> {
     const sessions = await this.findEndableSessions(resourceId, target, manager);
     if (sessions.length === 0) return;
+    const usageIds = sessions.map((session) => session.id);
     const ends = this.deferredSessionEnds.get(attemptId) ?? [];
-    ends.push({ usageIds: sessions.map((session) => session.id), notes, triggeredByUserId });
+    ends.push({ usageIds, notes, triggeredByUserId });
     this.deferredSessionEnds.set(attemptId, ends);
   }
 
@@ -373,28 +387,44 @@ export class UsageSessionEnds {
     let firstError: unknown;
     for (const usageId of usageIds) {
       // Another run may have ended it, or be ending it, since it was picked: nothing left to do then.
-      const session = await this.findEndableSession(resourceId, usageId, manager);
+      const session = await this.findEndablePart(resourceId, usageId, manager);
       if (!session) continue;
       try {
         await this.endSession(
           resourceId,
           session.user,
-          { notes, usageId },
+          { notes, usageId: session.id },
           {
             skipFormSubmissions: true,
             skipNoteNotification: true,
             auditOrigin: SYSTEM_AUDIT_ACTOR,
             triggeredByUserId,
             withinSessionChange,
+            followProjectSwitch: true,
           },
         );
       } catch (error) {
-        if (!(await this.findEndableSession(resourceId, usageId, manager))) continue;
+        if (!(await this.findEndablePart(resourceId, usageId, manager))) continue;
         this.logger.warn(`Ending session ${usageId} of resource ${resourceId} from a flow failed`);
         firstError ??= error;
       }
     }
     if (firstError) throw firstError;
+  }
+
+  /** The endable record of a picked session: itself, or the part a project switch moved it on to. */
+  private async findEndablePart(
+    resourceId: number,
+    pickedUsageId: number,
+    context?: TransactionScope,
+  ): Promise<UsageSession | null> {
+    // One step at a time: a switch that commits between the two reads is still seen by the second.
+    for (let usageId: number | null = pickedUsageId; usageId !== null;) {
+      const session = await this.findEndableSession(resourceId, usageId, context);
+      if (session) return session;
+      usageId = await this.lifecycle.sessions.findContinuationId(usageId, context);
+    }
+    return null;
   }
 
   /** The published session, unless it has ended or another stop is already ending it. */

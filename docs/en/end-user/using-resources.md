@@ -1,4 +1,5 @@
 # Using Resources
+
 <!-- llms-description: How to find resources, get introduced, start supervised sessions and start and end usage sessions. -->
 
 Resources are the machines, tools and equipment managed in Attraccess. This page explains how to find, access and use them.
@@ -100,6 +101,8 @@ If you are working on a project, you can link your usage session to it:
 1. When starting a usage session, select a **project** from the dropdown
 2. The session will be associated with the selected project
 3. This helps track resource usage per project
+
+While a machine session runs, **Change project** in your session changes its project, or removes it, without stopping the machine. Choose **Whole session** (preselected) to fix a wrong choice, or **Split from now** when you start working on something else. See [Changing the project of a running session](resources/usage-tracking.md#changing-the-project-of-a-running-session).
 
 ## View Usage History
 

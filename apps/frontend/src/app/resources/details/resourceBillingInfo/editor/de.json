@@ -28,6 +28,20 @@
         "shared": "Jeder Start und jedes Ende einer Sitzung schließt einen Zeitabschnitt. Der Verbrauch dieses Abschnitts wird gleichmäßig auf die darin aktiven Sitzungen aufgeteilt.",
         "per-session": "Ein Flow misst jede Sitzung getrennt über einen eigenen Messpunkt. Es wird nichts aufgeteilt."
       }
+    },
+    "projectSwitchCharging": {
+      "label": "Abrechnung beim Aufteilen einer Sitzung auf Projekte",
+      "description": "Wie eine laufende Sitzung abgerechnet wird, wenn sie auf Projekte aufgeteilt wird. Jeder Abschnitt wird getrennt abgerechnet und seinem Projekt zugeordnet. Eine ganze Sitzung einem anderen Projekt zuzuordnen kostet nichts.",
+      "options": {
+        "continue": "Sitzung fortsetzen",
+        "continue-per-part-rounding": "Fortsetzen, je Abschnitt runden",
+        "new-session": "Als neue Sitzung abrechnen"
+      },
+      "descriptions": {
+        "continue": "Keine neue Gebühr pro Nutzung. Minuten werden über alle Abschnitte gerundet, sodass sie zusammen nicht mehr kosten als eine nicht aufgeteilte Sitzung.",
+        "continue-per-part-rounding": "Keine neue Gebühr pro Nutzung. Jeder Abschnitt rundet seine Minuten selbst auf, daher kann jede Aufteilung eine Minute hinzufügen.",
+        "new-session": "Jeder Abschnitt wird wie eine neue Sitzung abgerechnet: Gebühr pro Nutzung, eigene Rundung und Guthabenprüfung vor der Aufteilung."
+      }
     }
   },
   "actions": {

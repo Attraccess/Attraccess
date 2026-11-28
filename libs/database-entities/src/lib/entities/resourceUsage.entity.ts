@@ -20,7 +20,7 @@ import { Project } from './project';
 
 import { Resource } from './resource.entity';
 
-import { ResourceUsageAction } from '@attraccess/application-models';
+import { ProjectSwitchCharging, ResourceUsageAction } from '@attraccess/application-models';
 
 import { User } from './user.entity';
 
@@ -35,6 +35,7 @@ import { User } from './user.entity';
 @Index('IDX_resource_usage_auto_end_at', ['autoEndAt'], {
   where: '"autoEndAt" IS NOT NULL AND "endTime" IS NULL',
 })
+@Index('IDX_resource_usage_previous_usage', ['previousUsageId'], { unique: true })
 @Entity()
 export class ResourceUsage {
   @Column({ type: 'bigint', nullable: true })
@@ -250,6 +251,34 @@ export class ResourceUsage {
   @Column({ type: 'boolean', default: false })
   @ApiProperty({ description: 'Whether the resource usage is finalized' })
   isFinalized!: boolean;
+
+  /** A continuation links to the part of the session it continues after a project switch. */
+  @Column({ nullable: true, type: 'integer' })
+  @ApiProperty({
+    description: 'The previous part of this session, when this part started with a project switch',
+    required: false,
+    nullable: true,
+    type: Number,
+  })
+  previousUsageId!: number | null;
+
+  @ManyToOne(() => ResourceUsage, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'previousUsageId', foreignKeyConstraintName: 'FK_resource_usage_previous_usage' })
+  previousUsage!: ResourceUsage | null;
+
+  /** The charging mode in effect at the switch that created this part; frozen like the prices. */
+  @Column({ nullable: true, type: 'varchar' })
+  projectSwitchCharging!: ProjectSwitchCharging | null;
+
+  /** On a continuation, when the session it continues started; `startTime` is when this part started. */
+  @Column({ type: 'timestamptz', nullable: true })
+  @ApiProperty({
+    description: 'When the session started that this record continues after a project switch; null otherwise',
+    type: Date,
+    required: false,
+    nullable: true,
+  })
+  sessionStartTime!: Date | null;
 
   /** Internal lifecycle reservation; excluded from public usage and duration calculations. */
   @Column({ type: 'boolean', default: false })

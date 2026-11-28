@@ -42,6 +42,34 @@ Während der Leser eine Aktion verarbeitet, sind die Bedienelemente kurzzeitig n
 
 Um die Maschinennutzung einem Projekt zuzuordnen, öffnen Sie über den Namen der Maschine deren Details. Tippen Sie auf **Projekt wählen**, wählen Sie Ihr Projekt aus und starten Sie die Nutzung dort. Wenn Sie direkt aus der Liste starten, wird die Nutzung ohne Projekt erfasst.
 
+### Das Projekt einer laufenden Sitzung wechseln
+
+An einem Touch-Leser mit aktueller Firmware (Fähigkeit **projectSwitch**) zeigen die Details Ihrer eigenen laufenden Sitzung **Projekt: …** und **Projekt wechseln**. Die Schaltfläche erscheint, wenn die Sitzung bereits ein Projekt hat oder Sie eines zum Wechseln haben.
+
+1. Öffnen Sie über den Namen der Maschine deren Details und tippen Sie auf **Projekt wechseln**
+2. Wählen Sie ein Projekt aus der Liste (sie lässt sich durchsuchen und blättern), oder tippen Sie neben der Überschrift auf **Kein Projekt**. Die aktuelle Auswahl ist nicht wählbar.
+3. Wählen Sie, worauf sich der Wechsel bezieht. Jede Schaltfläche sagt, wohin Ihre Nutzung geht:
+   - **Ganze Sitzung**, zuerst aufgeführt und hervorgehoben: Alles, was in der Sitzung bisher genutzt wurde, und alles ab jetzt geht an das neue Projekt. Wurde die Sitzung zuvor aufgeteilt, gilt das nur für die Zeit seit der letzten Aufteilung.
+   - **Ab jetzt**: Die Zeit bisher bleibt beim aktuellen Projekt und wird jetzt abgerechnet; die Sitzung läuft unter dem neuen weiter.
+
+   **Abbrechen** ändert nichts.
+
+4. Füllen Sie die für Ihre Wahl erforderlichen Formulare aus
+5. Der Leser bestätigt mit **Projekt gewechselt** und dem neuen Projekt
+
+Die Maschine läuft weiter, und die angezeigte Startzeit bleibt die Ihrer Sitzung. Endet Ihre Sitzung oder wird ihr Projekt anderswo geändert, während die Projektliste, die Auswahl oder ein Formular geöffnet ist, schließt der Leser diese und zeigt den aktuellen Stand.
+
+Wird der Wechsel abgelehnt, behält die Sitzung ihr Projekt:
+
+- Nur **Ab jetzt**: Ein Zähler ist nicht lesbar. Die Schaltfläche zeigt **⚠ Zähler nicht lesbar. Projekt unverändert.**
+- Nur **Ab jetzt**: Das Guthaben reicht nicht für eine neue Sitzung, wenn die Ressource [eine Aufteilung wie eine solche abrechnet](billing/configuration.md#abrechnung-beim-aufteilen-einer-sitzung-auf-projekte). Der Leser meldet [zu geringes Guthaben](#ergebnisse-meldungen-und-niedriges-guthaben)
+- Ihre Sitzung wurde genau während Ihrer Auswahl beendet: Ein Warnbildschirm mit der Überschrift **Projekt nicht gewechselt** meldet **Ihre Sitzung läuft nicht mehr.** Tippen Sie auf **OK** oder warten Sie.
+- Andere Ablehnungen, etwa ein fehlgeschlagener Ablauf, nennen keinen genauen Grund: Die Schaltfläche zeigt **⚠ Fehlgeschlagen – erneut tippen**
+
+Ist **Projekt wechseln** schon verschwunden, wenn der neu geladene Status erscheint, etwa weil die Sitzung inzwischen beendet wurde, wechselt jeder andere Grund, den eine Schaltfläche zeigen würde, auf den [Bildschirm **Etwas ist schiefgelaufen**](#ergebnisse-meldungen-und-niedriges-guthaben).
+
+Ältere Firmware, Attractap Lite, die BLE-Bridge und Plugin-Leser bieten dies nicht an. Siehe [Das Projekt einer laufenden Sitzung wechseln](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln).
+
 ### Ergebnisse, Meldungen und niedriges Guthaben
 
 Der Leser zeigt Ergebnisse auf einem eigenen Vollbild und kehrt danach zu Ihrem Bildschirm zurück:
@@ -94,7 +122,7 @@ _Mit dem Zurück-Pfeil gelangen Sie wieder zur Ressourcenliste. Beim Wechsel zwi
 
 ### Zusammenfassung zum Nutzungsende
 
-Nach dem erfolgreichen Beenden Ihrer eigenen Maschinennutzung zeigt der Leser **Danke, {name}!** mit Ihrem Anzeigenamen (Ihr Name oder, ohne Namen, Ihr Benutzername). **Dauer** ist die vergangene Sitzungszeit in Stunden, Minuten und Sekunden, nicht die Betriebszeit oder die abgerechneten Minuten. Die Stunden können 24 überschreiten. **Abgerechnet** zeigt den formatierten Endbetrag bei einer Gebühr ungleich null. Ohne Gebühr steht nur die Dauer mittig.
+Nach dem erfolgreichen Beenden Ihrer eigenen Maschinennutzung zeigt der Leser **Danke, {name}!** mit Ihrem Anzeigenamen (Ihr Name oder, ohne Namen, Ihr Benutzername). **Dauer** ist die vergangene Sitzungszeit in Stunden, Minuten und Sekunden, nicht die Betriebszeit oder die abgerechneten Minuten. Die Stunden können 24 überschreiten. **Abgerechnet** zeigt den formatierten Endbetrag bei einer Gebühr ungleich null. Ohne Gebühr steht nur die Dauer mittig. Wurde während der Sitzung [das Projekt gewechselt](#das-projekt-einer-laufenden-sitzung-wechseln), gelten beide für die ganze Sitzung: **Dauer** zählt ab ihrem ursprünglichen Start, und **Abgerechnet** addiert die Kosten aller Abschnitte, auch wenn der letzte Abschnitt nichts gekostet hat.
 
 ![Vollbild-Zusammenfassung mit Dauer und Endbetrag](../../_media/attractap/session-summary-billed.png)
 

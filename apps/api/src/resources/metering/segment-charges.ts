@@ -1,6 +1,7 @@
 import type { BillingAllocationSegmentRecord, ResourceMeteringSegmentRecord } from '@attraccess/application-models';
 
-import { formatMeterValue, meterCharge } from './quantity';
+import { partMeterCharge } from './continued-meter-charge';
+import { formatMeterValue } from './quantity';
 import { ExactSum, roundHalfUp, SegmentSplit, ShareParticipant, splitSegment } from './shared-allocation';
 
 const SCALE = BigInt(1_000_000_000);
@@ -40,13 +41,22 @@ export interface SessionShare {
   breakdown: BillingAllocationSegmentRecord[];
 }
 
-/** A session's quantity and whole credits over the closed segments it took part in. */
-export function sessionShare(segments: ClosedSegment[], usageId: number): SessionShare {
+/**
+ * A session's quantity and whole credits over the closed segments it took part in. A solo session is rounded
+ * together with `priorConsumption`, what the earlier parts of its switched session consumed (see
+ * `partMeterCharge`); shares of shared segments keep their rounding per segment.
+ */
+export function sessionShare(segments: ClosedSegment[], usageId: number, priorConsumption = BigInt(0)): SessionShare {
   const mine = segments.filter((segment) => segment.participants.some((p) => p.usageId === usageId));
   if (mine.every((segment) => segment.participants.length === 1)) {
     const consumed = mine.reduce((total, segment) => total + segmentConsumption(segment), BigInt(0));
     const rate = mine.at(-1)?.participants[0].creditsPerUnit ?? 0;
-    return { solo: true, quantity: consumed, credits: meterCharge(consumed, rate), breakdown: [] };
+    return {
+      solo: true,
+      quantity: consumed,
+      credits: partMeterCharge(priorConsumption, consumed, rate),
+      breakdown: [],
+    };
   }
   const quantity = new ExactSum();
   let credits = 0;

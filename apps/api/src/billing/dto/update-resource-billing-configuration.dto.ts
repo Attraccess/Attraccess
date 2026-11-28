@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsOptional, Min } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, Min } from 'class-validator';
+import { ProjectSwitchCharging } from '@attraccess/application-models';
 
 export class UpdateResourceBillingConfigurationDto {
   @ApiProperty({
@@ -37,4 +38,15 @@ export class UpdateResourceBillingConfigurationDto {
   @IsOptional()
   @Min(0)
   creditsPerOperatingMinute?: number | null;
+
+  @ApiProperty({
+    description:
+      'How a running session is charged when its owner splits it between projects (moving a whole session to another project charges nothing). `continue`: no new fee per use and minutes rounded on cumulative boundaries, so the parts together never bill more than one unsplit session. `continue-per-part-rounding`: no new fee per use, every part rounds its own minutes up. `new-session`: every part is billed like a session of its own, including the balance check.',
+    enum: ProjectSwitchCharging,
+    enumName: 'ProjectSwitchCharging',
+    required: false,
+  })
+  @IsEnum(ProjectSwitchCharging)
+  @IsOptional()
+  projectSwitchCharging?: ProjectSwitchCharging;
 }

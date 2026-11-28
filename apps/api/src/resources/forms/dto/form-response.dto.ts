@@ -27,6 +27,14 @@ export class FormResponseDto {
   @ApiProperty({ description: 'Default: whether required when ending a usage session' })
   isRequiredOnResourceUsageEnd!: boolean;
 
+  @ApiProperty({ description: 'Whether the form is required when a running session is split between projects' })
+  isRequiredOnResourceUsageProjectSwitch!: boolean;
+
+  @ApiProperty({
+    description: 'Whether the form is required when a running session moves as a whole to another project',
+  })
+  isRequiredOnResourceUsageProjectReassign!: boolean;
+
   @ApiProperty({ description: 'The resource of a resource form', example: 5, nullable: true, type: Number })
   resourceId!: number | null;
 

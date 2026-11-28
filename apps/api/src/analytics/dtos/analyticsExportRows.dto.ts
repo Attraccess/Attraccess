@@ -126,6 +126,16 @@ export class ResourceUsageExportRowDto {
   })
   projectId!: number | null;
 
+  @ApiProperty({
+    description:
+      'Set when this record continues a session after a project switch: the id of the part before it, which is its own row',
+    example: 1203,
+    required: false,
+    nullable: true,
+    type: Number,
+  })
+  previousUsageId!: number | null;
+
   @ApiProperty({ description: 'The project this usage session belongs to', required: false, ...ref('Project') })
   project?: object | null;
 

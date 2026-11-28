@@ -34,13 +34,33 @@ Runs during a usage start. No settings. Payload contains the new usage session's
 
 Type: `input.resource.usage.stopped` · Machines
 
-Runs during a usage stop. No settings. Payload contains the outgoing session, submitted forms, stop fields such as `endTime` and `endNotes`, and [`activeSessions`](flows/payloads-variables-templates.md#active-sessions-on-shared-machines). Example: switch off a relay or add a billing item before settlement. It does not run for a session that ends through a takeover; see [Resource Usage Takeover](flows/node-types.md#resource-usage-takeover).
+Runs during a usage stop. No settings. Payload contains the outgoing session, submitted forms, stop fields such as `endTime` and `endNotes`, and [`activeSessions`](flows/payloads-variables-templates.md#active-sessions-on-shared-machines). Example: switch off a relay or add a billing item before settlement. It does not run for a session that ends through a takeover; see [Resource Usage Takeover](flows/node-types.md#resource-usage-takeover). After a [project switch](flows/node-types.md#resource-usage-project-switched) it runs once, for the last part only: `startTime` is that part's start, while `sessionStartTime` is the start of the whole session (`null` if it was never switched). See [What a trigger provides](flows/payloads-variables-templates.md#what-a-trigger-provides).
 
 ### Resource Usage Takeover
 
 Type: `input.resource.usage.takeover` · Machines
 
 Runs when an active session is taken over. No settings. Payload contains the outgoing usage session plus `newUser`, `oldUser`, `takeOverTime` and `activeSessions` (always 1 to 1). Use `{{newUser.username}}` for the incoming owner. A takeover uses this trigger instead of the ordinary Usage Started trigger. The outgoing session ends here, and **Usage Stopped** does not run for it. Add billing items for the outgoing session (for example consumables you normally add on stop) with [**Add billing item**](flows/node-types.md#set-billing-items) in this flow; they are billed on the outgoing session. If stop charges should also apply to takeovers, add the same billing branch to both triggers. The takeover payload has no `endTime` or `endNotes` (use `takeOverTime`), and its `formSubmissions` are the new user's takeover form answers, not stop form answers, so a copied branch must read its values from there. Do not copy physical effects such as switching a relay off onto this trigger, because the machine stays in use by the new user.
+
+### Resource Usage Project Switched
+
+Type: `input.resource.usage.project-switched` · Machines
+
+The editor calls it **Project switched (split)**. Runs when the owner of a running session [splits it between projects](resources/usage-tracking.md#changing-the-project-of-a-running-session) with **Split from now**. No settings. The machine keeps running: **Usage Started**, **Usage Stopped** and **Usage Takeover** do not run, so a flow that must also react to a project change needs this trigger and **Resource Usage Project Reassigned**. Do not switch power off here.
+
+The payload contains the part that ends (`id` is its ID) plus `previousUsageId` (the same), `newUsageId` (the continuation), `previousProjectId` and `newProjectId` (`null` without a project), `previousProject`, `newProject`, `switchTime`, `activeSessions` (the same before and after) and `formSubmissions` with the answers to the [project switch forms](forms/overview.md). [**Add billing item**](flows/node-types.md#set-billing-items) adds to the part that ends.
+
+If this flow fails, the whole switch is refused and the session keeps running under the old project. [**End usage session**](flows/node-types.md#end-usage-session) with **The triggering session** is refused for the same reason (it would stop a machine that keeps running); **The session of a user** and **All sessions** end the chosen sessions after the switch, the switched one as its continuation.
+
+### Resource Usage Project Reassigned
+
+Type: `input.resource.usage.project-reassigned` · Machines
+
+The editor calls it **Project changed (whole session)**. Runs when the owner of a running session [moves the whole session](resources/usage-tracking.md#changing-the-project-of-a-running-session) to another project. No settings. The usage record keeps running; nothing starts, stops or is billed. **Project switched (split)** does not run then. Do not switch power off here.
+
+The payload contains the running session (as it was before the change) plus `usageId`, `previousProjectId` and `newProjectId` (`null` without a project), `previousProject`, `newProject`, `changeTime`, `activeSessions` (the same before and after) and `formSubmissions` with the answers to the [whole-session project change forms](forms/overview.md). [**Add billing item**](flows/node-types.md#set-billing-items) adds to the running session.
+
+If this flow fails, the change is refused and the session keeps its project. [**End usage session**](flows/node-types.md#end-usage-session) with **The triggering session** is refused for the same reason; **The session of a user** and **All sessions** end the chosen sessions after the change.
 
 ### Door Unlocked
 

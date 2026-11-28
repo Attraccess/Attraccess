@@ -311,6 +311,7 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
         strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||
         strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 ||
         strcmp(eventType, "EXTEND_RESOURCE_USAGE_SESSION") == 0 ||
+        strcmp(eventType, "SWITCH_SESSION_PROJECT") == 0 ||
         strcmp(eventType, "LOCK_DOOR") == 0 ||
         strcmp(eventType, "UNLOCK_DOOR") == 0 ||
         strcmp(eventType, "UNLATCH_DOOR") == 0 ||
@@ -340,6 +341,8 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
             result.warning = payload["warning"] | false;
             result.hasOwnership = payload["endedOwnSession"].is<bool>();
             if (result.hasOwnership) result.endedOwnSession = payload["endedOwnSession"].as<bool>();
+            const char *projectName = payload["projectName"].as<const char *>();
+            if (projectName) result.projectName = projectName;
             this->actionResultCallback(result);
         }
     }
@@ -462,7 +465,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
 
     const bool isActionResponse = strcmp(eventType, "START_RESOURCE_USAGE_SESSION") == 0 ||
         strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 || strcmp(eventType, "EXTEND_RESOURCE_USAGE_SESSION") == 0 ||
-        strcmp(eventType, "LOCK_DOOR") == 0 ||
+        strcmp(eventType, "SWITCH_SESSION_PROJECT") == 0 || strcmp(eventType, "LOCK_DOOR") == 0 ||
         strcmp(eventType, "UNLOCK_DOOR") == 0 || strcmp(eventType, "UNLATCH_DOOR") == 0 ||
         strcmp(eventType, "TRIGGER_FLOW_BUTTON") == 0;
     // UI_* types carry the server's messageId back in their ACK; every path below that acks uses it.

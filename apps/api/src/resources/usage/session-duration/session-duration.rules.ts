@@ -1,4 +1,4 @@
-import { ResourceType } from '@attraccess/application-models';
+import { ResourceType, sessionStartOf } from '@attraccess/application-models';
 import {
   SessionDurationEstimateExceedsMaximumException,
   SessionDurationEstimateRequiredException,
@@ -72,7 +72,8 @@ export function computeStartDeadline(
   } else if (canAsk) {
     throw new SessionDurationEstimateRequiredException(max);
   } else {
-    minutes = estimated = max ?? resource.defaultSessionDurationEstimateMinutes ?? DEFAULT_SESSION_DURATION_ESTIMATE_MINUTES;
+    minutes = estimated =
+      max ?? resource.defaultSessionDurationEstimateMinutes ?? DEFAULT_SESSION_DURATION_ESTIMATE_MINUTES;
     if (max !== null) minutes = estimated = Math.min(max, minutes);
   }
   if (minutes === null) return none;
@@ -97,13 +98,18 @@ export interface ExtensionRequest {
 }
 
 /** The latest deadline a session may reach: its maximum, or the absolute 30 day limit when it has none. */
-export function extensionCap(session: { startTime: Date; maxAutoEndAt: Date | null }): Date {
-  return session.maxAutoEndAt ?? addMinutes(session.startTime, MAX_SESSION_DURATION_MINUTES);
+export function extensionCap(session: {
+  startTime: Date;
+  sessionStartTime?: Date | null;
+  maxAutoEndAt: Date | null;
+}): Date {
+  // A project switch does not move the limit: it counts from the start of the session that was switched.
+  return session.maxAutoEndAt ?? addMinutes(sessionStartOf(session), MAX_SESSION_DURATION_MINUTES);
 }
 
 /** The new deadline of an extension, or a refusal. Nothing is clipped; `toMax` is the explicit way to the cap. */
 export function computeExtension(
-  session: { startTime: Date; autoEndAt: Date | null; maxAutoEndAt: Date | null },
+  session: { startTime: Date; sessionStartTime?: Date | null; autoEndAt: Date | null; maxAutoEndAt: Date | null },
   request: ExtensionRequest,
   now: Date,
 ): Date {
@@ -138,7 +144,9 @@ export const AUTO_END_NOTES: Record<AutoEndReason, string> = {
 };
 
 export function autoEndReason(session: { autoEndAt: Date | null; maxAutoEndAt: Date | null }): AutoEndReason {
-  return session.maxAutoEndAt !== null && session.autoEndAt !== null && session.autoEndAt.getTime() >= session.maxAutoEndAt.getTime()
+  return session.maxAutoEndAt !== null &&
+    session.autoEndAt !== null &&
+    session.autoEndAt.getTime() >= session.maxAutoEndAt.getTime()
     ? 'maximum'
     : 'estimate';
 }

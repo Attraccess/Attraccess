@@ -77,3 +77,33 @@ export function applyBillingFactor(gross: bigint, factor: number): { amount: num
     throw new RangeError('Charge exceeds the supported billing range');
   return { amount: Number(amount), discount: Number(discount) };
 }
+
+/**
+ * The billing factor on the `gross` of one part of a switched session, whose earlier parts charged `priorCredits`:
+ * it is rounded on the running total, so that the parts' discounts add up to the one of their sum.
+ */
+export function applyPartBillingFactor(
+  priorCredits: bigint,
+  gross: bigint,
+  factor: number,
+): { amount: number; discount: number } {
+  const discount =
+    applyBillingFactor(priorCredits + gross, factor).discount - applyBillingFactor(priorCredits, factor).discount;
+  return { amount: Number(gross - BigInt(discount)), discount };
+}
+
+const MINUTE_MS = 60_000;
+
+/** Whole minutes as billed: every started minute counts. */
+export function startedMinutes(ms: number): number {
+  return Math.ceil(Math.max(0, ms) / MINUTE_MS);
+}
+
+/**
+ * The minutes billed for `partMs` of a time that is rounded together with the `priorMs` before it (the earlier parts
+ * of a switched session): the started minutes of the whole run less those the earlier parts already billed, so the
+ * parts never add up to more than the time unsplit.
+ */
+export function cumulativeStartedMinutes(priorMs: number, partMs: number): number {
+  return startedMinutes(priorMs + partMs) - startedMinutes(priorMs);
+}

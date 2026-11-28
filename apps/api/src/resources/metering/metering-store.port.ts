@@ -195,6 +195,17 @@ export interface MeteringStore {
    * charged. Only the display data of the lines changes.
    */
   failSessions(sessionIds: string[], reason: string, context?: TransactionContext): Promise<void>;
+  /**
+   * ATT-1421: the consumption of the meter at `creditsPerUnit` that the earlier parts of `usageId`'s cumulatively
+   * rounded run settled (parts that continue the one before them in `continue` mode, back to the first that rounded
+   * on its own). 0 for a usage that rounds on its own.
+   */
+  findContinuedMeterConsumption(
+    usageId: number,
+    meterId: number,
+    creditsPerUnit: number,
+    context?: TransactionContext,
+  ): Promise<bigint>;
   /** Waives a pending or failed session; null when it was neither (nothing changed). */
   waiveSession(
     resourceId: number,

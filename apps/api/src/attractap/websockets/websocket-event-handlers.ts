@@ -7,6 +7,7 @@ import type { AttractapCrashReportHandler } from './handlers/crash-report/crash-
 import type { AttractapFirmwareHandler } from './handlers/firmware/firmware.handler';
 import type { AttractapFormsHandler } from './handlers/forms/forms.handler';
 import type { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
+import type { AttractapProjectSwitchHandler } from './handlers/session/project-switch.handler';
 import type { AttractapProjectsHandler } from './handlers/projects/projects.handler';
 import type { ResourceListService } from './handlers/resource-list/resource-list.service';
 import type { AttractapSessionHandler } from './handlers/session/session.handler';
@@ -25,6 +26,7 @@ export interface EventHandlerDeps {
   cardHandler: AttractapCardHandler;
   formsHandler: AttractapFormsHandler;
   sessionHandler: AttractapSessionHandler;
+  projectSwitchHandler: AttractapProjectSwitchHandler;
   billingHandler: AttractapBillingHandler;
   projectsHandler: AttractapProjectsHandler;
   supervisionHandler: AttractapSupervisionHandler;
@@ -93,6 +95,8 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
       d.sessionHandler.handleStartResourceUsageSession(socket, eventData),
     [AttractapEventType.STOP_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
       d.sessionHandler.handleStopResourceUsageSession(socket, eventData),
+    [AttractapEventType.SWITCH_SESSION_PROJECT]: (socket, eventData) =>
+      d.projectSwitchHandler.handleSwitchSessionProject(socket, eventData),
     [AttractapEventType.EXTEND_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
       d.sessionHandler.handleExtendResourceUsageSession(socket, eventData),
     [AttractapEventType.RESOURCE_USAGE_STATS]: (socket, eventData) =>

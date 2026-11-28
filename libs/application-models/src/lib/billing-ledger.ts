@@ -1,3 +1,4 @@
+import type { ProjectSwitchCharging } from './project-switch-charging';
 import { BillingTransactionStatus } from './billing-transaction';
 
 /**
@@ -40,6 +41,27 @@ export interface BillingTransactionItemRecord {
   allocation: BillingAllocationRecord | null;
 }
 
+/** What a billing event says in addition when the charged usage is one part of a session whose project was switched. */
+export interface SwitchedSessionCharge {
+  /** A later part follows: the charged part ended at a project switch, not with the session. */
+  continues: boolean;
+  /** The owner's completed charges (bills and meter corrections) of this part and all parts before it. */
+  sessionAmount: number;
+  resourceName: string;
+}
+
+/**
+ * What the running part of a switched session is billed with, as far as only the server knows it. Its minutes are the
+ * started minutes from `roundingStartTime` to its end, less those from `roundingStartTime` to its start.
+ */
+export interface RunningPartBilling {
+  /** The fee per use this part pays: 0 when the session paid it already. */
+  flatCredits: number;
+  roundingStartTime: Date;
+  /** What the earlier parts of the same rounding charged, before the billing factor, which is rounded with them. */
+  priorCredits: number;
+}
+
 export interface BillingTransactionRecord {
   id: number;
   userId: number;
@@ -53,6 +75,8 @@ export interface BillingTransactionRecord {
   externalReference?: string | null;
   status: BillingTransactionStatus;
   items?: BillingTransactionItemRecord[];
+  /** Only on live events of a switched session's charges; never stored. */
+  switchedSession?: SwitchedSessionCharge;
 }
 
 /** The public fields of a user as shown beside a transaction (never mail address, tokens or lock state). */
@@ -101,6 +125,7 @@ export interface ResourceBillingConfigurationRecord {
   creditsPerUsage: number;
   creditsPerMinute: number;
   creditsPerOperatingMinute: number;
+  projectSwitchCharging: ProjectSwitchCharging;
 }
 
 /** What a usage receipt mail is built from. */

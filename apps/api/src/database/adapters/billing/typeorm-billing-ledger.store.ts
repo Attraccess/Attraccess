@@ -1,14 +1,16 @@
 import {
   BillingTransactionStatus,
+  ProjectSwitchCharging,
   ResourceMeteringSessionStatus,
   type BillingTransactionDetail,
   type BillingTransactionRecord,
+  type SwitchedSessionCharge,
   type UsageReceiptSource,
 } from '@attraccess/application-models';
-import { BillingTransaction, BillingTransactionItem, User } from '@attraccess/database-entities';
+import { BillingTransaction, BillingTransactionItem, ResourceUsage, User } from '@attraccess/database-entities';
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../audit/recorder/audit-event';
 import {
   BillingAuditFactory,
@@ -16,10 +18,16 @@ import {
   BillingTransactionContext,
   NewBillingTransaction,
   SettleUsageChargeInput,
+  ContinuedUsagePart,
+  RunningUsagePricing,
 } from '../../../billing/ports/billing-ledger.port';
+import { findSwitchedSessionCharge } from './switched-session-queries';
 import { TransactionContextResolver } from '../transaction-context';
 import { toTransactionDetail, toTransactionRecord, toUsageReceipt } from './billing-mappers';
 import { findRelations } from '../find-options';
+
+/** The line the billing factor adds to a bill; it is no charge of its own. */
+const BILLING_FACTOR_ITEM = 'BILLING_FACTOR';
 
 const DETAIL_RELATIONS = ['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf', 'items'];
 
@@ -105,6 +113,58 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
       status: BillingTransactionStatus.Completed,
     });
     return Boolean(row);
+  }
+
+  async findContinuedUsageParts(usageId: number, context: BillingTransactionContext): Promise<ContinuedUsagePart[]> {
+    const rows: (Omit<ContinuedUsagePart, 'grossCredits'> & { grossCredits: string })[] = await this.contexts
+      .manager(context)
+      .query(
+        `WITH RECURSIVE "chain" AS (
+           SELECT "id", "previousUsageId", "startTime", "attributedOperatingDurationInMinutes",
+                  "projectSwitchCharging", 1 AS "depth"
+           FROM "resource_usage" WHERE "id" = $1
+           UNION ALL
+           SELECT "part"."id", "part"."previousUsageId", "part"."startTime",
+                  "part"."attributedOperatingDurationInMinutes", "part"."projectSwitchCharging", "chain"."depth" + 1
+           FROM "resource_usage" "part"
+           JOIN "chain" ON "part"."id" = "chain"."previousUsageId"
+           WHERE "chain"."projectSwitchCharging" = $2
+         )
+         SELECT "chain"."startTime", "chain"."attributedOperatingDurationInMinutes", "chain"."projectSwitchCharging",
+           (SELECT COALESCE(SUM("item"."unitPrice" * "item"."quantity"), 0)::text
+            FROM "billing_transaction" "bill"
+            JOIN "billing_transaction_item" "item" ON "item"."billingTransactionId" = "bill"."id"
+            WHERE "bill"."resourceUsageId" = "chain"."id"
+              AND NOT ("item"."name" = $3 AND "item"."meterQuantity" IS NULL
+                       AND "item"."meterCreditsPerUnit" IS NULL)) AS "grossCredits"
+         FROM "chain" ORDER BY "chain"."depth"`,
+        [usageId, ProjectSwitchCharging.CONTINUE, BILLING_FACTOR_ITEM],
+      );
+    return rows.map((row) => ({ ...row, grossCredits: BigInt(row.grossCredits) }));
+  }
+
+  async findRunningUsagePricing(
+    usageId: number,
+    context: BillingTransactionContext,
+  ): Promise<RunningUsagePricing | null> {
+    return this.contexts.manager(context).findOne(ResourceUsage, {
+      where: { id: usageId, endTime: IsNull() },
+      select: {
+        id: true,
+        userId: true,
+        resourceId: true,
+        startTime: true,
+        previousUsageId: true,
+        projectSwitchCharging: true,
+        creditsPerUsage: true,
+        sessionDurationCreditsPerMinute: true,
+        operatingDurationCreditsPerMinute: true,
+      },
+    });
+  }
+
+  findSwitchedSessionCharge(usageId: number, userId: number): Promise<SwitchedSessionCharge | null> {
+    return findSwitchedSessionCharge(this.transactions.manager, usageId, userId);
   }
 
   async findUsageTransaction(

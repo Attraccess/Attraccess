@@ -30,6 +30,8 @@ export function FormAppliesToSection({ resources }: Readonly<FormAppliesToSectio
         ['isRequiredOnResourceUsageStart', 'appliesTo.badges.start'],
         ['isRequiredOnResourceUsageTakeOver', 'appliesTo.badges.takeover'],
         ['isRequiredOnResourceUsageEnd', 'appliesTo.badges.end'],
+        ['isRequiredOnResourceUsageProjectSwitch', 'appliesTo.badges.projectSwitch'],
+        ['isRequiredOnResourceUsageProjectReassign', 'appliesTo.badges.projectReassign'],
       ] as const
     )
       .filter(([flag]) => resource.effective[flag])

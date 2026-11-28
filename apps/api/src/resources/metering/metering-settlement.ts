@@ -14,12 +14,28 @@ import { TransactionScope, UnitOfWork } from '../../database/unit-of-work';
 import { LiveNotificationsService } from '../../billing/live-notifications/live-notifications.service';
 
 import type { MeteringStore } from './metering-store.port';
-import { meterCharge, meterDiscount, formatMeterValue } from './quantity';
+import { partMeterCharge, partMeterDiscount, priorConsumptionOf } from './continued-meter-charge';
+import { meterCharge, formatMeterValue } from './quantity';
 import { sessionShare } from './segment-charges';
 
 const REINITIALIZED = 'The meter was re-initialized for a later session before the final reading was collected';
 
-export type MeterFinal = { status: 'ready'; operationId: string } | { status: 'unavailable'; reason: string };
+/** Why a reading missed at a project switch stays missing: the measurement goes on with the continuation. */
+const unreadAtProjectSwitch = (reason: string) =>
+  `The meter could not be read at the project switch (${reason}); consumption since its last reading is counted after the switch`;
+
+/** Why a session without its final reading is left pending or failed; `superseded` when a later session uses the meter. */
+function unreadReason(session: ResourceMeteringSessionRecord, final: MeterFinal, superseded: boolean): string {
+  // At a project switch the later session is the continuation: nothing was initialized again.
+  const switched = final.status === 'unavailable' && final.atProjectSwitch;
+  if (superseded && !switched) return REINITIALIZED;
+  if (session.compromisedReason) return session.compromisedReason;
+  if (final.status !== 'unavailable') return 'No final reading was collected';
+  return superseded ? unreadAtProjectSwitch(final.reason) : final.reason;
+}
+
+export type MeterFinal =
+  { status: 'ready'; operationId: string } | { status: 'unavailable'; reason: string; atProjectSwitch?: boolean };
 
 export type FinalCollection = { status: 'not-metered' } | { status: 'collected'; meters: Record<string, MeterFinal> };
 
@@ -79,7 +95,15 @@ export class MeteringSettlement {
     return usage;
   }
 
-  /** The usage's bill is completed and immutable: the meter consumption goes onto a new correction transaction. */
+  /**
+   * The usage's bill is completed and immutable: the meter consumption goes onto a new correction transaction.
+   *
+   * In a switched session (ATT-1421) this is the last part: a switch is refused while a billed meter of the part
+   * cannot be read, and settles the part with its reading. The correction is rounded with the earlier parts, which are
+   * all settled by then, so the session still costs what an unsplit one does. Should an earlier part ever be settled
+   * late, after a later part was billed, the later part did not count its consumption: each consumption is still
+   * billed once, by the part it belongs to, and the session can only differ from an unsplit one by rounding.
+   */
   async settleLate(sessionId: string, operationId: string, initiatorId: number): Promise<void> {
     await this.unitOfWork.run(async (scope) => {
       const session = await this.requireSession(sessionId, scope);
@@ -103,14 +127,16 @@ export class MeteringSettlement {
         return;
       }
       const original = await this.store.requireBillOfUsage(usage.id, true, scope);
-      const charge = meterCharge(BigInt(operation.totalValue as string), session.creditsPerUnit);
+      // The last part of a switched session is rounded with the earlier ones, which were settled at their switch.
+      const prior = await priorConsumptionOf(this.store, session, scope);
+      const charge = partMeterCharge(prior, BigInt(operation.totalValue as string), session.creditsPerUnit);
       const factor = usage.billingFactor ?? usage.userBillingFactor;
-      const discount = meterDiscount(charge, factor);
+      const discount = partMeterDiscount(prior, charge, session.creditsPerUnit, factor);
       const correction = await this.store.createCorrection(
         { userId: original.userId, initiatorId, correctionOfId: original.id, amount: -(charge - discount) },
         scope,
       );
-      await this.addMeterItem(scope, correction.id, session, operation);
+      await this.addMeterItem(scope, correction.id, session, operation, prior);
       if (discount !== 0) {
         await this.store.addBillItem(
           correction.id,
@@ -151,6 +177,12 @@ export class MeteringSettlement {
     });
   }
 
+  private async hasSegments(context: TransactionContext, session: ResourceMeteringSessionRecord): Promise<boolean> {
+    const usage = await this.store.findUsage(session.usageId, context);
+    if (!usage) throw new Error(`The usage ${session.usageId} does not exist`);
+    return (await this.store.findUsageSegments(session.meterId, usage, context)).length > 0;
+  }
+
   /**
    * The item a session's shares of its shared segments become. Null while a segment it took part in is still open;
    * `abandoned` when the meter was re-initialized before such a segment got its closing reading, so the share can
@@ -162,9 +194,12 @@ export class MeteringSettlement {
     const segments = await this.store.findUsageSegments(session.meterId, usage, context);
     if (segments.some((segment) => segment.status === 'abandoned')) return 'abandoned' as const;
     if (!segments.length || segments.some((segment) => segment.status !== 'closed')) return null;
-    const share = sessionShare(segments, usage.id);
+    const prior = await priorConsumptionOf(this.store, session, context);
+    const share = sessionShare(segments, usage.id, prior);
     return {
       share,
+      // Only a solo share is rounded with the earlier parts; its discount is rounded with them too.
+      priorConsumption: share.solo ? prior : BigInt(0),
       item: {
         name: session.meterName,
         description: null,
@@ -201,6 +236,28 @@ export class MeteringSettlement {
       await this.store.updateSession(
         session.id,
         { status: ResourceMeteringSessionStatus.Failed, failureReason: REINITIALIZED },
+        context,
+      );
+      return;
+    }
+    // A part before a project switch that has no segment: the continuation took its place in the one still open, and
+    // no earlier reading ever measured it. Nothing is left that a later reading could bill to it.
+    if (
+      !billed &&
+      final.status === 'unavailable' &&
+      final.atProjectSwitch &&
+      !(await this.hasSegments(context, session))
+    ) {
+      await this.addUnavailableItem(
+        context,
+        session.usageId,
+        session.meterName,
+        session.creditsPerUnit,
+        `metering:${session.id}:unavailable`,
+      );
+      await this.store.updateSession(
+        session.id,
+        { status: ResourceMeteringSessionStatus.Failed, failureReason: unreadAtProjectSwitch(final.reason) },
         context,
       );
       return;
@@ -283,7 +340,7 @@ export class MeteringSettlement {
       }
       const original = await this.store.requireBillOfUsage(usage.id, true, scope);
       const factor = usage.billingFactor ?? usage.userBillingFactor;
-      const discount = meterDiscount(billed.share.credits, factor);
+      const discount = partMeterDiscount(billed.priorConsumption, billed.share.credits, session.creditsPerUnit, factor);
       const correction = await this.store.createCorrection(
         {
           userId: original.userId,
@@ -328,9 +385,11 @@ export class MeteringSettlement {
     billId: number,
     session: ResourceMeteringSessionRecord,
     operation: ResourceMeteringOperationRecord,
+    /** What the earlier parts of the session's run consumed on the meter (see `partMeterCharge`). */
+    priorConsumption: bigint,
   ): Promise<number> {
     const externalReference = `metering:${session.id}:${operation.id}`;
-    const charge = meterCharge(BigInt(operation.totalValue as string), session.creditsPerUnit);
+    const charge = partMeterCharge(priorConsumption, BigInt(operation.totalValue as string), session.creditsPerUnit);
     if (await this.store.hasBillItem(billId, externalReference, context)) return charge;
     await this.store.addBillItem(
       billId,
@@ -377,26 +436,21 @@ export class MeteringSettlement {
         session.id,
         {
           status: unrecoverable ? ResourceMeteringSessionStatus.Failed : ResourceMeteringSessionStatus.Pending,
-          failureReason: superseded
-            ? REINITIALIZED
-            : session.compromisedReason
-              ? session.compromisedReason
-              : final.status === 'unavailable'
-                ? final.reason
-                : 'No final reading was collected',
+          failureReason: unreadReason(session, final, superseded),
         },
         context,
       );
       return;
     }
     const transaction = await this.store.requireBillOfUsage(usageId, false, context);
-    await this.addMeterItem(context, transaction.id, session, operation);
+    const prior = await priorConsumptionOf(this.store, session, context);
+    const charge = await this.addMeterItem(context, transaction.id, session, operation, prior);
     await this.store.updateSession(
       session.id,
       {
         status: ResourceMeteringSessionStatus.Settled,
         consumedValue: operation.totalValue,
-        chargeCredits: meterCharge(BigInt(operation.totalValue as string), session.creditsPerUnit),
+        chargeCredits: charge,
         finalOperationId: operation.id,
         failureReason: null,
         settledAt: new Date(),

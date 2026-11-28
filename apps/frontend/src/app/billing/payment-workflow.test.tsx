@@ -43,6 +43,11 @@ vi.mock('@attraccess/react-query-client', () => ({
   useGetResourceBillingConfiguration: () => ({ data: undefined }),
   useListResourceMeters: () => ({ data: state.meters }),
   useSetResourceMeterRate: () => ({ mutateAsync: state.setMeterRate }),
+  ProjectSwitchCharging: {
+    CONTINUE: 'continue',
+    CONTINUE_PER_PART_ROUNDING: 'continue-per-part-rounding',
+    NEW_SESSION: 'new-session',
+  },
   useSetResourceMeterAllocation: () => ({ mutateAsync: vi.fn() }),
   UseListResourceMetersKeyFn: (input: unknown) => ['meters', input],
   UseGetResourceMeteringStatusKeyFn: (input: unknown) => ['status', input],
@@ -179,6 +184,9 @@ it('edits all resource rates and converts them to minor units', async () => {
     fireEvent.change(input, { target: { value } });
     fireEvent.blur(input);
   }
+  // Continuing the session is the default; the admin changes how a project switch is charged.
+  expect(screen.getByRole('radio', { name: /^Continue the session/ })).toBeChecked();
+  fireEvent.click(screen.getByRole('radio', { name: /^Treat as a new session/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() => expect(state.refund).toHaveBeenCalled());
   expect(state.setMeterRate).toHaveBeenCalledWith({
@@ -187,7 +195,12 @@ it('edits all resource rates and converts them to minor units', async () => {
   });
   expect(state.refund).toHaveBeenCalledWith({
     path: { resourceId: 9 },
-    body: { creditsPerUsage: 125, creditsPerMinute: 250, creditsPerOperatingMinute: 375 },
+    body: {
+      creditsPerUsage: 125,
+      creditsPerMinute: 250,
+      creditsPerOperatingMinute: 375,
+      projectSwitchCharging: 'new-session',
+    },
   });
   const error = new Error('Rate rejected');
   act(() => state.callbacks.resource.onError(error));

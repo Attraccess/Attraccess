@@ -22,7 +22,10 @@ export function createBillingServiceFixture() {
     billingTransactionAmount: { observe: jest.fn() },
   };
   const events = { emit: jest.fn() };
-  const flows = { getNodes: jest.fn().mockResolvedValue([]) };
+  const flows = {
+    getNodes: jest.fn().mockResolvedValue([]),
+    getGlobalNodesOfFlowsWith: jest.fn().mockResolvedValue([]),
+  };
   const service = new BillingService(
     ledgerStore,
     configurationStore,

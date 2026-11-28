@@ -28,6 +28,8 @@ const noOverride = {
   isRequiredOnResourceUsageStart: null,
   isRequiredOnResourceUsageTakeOver: null,
   isRequiredOnResourceUsageEnd: null,
+  isRequiredOnResourceUsageProjectSwitch: null,
+  isRequiredOnResourceUsageProjectReassign: null,
 };
 
 describe('TypeOrmResourceFormStore on real PostgreSQL', () => {
@@ -48,6 +50,8 @@ describe('TypeOrmResourceFormStore on real PostgreSQL', () => {
     isRequiredOnResourceUsageStart: start,
     isRequiredOnResourceUsageTakeOver: false,
     isRequiredOnResourceUsageEnd: false,
+    isRequiredOnResourceUsageProjectSwitch: false,
+    isRequiredOnResourceUsageProjectReassign: false,
   });
   const global = (name: string, start = false) => form(name, start, { scope: 'global', resourceId: null });
   const group = (name: string, groupId: number, start = false) =>
@@ -241,6 +245,26 @@ describe('TypeOrmResourceFormStore on real PostgreSQL', () => {
       byDefault.id,
     ]);
     expect(await store.findRequiredForAction(resourceId, ResourceFormAction.START)).toEqual([]);
+  });
+
+  it('keeps the forms of moving a whole session and of splitting it apart, by default and by override', async () => {
+    const moved = await store.createForm({ ...global('Moved'), isRequiredOnResourceUsageProjectReassign: true }, []);
+    const split = await store.createForm({ ...global('Split'), isRequiredOnResourceUsageProjectSwitch: true }, []);
+    const required = async (resource: number, action: ResourceFormAction) =>
+      ids(await store.findRequiredForAction(resource, action));
+
+    expect(await required(resourceId, ResourceFormAction.PROJECT_REASSIGN)).toEqual([moved.id]);
+    expect(await required(resourceId, ResourceFormAction.PROJECT_SWITCH)).toEqual([split.id]);
+
+    await store.upsertOverride(split.id, resourceId, { ...noOverride, isRequiredOnResourceUsageProjectReassign: true });
+    await store.upsertOverride(moved.id, resourceId, {
+      ...noOverride,
+      isRequiredOnResourceUsageProjectReassign: false,
+    });
+
+    expect(await required(resourceId, ResourceFormAction.PROJECT_REASSIGN)).toEqual([split.id]);
+    expect(await required(otherResourceId, ResourceFormAction.PROJECT_REASSIGN)).toEqual([moved.id]);
+    expect(await required(resourceId, ResourceFormAction.PROJECT_SWITCH)).toEqual([split.id]);
   });
 
   it('writes an override only for a live form that reaches the resource', async () => {

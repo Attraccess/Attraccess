@@ -51,6 +51,7 @@ import {
   updateMeterRow,
 } from './meter-rows';
 import { clearPendingShareMarkers, insertCorrection } from './metering-bill-queries';
+import { continuedMeterConsumption, waiveSessionRow } from './metering-session-queries';
 import { openUsageRows, segmentsOfUsage, usageBoundarySince } from './metering-queries';
 import { toAttempt, toMeter, toOperation, toSegment, toSession, toUsage } from './metering-mappers';
 import { EntityManagerResolver } from '../entity-manager-resolver';
@@ -449,19 +450,17 @@ export class TypeOrmMeteringStore implements MeteringStore {
     at: Date,
     context?: TransactionContext,
   ): Promise<ResourceMeteringSessionRecord | null> {
-    const manager = this.managers.resolve(context);
-    const result = await manager.update(
-      ResourceMeteringSession,
-      {
-        id: sessionId,
-        resourceId,
-        status: In([ResourceMeteringSessionStatus.Pending, ResourceMeteringSessionStatus.Failed]),
-      },
-      { status: ResourceMeteringSessionStatus.Waived, settledAt: at },
-    );
-    if (!result.affected) return null;
-    await clearPendingShareMarkers(manager, [sessionId]);
-    return toSession(await manager.findOneByOrFail(ResourceMeteringSession, { id: sessionId }));
+    const row = await waiveSessionRow(this.managers.resolve(context), resourceId, sessionId, at);
+    return row ? toSession(row) : null;
+  }
+
+  findContinuedMeterConsumption(
+    usageId: number,
+    meterId: number,
+    creditsPerUnit: number,
+    context?: TransactionContext,
+  ): Promise<bigint> {
+    return continuedMeterConsumption(this.managers.resolve(context), usageId, meterId, creditsPerUnit);
   }
 
   // ---- operation ledger -------------------------------------------------------------------------

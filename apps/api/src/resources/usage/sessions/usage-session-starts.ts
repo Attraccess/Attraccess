@@ -1,7 +1,7 @@
 import { ResourceFlowNodeType } from '@attraccess/application-models';
 import type { UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
-import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { randomUUID } from 'node:crypto';
 
@@ -14,8 +14,6 @@ import { FinalCollection } from '../../metering/resource-metering.service';
 import { UsageResourceGate } from '../authorization/usage-resource-gate';
 
 import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
-
-import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
 
 import { SessionChangeInterruptedError } from '../errors/session-change-interrupted.error';
 
@@ -117,30 +115,27 @@ export class UsageSessionStarts {
         { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.id ?? user.id },
       );
       newSession = await this.lifecycle.transaction(async (scope) => {
-        const currentAttempt = await this.lifecycle.getLifecycleAttempt(scope, attemptId, resourceId);
-        if (currentAttempt.candidateUsageId !== createdSession.id) {
-          throw new TentativeSessionCancelledError();
-        }
+        const currentAttempt = await this.lifecycle.getAttemptOfCandidate(
+          scope,
+          attemptId,
+          resourceId,
+          createdSession.id,
+        );
         // The flow may have independently triggered maintenance while this start was pending.
         // Recheck the gate before making the candidate session visible.
         await this.gate.getResource(resourceId, user, { checkMaintenance: true, checkControlPermission: false }, scope);
         if (existingActiveSession) {
           await this.lifecycle.applyLifecycleDrafts(scope, currentAttempt);
-          const ended = await this.lifecycle.sessions.endSessionIfOpen(
+          ({ chargeTransactionId } = await this.lifecycle.endAndSettle(
+            scope,
             existingActiveSession.id,
             {
               endTime: currentAttempt.transitionTime,
               endNotes: `Session ended due to takeover by user ${user.id}`,
             },
-            scope,
-          );
-          if (!ended) throw new ConflictException('Usage session changed during takeover');
-          const endedSession = await this.lifecycle.sessions.findSessionWithRelations(
-            existingActiveSession.id,
-            'ended',
-            scope,
-          );
-          chargeTransactionId = await this.lifecycle.settleEndedSession(scope, endedSession, outgoingFinal);
+            outgoingFinal,
+            'Usage session changed during takeover',
+          ));
         } else {
           startedUsageIdToEmit = createdSession.id;
         }

@@ -97,6 +97,7 @@ export function toConfigurationRecord(row: ResourceBillingConfiguration): Resour
     creditsPerUsage: row.creditsPerUsage,
     creditsPerMinute: row.creditsPerMinute,
     creditsPerOperatingMinute: row.creditsPerOperatingMinute,
+    projectSwitchCharging: row.projectSwitchCharging,
   };
 }
 

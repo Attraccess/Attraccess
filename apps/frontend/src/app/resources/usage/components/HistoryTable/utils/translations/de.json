@@ -33,7 +33,7 @@
       "inProgress": "In Benutzung",
       "hasNotes": "Diese Sitzung hat Notizen",
       "project": {
-        "unassigned": "Nicht zugewiesen",
+        "unassigned": "Kein Projekt",
         "updateSuccess": "Projekt aktualisiert",
         "updateError": "Projektaktualisierung fehlgeschlagen"
       }

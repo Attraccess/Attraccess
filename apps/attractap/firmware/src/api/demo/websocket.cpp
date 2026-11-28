@@ -131,12 +131,19 @@ void DemoWebsocket::processOutbound(const char *data, size_t len)
 
     if (strcmp(type, "START_RESOURCE_USAGE_SESSION") == 0 || strcmp(type, "STOP_RESOURCE_USAGE_SESSION") == 0 ||
         strcmp(type, "EXTEND_RESOURCE_USAGE_SESSION") == 0 || strcmp(type, "LOCK_DOOR") == 0 || strcmp(type, "UNLOCK_DOOR") == 0 ||
-        strcmp(type, "UNLATCH_DOOR") == 0 || strcmp(type, "TRIGGER_FLOW_BUTTON") == 0)
+        strcmp(type, "UNLATCH_DOOR") == 0 || strcmp(type, "TRIGGER_FLOW_BUTTON") == 0 ||
+        strcmp(type, "SWITCH_SESSION_PROJECT") == 0)
         _actionRequestId = doc["data"]["payload"]["requestId"] | 0u;
 
     if (strcmp(type, "START_RESOURCE_USAGE_SESSION") == 0)
     {
         handleStartSession(doc["data"]["payload"]);
+        return;
+    }
+
+    if (strcmp(type, "SWITCH_SESSION_PROJECT") == 0)
+    {
+        handleSwitchProject(doc["data"]["payload"]);
         return;
     }
 
@@ -288,7 +295,11 @@ void DemoWebsocket::respondResourceList(uint32_t requestId, const char *language
         if (shown)
             addSessionJson(obj["activeUsageSession"].to<JsonObject>(), *shown);
         if (own)
+        {
             addSessionJson(obj["ownUsageSession"].to<JsonObject>(), *own);
+            if (r.type != 1)
+                addProjectSwitchOffer(obj, *own, english);
+        }
         JsonArray all = obj["activeUsageSessions"].to<JsonArray>();
         for (const DemoSession &session : sessions)
             addSessionJson(all.add<JsonObject>(), session);

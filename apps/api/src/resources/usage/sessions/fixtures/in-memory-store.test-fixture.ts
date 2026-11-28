@@ -1,4 +1,4 @@
-import { ResourceType, ResourceUsageAction } from '@attraccess/application-models';
+import { ResourceType, ResourceUsageAction, sessionStartOf } from '@attraccess/application-models';
 import type {
   SupervisionMode,
   UsageBillingItemDraft,
@@ -15,6 +15,7 @@ import type {
 } from '@attraccess/application-models';
 import type { TransactionScope, UnitOfWork } from '../../../../database/unit-of-work';
 import {
+  ContinuationDraft,
   DoorActionDraft,
   MachineCapacity,
   PendingSessionDraft,
@@ -34,6 +35,9 @@ const session = (fields: Partial<StoredSession> & Pick<StoredSession, 'id' | 're
   endNotes: null,
   usageInMinutes: -1,
   projectId: null,
+  previousUsageId: null,
+  projectSwitchCharging: null,
+  sessionStartTime: null,
   isFinalized: true,
   lifecyclePending: false,
   supervisorUserId: null,
@@ -263,6 +267,13 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return this.withRelations(stored);
   }
 
+  async assignRunningProject(usageId: number, projectId: number | null, _context: TransactionScope): Promise<boolean> {
+    const stored = this.required(usageId);
+    if (stored.endTime !== null || stored.lifecyclePending) return false;
+    stored.projectId = projectId;
+    return true;
+  }
+
   async findSessionForEvent(usageId: number, _context?: TransactionScope): Promise<UsageSessionWithParties | null> {
     const found = this.sessions.find((stored) => stored.id === usageId);
     return found ? this.withRelations(found) : null;
@@ -350,6 +361,23 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return [...this.attempts.values()].some((attempt) => attempt.previousUsageId === usageId);
   }
 
+  async isSessionBeingSwitched(usageId: number, _context?: TransactionScope): Promise<boolean> {
+    return [...this.attempts.values()].some(
+      (attempt) => attempt.kind.startsWith('project-') && attempt.previousUsageId === usageId,
+    );
+  }
+
+  async isProjectSwitchPending(resourceId: number): Promise<boolean> {
+    return [...this.attempts.values()].some(
+      (attempt) => attempt.kind.startsWith('project-') && attempt.resourceId === resourceId,
+    );
+  }
+
+  async findContinuationId(usageId: number, _context?: TransactionScope): Promise<number | null> {
+    const next = this.sessions.find((stored) => stored.previousUsageId === usageId && !stored.lifecyclePending);
+    return next?.id ?? null;
+  }
+
   async saveAttempt(attempt: UsageLifecycleAttempt, _context?: TransactionScope): Promise<UsageLifecycleAttempt> {
     const saved = { createdAt: new Date(), ...attempt };
     this.attempts.set(attempt.id, saved);
@@ -403,6 +431,35 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     });
     this.sessions.push(stored);
     return this.withRelations(stored);
+  }
+
+  async createContinuationSession(draft: ContinuationDraft): Promise<UsageSessionWithParties> {
+    const previous = this.sessions.find((stored) => stored.id === draft.previousUsageId && !stored.endTime);
+    if (!previous) throw new Error(`The session ${draft.previousUsageId} is not running`);
+    const stored = session({
+      ...previous,
+      id: this.nextId++,
+      startTime: draft.startTime,
+      startNotes: null,
+      isFinalized: false,
+      lifecyclePending: true,
+      projectId: draft.projectId,
+      previousUsageId: previous.id,
+      projectSwitchCharging: draft.projectSwitchCharging,
+      sessionStartTime: sessionStartOf(previous),
+      formSubmissions: undefined,
+      billingTransaction: null,
+    });
+    this.sessions.push(stored);
+    return this.withRelations(stored);
+  }
+
+  async inheritDeadline(previousUsageId: number, usageId: number): Promise<void> {
+    const previous = this.sessions.find((stored) => stored.id === previousUsageId);
+    const next = this.sessions.find((stored) => stored.id === usageId);
+    if (!previous || !next) throw new Error('Both parts of the switched session must exist');
+    const { autoEndAt, maxAutoEndAt, estimatedDurationMinutes, autoEndWarnedOffsetMinutes } = previous;
+    Object.assign(next, { autoEndAt, maxAutoEndAt, estimatedDurationMinutes, autoEndWarnedOffsetMinutes });
   }
 
   async findPendingSession(usageId: number, _context?: TransactionScope): Promise<UsageSessionWithParties | null> {

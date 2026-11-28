@@ -9,7 +9,11 @@ import { NodeExecutionContext } from './node-executor.interface';
 
 describe('BillingSetAdditionalItemsExecutor', () => {
   let executor: BillingSetAdditionalItemsExecutor;
-  let resourceUsageService: { getActiveSessionsForResource: jest.Mock; stageLifecycleBillingItem: jest.Mock };
+  let resourceUsageService: {
+    getActiveSessionsForResource: jest.Mock;
+    findLatestPartId: jest.Mock;
+    stageLifecycleBillingItem: jest.Mock;
+  };
   let billingItems: { addToPendingBill: jest.Mock };
   let unitOfWork: { run: jest.Mock; current: jest.Mock };
   const scope = { isOpen: true, afterCommit: jest.fn() } as TransactionScope;
@@ -40,6 +44,7 @@ describe('BillingSetAdditionalItemsExecutor', () => {
 
     resourceUsageService = {
       getActiveSessionsForResource: jest.fn().mockResolvedValue([{ id: 'ru-1' }]),
+      findLatestPartId: jest.fn(async (usageId: number) => usageId),
       stageLifecycleBillingItem: jest.fn().mockResolvedValue(undefined),
     };
     billingItems = { addToPendingBill: jest.fn().mockResolvedValue(true) };

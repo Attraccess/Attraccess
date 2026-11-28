@@ -3,7 +3,9 @@
     "title": {
       "start": "Complete forms before starting",
       "takeover": "Complete forms before taking over",
-      "end": "Complete forms before ending"
+      "end": "Complete forms before ending",
+      "projectSwitch": "Complete forms before splitting the session",
+      "projectReassign": "Complete forms before changing the project"
     },
     "description": "Please fill out the required fields to continue.",
     "submit": "Submit forms",

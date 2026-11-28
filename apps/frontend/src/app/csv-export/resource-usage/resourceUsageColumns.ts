@@ -142,6 +142,13 @@ export function buildResourceUsageColumns({
       key: 'supervisorDisplayName',
       getter: (item) => (item.supervisorUser ? formatUserDisplayName(item.supervisorUser) : ''),
     },
+    { label: t('columns.sessionId'), key: 'sessionId', getter: (item) => item.id },
+    {
+      // Set on a record that continues a session after a project switch.
+      label: t('columns.previousUsageId'),
+      key: 'previousUsageId',
+      getter: (item) => item.previousUsageId ?? '',
+    },
     { label: t('columns.userEmail'), key: 'userEmail', getter: (item) => item.userEmail ?? '' },
     {
       label: t('columns.userExternalIdentifier'),

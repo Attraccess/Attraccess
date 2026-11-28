@@ -207,6 +207,27 @@ describe('TypeOrmUsageSessionStore reads and ends', () => {
     });
   });
 
+  describe('completed supervised sessions', () => {
+    it('count a session switched twice (three parts) once, and an unswitched one once', async () => {
+      const supervised = { userId: 1, supervisorUserId: 3 };
+      await stored(1, { ...supervised, endTime: at(10) });
+      await stored(2, { ...supervised, startTime: at(10), endTime: at(20), previousUsageId: 1 });
+      await stored(3, { ...supervised, startTime: at(20), endTime: at(30), previousUsageId: 2 });
+      await stored(4, { ...supervised, endTime: at(40) }); // never switched
+      await stored(5, { userId: 1, endTime: at(50) }); // not supervised
+
+      expect(await a.store.countCompletedSupervisedSessions([1], 1)).toBe(2);
+    });
+
+    it('do not count a chain whose last part still runs', async () => {
+      const supervised = { userId: 1, supervisorUserId: 3 };
+      await stored(1, { ...supervised, endTime: at(10) });
+      await stored(2, { ...supervised, startTime: at(10), previousUsageId: 1 });
+
+      expect(await a.store.countCompletedSupervisedSessions([1], 1)).toBe(0);
+    });
+  });
+
   describe('door actions', () => {
     it('are stored as already ended sessions of the user that never count as running', async () => {
       const unlock = await a.store.recordDoorAction({

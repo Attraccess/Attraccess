@@ -22,6 +22,8 @@
     "supervisorId": "Aufsicht-ID",
     "supervisorDisplayName": "Aufsicht-Anzeigename",
     "supervisorUsername": "Aufsicht-Name",
+    "sessionId": "Sitzungs-ID",
+    "previousUsageId": "Fortsetzung von Sitzungs-ID (Projektwechsel)",
     "userEmail": "Benutzer-E-Mail",
     "userExternalIdentifier": "Externe Benutzer-ID",
     "supervisorEmail": "Aufsicht-E-Mail"

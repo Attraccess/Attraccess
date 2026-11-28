@@ -361,32 +361,108 @@ export class MeteringSegments {
   ): Promise<MeterFinal> {
     const actives = await this.activeParticipants(undefined, session.resourceId, session.meterId, [session.usageId]);
     const last = actives.length === 0;
-    const { attempts, retryDelaySeconds } = last
-      ? { attempts: definition.collect.finalAttempts, retryDelaySeconds: definition.collect.finalRetryDelaySeconds }
-      : BOUNDARY_ATTEMPT;
+    return this.readAndClose(
+      session,
+      {
+        kind: last ? 'final' : 'boundary',
+        label: 'Boundary reading',
+        timeoutSeconds: definition.collect.timeoutSeconds,
+        freshAfter,
+        ...(last
+          ? { attempts: definition.collect.finalAttempts, retryDelaySeconds: definition.collect.finalRetryDelaySeconds }
+          : BOUNDARY_ATTEMPT),
+      },
+      async () => this.nextParticipants(await this.store.findOpenSegment(session.meterId), actives),
+      sleep,
+    );
+  }
+
+  /**
+   * The owner of a session switches its project: one reading closes the segment `session` is in, and `successor`
+   * takes its place in the next one. A billed meter that cannot be read refuses the switch and leaves `session` as
+   * it was. When a tracking-only meter cannot be read, `successor` takes that place in the open segment instead, so
+   * what is still unread is counted after the switch.
+   */
+  async handOver(
+    session: ResourceMeteringSessionRecord,
+    successor: SessionValues,
+    definition: Definition,
+    freshAfter: Date,
+    sleep: (seconds: number) => Promise<void>,
+  ): Promise<MeterFinal> {
+    const meter = await this.requireMeter(session.meterId);
+    const running = await this.activeParticipants(undefined, session.resourceId, session.meterId, [successor.usageId]);
+    const others = running.filter((participant) => participant.session.usageId !== session.usageId);
+    const next = await this.store.createSession({ ...successor, accounting: 'segmented' });
+    const open = await this.ensureOpen(undefined, meter, running);
+    const final = await this.readAndClose(
+      session,
+      {
+        kind: 'boundary',
+        label: 'Switch reading',
+        timeoutSeconds: definition.collect.timeoutSeconds,
+        freshAfter,
+        attempts: definition.collect.finalAttempts,
+        retryDelaySeconds: definition.collect.finalRetryDelaySeconds,
+      },
+      async () => this.inStartOrder([...this.nextParticipants(open, others), this.toParticipant(next)]),
+      sleep,
+    );
+    if (final.status === 'ready') return final;
+    if (session.creditsPerUnit > 0) {
+      await this.store.deleteSession(next.id);
+    } else {
+      // One person, one share: with both parts in the segment, the others would get less of it than without a switch.
+      // The place stays the same, which decides a rounding tie as it would without the switch.
+      await this.store.updateSegment(open.id, {
+        participants: open.participants.map((participant) =>
+          participant.usageId === session.usageId ? this.toParticipant(next) : participant,
+        ),
+      });
+    }
+    return final;
+  }
+
+  /**
+   * Reads the meter for `session` up to `read.attempts` times and closes the segment it is in with the first reading
+   * that succeeds; `next` names who takes part in the segment that follows. Unavailable when no attempt succeeded.
+   */
+  private async readAndClose(
+    session: ResourceMeteringSessionRecord,
+    read: {
+      kind: MeteringOperationKind;
+      /** How the log names the reading. */
+      label: string;
+      timeoutSeconds: number;
+      freshAfter: Date;
+      attempts: number;
+      retryDelaySeconds: number;
+    },
+    next: () => Promise<MeteringSegmentParticipant[]>,
+    sleep: (seconds: number) => Promise<void>,
+  ): Promise<MeterFinal> {
     let reason = 'No attempt was made';
-    for (let attempt = 1; attempt <= attempts; attempt++) {
+    for (let attempt = 1; attempt <= read.attempts; attempt++) {
       try {
-        const operation = await this.hooks.runOperation(session, last ? 'final' : 'boundary', {
+        const operation = await this.hooks.runOperation(session, read.kind, {
           trigger: ResourceFlowNodeType.INPUT_METERING_COLLECT,
-          timeoutSeconds: definition.collect.timeoutSeconds,
-          freshAfter,
+          timeoutSeconds: read.timeoutSeconds,
+          freshAfter: read.freshAfter,
         });
         const meter = await this.requireMeter(session.meterId);
-        const open = await this.store.findOpenSegment(session.meterId);
         await this.close({
           resourceId: session.resourceId,
           meterId: session.meterId,
           reading: this.readingOf(operation, meter),
-          next: this.nextParticipants(open, actives),
+          next: await next(),
         });
         return { status: 'ready', operationId: operation.id };
       } catch (error) {
         reason = error instanceof Error ? error.message : String(error);
         this.logger.warn(
-          `Boundary reading ${attempt}/${attempts} of meter ${session.meterId} for usage ${session.usageId} failed: ${reason}`,
+          `${read.label} ${attempt}/${read.attempts} of meter ${session.meterId} for usage ${session.usageId} failed: ${reason}`,
         );
-        if (attempt < attempts && retryDelaySeconds > 0) await sleep(retryDelaySeconds);
+        if (attempt < read.attempts && read.retryDelaySeconds > 0) await sleep(read.retryDelaySeconds);
       }
     }
     return { status: 'unavailable', reason };

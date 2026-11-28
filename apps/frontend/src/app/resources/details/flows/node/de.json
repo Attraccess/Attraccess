@@ -97,6 +97,20 @@
             "outputs": {
               "output": "Ausgabe"
             }
+          },
+          "project-switched": {
+            "title": "Projekt gewechselt (Aufteilung)",
+            "description": "Wird ausgelöst, wenn jemand die eigene laufende Sitzung auf Projekte aufteilt („Ab jetzt aufteilen“). Die Maschine läuft weiter: „Nutzung gestartet“, „Nutzung beendet“ und „Nutzung übernommen“ werden nicht ausgeführt. Schlägt dieser Flow fehl, wird der Wechsel abgelehnt. Hier hinzugefügte Abrechnungsposten gehören zum Abschnitt, der endet.",
+            "outputs": {
+              "output": "Ausgabe"
+            }
+          },
+          "project-reassigned": {
+            "title": "Projekt geändert (ganze Sitzung)",
+            "description": "Wird ausgelöst, wenn jemand die ganze eigene laufende Sitzung einem anderen Projekt zuordnet. Der Nutzungseintrag läuft weiter und es wird nichts abgerechnet. Schlägt dieser Flow fehl, wird die Änderung abgelehnt.",
+            "outputs": {
+              "output": "Ausgabe"
+            }
           }
         },
         "metering": {

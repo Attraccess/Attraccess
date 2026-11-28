@@ -32,13 +32,33 @@ Läuft während eines Nutzungsstarts. Keine Einstellungen. Die Payload enthält 
 
 Typ: `input.resource.usage.stopped` · Maschinen
 
-Läuft während eines Nutzungsendes. Keine Einstellungen. Die Payload enthält die bisherige Sitzung, eingereichte Formulare und Endfelder wie `endTime`, `endNotes` sowie [`activeSessions`](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen). Beispiel: Relais ausschalten oder vor der Abrechnung einen Posten ergänzen. Läuft nicht für eine Sitzung, die durch eine Übernahme endet; siehe [Nutzung übernommen](flows/node-types.md#nutzung-übernommen).
+Läuft während eines Nutzungsendes. Keine Einstellungen. Die Payload enthält die bisherige Sitzung, eingereichte Formulare und Endfelder wie `endTime`, `endNotes` sowie [`activeSessions`](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen). Beispiel: Relais ausschalten oder vor der Abrechnung einen Posten ergänzen. Läuft nicht für eine Sitzung, die durch eine Übernahme endet; siehe [Nutzung übernommen](flows/node-types.md#nutzung-übernommen). Nach einem [Projektwechsel](flows/node-types.md#projekt-gewechselt) läuft er einmal und nur für den letzten Abschnitt: `startTime` ist dessen Start, `sessionStartTime` der Start der ganzen Sitzung (`null` ohne Wechsel). Siehe [Welche Daten ein Trigger liefert](flows/payloads-variables-templates.md#welche-daten-ein-trigger-liefert).
 
 ### Nutzung übernommen
 
 Typ: `input.resource.usage.takeover` · Maschinen
 
 Läuft bei Übernahme einer aktiven Sitzung. Keine Einstellungen. Die Payload enthält die bisherige Sitzung sowie `newUser`, `oldUser`, `takeOverTime` und `activeSessions` (immer 1 zu 1). `{{newUser.username}}` liest den neuen Besitzer. Eine Übernahme verwendet diesen Trigger anstelle von **Nutzung gestartet**. Die bisherige Sitzung endet hier, und **Nutzung beendet** läuft für sie nicht. Posten für die bisherige Sitzung (z. B. Verbrauchsmaterial, das Sie sonst beim Beenden ergänzen) erfassen Sie in diesem Flow mit dem Knoten [**Abrechnungs Position hinzufügen**](flows/node-types.md#abrechnungsposten-setzen); sie werden mit der bisherigen Sitzung abgerechnet. Sollen Posten vom Beenden auch bei Übernahmen anfallen, fügen Sie denselben Abrechnungszweig an beiden Triggern hinzu. Die Payload der Übernahme enthält kein `endTime` und kein `endNotes` (verwenden Sie `takeOverTime`), und ihre `formSubmissions` sind die Antworten des neuen Benutzers auf das Übernahmeformular, nicht auf das Beendigungsformular; ein kopierter Zweig muss seine Werte von dort lesen. Physische Effekte wie das Ausschalten eines Relais gehören nicht an diesen Trigger, denn die Maschine bleibt beim neuen Benutzer in Nutzung.
+
+### Projekt gewechselt
+
+Typ: `input.resource.usage.project-switched` · Maschinen
+
+Im Editor heißt der Trigger **Projekt gewechselt (Aufteilung)**. Läuft, wenn jemand die eigene laufende Sitzung mit **Ab jetzt aufteilen** [auf Projekte aufteilt](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln). Keine Einstellungen. Die Maschine läuft weiter: **Nutzung gestartet**, **Nutzung beendet** und **Nutzung übernommen** laufen dabei nicht. Ein Flow, der auf jeden Projektwechsel reagieren soll, braucht daher diesen Trigger und **Projekt geändert (ganze Sitzung)**. Schalten Sie hier nicht den Strom ab.
+
+Die Payload enthält den Abschnitt, der endet (`id` ist seine ID), sowie `previousUsageId` (dieselbe), `newUsageId` (die Fortsetzung), `previousProjectId` und `newProjectId` (`null` ohne Projekt), `previousProject`, `newProject`, `switchTime`, `activeSessions` (vorher und nachher gleich) und `formSubmissions` mit den Antworten der [Formulare zum Projektwechsel](forms/overview.md). [**Abrechnungs Position hinzufügen**](flows/node-types.md#abrechnungsposten-setzen) ergänzt den Abschnitt, der endet.
+
+Schlägt dieser Flow fehl, wird der gesamte Wechsel abgelehnt und die Sitzung läuft unter dem alten Projekt weiter. [**Nutzungssitzung beenden**](flows/node-types.md#nutzungssitzung-beenden) mit **Die auslösende Sitzung** wird aus demselben Grund abgelehnt (es würde eine weiterlaufende Maschine stoppen); **Die Sitzung eines Benutzers** und **Alle Sitzungen** beenden die gewählten Sitzungen nach dem Wechsel, die gewechselte als ihre Fortsetzung.
+
+### Projekt geändert (ganze Sitzung)
+
+Typ: `input.resource.usage.project-reassigned` · Maschinen
+
+Läuft, wenn jemand [die ganze eigene laufende Sitzung](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln) einem anderen Projekt zuordnet. Keine Einstellungen. Der Nutzungseintrag läuft weiter; nichts wird gestartet, beendet oder abgerechnet. **Projekt gewechselt (Aufteilung)** läuft dabei nicht. Schalten Sie hier nicht den Strom ab.
+
+Die Payload enthält die laufende Sitzung (Stand vor der Änderung) sowie `usageId`, `previousProjectId` und `newProjectId` (`null` ohne Projekt), `previousProject`, `newProject`, `changeTime`, `activeSessions` (vorher und nachher gleich) und `formSubmissions` mit den Antworten der [Formulare zur Projektänderung (ganze Sitzung)](forms/overview.md). [**Abrechnungs Position hinzufügen**](flows/node-types.md#abrechnungsposten-setzen) ergänzt die laufende Sitzung.
+
+Schlägt dieser Flow fehl, wird die Änderung abgelehnt und die Sitzung behält ihr Projekt. [**Nutzungssitzung beenden**](flows/node-types.md#nutzungssitzung-beenden) mit **Die auslösende Sitzung** wird aus demselben Grund abgelehnt; **Die Sitzung eines Benutzers** und **Alle Sitzungen** beenden die gewählten Sitzungen nach der Änderung.
 
 ### Tür entriegelt
 

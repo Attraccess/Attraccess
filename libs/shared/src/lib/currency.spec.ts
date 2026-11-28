@@ -1,8 +1,11 @@
 import {
   applyBillingFactor,
+  applyPartBillingFactor,
+  cumulativeStartedMinutes,
   dbCurrencyToUserCurrency,
   formatCredits,
   parseCredits,
+  startedMinutes,
   toExactCredits,
   userCurrencyToDbCurrency,
 } from './currency';
@@ -97,5 +100,36 @@ describe('currency', () => {
     const product = toExactCredits(4503599627370496) * toExactCredits(2);
     expect(formatCredits(product, 2, { useGrouping: false })).toBe('90071992547409.92');
     expect(formatCredits(product - BigInt(1), 2, { locale: 'de' })).toBe('90.071.992.547.409,91');
+  });
+
+  it.each([
+    [0, 0],
+    [-5, 0],
+    [1, 1],
+    [60_000, 1],
+    [60_001, 2],
+  ])('counts %s ms as %s started minutes', (ms, minutes) => {
+    expect(startedMinutes(ms)).toBe(minutes);
+  });
+
+  it('rounds parts of one run together, never above the unsplit run', () => {
+    // 3 parts of 20.5 s each: alone each would round up to a minute, together they start 2.
+    const part = 20_500;
+    const minutes = [0, 1, 2].map((index) => cumulativeStartedMinutes(index * part, part));
+    expect(minutes).toEqual([1, 0, 1]);
+    expect(minutes.reduce((sum, value) => sum + value, 0)).toBe(startedMinutes(3 * part));
+    expect(cumulativeStartedMinutes(0, 90_000)).toBe(startedMinutes(90_000));
+    expect(cumulativeStartedMinutes(60_000, 0)).toBe(0);
+  });
+
+  it.each([33, 50])('adds the parts of a run up to the unsplit charge at a factor of %s%%', (factor) => {
+    const parts = [BigInt(3), BigInt(1), BigInt(5), BigInt(2)];
+    let prior = BigInt(0);
+    let paid = 0;
+    for (const gross of parts) {
+      paid += applyPartBillingFactor(prior, gross, factor).amount;
+      prior += gross;
+    }
+    expect(paid).toBe(applyBillingFactor(prior, factor).amount);
   });
 });

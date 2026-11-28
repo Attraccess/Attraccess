@@ -25,6 +25,7 @@ import { NetworkRestrictedHint } from '../../../../../components/networkRestrict
 import en from './translations/en.json';
 import de from './translations/de.json';
 import { FlowButtons } from './flowButtons';
+import { SessionProjectSection } from './SessionProjectSection';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
@@ -142,20 +143,10 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
         <SessionTimer startTime={startTime} variant="hero" />
         {myUsage?.autoEndAt && <SessionAutoEnd resourceId={resourceId} usage={myUsage} canExtend centered />}
 
-        {(myUsage?.project || myUsage?.supervisorUser) && (
-          <div className="border-t border-divider pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {myUsage?.project && (
-              <div className="min-w-0">
-                <p className="text-xs uppercase tracking-wide text-default-500">{t('project')}</p>
-                <p className="font-medium text-foreground truncate">{myUsage.project.name}</p>
-              </div>
-            )}
-            {myUsage?.supervisorUser && (
-              <div className="min-w-0">
-                <p className="text-xs uppercase tracking-wide text-default-500 mb-1">{t('supervisedBy')}</p>
-                <AttraccessUser user={myUsage.supervisorUser} />
-              </div>
-            )}
+        {myUsage?.supervisorUser && (
+          <div className="min-w-0 border-t border-divider pt-4">
+            <p className="text-xs uppercase tracking-wide text-default-500 mb-1">{t('supervisedBy')}</p>
+            <AttraccessUser user={myUsage.supervisorUser} />
           </div>
         )}
 
@@ -192,6 +183,9 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
           </Dropdown>
         </ButtonGroup>
         <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageEnd} />
+
+        {/* Below the buttons: in the fixed-height dashboard tile End Session must show without scrolling. */}
+        {myUsage && <SessionProjectSection resourceId={resourceId} usage={myUsage} />}
       </SessionStatusCard>
 
       <SessionNotesModal

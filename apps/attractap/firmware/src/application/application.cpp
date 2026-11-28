@@ -181,7 +181,8 @@ void Application::finishReaderAction(bool success) {
   this->leaveForms();
   this->actionCompletionMessage = success
       ? FirmwareI18n::Text(type == "START_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageStarted
-      : type == "STOP_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageEnded : FirmwareI18n::Message::ActionConfirmed)
+      : type == "STOP_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageEnded
+      : type == "SWITCH_SESSION_PROJECT" ? FirmwareI18n::Message::ProjectChanged : FirmwareI18n::Message::ActionConfirmed)
       : FirmwareI18n::Text();
   // Keep input blocked until fresh ownership/availability arrives, so a fast
   // second tap cannot act on the row's pre-action state.

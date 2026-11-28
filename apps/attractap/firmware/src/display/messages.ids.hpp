@@ -300,6 +300,10 @@ enum class Message {
     FormImageScanHint, FormImageCount,
     SecureConversionTitle, SecureConversionTransfer, SecureConversionVerify, SecureConversionBurn,
     SecureConversionBootloader, SecureConversionDontUnplug, SecureConversionRestartHint,
+    ChangeProject, NoProject, CurrentProjectLine, SwitchingProject, ProjectChanged, PleaseCompleteBeforeSwitchingProject,
+    ErrorMeterSwitchFailed, ProjectNotChanged, ErrorSwitchSessionGone,
+    WholeSession, FromNowOn, EverythingGoesTo, EverythingGoesToNoProject, SinceLastChangeGoesTo,
+    SinceLastChangeGoesToNoProject, TimeSoFarStaysOn, TimeSoFarStaysWithoutProject,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };

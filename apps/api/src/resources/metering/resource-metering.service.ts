@@ -16,7 +16,12 @@ import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event'
 
 import { LiveNotificationsService } from '../../billing/live-notifications/live-notifications.service';
 
-import { archivedMeterAccepts, MeteringOperationError, MeteringReadings } from './metering-readings';
+import {
+  archivedMeterAccepts,
+  MeteringOperationError,
+  MeteringReadings,
+  MeteringTimeoutError,
+} from './metering-readings';
 
 import { MeteringReport } from '../flows/node-executors/index';
 
@@ -38,17 +43,16 @@ import { findActiveMeterSessions, getMeteringSessionLimit } from './meter-sessio
 
 import { MeteringSegments } from './metering-segments';
 
+import { handOverMeters, returnToSwitchedSession } from './metering-handover';
+
+import { recordMeterUpdate } from './meter-audit';
+import { sleepSeconds } from './sleep-seconds';
+
 export type { MeterProblem } from './metering-definition';
 
 export type { FinalCollection } from './metering-settlement';
 
-export { MeteringOperationError } from './metering-readings';
-
-export class MeteringTimeoutError extends MeteringOperationError {
-  constructor(seconds: number) {
-    super(`The metering flow did not reply within ${seconds}s`);
-  }
-}
+export { MeteringOperationError, MeteringTimeoutError } from './metering-readings';
 
 @Injectable()
 export class ResourceMeteringService implements OnModuleInit {
@@ -276,17 +280,11 @@ export class ResourceMeteringService implements OnModuleInit {
     const before = await this.store.findMeter(resourceId, meterId);
     const updated = await this.catalog.setRate(resourceId, meterId, creditsPerUnit);
     if (before && initiatorId !== undefined && before.creditsPerUnit !== creditsPerUnit)
-      await this.audit.record({
-        domain: 'resource',
-        action: 'meter.updated',
-        actor: { id: initiatorId, authenticationMethod: 'session' },
-        subject: { type: 'resource', id: resourceId },
-        details: {
-          meterId,
-          meterName: before.name,
-          'before.creditsPerUnit': before.creditsPerUnit,
-          'after.creditsPerUnit': creditsPerUnit,
-        },
+      await recordMeterUpdate(this.audit, resourceId, initiatorId, {
+        meterId,
+        meterName: before.name,
+        'before.creditsPerUnit': before.creditsPerUnit,
+        'after.creditsPerUnit': creditsPerUnit,
       });
     return updated;
   }
@@ -296,17 +294,11 @@ export class ResourceMeteringService implements OnModuleInit {
     const before = await this.store.findMeter(resourceId, meterId);
     const updated = await this.catalog.setAllocation(resourceId, meterId, allocation);
     if (before && before.allocation !== allocation)
-      await this.audit.record({
-        domain: 'resource',
-        action: 'meter.updated',
-        actor: { id: initiatorId, authenticationMethod: 'session' },
-        subject: { type: 'resource', id: resourceId },
-        details: {
-          meterId,
-          meterName: before.name,
-          'before.allocation': before.allocation,
-          'after.allocation': allocation,
-        },
+      await recordMeterUpdate(this.audit, resourceId, initiatorId, {
+        meterId,
+        meterName: before.name,
+        'before.allocation': before.allocation,
+        'after.allocation': allocation,
       });
     return updated;
   }
@@ -383,6 +375,7 @@ export class ResourceMeteringService implements OnModuleInit {
 
   /** Removes the metering of a tentative usage that is being rolled back. */
   async discardCandidate(context: TransactionContext, usageId: number): Promise<void> {
+    await returnToSwitchedSession(this.store, context, usageId);
     await this.segments.withdraw(context, usageId);
     await this.store.deleteSessionsOfUsage(usageId, context);
   }
@@ -405,7 +398,7 @@ export class ResourceMeteringService implements OnModuleInit {
         session,
         await this.getDefinition(session.resourceId, session.meterId),
         freshAfter,
-        (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000)),
+        sleepSeconds,
       );
     }
     if (session.collectionMode === 'increment') {
@@ -438,9 +431,8 @@ export class ResourceMeteringService implements OnModuleInit {
         this.logger.warn(
           `Final metering collection ${attempt}/${collect.finalAttempts} for usage ${usageId} failed: ${reason}`,
         );
-        if (attempt < collect.finalAttempts && collect.finalRetryDelaySeconds > 0) {
-          await new Promise((resolve) => setTimeout(resolve, collect.finalRetryDelaySeconds * 1000));
-        }
+        if (attempt < collect.finalAttempts && collect.finalRetryDelaySeconds > 0)
+          await sleepSeconds(collect.finalRetryDelaySeconds);
       }
     }
     return { status: 'unavailable', reason };
@@ -462,6 +454,21 @@ export class ResourceMeteringService implements OnModuleInit {
   }
 
   // ---- lifecycle --------------------------------------------------------------------------------
+
+  /** Splits the metering of a running usage at a project switch; throws when a billed meter cannot be read. */
+  handOver(usageId: number, successorUsageId: number, at: Date): Promise<FinalCollection> {
+    return handOverMeters(
+      {
+        store: this.store,
+        segments: this.segments,
+        collectOwn: (session, freshAfter) => this.collectSessionFinal(session, freshAfter),
+        getDefinition: (resourceId, meterId) => this.getDefinition(resourceId, meterId),
+      },
+      usageId,
+      successorUsageId,
+      at,
+    );
+  }
 
   /**
    * Establishes the metering session for a (still tentative) usage. Throws when the meter is missing or

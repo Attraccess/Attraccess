@@ -1,4 +1,4 @@
-import { BillingTransactionRecord } from '@attraccess/application-models';
+import { BillingTransactionRecord, type SwitchedSessionCharge } from '@attraccess/application-models';
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { Subject } from 'rxjs';
 import { BILLING_LEDGER_STORE, BillingLedgerStore } from '../ports/billing-ledger.port';
@@ -25,7 +25,10 @@ export class LiveNotificationsService {
     }
   }
 
-  public async notifyTransactionUpdate(transactionOrId: { id: number } | number): Promise<void> {
+  public async notifyTransactionUpdate(
+    transactionOrId: { id: number } | number,
+    switchedSession?: SwitchedSessionCharge | null,
+  ): Promise<void> {
     const transactionId = typeof transactionOrId === 'number' ? transactionOrId : transactionOrId.id;
 
     const transaction = await this.ledgerStore.findTransactionWithItems(transactionId);
@@ -33,7 +36,9 @@ export class LiveNotificationsService {
       throw new BadRequestException('Transaction not found');
     }
 
-    this.transactionSubjects.get(transaction.userId)?.next({ data: transaction });
+    this.transactionSubjects
+      .get(transaction.userId)
+      ?.next({ data: switchedSession ? { ...transaction, switchedSession } : transaction });
   }
 
   /**

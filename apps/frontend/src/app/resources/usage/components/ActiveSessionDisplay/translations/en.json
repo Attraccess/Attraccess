@@ -13,7 +13,6 @@
       "description": "End the session and provide notes."
     }
   },
-  "project": "Project",
   "supervisedBy": "Supervised by",
   "live": "You are using this"
 }

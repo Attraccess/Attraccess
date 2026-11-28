@@ -75,6 +75,26 @@ describe('TypeOrmAnalyticsReader on real PostgreSQL', () => {
     expect(counts).toEqual(new Map([[2, 2]]));
   });
 
+  it('counts a session with a switched project once, whichever of its parts the range covers', async () => {
+    const part = { resourceId: 1, userId: 1, usageAction: ResourceUsageAction.Usage, isFinalized: true };
+    const first = await source
+      .getRepository(ResourceUsage)
+      .save({ ...part, startTime: at('12T08:00:00'), endTime: at('12T10:00:00') });
+    await source
+      .getRepository(ResourceUsage)
+      .save({ ...part, startTime: at('12T10:00:00'), endTime: at('12T12:00:00'), previousUsageId: first.id });
+    const count = async (start: string, asOf: string) =>
+      (await reader.countSessionsInRange([1], { ...params, start: at(start), asOf: at(asOf) })).get(1);
+
+    expect(await count('12T00:00:00', '13T00:00:00')).toBe(1);
+    // only the part before the switch, also with the range ending exactly at the switch
+    expect(await count('12T07:00:00', '12T09:00:00')).toBe(1);
+    expect(await count('12T07:00:00', '12T10:00:00')).toBe(1);
+    // only the continuation, also with the range starting exactly at the switch
+    expect(await count('12T10:00:00', '12T13:00:00')).toBe(1);
+    expect(await count('12T11:00:00', '12T13:00:00')).toBe(1);
+  });
+
   it('finds the first activity start of a set of resources inside the range', async () => {
     expect(await reader.findFirstActivityStart([2, 3], params.start, params.asOf)).toEqual(at('11T00:00:00'));
     expect(await reader.findFirstActivityStart([1, 4], params.start, params.asOf)).toBeNull();

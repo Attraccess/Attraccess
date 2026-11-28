@@ -152,6 +152,8 @@ export interface MeteringUsageRecord {
   endTime: Date | null;
   meterRates: UsageMeterRate[] | null;
   billingFactor: number | null;
+  /** The part this usage continues after a project switch; null or absent on any other usage. */
+  previousUsageId?: number | null;
 }
 
 /** A usage with the billing factor of its user, for charging a late meter correction. */

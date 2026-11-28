@@ -130,6 +130,37 @@ describe('maintenance evaluation store on real PostgreSQL', () => {
     });
   });
 
+  describe('sessions whose project was switched', () => {
+    /** A session switched twice: three parts linked through previousUsageId, the last ending at `endTime`. */
+    const addSwitchedSession = async (endTime: Date) => {
+      let previousUsageId: number | null = null;
+      for (const minutes of [0, 10, 20]) {
+        const part: ResourceUsage = await source.getRepository(ResourceUsage).save({
+          resourceId,
+          userId,
+          usageAction: ResourceUsageAction.Usage,
+          startTime: new Date(endTime.getTime() - (30 - minutes) * 60_000),
+          endTime: new Date(endTime.getTime() - (20 - minutes) * 60_000),
+          previousUsageId,
+          isFinalized: true,
+        });
+        previousUsageId = part.id;
+      }
+    };
+
+    it('count one use per session, however many parts it has', async () => {
+      await addSwitchedSession(new Date('2025-03-02T00:00:00.000Z'));
+      await addSession(new Date('2025-03-03T00:00:00.000Z'));
+
+      expect(await store.current().completedSessionCountSince(resourceId, createdAt)).toBe(2);
+      const [state] = await store.loadServiceCycleStates(
+        [{ resourceId, scheduleId, createdAt, countSessions: true }],
+        new Date('2026-01-01T00:00:00.000Z'),
+      );
+      expect(state.completedSessions).toBe(2);
+    });
+  });
+
   describe('service cycle states', () => {
     it('resolves baselines, running maintenance and completed sessions in one query per kind', async () => {
       await addMaintenance(new Date('2025-02-01T00:00:00.000Z'));

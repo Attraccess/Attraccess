@@ -335,6 +335,27 @@ describe('AttractapFirmwareHandler', () => {
     });
 
     it.each([
+      [
+        'a touch reader with the projectSwitch capability',
+        { version: '2.16.0', capabilities: { projectSwitch: true } },
+        true,
+      ],
+      ['an older firmware without capabilities', { version: '2.15.0' }, false],
+      ['firmware that does not report projectSwitch', { version: '2.16.0', capabilities: { cardRelay: true } }, false],
+      ['a non-boolean capability', { version: '2.16.0', capabilities: { projectSwitch: 'true' } }, false],
+    ])('sets projectSwitch from FIRMWARE_INFO: %s', async (_name, info, expected) => {
+      fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue(null);
+      // A reconnecting reader that downgraded must not keep a previous connection's capability.
+      fixture.socket.state.projectSwitch = !expected;
+
+      await fixture.handler.handleFirmwareInfo(fixture.socket, {
+        payload: { name: 'attractap', variant: 'touch', ...info },
+      } as AttractapEvent['data']);
+
+      expect(fixture.socket.state.projectSwitch).toBe(expected);
+    });
+
+    it.each([
       ['the BLE Bridge', { capabilities: { nfc: false } }, false],
       ['2.10.0 with NFC', { capabilities: { nfc: true } }, true],
       ['firmware that does not report nfc', { capabilities: {} }, true],

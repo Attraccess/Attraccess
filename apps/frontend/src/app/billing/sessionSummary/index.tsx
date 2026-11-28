@@ -13,6 +13,10 @@ import { useLiveTransactionUpdates } from '../dashboard/summary/live-updates';
 import en from './en.json';
 import de from './de.json';
 
+/** At the end of a switched session the cost of all its parts, otherwise the amount of the transaction itself. */
+const chargedAmount = (transaction: BillingTransaction) =>
+  transaction.switchedSession?.continues === false ? transaction.switchedSession.sessionAmount : transaction.amount;
+
 /** Stays mounted when the active session card disappears or the user navigates away. */
 export function SessionBillingSummary() {
   const { user } = useAuth();
@@ -24,12 +28,16 @@ export function SessionBillingSummary() {
   const lastTransaction = useRef<BillingTransaction | undefined>(undefined);
   if (transaction) lastTransaction.current = transaction;
   const displayedTransaction = transaction ?? lastTransaction.current;
+  // Set for a charge of one part of a session whose project was switched.
+  const switched = displayedTransaction?.switchedSession;
+  const endedAtSwitch = switched?.continues === true;
   // Live updates include the receipt fields but do not load the session/resource relations.
   const { data: details } = useGetBillingTransaction(
     { path: { transactionId: displayedTransaction?.id ?? 0 } },
     undefined,
     {
-      enabled: !!transaction,
+      // A last part without a charge announces its removed pending bill, which cannot be read.
+      enabled: transaction?.status === BillingTransactionStatus.COMPLETED,
     },
   );
   const {
@@ -47,10 +55,12 @@ export function SessionBillingSummary() {
 
   useLiveTransactionUpdates({
     onUpdate: (incoming) => {
+      // When a switched session ends, its cost is that of all parts, even if the last one is free.
+      const endsSwitchedSession = incoming.switchedSession?.continues === false;
       if (
         incoming.userId !== user?.id ||
-        incoming.status !== BillingTransactionStatus.COMPLETED ||
-        incoming.amount === 0 ||
+        (!endsSwitchedSession && incoming.status !== BillingTransactionStatus.COMPLETED) ||
+        chargedAmount(incoming) === 0 ||
         !incoming.resourceUsageId ||
         incoming.refundOfId ||
         incoming.correctionOfId ||
@@ -76,16 +86,17 @@ export function SessionBillingSummary() {
       {() => (
         <>
           <ModalHeader>
-            <ModalHeading>{t('title')}</ModalHeading>
+            <ModalHeading>{t(endedAtSwitch ? 'part.title' : 'title')}</ModalHeading>
           </ModalHeader>
           <ModalBody>
-            <p>{details?.resourceUsage?.resource?.name}</p>
-            <p className="text-sm text-muted">{t('total')}</p>
+            <p>{switched?.resourceName ?? details?.resourceUsage?.resource?.name}</p>
+            <p className="text-sm text-muted">{t(endedAtSwitch ? 'part.total' : 'total')}</p>
             {configuration ? (
               <p className="text-3xl font-semibold" data-cy="session-billing-total">
                 {formatNumber(
+                  // `0 -` rather than a negation: nothing must not read as "-0.00".
                   dbCurrencyToUserCurrency(
-                    displayedTransaction?.amount ? -displayedTransaction.amount : 0,
+                    0 - (displayedTransaction ? chargedAmount(displayedTransaction) : 0),
                     configuration.minorUnit,
                   ),
                 )}{' '}
@@ -101,6 +112,7 @@ export function SessionBillingSummary() {
             ) : (
               <Spinner aria-label={t('loading')} />
             )}
+            {switched && <p className="text-sm">{t(endedAtSwitch ? 'part.continues' : 'allParts')}</p>}
             <p className="text-sm text-muted">{t('historyHint')}</p>
           </ModalBody>
           <ModalFooter>

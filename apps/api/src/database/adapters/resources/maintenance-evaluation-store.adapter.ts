@@ -23,6 +23,7 @@ import {
 import { captureDurationState } from './maintenance-duration-state';
 import { toMaintenanceScheduleRecord } from './maintenance-mappers';
 import { findRelations } from '../find-options';
+import { lastPartCondition } from '../usage/session-part-conditions';
 
 const CONFIG_RELATIONS = ['usageHoursConfig', 'usageCountConfig', 'timeIntervalConfig'];
 
@@ -72,14 +73,18 @@ export class TypeOrmMaintenanceEvaluationView implements MaintenanceEvaluationVi
   }
 
   async completedSessionCountSince(resourceId: number, since: Date): Promise<number> {
-    return this.manager
-      .getRepository(ResourceUsage)
-      .createQueryBuilder('usage')
-      .where('usage.resourceId = :resourceId', { resourceId })
-      .andWhere('usage.lifecyclePending = :lifecyclePending', { lifecyclePending: false })
-      .andWhere('usage.endTime IS NOT NULL')
-      .andWhere('usage.endTime >= :since', { since })
-      .getCount();
+    return (
+      this.manager
+        .getRepository(ResourceUsage)
+        .createQueryBuilder('usage')
+        .where('usage.resourceId = :resourceId', { resourceId })
+        .andWhere('usage.lifecyclePending = :lifecyclePending', { lifecyclePending: false })
+        .andWhere('usage.endTime IS NOT NULL')
+        .andWhere('usage.endTime >= :since', { since })
+        // A session whose project was switched is one use, counted when its last part ends.
+        .andWhere(lastPartCondition('usage'))
+        .getCount()
+    );
   }
 
   durationFingerprint(resourceId: number): Promise<string> {

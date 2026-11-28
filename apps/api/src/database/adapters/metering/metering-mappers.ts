@@ -90,6 +90,7 @@ export const toUsage = (row: ResourceUsage): MeteringUsageRecord => ({
   endTime: row.endTime,
   meterRates: row.meterRates,
   billingFactor: row.billingFactor,
+  previousUsageId: row.previousUsageId,
 });
 
 export const toAttempt = (row: ResourceUsageLifecycleAttempt): MeteringLifecycleAttempt => ({

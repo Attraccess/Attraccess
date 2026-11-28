@@ -30,6 +30,9 @@ public:
     void refreshProjects();
     void resetProjectsSearch();
     void setSelectedProject(uint32_t projectId);
+    // Picking the project a running session continues under: "No project" is a choice of its own, and the project
+    // the session is booked to (0: none) cannot be picked. Off for the choice before a start.
+    void setSwitchTarget(bool switching, uint32_t currentProjectId = 0);
     // The resource the project is chosen for, shown under the title.
     void setResourceName(const std::string &name);
     void setProjectsPageRequestCallback(std::function<bool(uint32_t, const std::string &)> callback);
@@ -45,6 +48,14 @@ private:
     lv_obj_t *screen = nullptr;
     API::ProjectsOfUserResponse projectsCache;
     uint32_t selectedProjectId = 0;
+    bool switching = false;
+    uint32_t currentProjectId = 0;
+    lv_obj_t *titleLabel = nullptr;
+    // Beside the title while switching, not an entry of the list: a full page leaves the list no room for it.
+    lv_obj_t *noProjectButton = nullptr;
+    void createProjectsTitleRow(lv_obj_t *panel);
+    void updateSwitchChrome();
+    static void onNoProjectClick(lv_event_t *e);
     uint32_t projectsCurrentPage = 1;
     uint32_t projectsTotalCount = 0;
     uint32_t projectsPageLimit = API::MAX_PROJECTS_PER_PAGE;

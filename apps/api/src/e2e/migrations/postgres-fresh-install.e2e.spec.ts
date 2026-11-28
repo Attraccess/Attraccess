@@ -54,6 +54,7 @@ describe('Fresh PostgreSQL install (e2e)', () => {
       'DiscardZeroUsageBills1796400000001',
       'ResourceMeterArchive1796400000002',
       'NfcCardUniqueUid1796500000100',
+      'ProjectSwitch1796500000200',
     ]);
     expect(postgresBackend.migrationTrack.tableName).toBe('migrations');
     const [{ count }] = await source.query(

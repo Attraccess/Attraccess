@@ -21,6 +21,8 @@ enum button_click_type_t
         BUTTON_CLICK_TYPE_FLOW_BUTTON,
         BUTTON_CLICK_TYPE_LOGOUT,
         BUTTON_CLICK_TYPE_BACK,
+        // "Change project" of the card holder's own running session (ATT-1421).
+        BUTTON_CLICK_TYPE_SWITCH_PROJECT,
     };
 
 struct UserDetails

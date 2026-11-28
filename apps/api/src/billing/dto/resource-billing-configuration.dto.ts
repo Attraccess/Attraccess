@@ -1,6 +1,7 @@
 // The related resource is documented with its public schema; it is not billing data.
 import { Resource } from '../../resources/dtos/resource.dto';
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import { ProjectSwitchCharging } from '@attraccess/application-models';
 
 class ResourceBillingConfigurationItemDto {
   @ApiProperty({
@@ -51,6 +52,14 @@ export class ResourceBillingConfigurationValuesDto {
 
   @ApiProperty({ description: 'The credit cost per attributable operating minute' })
   creditsPerOperatingMinute!: number;
+
+  @ApiProperty({
+    description:
+      'How a running session is charged when its owner splits it between projects. Moving a whole session charges nothing.',
+    enum: ProjectSwitchCharging,
+    enumName: 'ProjectSwitchCharging',
+  })
+  projectSwitchCharging!: ProjectSwitchCharging;
 }
 
 export class ResourceBillingConfigurationDto {

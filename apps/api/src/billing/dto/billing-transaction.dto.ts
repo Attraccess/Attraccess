@@ -3,6 +3,7 @@ import { BillingTransactionStatus } from '@attraccess/application-models';
 import { UserDto } from '../../users-and-auth/users/dtos/user.dto';
 import { ResourceUsageResponseDto } from '../../resources/usage/dtos/resource-usage-response.dto';
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import { SwitchedSessionChargeDto } from './switched-session-charge.dto';
 
 /** Schema names stay `BillingTransaction*` so the published API description does not change. */
 @ApiSchema({ name: 'BillingTransactionItem' })
@@ -131,4 +132,12 @@ export class BillingTransactionDto {
     isArray: true,
   })
   items?: BillingTransactionItemDto[];
+
+  @ApiProperty({
+    description:
+      'Only on live events, for a charge of one part of a session whose project was switched. The event of a last part without any charge carries the removed pending transaction.',
+    required: false,
+    type: () => SwitchedSessionChargeDto,
+  })
+  switchedSession?: SwitchedSessionChargeDto;
 }

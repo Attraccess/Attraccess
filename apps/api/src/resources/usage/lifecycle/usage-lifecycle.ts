@@ -7,7 +7,7 @@ import type {
   UsageSessionWithParties,
 } from '@attraccess/application-models';
 
-import { ConflictException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -16,6 +16,7 @@ import { TransactionScope, UNIT_OF_WORK, UnitOfWork, runWithRetry } from '../../
 import { ResourceUsageLifecycleAbortedEvent } from '../events/resource-usage.events';
 
 import { SessionChangeInterruptedError } from '../errors/session-change-interrupted.error';
+import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
 
 import { ExternalEffectFailureError } from '../../flows/errors/external-effect-failure.error';
 
@@ -63,6 +64,11 @@ export interface EndSessionOptions {
    * the machine's turn is taken, so an extension that wins the race keeps the session running.
    */
   autoEndReason?: AutoEndReason;
+  /**
+   * Flow ends: nobody is there to try again, so a project switch of the named session does not refuse the end. It
+   * waits and ends the continuation, or the old part when the switch is rolled back.
+   */
+  followProjectSwitch?: boolean;
 }
 
 export interface StartSessionOptions {
@@ -89,11 +95,35 @@ export interface StartSessionOptions {
   canAskDuration?: boolean;
 }
 
+/** When and why a running usage ends. */
+export interface SessionEnd {
+  endTime: Date;
+  endNotes: string | null | undefined;
+}
+
+/** A usage that was ended and billed, with its charge transaction (none when nothing was charged). */
+export interface EndedAndSettled {
+  ended: UsageSessionWithParties;
+  chargeTransactionId: number | undefined;
+}
+
 /** Published usage sessions on the machine around a start, stop or takeover, handed to flows as `activeSessions`. */
 export interface ActiveSessionCounts {
   before: number;
   after: number;
   limit: number;
+}
+
+/**
+ * The tentative session of a project switch is the running session itself, under another project: cancelling it
+ * would run the stop flow of a machine that keeps running. A switch flow that fails refuses the switch instead.
+ */
+function assertCandidateMayBeCancelled(attempt: UsageLifecycleAttempt): void {
+  if (attempt.kind === 'project-switch' || attempt.kind === 'project-reassign') {
+    throw new FlowExecutionError(
+      'A project change flow cannot end the session being changed; name a user or all sessions to end them after the change',
+    );
+  }
 }
 
 /** Lifecycle attempts of starts, stops and takeovers: their drafts, flows, metering, recovery and abort. */
@@ -136,6 +166,18 @@ export class UsageLifecycle {
     return (await this.metering?.collectFinal(usageId, at)) ?? { status: 'not-metered' };
   }
 
+  /**
+   * Splits the metering of a running session between it and its continuation after a project switch; a billed meter
+   * that cannot be read refuses the switch.
+   */
+  async handOverMeters(usageId: number, successorUsageId: number, at: Date): Promise<FinalCollection> {
+    try {
+      return (await this.metering?.handOver(usageId, successorUsageId, at)) ?? { status: 'not-metered' };
+    } catch (error) {
+      throw new BadRequestException(`METER_SWITCH_FAILED: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   async initializeMeter(options: Parameters<ResourceMeteringService['initialize']>[0]): Promise<void> {
     await this.metering?.initialize(options);
   }
@@ -152,6 +194,34 @@ export class UsageLifecycle {
       ? await this.billingService.chargeForResourceUsage(endedSession, scope, operatingShare)
       : await this.billingService.chargeForResourceUsage(endedSession, scope);
     return charge?.id;
+  }
+
+  /**
+   * Ends a running usage at `end` and bills it, all in `scope`: the end of a stop, of the session a takeover replaces,
+   * and of the part a project switch closes. `null` when the usage had already ended.
+   */
+  async endAndSettleIfOpen(
+    scope: TransactionScope,
+    usageId: number,
+    end: SessionEnd,
+    final: FinalCollection,
+  ): Promise<EndedAndSettled | null> {
+    if (!(await this.sessions.endSessionIfOpen(usageId, end, scope))) return null;
+    const ended = await this.sessions.findSessionWithRelations(usageId, 'ended', scope);
+    return { ended, chargeTransactionId: await this.settleEndedSession(scope, ended, final) };
+  }
+
+  /** {@link endAndSettleIfOpen}, refused with `conflictMessage` when the usage had already ended. */
+  async endAndSettle(
+    scope: TransactionScope,
+    usageId: number,
+    end: SessionEnd,
+    final: FinalCollection,
+    conflictMessage: string,
+  ): Promise<EndedAndSettled> {
+    const result = await this.endAndSettleIfOpen(scope, usageId, end, final);
+    if (!result) throw new ConflictException(conflictMessage);
+    return result;
   }
 
   async applyLifecycleDrafts(context: TransactionScope, attempt: UsageLifecycleAttempt): Promise<void> {
@@ -186,14 +256,17 @@ export class UsageLifecycle {
       await this.metering?.discardCandidate(scope, attempt.candidateUsageId);
       await this.sessions.deletePendingSession(attempt.candidateUsageId, scope);
     }
-    // The session a stop or takeover was about to end keeps running, so it still shares the meter.
-    if (attempt.previousUsageId !== null) await this.metering?.restoreParticipant(scope, attempt.previousUsageId);
+    // The session a stop or takeover was about to end keeps running, so it still shares the meter. Moving a whole
+    // session to another project never touched its meters.
+    if (attempt.previousUsageId !== null && attempt.kind !== 'project-reassign')
+      await this.metering?.restoreParticipant(scope, attempt.previousUsageId);
   }
 
   /** A flow may end the tentative session it was started for before it becomes visible. */
   async cancelLifecycleCandidate(attemptId: string, resourceId: number): Promise<void> {
     await this.transaction(async (scope) => {
       const attempt = await this.getLifecycleAttempt(scope, attemptId, resourceId);
+      assertCandidateMayBeCancelled(attempt);
       if (attempt.candidateUsageId === null) {
         throw new ConflictException('The usage lifecycle attempt has no candidate session');
       }
@@ -217,6 +290,7 @@ export class UsageLifecycle {
   ): Promise<void> {
     const { candidate, activeSessions } = await this.transaction(async (scope) => {
       const attempt = await this.getLifecycleAttempt(scope, attemptId, resourceId);
+      assertCandidateMayBeCancelled(attempt);
       if (attempt.candidateUsageId === null) {
         throw new ConflictException('The usage lifecycle attempt has no candidate session');
       }
@@ -361,6 +435,18 @@ export class UsageLifecycle {
   async getLifecycleAttempt(context: TransactionScope, id: string, resourceId: number): Promise<UsageLifecycleAttempt> {
     const attempt = await this.sessions.findAttempt(id, resourceId, context);
     if (!attempt) throw new SessionChangeInterruptedError();
+    return attempt;
+  }
+
+  /** The attempt of a start, takeover or switch that still has `candidateUsageId` as its tentative session. */
+  async getAttemptOfCandidate(
+    context: TransactionScope,
+    id: string,
+    resourceId: number,
+    candidateUsageId: number,
+  ): Promise<UsageLifecycleAttempt> {
+    const attempt = await this.getLifecycleAttempt(context, id, resourceId);
+    if (attempt.candidateUsageId !== candidateUsageId) throw new TentativeSessionCancelledError();
     return attempt;
   }
 

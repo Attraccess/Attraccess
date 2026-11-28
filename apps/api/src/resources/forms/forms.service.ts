@@ -50,6 +50,8 @@ const REQUIRED_FLAG = {
   [ResourceFormAction.START]: 'isRequiredOnResourceUsageStart',
   [ResourceFormAction.TAKEOVER]: 'isRequiredOnResourceUsageTakeOver',
   [ResourceFormAction.END]: 'isRequiredOnResourceUsageEnd',
+  [ResourceFormAction.PROJECT_SWITCH]: 'isRequiredOnResourceUsageProjectSwitch',
+  [ResourceFormAction.PROJECT_REASSIGN]: 'isRequiredOnResourceUsageProjectReassign',
 } as const satisfies Record<ResourceFormAction, keyof FormRequiredFlags>;
 
 @Injectable()
@@ -146,6 +148,8 @@ export class ResourceFormsService {
       isRequiredOnResourceUsageStart: dto.isRequiredOnResourceUsageStart ?? null,
       isRequiredOnResourceUsageTakeOver: dto.isRequiredOnResourceUsageTakeOver ?? null,
       isRequiredOnResourceUsageEnd: dto.isRequiredOnResourceUsageEnd ?? null,
+      isRequiredOnResourceUsageProjectSwitch: dto.isRequiredOnResourceUsageProjectSwitch ?? null,
+      isRequiredOnResourceUsageProjectReassign: dto.isRequiredOnResourceUsageProjectReassign ?? null,
     });
     const applicable = saved ? await this.findApplicable(resourceId, formId) : undefined;
     if (!applicable) {
@@ -182,6 +186,8 @@ export class ResourceFormsService {
     dto.isRequiredOnResourceUsageStart = override.isRequiredOnResourceUsageStart;
     dto.isRequiredOnResourceUsageTakeOver = override.isRequiredOnResourceUsageTakeOver;
     dto.isRequiredOnResourceUsageEnd = override.isRequiredOnResourceUsageEnd;
+    dto.isRequiredOnResourceUsageProjectSwitch = override.isRequiredOnResourceUsageProjectSwitch;
+    dto.isRequiredOnResourceUsageProjectReassign = override.isRequiredOnResourceUsageProjectReassign;
     return dto;
   }
 
@@ -190,6 +196,8 @@ export class ResourceFormsService {
     dto.isRequiredOnResourceUsageStart = flags.isRequiredOnResourceUsageStart;
     dto.isRequiredOnResourceUsageTakeOver = flags.isRequiredOnResourceUsageTakeOver;
     dto.isRequiredOnResourceUsageEnd = flags.isRequiredOnResourceUsageEnd;
+    dto.isRequiredOnResourceUsageProjectSwitch = flags.isRequiredOnResourceUsageProjectSwitch;
+    dto.isRequiredOnResourceUsageProjectReassign = flags.isRequiredOnResourceUsageProjectReassign;
     return dto;
   }
 
@@ -244,7 +252,7 @@ export class ResourceFormsService {
   }
 
   protected assertSupportedAction(action: ResourceFormAction): void {
-    if (![ResourceFormAction.START, ResourceFormAction.TAKEOVER, ResourceFormAction.END].includes(action)) {
+    if (!Object.hasOwn(REQUIRED_FLAG, action)) {
       throw new BadRequestException(`Unsupported form action: ${action}`);
     }
   }
@@ -282,6 +290,8 @@ export class ResourceFormsService {
     response.isRequiredOnResourceUsageStart = form.isRequiredOnResourceUsageStart;
     response.isRequiredOnResourceUsageTakeOver = form.isRequiredOnResourceUsageTakeOver;
     response.isRequiredOnResourceUsageEnd = form.isRequiredOnResourceUsageEnd;
+    response.isRequiredOnResourceUsageProjectSwitch = form.isRequiredOnResourceUsageProjectSwitch;
+    response.isRequiredOnResourceUsageProjectReassign = form.isRequiredOnResourceUsageProjectReassign;
     response.resourceId = form.resourceId;
     response.groupId = form.groupId;
     response.fields = (form.fields ?? [])
@@ -538,6 +548,8 @@ export class ResourceFormsService {
       isRequiredOnResourceUsageStart: dto.isRequiredOnResourceUsageStart,
       isRequiredOnResourceUsageTakeOver: dto.isRequiredOnResourceUsageTakeOver,
       isRequiredOnResourceUsageEnd: dto.isRequiredOnResourceUsageEnd,
+      isRequiredOnResourceUsageProjectSwitch: dto.isRequiredOnResourceUsageProjectSwitch ?? false,
+      isRequiredOnResourceUsageProjectReassign: dto.isRequiredOnResourceUsageProjectReassign ?? false,
     };
   }
 

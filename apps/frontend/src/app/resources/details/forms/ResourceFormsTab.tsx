@@ -128,9 +128,11 @@ export function ResourceFormsTab() {
                 <TableColumn isRowHeader>{t('resourceTab.columns.name')}</TableColumn>
                 <TableColumn>{t('resourceTab.columns.source')}</TableColumn>
                 <TableColumn>{t('resourceTab.columns.enabled')}</TableColumn>
-                <TableColumn>{t('resourceTab.columns.start')}</TableColumn>
-                <TableColumn>{t('resourceTab.columns.takeover')}</TableColumn>
-                <TableColumn>{t('resourceTab.columns.end')}</TableColumn>
+                <TableColumn className="px-2">{t('resourceTab.columns.start')}</TableColumn>
+                <TableColumn className="px-2">{t('resourceTab.columns.takeover')}</TableColumn>
+                <TableColumn className="px-2">{t('resourceTab.columns.end')}</TableColumn>
+                <TableColumn className="px-2">{t('resourceTab.columns.projectSwitch')}</TableColumn>
+                <TableColumn className="px-2">{t('resourceTab.columns.projectReassign')}</TableColumn>
                 <TableColumn>
                   <TableActionsColumnHeader />
                 </TableColumn>
@@ -163,8 +165,9 @@ export function ResourceFormsTab() {
                         data-cy={`resource-form-toggle-${item.form.id}`}
                       />
                     </TableCell>
+                    {/* Narrow padding: with four of these columns the row menu must still fit at 1280 px. */}
                     {OVERRIDE_FLAGS.map(([action, flag]) => (
-                      <TableCell key={action}>
+                      <TableCell key={action} className="px-2">
                         <OverrideSelect
                           item={item}
                           action={action}

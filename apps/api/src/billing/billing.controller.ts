@@ -8,6 +8,7 @@ import {
   ForbiddenException,
   Get,
   Logger,
+  NotFoundException,
   Param,
   ParseIntPipe,
   Post,
@@ -78,6 +79,8 @@ import { SumupTransactionCallbackDto } from './dto/sumup/sumup-transaction-callb
 
 import { SumupTopUpDto } from './dto/sumup/top-up.dto';
 import { ResourceListVisible } from '../resources/visibility/resource-list-visible.interceptor';
+import { isResourceManager } from '../resources/visibility/is-resource-manager';
+import { RunningPartBillingDto } from './dto/running-part-billing.dto';
 
 @RequiresLicense(LicenseModuleType.BILLING)
 @ApiTags('Billing')
@@ -236,6 +239,32 @@ export class BillingController {
     @Req() request: AuthenticatedRequest,
   ): Promise<UsageTransactionDto> {
     return { transactionId: await this.billingService.getTransactionIdForUsage(usageId, request.user.id) };
+  }
+
+  @Get('/billing/usages/:usageId/running-part')
+  @Auth()
+  @ApiOperation({
+    summary: 'Get how the running part of a usage session will be billed',
+    description:
+      'For estimating the bill of a session that continues after a project switch. Available to the owner of the session, billing managers and resource managers.',
+    operationId: 'getRunningPartBilling',
+  })
+  @ApiResponse({ status: 200, description: 'The figures the part will be billed with.', type: RunningPartBillingDto })
+  @ApiResponse({ status: 404, description: 'No such running usage session, or not one you may see' })
+  async getRunningPartBilling(
+    @Param('usageId', ParseIntPipe) usageId: number,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<RunningPartBillingDto> {
+    // Somebody else's session is answered like a missing one, so the answer does not tell which usages run.
+    const notFound = () => new NotFoundException('No running usage session found');
+    const part = await this.billingService.getRunningPartBilling(usageId);
+    if (!part) throw notFound();
+    const { userId, ...billing } = part;
+    const { user } = request;
+    if (userId !== user.id && !user.effectivePermissions?.has('billing.manage') && !isResourceManager(user)) {
+      throw notFound();
+    }
+    return billing;
   }
 
   @Get('/users/:userId/billing/transactions/:transactionId')

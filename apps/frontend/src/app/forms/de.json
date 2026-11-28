@@ -14,6 +14,8 @@
     "resourceUsageStart": "Standardmäßig erforderlich bei Sitzungsstart",
     "resourceUsageTakeover": "Standardmäßig erforderlich bei Übernahme",
     "resourceUsageEnd": "Standardmäßig erforderlich bei Sitzungsende",
+    "resourceUsageProjectSwitch": "Standardmäßig erforderlich bei Projektwechsel (Aufteilung)",
+    "resourceUsageProjectReassign": "Standardmäßig erforderlich bei Projektänderung (ganze Sitzung)",
     "addField": "Feld hinzufügen",
     "reorderField": "Feld verschieben",
     "emptyFieldsTitle": "Keine Felder",
@@ -94,7 +96,7 @@
   },
   "globalList": {
     "title": "Formulare",
-    "subtitle": "Formulare, die Mitglieder beim Starten, Übernehmen oder Beenden einer Sitzung ausfüllen. Ein Formular gilt für eine Ressource, eine Ressourcengruppe oder alle Ressourcen.",
+    "subtitle": "Formulare, die Mitglieder beim Starten, Übernehmen oder Beenden einer Sitzung oder beim Projektwechsel ausfüllen. Ein Formular gilt für eine Ressource, eine Ressourcengruppe oder alle Ressourcen.",
     "create": "Neues Formular",
     "tableLabel": "Formulare",
     "empty": "Noch keine Formulare",
@@ -146,7 +148,9 @@
     "badges": {
       "start": "Beim Start",
       "takeover": "Bei Übernahme",
-      "end": "Beim Beenden"
+      "end": "Beim Beenden",
+      "projectSwitch": "Bei Projektwechsel (Aufteilung)",
+      "projectReassign": "Bei Projektänderung (ganze Sitzung)"
     },
     "switchedOff": "{{count}} ausgeschaltet"
   },
@@ -166,7 +170,9 @@
     "actions": {
       "start": "Start",
       "takeover": "Übernahme",
-      "end": "Ende"
+      "end": "Ende",
+      "project-switch": "Projektwechsel (Aufteilung)",
+      "project-reassign": "Projektänderung (ganze Sitzung)"
     },
     "showAnswers": "Antworten anzeigen",
     "hideAnswers": "Antworten ausblenden",
@@ -186,7 +192,9 @@
       "enabled": "Aktiv",
       "start": "Start",
       "takeover": "Übernahme",
-      "end": "Ende"
+      "end": "Ende",
+      "projectSwitch": "Projektwechsel (Aufteilung)",
+      "projectReassign": "Projektänderung (ganze Sitzung)"
     },
     "toggle": "{{name}} für diese Ressource verwenden",
     "override": {

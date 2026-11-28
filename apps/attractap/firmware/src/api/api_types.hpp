@@ -53,6 +53,13 @@ struct ActiveSession
         char displayName[MAX_DISPLAY_NAME_LEN] = {};
     };
 
+// What changing the project of a running session applies to: the whole session, or only the time from now on.
+enum class ProjectChangeMode : uint8_t
+{
+    WHOLE_SESSION,
+    SPLIT,
+};
+
 struct ResourceBrief
     {
         uint32_t id;
@@ -95,6 +102,13 @@ struct ResourceBrief
         uint32_t autoEndReceivedMs = 0;
         uint32_t autoEndEpoch = 0;
         int16_t autoEndUtcOffsetMinutes = 0;
+        // Project switch (ATT-1421, capabilities.projectSwitch): the server offers it for the card holder's own
+        // running session, and says which project that is booked to (0: none). Older servers send nothing.
+        bool canSwitchProject = false;
+        uint32_t ownProjectId = 0;
+        std::string ownProjectName;
+        // The running record continues an earlier split, so moving it leaves the earlier parts where they are.
+        bool ownSessionContinued = false;
         // Every active session (bounded) so managers can end a chosen one.
         std::vector<ActiveSession> activeSessions;
         // Parallel UI: a limit lowered to 1 while several sessions run still lists them so each can be stopped.
@@ -180,6 +194,8 @@ struct ActionResult {
         std::string blockBody{};
         // allow-with-warning: the start went through but the plugin asked for attention.
         bool warning = false;
+        // SWITCH_SESSION_PROJECT: the project the session continues under; empty without one.
+        std::string projectName{};
     };
 };
 
@@ -191,6 +207,8 @@ enum class ResourceUsageFormActionType : uint8_t
         START,
         END,
         TAKEOVER,
+        PROJECT_SWITCH,
+        PROJECT_REASSIGN,
     };
 
 enum class ResourceUsageFormFieldType : uint8_t

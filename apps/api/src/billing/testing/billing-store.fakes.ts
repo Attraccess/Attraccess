@@ -2,7 +2,9 @@ import {
   BillingTransactionDetail,
   BillingTransactionRecord,
   BillingTransactionStatus,
+  ProjectSwitchCharging,
   ResourceBillingConfigurationRecord,
+  SwitchedSessionCharge,
   UsageReceiptSource,
 } from '@attraccess/application-models';
 import type { AuditEvent } from '../../audit/recorder/audit-event';
@@ -12,7 +14,9 @@ import {
   BillingAuditFactory,
   BillingLedgerStore,
   BillingTransactionContext,
+  ContinuedUsagePart,
   NewBillingTransaction,
+  RunningUsagePricing,
   SettleUsageChargeInput,
 } from '../ports/billing-ledger.port';
 
@@ -71,6 +75,13 @@ export class FakeBillingLedgerStore implements BillingLedgerStore {
     return Promise.resolve(this.balances.get(userId) ?? null);
   }
 
+  /** Parts of switched sessions by the usage id a read starts at, newest first. */
+  continuedUsageParts = new Map<number, ContinuedUsagePart[]>();
+
+  findContinuedUsageParts(usageId: number): Promise<ContinuedUsagePart[]> {
+    return Promise.resolve(this.continuedUsageParts.get(usageId) ?? []);
+  }
+
   findTransactionIdForUsage(usageId: number, userId: number): Promise<number | null> {
     const found = this.transactions.find((t) => t.resourceUsageId === usageId && t.userId === userId);
     return Promise.resolve(found?.id ?? null);
@@ -93,6 +104,14 @@ export class FakeBillingLedgerStore implements BillingLedgerStore {
 
   findTransactionWithItems(transactionId: number): Promise<BillingTransactionRecord | null> {
     return Promise.resolve(this.transactions.find((t) => t.id === transactionId) ?? null);
+  }
+
+  findRunningUsagePricing(): Promise<RunningUsagePricing | null> {
+    return Promise.resolve(null);
+  }
+
+  findSwitchedSessionCharge(): Promise<SwitchedSessionCharge | null> {
+    return Promise.resolve(null);
   }
 
   findCompletedUsageCharge(usageId: number, userId: number): Promise<BillingTransactionRecord | null> {
@@ -258,6 +277,7 @@ export class FakeBillingConfigurationStore implements BillingConfigurationStore 
       creditsPerUsage: 0,
       creditsPerMinute: 0,
       creditsPerOperatingMinute: 0,
+      projectSwitchCharging: ProjectSwitchCharging.CONTINUE,
       ...rates,
     };
     this.configurations.set(resourceId, record);

@@ -376,6 +376,31 @@ Compatibility: an older reader ignores the new list fields and never sends `esti
 server sends none of the fields, so the reader shows nothing new. `EXTEND_RESOURCE_USAGE_SESSION` is only sent to a
 server that put `autoEndInSeconds` in the list.
 
+## Project switch protocol (2.16.0)
+
+The card holder can change the project of their own running machine session without stopping the machine
+(ATT-1421): **Projekt wechseln** in the session area of the details screen opens the project picker (search, paging,
+**Kein Projekt**; the current choice is disabled), then the choice of what the change applies to
+(`ProjectChangeModeScreen`: **Ganze Sitzung**, first and highlighted, or **Ab jetzt**; each says where the usage
+goes), then any required forms of that choice. Touch and Touch V2 readers (also their demo variants) announce this
+with `capabilities.projectSwitch: true` in their firmware info; the server refuses the event from readers without it.
+
+| Direction       | Event                    | Payload                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reader → server | `READER_FIRMWARE_INFO`   | `capabilities.projectSwitch: true`                                                                                                                                                                                                                                                                                                                                                                            |
+| Server → reader | `RESOURCE_LIST`          | per machine with the card holder's running session: `canSwitchProject: true`, `ownProjectId` (int or `null`), `ownProjectName` (string or `null`), `ownSessionContinued` (the running record continues a split); absent when there is nothing to switch to                                                                                                                                                    |
+| Reader → server | `SWITCH_SESSION_PROJECT` | `resourceId`, `usageId` (the running session shown), `mode` (`whole-session` or `split`, required), `projectId` (int, or `null` for no project), `cardSessionId`, `requestId`                                                                                                                                                                                                                                 |
+| Server → reader | `SWITCH_SESSION_PROJECT` | `success: true` with `usageId` (the running record: unchanged for `whole-session`, the continuation for `split`) and `projectName` (or `null`), or `error` (`PROJECT_SWITCH_NOT_SUPPORTED`, `INVALID_PROJECT_ID`, `INVALID_PROJECT_CHANGE_MODE`, `INSUFFICIENT_BALANCE`, `METER_SWITCH_FAILED`, `FLOW_EXECUTION_ERROR`, `PROJECT_SWITCH_SESSION_CHANGED`, `NoOwnActiveSessionError`, or the server's message) |
+
+Required forms of the chosen mode go through the same `RESOURCE_USAGE_FORM_REQUEST` exchange as a start (action
+`project-reassign` for `whole-session`, `project-switch` for `split`). After a refusal the server resends the
+resource's row; after a change, made on the reader or elsewhere, the whole list. The picker, the choice and the forms
+close when their session ends, is split or is moved to another project elsewhere. Neither choice runs start, stop or
+takeover flows, so the machine keeps running and the reader shows the original start time.
+
+Compatibility: an older reader never announces the capability and gets none of the list fields; an older server sends
+none of them, so the reader offers no switch. `mode` has no default; the payload without it was never released.
+
 ## Bluetooth setup (2.11.0)
 
 `src/bt_setup/` (ATT-1315 for the bridge, ATT-1371 for the readers): the web app's **Set up over Bluetooth**

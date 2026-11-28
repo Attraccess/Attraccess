@@ -61,7 +61,7 @@ void Application::handleResourceListUpdate(
     if (!this->actionCompletionMessage.empty() && !this->billingSummaryShown) {
       // Back on the list when the action was started there; routing does that once the screen is done.
       this->showStatus(StatusScreen::success(this->actionCompletionMessage,
-                                             FirmwareI18n::Text::literal(this->completedResourceName) /* i18n-data: Server-supplied resource name; preserve exact contents. */),
+                                             FirmwareI18n::Text::literal(this->completionSubject) /* i18n-data: Server-supplied resource or project name, or the localized NoProject text; preserve exact contents. */),
                        this->returnToListAfterAction);
     }
     this->billingSummaryShown = false;
@@ -91,6 +91,7 @@ bool Application::requestProjectsPage(uint32_t page, const std::string &search) 
 
 void Application::clearProjectSelection() {
   this->clearSelectedProject();
+  this->projectSwitchUsageId = 0;
   lv_lock();
   Display::projectSelectScreen.resetProjectsSearch();
   lv_unlock();
@@ -239,6 +240,7 @@ void Application::updateSelectedResourceDetails() {
       if (this->extendTargets(resource)) Display::extendSessionScreen.update(resource);
       else Display::returnFromTransient();
     }
+    this->closeStaleProjectSwitch(resource);
     const bool personalized = resource.accessKnown && this->cardAuthenticationData.username == this->resourceList.authenticatedUsername;
     const bool legacy = !resource.accessKnown && this->authenticationResourceId == resource.id;
     Display::resourceDetailsScreen.setUserDetails({
@@ -250,6 +252,7 @@ void Application::updateSelectedResourceDetails() {
       personalized && resource.canEndOtherSessions,
       personalized,
       this->cardAuthenticationData.displayName});
+    if (!this->waitingForResourceRefresh) Display::resourceDetailsScreen.keepActionErrorOnItsButton();
     return;
   }
   // The selected resource was removed while the user was looking at it.
@@ -422,6 +425,9 @@ void Application::handleResourceDetailsButtonClick(
     this->returnToListAfterAction = false;
     this->clearSelectedProject();
     break;
+  case ResourceDetailsScreen::BUTTON_CLICK_TYPE_SWITCH_PROJECT:
+    this->openProjectSwitch();
+    break;
   }
 }
 
@@ -572,6 +578,8 @@ void Application::handleExtend(uint32_t minutes, bool toMax) {
 }
 
 void Application::openProjects() {
+  this->projectSwitchUsageId = 0;
+  Display::projectSelectScreen.setSwitchTarget(false);
   Display::projectSelectScreen.setSelectedProject(this->selectedProjectId);
   Display::projectSelectScreen.setResourceName(this->resourceNameOf(this->selectedResourceId));
   Display::projectSelectScreen.begin();

@@ -34,7 +34,7 @@ Erreicht eine Ressource dasselbe Formular mehrfach, zum Beispiel über zwei Grup
 Unter **Einstellungen** → **Formulare** einer Ressource sehen Sie alle Formulare, die für sie gelten, auch geerbte Gruppen- und globale Formulare. Für jedes Formular können Sie:
 
 - **Es abschalten** für diese Ressource. Überall sonst gilt das Formular weiter.
-- **Festlegen, wann es verlangt wird.** Wählen Sie für Sitzungsstart, Sitzungsübernahme und Sitzungsende jeweils **Erben** (Standard des Formulars), **Erforderlich** oder **Nicht erforderlich**.
+- **Festlegen, wann es verlangt wird.** Wählen Sie für Sitzungsstart, Sitzungsübernahme, Sitzungsende, Projektwechsel (Aufteilung) und Projektänderung (ganze Sitzung) jeweils **Erben** (Standard des Formulars), **Erforderlich** oder **Nicht erforderlich**.
 
 Nur diese Einstellungen können je Ressource abweichen. Name und Felder sind überall gleich, wo das Formular gilt.
 
@@ -42,11 +42,13 @@ Nur diese Einstellungen können je Ressource abweichen. Name und Felder sind üb
 
 Ein Formular legt für jeden Zeitpunkt im Nutzungszyklus einen Standard fest. Eine Ressource kann diese Standards anpassen (siehe oben):
 
-| Auslöser              | Wann es erscheint                                                       |
-| --------------------- | ----------------------------------------------------------------------- |
-| **Sitzungsstart**     | Wenn ein Benutzer die Nutzung der Ressource startet                     |
-| **Sitzungsübernahme** | Wenn ein Benutzer eine aktive Sitzung eines anderen Benutzers übernimmt |
-| **Sitzungsende**      | Wenn ein Benutzer seine Nutzungssitzung beendet                         |
+| Auslöser                            | Wann es erscheint                                                                                                                                                                                                                           |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sitzungsstart**                   | Wenn ein Benutzer die Nutzung der Ressource startet                                                                                                                                                                                         |
+| **Sitzungsübernahme**               | Wenn ein Benutzer eine aktive Sitzung eines anderen Benutzers übernimmt                                                                                                                                                                     |
+| **Sitzungsende**                    | Wenn ein Benutzer seine Nutzungssitzung beendet                                                                                                                                                                                             |
+| **Projektwechsel (Aufteilung)**     | Wenn ein Benutzer seine laufende Sitzung [auf Projekte aufteilt](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln). Die Antworten gehören zum Abschnitt, der dabei beginnt. Andere Formulare werden nicht verlangt. |
+| **Projektänderung (ganze Sitzung)** | Wenn ein Benutzer seine ganze laufende Sitzung einem anderen Projekt zuordnet. Die Antworten gehören zur laufenden Sitzung. Andere Formulare werden nicht verlangt.                                                                         |
 
 > [!TIP]
 > Verwenden Sie **Sitzungsende**-Formulare, um Daten zu erfassen, die erst nach der Nutzung bekannt sind, wie Materialverbrauch oder Druckergebnisse.

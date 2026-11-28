@@ -42,6 +42,34 @@ While the reader processes an action, the controls are temporarily unavailable. 
 
 To record machine usage against a project, tap the machine's name to open its details, tap **Projekt wählen** (Choose project), and select your project before starting there. Starting directly from the list records the usage without a project.
 
+### Change the project of a running session
+
+On a Touch reader with current firmware (the capability **projectSwitch**), the details of your own running session show **Projekt: …** and **Projekt wechseln** (Change project). The button is offered when the session already has a project or you have one to switch to.
+
+1. Tap the machine's name to open its details, then tap **Projekt wechseln**
+2. Pick a project from the list (it can be searched and paged), or tap **Kein Projekt** (No project) next to the title. The current choice cannot be picked.
+3. Choose what the change applies to. Each button says where your usage goes:
+   - **Ganze Sitzung** (Whole session), listed first and highlighted: everything used in the session so far, and from now on, goes to the new project. If the session was split before, this covers only the time since the last split.
+   - **Ab jetzt** (From now on): the time so far stays on the current project and is billed now; the session continues under the new one.
+
+   **Abbrechen** (Cancel) changes nothing.
+
+4. Complete any form required for your choice
+5. The reader confirms with **Projekt gewechselt** (Project changed) and the new project
+
+The machine keeps running, and the start time shown stays that of your session. If your session ends or its project changes elsewhere while the project list, the choice or a form is open, the reader closes it and shows the current status.
+
+If the change is refused, the session keeps its project:
+
+- **Ab jetzt** only: a meter cannot be read. The button shows **⚠ Zähler nicht lesbar. Projekt unverändert.** (Meter not readable. Project unchanged.)
+- **Ab jetzt** only: the balance does not cover a new session where the resource [charges a split like one](billing/configuration.md#charging-when-a-session-is-split-between-projects). The reader reports [insufficient balance](#results-messages-and-low-balance)
+- Your session ended just as you made your choice: a warning screen titled **Projekt nicht gewechselt** (Project not changed) says **Ihre Sitzung läuft nicht mehr.** (Your session is no longer running.) Tap **OK** or wait.
+- Other refusals, such as a failed flow, show no specific reason: the button shows **⚠ Fehlgeschlagen – erneut tippen** (⚠ Failed – tap to retry)
+
+If **Projekt wechseln** is already gone when the reloaded status appears, for example because the session ended meanwhile, any other reason a button would show moves to the [**Etwas ist schiefgelaufen** (Something went wrong) screen](#results-messages-and-low-balance).
+
+Older firmware, Attractap Lite, the BLE Bridge and plugin readers do not offer this. See [Changing the project of a running session](resources/usage-tracking.md#changing-the-project-of-a-running-session).
+
 ### Results, messages and low balance
 
 The reader reports results on a full screen of its own and returns to the screen you were on:
@@ -94,7 +122,7 @@ _The back arrow returns to the resource list. You remain signed in when you move
 
 ### Session finished summary
 
-After you successfully stop your own machine session, the reader shows **Danke, {name}!** with your display name (your name, or your username when none is set). **Dauer** is the elapsed session time in hours, minutes and seconds, not machine operating time or billed minutes. Hours can exceed 24. **Abgerechnet** shows the final formatted charge when there is a nonzero charge; otherwise only the centered duration appears.
+After you successfully stop your own machine session, the reader shows **Danke, {name}!** with your display name (your name, or your username when none is set). **Dauer** is the elapsed session time in hours, minutes and seconds, not machine operating time or billed minutes. Hours can exceed 24. **Abgerechnet** shows the final formatted charge when there is a nonzero charge; otherwise only the centered duration appears. If the [project was switched](#change-the-project-of-a-running-session) during the session, both are about the whole session: **Dauer** counts from its original start, and **Abgerechnet** adds up the charges of all its parts, also when the last part cost nothing.
 
 ![Full-screen goodbye with elapsed duration and final charge](../../_media/attractap/session-summary-billed.png)
 

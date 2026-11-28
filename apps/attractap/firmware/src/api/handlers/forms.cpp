@@ -268,6 +268,14 @@ API::ResourceUsageFormActionType API::parseFormAction(const char *action)
     {
         return ResourceUsageFormActionType::TAKEOVER;
     }
+    if (strcmp(action, "project-switch") == 0)
+    {
+        return ResourceUsageFormActionType::PROJECT_SWITCH;
+    }
+    if (strcmp(action, "project-reassign") == 0)
+    {
+        return ResourceUsageFormActionType::PROJECT_REASSIGN;
+    }
     return ResourceUsageFormActionType::UNKNOWN;
 }
 
@@ -281,6 +289,10 @@ const char *API::formActionToString(ResourceUsageFormActionType action)
         return "end";
     case ResourceUsageFormActionType::TAKEOVER:
         return "takeover";
+    case ResourceUsageFormActionType::PROJECT_SWITCH:
+        return "project-switch";
+    case ResourceUsageFormActionType::PROJECT_REASSIGN:
+        return "project-reassign";
     default:
         return "";
     }

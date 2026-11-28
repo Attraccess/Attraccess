@@ -24,6 +24,8 @@ export interface FormRecord {
   isRequiredOnResourceUsageStart: boolean;
   isRequiredOnResourceUsageTakeOver: boolean;
   isRequiredOnResourceUsageEnd: boolean;
+  isRequiredOnResourceUsageProjectSwitch: boolean;
+  isRequiredOnResourceUsageProjectReassign: boolean;
   resourceId: number | null;
   groupId: number | null;
   /** Set when the form was deleted; deleted forms only stay for the history of their submissions. */
@@ -36,6 +38,8 @@ export interface FormRequiredFlags {
   isRequiredOnResourceUsageStart: boolean;
   isRequiredOnResourceUsageTakeOver: boolean;
   isRequiredOnResourceUsageEnd: boolean;
+  isRequiredOnResourceUsageProjectSwitch: boolean;
+  isRequiredOnResourceUsageProjectReassign: boolean;
 }
 
 /** How one resource deviates from a form that applies to it. A `null` flag inherits the form's default. */
@@ -47,6 +51,8 @@ export interface FormResourceOverrideRecord {
   isRequiredOnResourceUsageStart: boolean | null;
   isRequiredOnResourceUsageTakeOver: boolean | null;
   isRequiredOnResourceUsageEnd: boolean | null;
+  isRequiredOnResourceUsageProjectSwitch: boolean | null;
+  isRequiredOnResourceUsageProjectReassign: boolean | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -77,7 +83,11 @@ export function effectiveFormFlags(
   form: FormRequiredFlags,
   override: Pick<
     FormResourceOverrideRecord,
-    'isRequiredOnResourceUsageStart' | 'isRequiredOnResourceUsageTakeOver' | 'isRequiredOnResourceUsageEnd'
+    | 'isRequiredOnResourceUsageStart'
+    | 'isRequiredOnResourceUsageTakeOver'
+    | 'isRequiredOnResourceUsageEnd'
+    | 'isRequiredOnResourceUsageProjectSwitch'
+    | 'isRequiredOnResourceUsageProjectReassign'
   > | null,
 ): FormRequiredFlags {
   return {
@@ -85,5 +95,9 @@ export function effectiveFormFlags(
     isRequiredOnResourceUsageTakeOver:
       override?.isRequiredOnResourceUsageTakeOver ?? form.isRequiredOnResourceUsageTakeOver,
     isRequiredOnResourceUsageEnd: override?.isRequiredOnResourceUsageEnd ?? form.isRequiredOnResourceUsageEnd,
+    isRequiredOnResourceUsageProjectSwitch:
+      override?.isRequiredOnResourceUsageProjectSwitch ?? form.isRequiredOnResourceUsageProjectSwitch,
+    isRequiredOnResourceUsageProjectReassign:
+      override?.isRequiredOnResourceUsageProjectReassign ?? form.isRequiredOnResourceUsageProjectReassign,
   };
 }

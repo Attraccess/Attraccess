@@ -16,6 +16,7 @@ import { SessionTimer } from '../../resources/usage/components/SessionTimer';
 import { BigNumber, itemsPerSize, MoreLink, WidgetEmpty, WidgetError, WidgetList, WidgetLoading } from './widgetParts';
 import de from './de.json';
 import en from './en.json';
+import { sessionStartOf } from '../../resources/usage/sessionDuration';
 
 const ROWS_PER_SIZE = { medium: 3, large: 7 };
 // Live updates are per resource, so a session started on a resource not listed yet shows up with the next refresh.
@@ -52,7 +53,7 @@ function InUseRow({ resource }: Readonly<{ resource: Resource }>) {
       </span>
       {usage && (
         <span className="shrink-0">
-          <SessionTimer startTime={usage.startTime} variant="compact" />
+          <SessionTimer startTime={sessionStartOf(usage)} variant="compact" />
         </span>
       )}
     </li>
