@@ -35,8 +35,11 @@ class ReaderConsole:
         self.log = log_path.open("ab")
         self.thread = None
         self.running = False
+        # Why the capture lost the serial connection since it was started, or None.
+        self.lost = None
 
     def start(self):
+        self.lost = None
         self.running = True
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
@@ -52,7 +55,12 @@ class ReaderConsole:
                 chunk = self.driver._read(timeout=0.2, max_size=4096)
             except TIMEOUT:
                 continue
-            except Exception:  # The console reconnects after a reader reset.
+            except Exception as error:  # The connection does not come back by itself: reopen the port.
+                if self.running and not self.lost:
+                    self.lost = f"{type(error).__name__}: {error}"
+                    stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+                    self.log.write(f"\n===== HIL harness {stamp}: serial connection lost: {self.lost}\n".encode())
+                    self.log.flush()
                 time.sleep(0.2)
                 continue
             self.log.write(chunk)

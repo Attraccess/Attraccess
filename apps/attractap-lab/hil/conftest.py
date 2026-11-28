@@ -12,6 +12,7 @@ HIL_WSS=1 connects the reader over wss:// through a TLS front with a device-lab
 CA (attractap_lab.lab_tls); run.sh builds the reader image to trust that CA.
 """
 
+from dataclasses import asdict
 import json
 import os
 import re
@@ -29,6 +30,7 @@ from attractap_lab.drivers import (
 )
 from attractap_lab.enrollment import approve, latest_code
 from attractap_lab.reader_screen import ReaderTestHooks
+from attractap_lab.serial_recovery import RecoveringReset, recover_serial
 from attractap_lab.workflow import claim, flash_reader, send_reader_wifi
 
 from reader_reset import ReaderNotIdle, settle
@@ -368,17 +370,34 @@ def laser(api, admin, reader, resource, users):
 
 
 REPORT = RunReport()
+RECOVERING_RESET = RecoveringReset(REPORT)
 # Set once a reboot could not bring the reader back: later tests then fail fast instead of rebooting again.
 UNUSABLE = {}
 
 
 def reset_reader(request, label):
-    """Run ``settle`` before ``label`` and record what it cleaned up (see reader_reset.py)."""
+    """Run ``settle`` before ``label`` and record what it cleaned up (see reader_reset.py).
+
+    A dropped serial connection is recovered once per run (attractap_lab.serial_recovery) and
+    logged to serial-drops.jsonl; the terminal summary reports it as a warning.
+    """
     names = ("target", "reader", "api", "admin", "emulator")
     target, reader, api, admin, emulator = (request.getfixturevalue(name) for name in names)
+    artifacts = request.getfixturevalue("artifacts")
+    console = reader["console"]
+
+    def reset(allow_reboot):
+        return settle(target, reader, api, admin, emulator, PIN, allow_reboot=allow_reboot)
+
+    def recover(steps):
+        driver = target.get_driver("SerialDriver", activate=False)
+        recover_serial(target, driver, console, open_console=open_console, check=lambda: reset(False),
+                       power_log=artifacts / "power-cycle.log", steps=steps)
+
     started = time.monotonic()
+    drops = len(REPORT.drops)
     try:
-        actions = settle(target, reader, api, admin, emulator, PIN, allow_reboot=not UNUSABLE)
+        actions = RECOVERING_RESET(label, console, lambda: reset(not UNUSABLE), recover)
     except Exception as error:
         UNUSABLE.setdefault("since", label)
         REPORT.checked(label, [f"FAILED: {error}"], time.monotonic() - started)
@@ -386,13 +405,18 @@ def reset_reader(request, label):
         if UNUSABLE["since"] != label:
             message += f" (unusable since {UNUSABLE['since']})"
         raise ReaderNotIdle(f"{message}: {error}") from error
+    finally:
+        for drop in REPORT.drops[drops:]:
+            print(f"WARNING: reader serial connection dropped {drop.text()}")
+            with (artifacts / "serial-drops.jsonl").open("a") as out:
+                out.write(json.dumps(asdict(drop)) + "\n")
     UNUSABLE.clear()
     seconds = time.monotonic() - started
     REPORT.checked(label, actions, seconds)
     if actions:
         entry = {"before": label, "left_by": REPORT.previous, "seconds": round(seconds, 1), "actions": actions}
         print(f"reader reset: {entry}")
-        with (request.getfixturevalue("artifacts") / "reader-resets.jsonl").open("a") as out:
+        with (artifacts / "reader-resets.jsonl").open("a") as out:
             out.write(json.dumps(entry) + "\n")
 
 
@@ -422,8 +446,9 @@ def pytest_terminal_summary(terminalreporter):
     for line in lines:
         terminalreporter.write_line(line)
     if os.environ.get("GITHUB_ACTIONS") == "true":
-        if REPORT.annotation():
-            terminalreporter.write_line(REPORT.annotation())
+        for command in [REPORT.annotation(), *REPORT.warning_annotations()]:
+            if command:
+                terminalreporter.write_line(command)
         summary = os.environ.get("GITHUB_STEP_SUMMARY")
         if summary and REPORT.markdown():
             with open(summary, "a") as out:
