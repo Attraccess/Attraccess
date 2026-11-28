@@ -45,6 +45,7 @@ import { AttractapSupervisionHandler } from '../supervision/supervision.handler'
 import { AttractapFormsHandler } from '../forms/forms.handler';
 import { CardSessionService } from '../ui/card-session.service';
 import { CARD_WRITE_START_ERRORS, assertReaderRelaysCards } from './card-write-errors';
+import type { EnrollPayload, ResetPayload } from './card-arm-payloads';
 import { assertReaderPaired } from '../../../reader-pairing';
 import type { AuditAuthenticationMethod as AuthenticationMethod } from '@attraccess/application-models';
 
@@ -528,8 +529,14 @@ export class AttractapCardHandler implements OnModuleInit {
     this.cardConversations.abort(socket, 'CARD_REMOVED', 'enroll');
   }
 
-  /** One screen flow per reader; any supervision counts, so busy is the same with or without Valkey's claim. */
+  /**
+   * One screen flow per reader; any supervision counts, so busy is the same with or without Valkey's claim. An
+   * enrollment or reset past its time ends here: its result or the reader's cancel may never arrive (ATT-1426).
+   * Not while a card conversation runs (it has its own deadline): a write in progress still reports its result.
+   */
   private isBusyWithCardFlow(socket: AuthenticatedWebSocket): boolean {
+    const armed = socket.state.enrollment ?? socket.state.resetNfcCardData;
+    if (armed && armedTooLongAgo(armed.armedAt) && !socket.state.cardConversation) this.endCardFlows(socket);
     const { enrollment, resetNfcCardData, massIntroductionFlow, supervisionFlow } = socket.state;
     return !!(enrollment || resetNfcCardData || massIntroductionFlow || supervisionFlow);
   }
@@ -573,23 +580,3 @@ const ENROLL = 'card.enroll';
 const RESET = 'card.reset';
 /** Arming waits for the reader's ACK (with retries) on the holding instance. */
 const ROUTE_TIMEOUT_MS = 20_000;
-
-type AuditPrincipal = NonNullable<AuthenticatedWebSocket['state']['enrollment']>['auditPrincipal'];
-
-interface EnrollPayload {
-  readerId: number;
-  userId: number;
-  auditPrincipal: AuditPrincipal;
-  username: string;
-  displayName: string;
-  screenClaim?: string;
-}
-
-interface ResetPayload {
-  readerId: number;
-  cardId: number;
-  auditPrincipal: AuditPrincipal;
-  username: string;
-  displayName: string;
-  screenClaim?: string;
-}

@@ -233,6 +233,66 @@ describe('reader session through the real gateway', () => {
     expect(again.frames.filter((f) => f.type === FrameType.JSON)).toHaveLength(0);
   });
 
+  // ATT-1426: a reader that restarts (crash, power cut) never closes its connection; the server keeps it open.
+  it('drops the older connection of a reader that signs in again, so its armed enrollment does not keep it busy', async () => {
+    const cards = gateway['cardHandler'] as unknown as {
+      armEnrollmentLocally(payload: Record<string, unknown>): Promise<boolean>;
+    };
+    const enrollment = {
+      readerId: 22,
+      userId: 3,
+      auditPrincipal: { userId: 3, authenticationMethod: 'session' },
+      username: 'bob',
+      displayName: 'Bob',
+    };
+    const arm = async ({ reader, socket }: Awaited<ReturnType<typeof signedIn>>) => {
+      socket.state.cardRelay = true;
+      const armed = cards.armEnrollmentLocally(enrollment);
+      armed.catch(() => undefined);
+      await Promise.race([
+        armed,
+        reader.nextFrame(
+          (f) => f.type === FrameType.JSON && json(f).data?.type === 'ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO',
+        ),
+      ]);
+      const ack = { type: 'ACK_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO' };
+      reader.send(FrameType.JSON, JSON.stringify({ event: 'EVENT', data: ack }));
+      return armed;
+    };
+    const before = await signedIn(22);
+    await expect(arm(before)).resolves.toBe(true);
+
+    // The reader restarts and signs in again. The old connection stays silent and open on its side.
+    const after = await signedIn(22);
+
+    expect(before.socket.state.enrollment).toBeNull();
+    await expect(arm(after)).resolves.toBe(true);
+    await before.reader.closed;
+    const open = [...app.get(WebsocketService).sockets.values()].filter((socket) => socket.readerId === 22);
+    expect(open).toEqual([after.socket]);
+  });
+
+  it('keeps the newer connection when the handshake of an older one finishes last', async () => {
+    let release = () => undefined as void;
+    let held = () => undefined as void;
+    const holding = new Promise<void>((resolve) => (held = resolve));
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    jest.spyOn(app.get(CredentialRegistryService), 'isActive').mockImplementationOnce(async () => {
+      held();
+      await gate;
+      return true;
+    });
+    const older = await connectPaired(23);
+    await holding;
+    const newer = await signedIn(23);
+
+    release();
+    await older.reader.closed;
+
+    const open = [...app.get(WebsocketService).sockets.values()].filter((socket) => socket.readerId === 23);
+    expect(open).toEqual([newer.socket]);
+  });
+
   it('ends a card conversation and the verified user as soon as the credential changes', async () => {
     const { reader, socket } = await signedIn(20);
     socket.state.verifiedUserId = 3;
@@ -250,6 +310,8 @@ describe('reader session through the real gateway', () => {
     // Before the socket's close event: nothing of the old login is left.
     expect(socket.state.verifiedUserId).toBeNull();
     expect(socket.state.verifiedCardUid).toBeNull();
+    // Nothing can be routed to the dying connection either.
+    expect(app.get(WebsocketService).sockets.has(socket.id)).toBe(false);
     expect(await conversation).toEqual({ ok: false, reason: 'READER_UNREACHABLE' });
     expect(conversations.activeConversations).toBe(0);
     await reader.closed;
