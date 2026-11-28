@@ -59,16 +59,17 @@ Activity visibility (below) is applied on top: a machine you cannot see never sh
 
 The official plugins follow the setting too. A machine that is only in hidden resource groups additionally stays hidden in plugins, as before.
 
-- **Reservations:** availability, new bookings, the reservation settings of a machine, the manager pages and calendar feeds leave a hidden machine out or answer "not found". Managing a machine's reservations does not make it visible. You keep **your own bookings** on a machine that became hidden: they stay under **My reservations** with the machine name, you can still open and cancel them, and your calendar feeds keep them.
-- **Status walls:** whoever sets up a wall can only select machines and resource groups they may see, and **all resources** needs someone whose machine list is not narrowed.
+- **Reservations:** availability, new bookings, the reservation settings of a machine, the manager pages and calendar feeds leave a hidden machine out or answer "not found". Being allowed to manage a machine's reservations does not by itself make it visible. You keep **your own bookings** on a machine that became hidden: they stay under **My reservations** with the machine name, you can still open, cancel, keep or end them early, and your calendar feeds keep them as long as their selection still covers the machine.
+- **Status walls:** whoever sets up a wall can only select machines and resource groups they may see, and **all resources** needs someone whose machine list is not narrowed. A selected group shows all its machines, including ones that person may not see, and **all resources** also shows machines that are only in hidden resource groups.
 
 > [!WARNING]
-> Plugins from other sources follow the setting only if they use the [visibility methods of the plugin SDK](plugins/developing-plugins.md#machine-visibility). Review them before relying on this setting to hide your equipment list. Attractap reader screens, notifications and emails of plugins are not narrowed by this setting.
+> Plugins from other sources follow the setting only if they use the [visibility methods of the plugin SDK](plugins/developing-plugins.md#machine-visibility). Review them before relying on this setting to hide your equipment list.
 
 > [!NOTE]
 > These places deliberately show machines regardless of this setting:
 >
 > - **Status wall links:** the public link of a status wall shows what the wall was set up with to anyone who has it.
+> - **Plugin messages and reader screens:** what plugins, including official ones, show on Attractap readers or send in notifications and emails is not narrowed.
 > - **Projects:** a project's usage history and statistics show its members the machines used in the project. This is project data shared with the project's members.
 > - **Reports:** the report export (**Export Resource Reports**, `resources.reports.export`) covers every machine.
 

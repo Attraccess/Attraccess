@@ -74,8 +74,8 @@ The sidebar entry **My reservations** lists your upcoming and past bookings with
 You can cancel pending and upcoming bookings there, end a running booking early and follow the link to your
 [calendar feeds](#calendar-feeds-ical).
 
-If a machine becomes hidden from you (see [Who can see the machine list](settings/overview.md)), your own bookings
-on it stay in the list and you can still open and cancel them. Everything else about the machine, such as its
+If a machine becomes hidden from you (see [Who can see the machine list](settings/overview.md#machine-list-visibility)),
+your own bookings on it stay in the list and you can still open, cancel, keep or end them early. Everything else about the machine, such as its
 availability or other people's bookings, answers "not found".
 
 ## Approval
@@ -278,8 +278,13 @@ On your account page, the section **Calendar feeds (iCal)** lets you subscribe t
 - Each feed has a **selection**. Combine one or more of: specific resources, resource groups, all resources you are
   introduced to, all resources you maintain, and only your own bookings.
 - Only resources you may see **at the time the calendar is requested** are included (see
-  [Who can see the machine list](settings/overview.md)). Your **own bookings** stay in the feed even on a machine that
-  became hidden from you. You cannot save a feed that selects a machine you may not see.
+  [Who can see the machine list](settings/overview.md#machine-list-visibility)). Your **own bookings** stay in the feed
+  even on a machine that became hidden from you, as long as the feed's selection still covers the machine. A machine
+  that is covered only by "all resources you are introduced to" (or "you maintain") leaves the feed, your bookings
+  included, once you lose that introduction (or role).
+- You cannot save a feed that selects a specific machine you may not see, not even to rename it, and this also applies
+  to a machine you selected earlier. The dialog does not list such a machine: choose **Clear selection**, select the
+  machines again, then save. The feed keeps its link.
 - Confirmed bookings appear as events, pending bookings as **tentative** events. Cancelled bookings disappear. The
   feed covers the last 30 days up to the booking horizon of each resource.
 - The title is "Resource – Name" for your own bookings, for resources you manage and for resources where you may see

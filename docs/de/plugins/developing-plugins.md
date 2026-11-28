@@ -1136,7 +1136,8 @@ Scheduler. Unbekannte Personen und Ressourcen ergeben negative Antworten (`false
 
 Alles, was einer Person verrät, dass es eine Maschine gibt (eine Liste, eine Seite, ein Feed, ein Export), muss die
 Instanz-Einstellung **Wer die Maschinenliste sehen darf** und die verborgenen Ressourcengruppen befolgen. Bauen Sie
-keine der Regeln nach: Fragen Sie den Host nach den Ressourcen, die die Person sehen darf.
+keine der Regeln nach: Fragen Sie den Host nach den Ressourcen, die die Person sehen darf. Diese Methoden gehören zu
+`context.resourceAccess` (Berechtigung `ACCESS_RESOURCES`); was ein Prinzipal ist, steht oben.
 
 | Methode                                    | Liefert                                                                                                                                                   |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1146,16 +1147,20 @@ keine der Regeln nach: Fragen Sie den Host nach den Ressourcen, die die Person s
 | `getResourceListScope(principal)`          | `all` oder `permitted`: ob die Einstellung die Maschinenliste des Prinzipals einschränkt. Damit erlauben Sie eine Auswahl, die „alle Ressourcen“ meint.   |
 | `filterVisibleGroups(principal, groupIds)` | Die Ressourcengruppen aus `groupIds`, die der Kern dem Prinzipal auflisten würde, in der übergebenen Reihenfolge.                                         |
 
-Die ersten drei verbinden die Maschinenlisten-Regel des Kerns (Verwaltende sehen alles; im Modus `authenticated` auch
-alle mit `resources.read`; alle anderen sehen, worin sie eingewiesen sind, was sie einweisen oder warten, was sie
-gerade nutzen und Maschinen, die Aufsicht erlauben oder verlangen) mit der Regel für verborgene Gruppen, beide müssen
-also zutreffen. Übergeben Sie bei Anfragen `request.user` und bei Hintergrundarbeit für eine Person, etwa dem Rendern
-ihres Kalender-Feeds, eine Nutzer-ID. Unbekannte Personen sehen nichts.
+Die ersten drei verbinden die Maschinenlisten-Regel des Kerns (mit `resources.update` oder `resources.access.manage`
+erfüllt man sie für jede Maschine; im Modus `authenticated` auch mit `resources.read`; alle anderen erfüllen sie für
+das, worin sie eingewiesen sind, was sie einweisen oder warten, was sie gerade nutzen und für Maschinen, die Aufsicht
+erlauben oder verlangen) mit der Regel für verborgene Gruppen, beide müssen also zutreffen. Nach der Regel für
+verborgene Gruppen braucht man für eine Maschine, die nur in verborgenen Gruppen liegt, zusätzlich `resources.update`,
+oder man muss für eine dieser Gruppen Einweiser oder in sie eingewiesen sein. `getResourceListScope` betrachtet nur die
+Einstellung: `all` bedeutet nicht, dass der Prinzipal jede Maschine sehen darf. Übergeben Sie bei Anfragen `request.user` und bei Hintergrundarbeit für eine Person, etwa dem Rendern
+ihres Kalender-Feeds, eine Benutzer-ID. Unbekannte Personen sehen nichts.
 
 Routen mit der Maschinen-ID im Pfad erhalten den Decorator `@ResourceVisible()`. Bei angemeldeten Anfragen beantwortet
 er eine Ressource, die die aufrufende Person nicht sehen darf, mit demselben 404 wie der Kern
 (`ResourceNotFoundException`), bevor Ihr Handler läuft. Er braucht keine Plugin-Berechtigung. Er liest `:resourceId`;
-für einen anderen Parameter übergeben Sie dessen Namen:
+für einen anderen Parameter übergeben Sie dessen Namen. Er prüft nur IDs aus reinen Ziffern und lässt alles andere
+durch. Die Route muss den Parameter deshalb mit `ParseIntPipe` lesen, das nicht ganzzahlige Werte mit `400` ablehnt:
 
 ```ts
 @Auth()

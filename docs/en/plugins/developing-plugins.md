@@ -733,7 +733,8 @@ resources yield negative answers (`false`, all-false, `[]`) rather than errors.
 
 Whatever tells a person that a machine exists (a list, a page, a feed, an export) has to follow the instance's **Who can
 see the machine list** setting and the hidden resource groups. Do not rebuild either rule: ask the host for the
-resources the person may see.
+resources the person may see. These methods are part of `context.resourceAccess` (permission `ACCESS_RESOURCES`); the
+principal is described above.
 
 | Method                                     | Returns                                                                                                                                  |
 | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -743,15 +744,20 @@ resources the person may see.
 | `getResourceListScope(principal)`          | `all` or `permitted`: whether the setting narrows the principal's machine list. Use it to allow a selection that means "every resource". |
 | `filterVisibleGroups(principal, groupIds)` | The resource groups among `groupIds` that core would list for the principal, in the given order.                                         |
 
-The first three combine core's machine list rule (managers see everything; in the `authenticated` mode so do
-`resources.read` holders; everyone else sees what they are introduced to, introduce or maintain, currently use, and
-machines that allow or require supervision) with the hidden-group rule, so both must pass. Pass `request.user` for
+The first three combine core's machine list rule (`resources.update` and `resources.access.manage` holders pass it for
+every machine; in the `authenticated` mode so do `resources.read` holders; everyone else passes it for what they are
+introduced to, introduce or maintain, currently use, and machines that allow or require supervision) with the
+hidden-group rule, so both must pass. Under the hidden-group rule, a machine that is only in hidden groups also needs
+`resources.update`, or an introducer role or introduction on one of those groups. `getResourceListScope` looks only at
+the setting: `all` does not mean the principal may see every machine. Pass `request.user` for
 request work and a user id for background work done for a person, such as rendering their calendar feed. Unknown users
 see nothing.
 
 Routes with the machine id in their path take the `@ResourceVisible()` decorator. For a signed-in request it answers a
 resource the caller cannot see with the same 404 as core (`ResourceNotFoundException`), before your handler runs. It
-needs no plugin permission. It reads `:resourceId`; pass the parameter name for another one:
+needs no plugin permission. It reads `:resourceId`; pass the parameter name for another one. It only checks an id made
+of plain digits and passes anything else on, so the route must read the parameter with `ParseIntPipe`, which rejects
+non-integer text with `400`:
 
 ```ts
 @Auth()

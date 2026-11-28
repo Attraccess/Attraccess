@@ -78,8 +78,9 @@ Der Seitenleisten-Eintrag **Meine Reservierungen** listet Ihre kommenden und ver
 Dort können Sie ausstehende und kommende Buchungen stornieren, eine laufende Buchung vorzeitig beenden und zu Ihren
 [Kalender-Feeds](#kalender-feeds-ical) wechseln.
 
-Wird eine Maschine für Sie verborgen (siehe [Wer die Maschinenliste sehen darf](settings/overview.md)), bleiben Ihre
-eigenen Buchungen darauf in der Liste und lassen sich weiter öffnen und stornieren. Alles andere zu dieser Maschine,
+Wird eine Maschine für Sie verborgen (siehe
+[Wer die Maschinenliste sehen darf](settings/overview.md#sichtbarkeit-der-maschinenliste)), bleiben Ihre eigenen
+Buchungen darauf in der Liste und lassen sich weiter öffnen, stornieren, behalten oder vorzeitig beenden. Alles andere zu dieser Maschine,
 etwa ihre Verfügbarkeit oder Buchungen anderer, antwortet mit „nicht gefunden“.
 
 ## Genehmigung
@@ -299,9 +300,14 @@ Auf Ihrer Kontoseite können Sie im Abschnitt **Kalender-Feeds (iCal)** Buchunge
   Ressourcengruppen, alle Ressourcen, in die Sie eingewiesen sind, alle Ressourcen, die Sie warten, und nur Ihre
   eigenen Buchungen.
 - Enthalten sind nur Ressourcen, die Sie **zum Zeitpunkt des Kalenderabrufs** sehen dürfen (siehe
-  [Wer die Maschinenliste sehen darf](settings/overview.md)). Ihre **eigenen Buchungen** bleiben auch dann im Feed,
-  wenn eine Maschine für Sie verborgen wurde. Ein Feed, der eine für Sie nicht sichtbare Maschine auswählt, lässt sich
-  nicht speichern.
+  [Wer die Maschinenliste sehen darf](settings/overview.md#sichtbarkeit-der-maschinenliste)). Ihre **eigenen
+  Buchungen** bleiben auch dann im Feed, wenn eine Maschine für Sie verborgen wurde, solange die Auswahl des Feeds die
+  Maschine noch umfasst. Ist eine Maschine nur über „alle Ressourcen, in die Sie eingewiesen sind“ (oder „die Sie
+  warten“) enthalten, fällt sie samt Ihren Buchungen aus dem Feed, sobald Sie die Einweisung (oder die Rolle)
+  verlieren.
+- Ein Feed, der eine bestimmte, für Sie nicht sichtbare Maschine auswählt, lässt sich nicht speichern, auch nicht zum
+  Umbenennen. Das gilt auch für früher Ausgewähltes. Der Dialog führt eine solche Maschine nicht auf: Wählen Sie
+  **Auswahl leeren**, wählen Sie die Maschinen neu aus und speichern Sie dann. Der Feed behält seinen Link.
 - Bestätigte Buchungen erscheinen als Termine, ausstehende als **vorläufige** Termine. Stornierte Buchungen
   verschwinden. Der Feed deckt die letzten 30 Tage bis zum Buchungshorizont der jeweiligen Ressource ab.
 - Der Titel lautet „Ressource – Name“ bei Ihren eigenen Buchungen, bei Ressourcen, die Sie verwalten, und bei
