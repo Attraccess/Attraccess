@@ -101,6 +101,8 @@ Wenn Sie an einem Projekt arbeiten, können Sie Ihre Nutzungssitzung damit verkn
 2. Die Sitzung wird mit dem ausgewählten Projekt verknüpft
 3. Dies hilft bei der Nachverfolgung der Ressourcennutzung pro Projekt
 
+Während eine Maschinensitzung läuft, ordnet **Projekt wechseln** in Ihrer Sitzung sie einem anderen oder keinem Projekt zu, ohne die Maschine anzuhalten. Siehe [Das Projekt einer laufenden Sitzung wechseln](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln).
+
 ## Nutzungsverlauf anzeigen
 
 Um Ihre vergangenen Nutzungssitzungen einzusehen:

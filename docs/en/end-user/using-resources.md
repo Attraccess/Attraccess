@@ -101,6 +101,8 @@ If you are working on a project, you can link your usage session to it:
 2. The session will be associated with the selected project
 3. This helps track resource usage per project
 
+While a machine session runs, **Change project** in your session moves it to another project, or to none, without stopping the machine. See [Switching the project of a running session](resources/usage-tracking.md#switching-the-project-of-a-running-session).
+
 ## View Usage History
 
 To see your past usage sessions:
