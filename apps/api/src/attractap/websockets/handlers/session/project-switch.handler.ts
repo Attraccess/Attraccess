@@ -1,6 +1,7 @@
 import { ResourceFormAction } from '@attraccess/application-models';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InsufficientBalanceError } from '../../../../billing/errors/insufficient-balance.error';
+import { NoSessionToSwitchError } from '../../../../resources/usage/errors/no-session-to-switch.error';
 import { SumUpService } from '../../../../billing/sumup/sumup.service';
 import { ResourceUsageService } from '../../../../resources/usage/sessions/resource-usage.service';
 import { UsersService } from '../../../../users-and-auth/users/users.service';
@@ -10,7 +11,10 @@ import { ResourceActionGuard } from '../resource-action.guard';
 import { ResourceListService } from '../resource-list/resource-list.service';
 import { CardSessionService } from '../ui/card-session.service';
 
-/** Refusals the reader has a text for, as the prefix of the server's message. */
+/**
+ * Refusals answered with their code alone; the rest of the server's message is not for the screen. The reader has a
+ * text for METER_SWITCH_FAILED. Its firmware has none for FLOW_EXECUTION_ERROR and shows its general failure there.
+ */
 const CODED_REFUSAL = /^(METER_SWITCH_FAILED|FLOW_EXECUTION_ERROR)\b/;
 
 /** `capabilities.projectSwitch` readers: the card holder moves their running session to another project. */
@@ -73,6 +77,26 @@ export class AttractapProjectSwitchHandler {
       return;
     }
 
+    const user = userId == null ? null : await this.usersService.findOne({ id: userId });
+    if (!user) {
+      await reply({ error: 'USER_NOT_FOUND' });
+      return;
+    }
+
+    const target = { projectId, ...(Number.isInteger(usageId) ? { usageId } : {}) };
+    const refuse = async (error: unknown) => {
+      await this.replyRefusal(resourceId, reply, error);
+      // The refreshed row shows what still runs, and under which project.
+      await this.resourceListService.sendResourceListToSocket(socket, { resourceIds: new Set([resourceId]) });
+    };
+    try {
+      // Before the forms: nobody should fill them in for a switch that cannot happen.
+      await this.resourceUsageService.assertSessionProjectSwitchable(resourceId, user, target);
+    } catch (error) {
+      await refuse(error);
+      return;
+    }
+
     const action = ResourceFormAction.PROJECT_SWITCH;
     const formSubmissions = await this.formsHandler.ensureFormsSatisfied({
       socket,
@@ -83,34 +107,36 @@ export class AttractapProjectSwitchHandler {
     });
     if (formSubmissions === null) return;
 
-    const user = userId == null ? null : await this.usersService.findOne({ id: userId });
-    if (!user) {
-      await reply({ error: 'USER_NOT_FOUND' });
-      return;
-    }
-
     try {
       const releaseCardSession = this.cardSessions.hold(socket);
       const switched = await this.resourceUsageService
         .switchSessionProject(
           resourceId,
           user,
-          { projectId, formSubmissions, ...(Number.isInteger(usageId) ? { usageId } : {}) },
+          { ...target, formSubmissions },
           { auditOrigin: { id: user.id, authenticationMethod: null } },
         )
         .finally(releaseCardSession);
       this.formsHandler.clearFormDraft(socket, resourceId, action);
       await reply({ success: true, usageId: switched.id, projectName: switched.project?.name ?? null });
     } catch (error) {
-      if (error instanceof InsufficientBalanceError) {
-        await reply({ error: 'INSUFFICIENT_BALANCE', sumUpEnabled: await this.sumUpService.getIsEnabled() });
-      } else {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.warn(`Switching the project of a session on resource ${resourceId} failed: ${message}`);
-        await reply({ error: CODED_REFUSAL.exec(message)?.[1] ?? message });
-      }
-      // The refreshed row shows what still runs, and under which project.
-      await this.resourceListService.sendResourceListToSocket(socket, { resourceIds: new Set([resourceId]) });
+      await refuse(error);
     }
+  }
+
+  private async replyRefusal(
+    resourceId: number,
+    reply: (payload: Record<string, unknown>) => Promise<unknown>,
+    error: unknown,
+  ): Promise<void> {
+    if (error instanceof InsufficientBalanceError) {
+      await reply({ error: 'INSUFFICIENT_BALANCE', sumUpEnabled: await this.sumUpService.getIsEnabled() });
+      return;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    this.logger.warn(`Switching the project of a session on resource ${resourceId} failed: ${message}`);
+    // The code of a stop without an own session: the reader says that none of theirs runs here.
+    if (error instanceof NoSessionToSwitchError) await reply({ error: 'NoOwnActiveSessionError' });
+    else await reply({ error: CODED_REFUSAL.exec(message)?.[1] ?? message });
   }
 }

@@ -94,6 +94,16 @@ export class BillingService {
     await this.openUsageBill(usage.id, user.id, context);
   }
 
+  /** Whether a flow of the resource can lower what a running usage costs, with a billing item priced below zero. */
+  public async flowsMayLowerCharge(resourceId: number, context?: BillingTransactionContext): Promise<boolean> {
+    const nodes = await this.resourceFlowsService.getNodes(
+      resourceId,
+      ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS,
+      context,
+    );
+    return nodes.some((node) => Number((node.data as { unitPrice?: unknown } | null)?.unitPrice) < 0);
+  }
+
   /**
    * The pending bill of the usage that continues a session after a project switch. Only a resource that charges the
    * continuation like a new session checks the balance again.

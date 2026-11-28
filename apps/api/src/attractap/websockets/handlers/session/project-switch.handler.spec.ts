@@ -1,7 +1,8 @@
 import { ResourceFormAction } from '@attraccess/application-models';
-import { Logger } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { InsufficientBalanceError } from '../../../../billing/errors/insufficient-balance.error';
 import { MachineBusyError } from '../../../../resources/usage/errors/machine-busy.error';
+import { NoSessionToSwitchError } from '../../../../resources/usage/errors/no-session-to-switch.error';
 import { AttractapEventType, type AuthenticatedWebSocket } from '../../websocket.types';
 import { AttractapProjectSwitchHandler } from './project-switch.handler';
 
@@ -12,6 +13,7 @@ describe('AttractapProjectSwitchHandler', () => {
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     const services = {
       resourceUsageService: {
+        assertSessionProjectSwitchable: jest.fn().mockResolvedValue(undefined),
         switchSessionProject: jest.fn().mockResolvedValue({ id: 12, project: { name: 'Rocket' } }),
       },
       usersService: { findOne: jest.fn().mockResolvedValue(user) },
@@ -108,12 +110,43 @@ describe('AttractapProjectSwitchHandler', () => {
     expect(replies()).toEqual([]);
   });
 
+  it('asks for forms only after checking that the shown session can be switched to the target', async () => {
+    const { services, request } = setUp();
+
+    await request();
+
+    expect(services.resourceUsageService.assertSessionProjectSwitchable).toHaveBeenCalledWith(10, user, {
+      projectId: 7,
+      usageId: 11,
+    });
+    expect(services.resourceUsageService.assertSessionProjectSwitchable.mock.invocationCallOrder[0]).toBeLessThan(
+      services.formsHandler.ensureFormsSatisfied.mock.invocationCallOrder[0],
+    );
+  });
+
   it.each([
+    ['the session ended', new NoSessionToSwitchError(), 'NoOwnActiveSessionError'],
     [
-      'a failed meter reading',
-      new Error('METER_SWITCH_FAILED: The meter "Energy" could not be read'),
-      'METER_SWITCH_FAILED',
+      'the target is the current project',
+      new BadRequestException('The session already belongs to this project'),
+      'The session already belongs to this project',
     ],
+  ])('answers without asking for forms when %s', async (_case, error, expected) => {
+    const { services, request, replies } = setUp();
+    services.resourceUsageService.assertSessionProjectSwitchable.mockRejectedValue(error);
+
+    await request();
+
+    expect(replies()).toEqual([expect.objectContaining({ error: expected, requestId: 3 })]);
+    expect(services.formsHandler.ensureFormsSatisfied).not.toHaveBeenCalled();
+    expect(services.resourceUsageService.switchSessionProject).not.toHaveBeenCalled();
+    expect(services.resourceListService.sendResourceListToSocket).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a session that ended while the switch was asked for', new NoSessionToSwitchError(), 'NoOwnActiveSessionError'],
+    ['a project that is gone', new NotFoundException('Project not found'), 'Project not found'],
+    ['a failed meter reading', new Error('METER_SWITCH_FAILED: "Energy": meter offline'), 'METER_SWITCH_FAILED'],
     ['a busy machine', new MachineBusyError(), new MachineBusyError().message],
   ])('answers %s and refreshes the row', async (_case, error, expected) => {
     const { services, request, replies } = setUp();

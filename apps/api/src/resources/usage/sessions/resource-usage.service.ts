@@ -209,6 +209,15 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     return this.ends.endSession(resourceId, user, dto, options);
   }
 
+  /** Refuses a project switch that can be told to fail before anything is asked of the person. */
+  public assertSessionProjectSwitchable(
+    resourceId: number,
+    user: UsageSessionUser,
+    dto: SwitchUsageSessionProjectDto,
+  ): Promise<void> {
+    return this.projectSwitch.assertSwitchable(resourceId, user, dto);
+  }
+
   /** Continues the caller's running session under another project, without stopping the machine. */
   async switchSessionProject(
     resourceId: number,

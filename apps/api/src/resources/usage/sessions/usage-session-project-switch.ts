@@ -11,14 +11,7 @@ import type {
   UsageSessionWithParties,
   UsageFormSubmissionDraft,
 } from '@attraccess/application-models';
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
 import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../../audit/recorder/audit-event';
@@ -29,10 +22,12 @@ import { ResourceFormsService } from '../../forms/forms.service';
 import type { FinalCollection } from '../../metering/resource-metering.service';
 import type { SwitchUsageSessionProjectDto } from '../dtos/switchUsageSessionProject.dto';
 import { MachineBusyError } from '../errors/machine-busy.error';
+import { NoSessionToSwitchError } from '../errors/no-session-to-switch.error';
 import { SessionChangeInterruptedError } from '../errors/session-change-interrupted.error';
 import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
 import { ActiveSessionCounts, UsageLifecycle } from '../lifecycle/usage-lifecycle';
 import { usageFlowPayload } from '../lifecycle/usage-flow-payload';
+import { assertNewSessionPayableAfterCharge } from './switch-balance-precheck';
 import { UsageSessionEnds } from './usage-session-ends';
 import { UsageSessionNotifications } from './usage-session-notifications';
 import { UsageSessionRecords } from './usage-session-records';
@@ -80,6 +75,22 @@ export class UsageSessionProjectSwitch {
     );
   }
 
+  /**
+   * The refusals of a switch that can be told before anything is asked of the person, such as the switch forms. The
+   * switch itself checks again.
+   */
+  async assertSwitchable(resourceId: number, user: UsageSessionUser, dto: SwitchUsageSessionProjectDto): Promise<void> {
+    const projectId = await this.targetProjectId(user, dto);
+    const active = await this.records.getActiveSessionsForResource(resourceId);
+    this.pickSwitchableSession(active, user, dto.usageId, projectId);
+  }
+
+  private async targetProjectId(user: UsageSessionUser, dto: SwitchUsageSessionProjectDto): Promise<number | null> {
+    if (dto.projectId === undefined) throw new BadRequestException('Project assignment is required');
+    // The same membership check as at the start; resolved before the transaction, as it reads on its own connection.
+    return dto.projectId === null ? null : (await this.projectsService.findOneById(user.id, dto.projectId)).id;
+  }
+
   private async switchNow(
     resourceId: number,
     user: UsageSessionUser,
@@ -88,10 +99,7 @@ export class UsageSessionProjectSwitch {
     attemptId: string,
   ): Promise<UsageSession> {
     const auditOrigin = options.auditOrigin ?? ({ id: user.id, authenticationMethod: 'session' } satisfies AuditActor);
-    if (dto.projectId === undefined) throw new BadRequestException('Project assignment is required');
-    // The same membership check as at the start; resolved before the transaction, as it reads on its own connection.
-    const projectId =
-      dto.projectId === null ? null : (await this.projectsService.findOneById(user.id, dto.projectId)).id;
+    const projectId = await this.targetProjectId(user, dto);
     const prepared = await this.prepare(resourceId, user, dto, projectId, attemptId);
     const { previous, continuation, switchTime, formSubmissions } = prepared;
 
@@ -100,6 +108,16 @@ export class UsageSessionProjectSwitch {
     try {
       // The meter boundary comes first: a meter that cannot be read refuses the switch before any flow ran.
       const final: FinalCollection = await this.lifecycle.handOverMeters(previous.id, continuation.id, switchTime);
+      if (continuation.projectSwitchCharging === ProjectSwitchCharging.NEW_SESSION) {
+        await assertNewSessionPayableAfterCharge(this.lifecycle, this.billingService, {
+          resourceId,
+          previousUsageId: previous.id,
+          continuation,
+          switchTime,
+          final,
+          user,
+        });
+      }
       await this.lifecycle.runUsageFlow(
         undefined,
         resourceId,
@@ -157,7 +175,23 @@ export class UsageSessionProjectSwitch {
     if (session || (usageId === undefined && sessions.length > 0)) {
       throw new ForbiddenException('Only the owner of a running session can switch its project');
     }
-    throw new NotFoundException('No active usage session found');
+    throw new NoSessionToSwitchError();
+  }
+
+  private pickSwitchableSession(
+    sessions: UsageSession[],
+    user: UsageSessionUser,
+    usageId: number | undefined,
+    projectId: number | null,
+  ): UsageSession {
+    const session = this.pickOwnSession(sessions, user, usageId);
+    if (session.usageAction !== ResourceUsageAction.Usage || session.resource?.type !== ResourceType.Machine) {
+      throw new BadRequestException('Only running machine sessions can switch their project');
+    }
+    if (session.projectId === projectId) {
+      throw new BadRequestException('The session already belongs to this project');
+    }
+    return session;
   }
 
   private prepare(
@@ -173,13 +207,7 @@ export class UsageSessionProjectSwitch {
       const sharedMachine = sessionLimit > 1;
       await this.lifecycle.assertLifecycleAvailable(scope, resourceId, sharedMachine);
       const active = await this.records.getActiveSessionsForResource(resourceId, scope);
-      const previous = this.pickOwnSession(active, user, dto.usageId);
-      if (previous.usageAction !== ResourceUsageAction.Usage || previous.resource?.type !== ResourceType.Machine) {
-        throw new BadRequestException('Only running machine sessions can switch their project');
-      }
-      if (previous.projectId === projectId) {
-        throw new BadRequestException('The session already belongs to this project');
-      }
+      const previous = this.pickSwitchableSession(active, user, dto.usageId, projectId);
       if (sharedMachine && (await sessions.isSessionBeingEnded(previous.id, scope))) {
         throw new MachineBusyError();
       }
