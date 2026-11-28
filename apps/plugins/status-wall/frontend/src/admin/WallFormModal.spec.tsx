@@ -117,7 +117,7 @@ describe('WallFormModal', () => {
   it.each([
     ['ResourceNotFoundException', 404, /contains a resource you cannot see.*Clear the resource selection/],
     ['ResourceGroupNotFound', 404, /contains a group you cannot see.*Remove it from the selection/],
-    ['Showing every resource needs access to the whole machine list', 403, /Switch off "Show all resources"/],
+    ['ResourceListNarrowed', 403, /Switch off "Show all resources"/],
     ['Not Found', 404, /^Not Found$/],
   ])('explains the refusal "%s" in words a manager can act on', async (message, status, shown) => {
     const user = userEvent.setup();

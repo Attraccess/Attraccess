@@ -79,7 +79,7 @@ export class WallsService {
   private async assertSelectable(viewer: PluginAccessPrincipal, selection: WallSelection, stored?: WallSelection) {
     const access = this.context.resourceAccess;
     if (selection.all && (await access.getResourceListScope(viewer)) !== 'all') {
-      throw new ForbiddenException('Showing every resource needs access to the whole machine list');
+      throw new ForbiddenException('ResourceListNarrowed');
     }
     const resource = await this.refusedResourceId(viewer, selection.resourceIds, stored?.resourceIds ?? []);
     if (resource !== undefined) throw new ResourceNotFoundException(resource);

@@ -36,7 +36,9 @@ export class WallsController {
   @ApiOperation({ summary: 'Create a status wall' })
   @ApiBody({ type: WallBody })
   @ApiCreatedResponse({ type: WallDto })
-  @ApiForbiddenResponse({ description: '"All resources" needs a manager who sees the whole machine list' })
+  @ApiForbiddenResponse({
+    description: 'ResourceListNarrowed: "all resources" needs a manager who sees the whole machine list',
+  })
   @ApiNotFoundResponse({ description: 'A selected resource or group does not exist or is hidden from the caller' })
   create(@Body(validated(WallBody)) body: WallBody, @Req() request: AuthenticatedRequest): Promise<Wall> {
     return this.walls.create(request.user, body);
@@ -47,7 +49,9 @@ export class WallsController {
   @ApiParam(WALL_ID)
   @ApiBody({ type: WallBody })
   @ApiOkResponse({ type: WallDto })
-  @ApiForbiddenResponse({ description: '"All resources" needs a manager who sees the whole machine list' })
+  @ApiForbiddenResponse({
+    description: 'ResourceListNarrowed: "all resources" needs a manager who sees the whole machine list',
+  })
   @ApiNotFoundResponse({ description: 'Unknown wall, or a selected resource or group that is missing or hidden' })
   update(
     @Param('id', ParseIntPipe) id: number,

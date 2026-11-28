@@ -48,8 +48,9 @@ export function createFakeContext() {
       filterVisible: jest.fn(async (_viewer: unknown, ids: number[]) =>
         ids.filter((id) => !state.hiddenResources.has(id) && !state.deletedResources.has(id)),
       ),
+      // Like the host: a group that does not exist is not visible either.
       filterVisibleGroups: jest.fn(async (_viewer: unknown, ids: number[]) =>
-        ids.filter((id) => !state.hiddenGroups.has(id)),
+        ids.filter((id) => state.groups.has(id) && !state.hiddenGroups.has(id)),
       ),
       getActiveSessions: jest.fn(async (id: number) => state.sessions.get(id) ?? []),
       getMaintenanceWindows: jest.fn(async (id: number) => state.maintenance.get(id) ?? []),

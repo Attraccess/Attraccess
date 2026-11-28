@@ -35,7 +35,8 @@ describe('WallsService', () => {
   });
 
   it('updates name and selection but keeps the link', async () => {
-    const { service, setNow } = setup();
+    const { service, setNow, state } = setup();
+    state.groups.set(3, []);
     const wall = await service.create(1, { name: 'Hall', selection: selection({ all: true }) });
     setNow(new Date('2026-11-21T09:00:00.000Z'));
 
@@ -124,8 +125,9 @@ describe('WallsService selection and machine list visibility (ATT-1407)', () => 
     const wall = await service.create(1, wallWith({ all: true }));
     state.listScope = 'permitted';
 
-    await expect(service.create(1, wallWith({ all: true }))).rejects.toMatchObject({ status: 403 });
-    await expect(service.update(1, wall.id, wallWith({ all: true }))).rejects.toMatchObject({ status: 403 });
+    const narrowed = { status: 403, response: expect.objectContaining({ message: 'ResourceListNarrowed' }) };
+    await expect(service.create(1, wallWith({ all: true }))).rejects.toMatchObject(narrowed);
+    await expect(service.update(1, wall.id, wallWith({ all: true }))).rejects.toMatchObject(narrowed);
     await expect(service.create(1, wallWith({ resourceIds: [1] }))).resolves.toBeDefined();
   });
 
@@ -137,6 +139,9 @@ describe('WallsService selection and machine list visibility (ATT-1407)', () => 
 
     await expect(service.create(1, wallWith({ groupIds: [7] }))).rejects.toMatchObject(hiddenGroup);
     await expect(service.update(1, wall.id, wallWith({ groupIds: [7] }))).rejects.toMatchObject(hiddenGroup);
+    // A group that never existed is refused the same way.
+    await expect(service.create(1, wallWith({ groupIds: [404] }))).rejects.toMatchObject(hiddenGroup);
+    await expect(service.update(1, wall.id, wallWith({ groupIds: [404] }))).rejects.toMatchObject(hiddenGroup);
 
     // Deleted since (it shows nothing): the wall stays editable.
     state.groups.delete(7);
@@ -144,7 +149,8 @@ describe('WallsService selection and machine list visibility (ATT-1407)', () => 
   });
 
   it('passes the request user to the host, so an API token scope applies', async () => {
-    const { service, context } = setup();
+    const { service, context, state } = setup();
+    state.groups.set(2, []);
     const viewer = { id: 4, effectivePermissions: new Set(['status-wall.manage']) };
     await service.create(viewer, wallWith({ resourceIds: [1], groupIds: [2] }));
     expect(context.resourceAccess.filterVisible).toHaveBeenCalledWith(viewer, [1]);

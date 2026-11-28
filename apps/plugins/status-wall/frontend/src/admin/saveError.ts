@@ -4,7 +4,7 @@ import { PluginApiError } from '@attraccess/plugins-frontend-sdk';
 const KNOWN_REFUSALS: Record<string, string> = {
   ResourceNotFoundException: 'form.errors.resourceUnavailable',
   ResourceGroupNotFound: 'form.errors.groupUnavailable',
-  'Showing every resource needs access to the whole machine list': 'form.errors.allNeedsWholeList',
+  ResourceListNarrowed: 'form.errors.allNeedsWholeList',
 };
 
 /** Localised, actionable text for a refused save; any other failure keeps its own message. */
