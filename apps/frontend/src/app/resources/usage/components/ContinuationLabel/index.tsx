@@ -16,7 +16,8 @@ export function ContinuationLabel({ previousUsageId, className = '' }: Readonly<
   return (
     <span className={`flex items-start gap-1 text-xs text-muted ${className}`} data-cy="usage-continuation">
       <CornerDownRight className="w-3 h-3 mt-0.5 shrink-0" aria-hidden />
-      {t('continuedFrom', { id: previousUsageId })}
+      {/* Not the previous record's id: it is not shown anywhere, and on a project's history it is in another one. */}
+      {t('continuation')}
     </span>
   );
 }
