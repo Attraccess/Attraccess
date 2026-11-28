@@ -207,7 +207,7 @@ verwenden wäre ein neuer Display-Abschnitt.
   - **Gehäuse.** Der vierte Platinen-Schraubdom und seine Einschmelzmutter rückten mit dem Loch nach Gehäuse
     (-27; -90,85); der Flansch der Kachel verlor seine Aussparung, und der Displayrahmen (er endet bei y 93,6)
     braucht keine. Der Dom hält 2,8 mm zum nächsten Magnetdom der Frontplatte. Die Zunge hält 1,0 mm zum Verriegelungsbügel der
-    Kappe unter dem unteren Platinenrand (wie der Rest dieses Randes), 6,0 mm zum Magneten der Frontplatte, 9,6 mm
+    Kappe unter dem unteren Platinenrand (wie der Rest dieses Randes), mindestens 4 mm zu den Magneten der Frontplatte, mindestens 9 mm
     zum Stecker und 12,5 mm zum Dock; die Kollisionsprüfung von Kappe, Kachel, Displayrahmen, Magneten, Platine und
     Dock findet nichts Neues.
   - **NFC.** Die Zunge hängt am Kupfer unter der Schleife und reicht nicht in die Nähe der Lücke bei y 117, schließt

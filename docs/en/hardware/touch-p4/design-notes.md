@@ -192,7 +192,7 @@ MIPI DSI on a 20-pin flex, 77 x 80 mm: it does not fit; using it would be a new 
   - **Case.** The fourth PCB boss and its insert moved with the hole, to case (-27, -90.85); the tile's flange lost
     its notch, and the display frame (it ends at y 93.6) needs none. The boss keeps 2.8 mm from the nearest
     faceplate magnet's boss. The tab keeps 1.0 mm from the cap's lock bar below the board's lower edge (as the rest
-    of that edge), 6.0 mm from the faceplate magnet, 9.6 mm from the plug and 12.5 mm from the dock; the
+    of that edge), at least 4 mm from the faceplate magnets, at least 9 mm from the plug and 12.5 mm from the dock; the
     interference check of cap, tile, display frame, magnets, board and dock finds nothing new.
   - **NFC.** The tab hangs on the copper below the loop and reaches nowhere near the gap at y 117, so it closes no
     turn round the loop (`simulate`: no closed copper, the loop's inductance unchanged).
