@@ -1,11 +1,13 @@
 import { BillingTransactionStatus, ProjectSwitchCharging } from '@attraccess/application-models';
-import { BillingTransactionItem, ResourceUsage } from '@attraccess/database-entities';
+import { applyPartBillingFactor } from '@attraccess/shared';
+import { BillingTransaction, BillingTransactionItem, ResourceUsage } from '@attraccess/database-entities';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
+import type { LiveNotificationsService } from '../../../billing/live-notifications/live-notifications.service';
 import { createBillingDatabase, type BillingConnection } from './billing-persistence.test-fixture';
 
 type Database = Awaited<ReturnType<typeof createBillingDatabase>>;
 
-const { CONTINUE, NEW_SESSION } = ProjectSwitchCharging;
+const { CONTINUE, CONTINUE_PER_PART_ROUNDING, NEW_SESSION } = ProjectSwitchCharging;
 const at = (minutes: number) => new Date(Date.parse('2026-11-13T09:00:00.000Z') + Math.round(minutes * 60_000));
 
 /** ATT-1421: the real ledger bills the parts of a switched session, reading the chain through `previousUsageId`. */
@@ -90,6 +92,135 @@ describe('Billing a switched session', () => {
         [at(1.5), NEW_SESSION],
       ]);
     });
+  });
+
+  it.each<[string, ProjectSwitchCharging[]]>([
+    ['continue', [CONTINUE, CONTINUE]],
+    ['per-part', [CONTINUE_PER_PART_ROUNDING, CONTINUE_PER_PART_ROUNDING]],
+    ['new-session', [NEW_SESSION, NEW_SESSION]],
+    ['changed to continue after a new session', [NEW_SESSION, CONTINUE]],
+    ['changed to continue after per-part rounding', [CONTINUE_PER_PART_ROUNDING, CONTINUE]],
+    ['changed to new-session after continue', [CONTINUE, NEW_SESSION]],
+  ])('tells what the running part will be billed with (%s)', async (name, modes) => {
+    const { user, resource, parts } = await billChain(`running ${name}`, [0, 1.5, 3.2], [null, modes[0]]);
+    const startTime = at(3.2);
+    const running = await db.seedUsage(db.primary, user.id, resource.id, {
+      startTime,
+      endTime: null,
+      isFinalized: true,
+      previousUsageId: parts[1].id,
+      projectSwitchCharging: modes[1],
+      creditsPerUsage: 999,
+      sessionDurationCreditsPerMinute: 199,
+      billingFactor: 33,
+    });
+
+    const billingOfPart = await billing.service.getRunningPartBilling(running.id);
+    expect(billingOfPart?.userId).toBe(user.id);
+
+    // The estimate the web makes from those figures, for an end 2.3 minutes later ...
+    const endTime = at(5.5);
+    const { flatCredits, priorCredits, roundingStartTime } = billingOfPart as NonNullable<typeof billingOfPart>;
+    const started = (time: Date) => Math.ceil((time.getTime() - roundingStartTime.getTime()) / 60_000);
+    const gross = BigInt(flatCredits + 199 * (started(endTime) - started(startTime)));
+    const estimate = applyPartBillingFactor(BigInt(priorCredits), gross, 33).amount;
+
+    // ... is the bill of that part.
+    await db.primary.getRepository(ResourceUsage).update(running.id, { endTime });
+    await billing.service.chargeForResourceUsage({
+      ...running,
+      endTime,
+      resource: { id: resource.id },
+      user: { billingFactor: 100 },
+    });
+    expect(await charges([running])).toEqual([estimate]);
+    await expect(billing.service.getRunningPartBilling(running.id)).resolves.toBeNull();
+  });
+
+  it('sums the charges and meter corrections of all parts up to the one asked about', async () => {
+    const { user, resource, parts } = await billChain('totals', [0, 1.5, 1.7, 4.4], [null, CONTINUE, CONTINUE]);
+    const own = await billing.ledger.findUsageTransaction(parts[0].id);
+    const correction = {
+      userId: user.id,
+      amount: -7,
+      status: BillingTransactionStatus.Completed,
+      correctionOfId: own?.id,
+    };
+    await db.primary.getRepository(BillingTransaction).save(correction);
+
+    // 5 + 2 x 2 minutes for the first part, nothing for the second, 2 x 3 minutes for the third, 7 corrected.
+    await expect(billing.service.getSwitchedSessionCharge(parts[0].id, user.id)).resolves.toEqual({
+      continues: true,
+      sessionAmount: -16,
+      resourceName: resource.name,
+    });
+    await expect(billing.service.getSwitchedSessionCharge(parts[2].id, user.id)).resolves.toEqual({
+      continues: false,
+      sessionAmount: -22,
+      resourceName: resource.name,
+    });
+    // Somebody else has no charge in it.
+    await expect(billing.service.getSwitchedSessionCharge(parts[2].id, user.id + 1000)).resolves.toMatchObject({
+      sessionAmount: 0,
+    });
+  });
+
+  it('knows nothing special about a session that was never switched', async () => {
+    const { user, parts } = await billChain('unswitched', [0, 1.5], [null]);
+
+    await expect(billing.service.getSwitchedSessionCharge(parts[0].id, user.id)).resolves.toBeNull();
+    await expect(billing.service.getSwitchedSessionCharge(999_999, user.id)).resolves.toBeNull();
+  });
+
+  it('says on every live event of a switched session what it is about, also when the last part is free', async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const live = (billing.service as unknown as { liveNotificationsService: LiveNotificationsService })
+      .liveNotificationsService;
+    const { user, resource } = await db.seed(db.primary, 'events');
+    const subscription = live.getTransactionSubject(user.id).subscribe(({ data }) => events.push({ ...data }));
+    const bill = async (usage: ResourceUsage) => {
+      await billing.ledger.insertTransaction({
+        userId: user.id,
+        resourceUsageId: usage.id,
+        amount: 0,
+        status: BillingTransactionStatus.Pending,
+      });
+      await billing.service.chargeForResourceUsage({
+        ...usage,
+        resource: { id: resource.id },
+        user: { billingFactor: 100 },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    };
+
+    const first = await db.seedUsage(db.primary, user.id, resource.id, { startTime: at(0), endTime: at(1.5) });
+    const last = await db.seedUsage(db.primary, user.id, resource.id, {
+      startTime: at(1.5),
+      endTime: null,
+      isFinalized: true,
+      previousUsageId: first.id,
+      projectSwitchCharging: CONTINUE,
+    });
+    await bill(first);
+    // Ends within the minute the first part already paid for: no charge of its own.
+    await db.primary.getRepository(ResourceUsage).update(last.id, { endTime: at(1.7) });
+    await bill({ ...last, endTime: at(1.7) } as ResourceUsage);
+    subscription.unsubscribe();
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        resourceUsageId: first.id,
+        amount: -9,
+        status: BillingTransactionStatus.Completed,
+        switchedSession: { continues: true, sessionAmount: -9, resourceName: resource.name },
+      }),
+      // The removed pending bill of the last part.
+      expect.objectContaining({
+        resourceUsageId: last.id,
+        status: BillingTransactionStatus.Pending,
+        switchedSession: { continues: false, sessionAmount: -9, resourceName: resource.name },
+      }),
+    ]);
   });
 
   it('checks the balance at a switch only when the continuation is charged like a new session', async () => {

@@ -5,5 +5,11 @@
   "close": "Fertig",
   "loading": "Abrechnung wird geladen",
   "loadError": "Die Abrechnungswährung konnte nicht geladen werden.",
-  "retry": "Erneut versuchen"
+  "retry": "Erneut versuchen",
+  "allParts": "Darin sind alle Abschnitte der Sitzung enthalten, vor und nach jedem Projektwechsel.",
+  "part": {
+    "title": "Projekt gewechselt",
+    "total": "Kosten für den Abschnitt vor dem Wechsel",
+    "continues": "Der Wechsel hat deine Sitzung nicht beendet: Sie lief weiter. Der Betrag gilt nur für den beendeten Abschnitt."
+  }
 }

@@ -77,3 +77,17 @@ export function applyBillingFactor(gross: bigint, factor: number): { amount: num
     throw new RangeError('Charge exceeds the supported billing range');
   return { amount: Number(amount), discount: Number(discount) };
 }
+
+/**
+ * The billing factor on the `gross` of one part of a switched session, whose earlier parts charged `priorCredits`:
+ * it is rounded on the running total, so that the parts' discounts add up to the one of their sum.
+ */
+export function applyPartBillingFactor(
+  priorCredits: bigint,
+  gross: bigint,
+  factor: number,
+): { amount: number; discount: number } {
+  const discount =
+    applyBillingFactor(priorCredits + gross, factor).discount - applyBillingFactor(priorCredits, factor).discount;
+  return { amount: Number(gross - BigInt(discount)), discount };
+}

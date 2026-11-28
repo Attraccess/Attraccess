@@ -46,6 +46,7 @@ export function toBillingTransactionDto(
     externalReference: transaction.externalReference,
     status: transaction.status,
     items: transaction.items?.map(toBillingTransactionItemDto),
+    switchedSession: transaction.switchedSession,
     initiator: detail.initiator,
     resourceUsage: detail.resourceUsage,
     refundOf: detail.refundOf ? toBillingTransactionDto(detail.refundOf) : detail.refundOf,

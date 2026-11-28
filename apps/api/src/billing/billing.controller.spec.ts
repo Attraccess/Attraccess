@@ -1,6 +1,6 @@
 import { registerBillingControllerFixture } from './billing.controller.test-fixture';
 import { BillingTransactionRecord, BillingTransactionStatus } from '@attraccess/application-models';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Currency, SetBillingConfigurationDto } from './dto/set-configuration.dto';
 import { BillingConfigurationDto } from './dto/configuration.dto';
 import { SetSumUpApiKeyDto } from './dto/sumup/set-sumup-apiKey.dto';
@@ -85,6 +85,37 @@ describe('BillingController', () => {
       ),
     ).toEqual({ transactionId: null });
     expect(fixture.service.getTransactionIdForUsage).toHaveBeenCalledWith(8, 2);
+  });
+
+  describe('getRunningPartBilling', () => {
+    const figures = { flatCredits: 0, roundingStartTime: new Date('2026-11-28T10:00:00Z'), priorCredits: 1400 };
+
+    it.each([
+      ['the owner', { id: 1 }],
+      ['a billing manager', { id: 2, effectivePermissions: new Set(['billing.manage']) }],
+      ['a resource manager', { id: 2, effectivePermissions: new Set(['resources.update']) }],
+    ])('tells %s the figures without the owner', async (_name, user) => {
+      fixture.service.getRunningPartBilling.mockResolvedValue({ userId: 1, ...figures });
+
+      await expect(fixture.controller.getRunningPartBilling(8, fixture.baseReq(user))).resolves.toStrictEqual(figures);
+      expect(fixture.service.getRunningPartBilling).toHaveBeenCalledWith(8);
+    });
+
+    it("refuses somebody else's session", async () => {
+      fixture.service.getRunningPartBilling.mockResolvedValue({ userId: 1, ...figures });
+
+      await expect(fixture.controller.getRunningPartBilling(8, fixture.baseReq({ id: 2 }))).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
+    it('does not find a usage that does not run', async () => {
+      fixture.service.getRunningPartBilling.mockResolvedValue(null);
+
+      await expect(fixture.controller.getRunningPartBilling(8, fixture.baseReq())).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
   });
 
   describe('getBillingTransactions', () => {

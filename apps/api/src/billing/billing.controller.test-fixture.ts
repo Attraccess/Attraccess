@@ -25,6 +25,7 @@ export function registerBillingControllerFixture() {
     getHistory: jest.Mock;
     getTransaction: jest.Mock;
     getTransactionIdForUsage: jest.Mock;
+    getRunningPartBilling: jest.Mock;
     createManualTransaction: jest.Mock;
     getResourceBillingConfiguration: jest.Mock;
     updateResourceBillingConfiguration: jest.Mock;
@@ -54,6 +55,7 @@ export function registerBillingControllerFixture() {
       getHistory: jest.fn(),
       getTransaction: jest.fn(),
       getTransactionIdForUsage: jest.fn(),
+      getRunningPartBilling: jest.fn(),
       createManualTransaction: jest.fn(),
       getResourceBillingConfiguration: jest.fn(),
       updateResourceBillingConfiguration: jest.fn(),

@@ -4,6 +4,7 @@ import {
   BillingTransactionStatus,
   ProjectSwitchCharging,
   ResourceBillingConfigurationRecord,
+  SwitchedSessionCharge,
   UsageReceiptSource,
 } from '@attraccess/application-models';
 import type { AuditEvent } from '../../audit/recorder/audit-event';
@@ -15,6 +16,7 @@ import {
   BillingTransactionContext,
   ContinuedUsagePart,
   NewBillingTransaction,
+  RunningUsagePricing,
   SettleUsageChargeInput,
 } from '../ports/billing-ledger.port';
 
@@ -102,6 +104,14 @@ export class FakeBillingLedgerStore implements BillingLedgerStore {
 
   findTransactionWithItems(transactionId: number): Promise<BillingTransactionRecord | null> {
     return Promise.resolve(this.transactions.find((t) => t.id === transactionId) ?? null);
+  }
+
+  findRunningUsagePricing(): Promise<RunningUsagePricing | null> {
+    return Promise.resolve(null);
+  }
+
+  findSwitchedSessionCharge(): Promise<SwitchedSessionCharge | null> {
+    return Promise.resolve(null);
   }
 
   findCompletedUsageCharge(usageId: number, userId: number): Promise<BillingTransactionRecord | null> {

@@ -45,6 +45,13 @@ With **Continue the session**, a part's billed minutes are the started minutes f
 
 Prices and the billing factor stay those saved when the session started; the option in effect is saved with each switch. Meter consumption and items added by flows are billed on the part in which they occur; each meter share is rounded to whole credits per part, as for any two sessions, and on [shared machines](#shared-machines) the shares are rounded once per time segment, so a switch adds a segment boundary. A part without any charge leaves no transaction.
 
+### What the user sees
+
+- **At a switch** the web app shows **Project switched** with the charge for the part that ended, and says that the session continued. A part without a charge shows nothing.
+- **While the session runs**, the **Live session** billing view of a continuation covers only the part since the latest switch: **Time since project switch** and **Estimated bill since the switch**. The estimate follows the option above, so it does not include a fee per usage or a started minute that an earlier part already paid. Apart from the owner, only billing and resource managers get this estimate.
+- **When the session ends**, the **Session billing summary** shows what all its parts cost together, also when the last part cost nothing.
+- **E-mail receipts** are sent for each charged part, like for a session of its own, with the times and the amount of that part.
+
 ## Meter consumption
 
 Each named meter can have an optional price per measured value in the resource's billing settings. Multiple meters can be billed in one session. Names and rates are captured at session start; only session consumption is charged, while idle consumption remains part of lifetime metrics. A rate of zero keeps tracking active without charging.

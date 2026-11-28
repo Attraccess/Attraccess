@@ -5,5 +5,11 @@
   "close": "Done",
   "loading": "Loading billing total",
   "loadError": "Could not load the billing currency.",
-  "retry": "Try again"
+  "retry": "Try again",
+  "allParts": "This includes every part of the session, before and after each project switch.",
+  "part": {
+    "title": "Project switched",
+    "total": "Charge for the part before the switch",
+    "continues": "Your session was not ended by the switch: it continued. This amount covers only the part that ended."
+  }
 }

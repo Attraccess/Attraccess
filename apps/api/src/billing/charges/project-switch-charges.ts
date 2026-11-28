@@ -1,5 +1,5 @@
-import { ProjectSwitchCharging } from '@attraccess/application-models';
-import { applyBillingFactor, toExactCredits } from '@attraccess/shared';
+import { ProjectSwitchCharging, type RunningPartBilling } from '@attraccess/application-models';
+import { toExactCredits } from '@attraccess/shared';
 import type { ContinuedUsagePart } from '../ports/billing-ledger.port';
 import type { BillableUsage } from './billable-usage';
 
@@ -16,6 +16,12 @@ export interface UsagePartRates {
   creditsPerMinute: number;
   creditsPerOperatingMinute: number;
 }
+
+/** The part of a usage that decides how its time is billed. */
+export type UsagePartTimes = Pick<
+  BillableUsage,
+  'startTime' | 'endTime' | 'previousUsageId' | 'projectSwitchCharging' | 'attributedOperatingDurationInMinutes'
+>;
 
 /** What one usage record bills for itself, whether it is a whole session or one part of a switched one. */
 export interface UsagePartCharges {
@@ -36,7 +42,7 @@ const paysFlatFee = (mode: ProjectSwitchCharging | null | undefined) =>
   !mode || mode === ProjectSwitchCharging.NEW_SESSION;
 
 /** Whether the part's minutes are rounded together with the parts before it, which then have to be read. */
-export const roundsWithPreviousParts = (usage: BillableUsage): boolean =>
+export const roundsWithPreviousParts = (usage: UsagePartTimes): boolean =>
   usage.projectSwitchCharging === ProjectSwitchCharging.CONTINUE && usage.previousUsageId != null;
 
 /**
@@ -44,7 +50,7 @@ export const roundsWithPreviousParts = (usage: BillableUsage): boolean =>
  * rounded on its own; it is empty for every other usage.
  */
 export function usagePartCharges(
-  usage: BillableUsage,
+  usage: UsagePartTimes,
   rates: UsagePartRates,
   previous: ContinuedUsagePart[] = [],
 ): UsagePartCharges {
@@ -82,9 +88,16 @@ export function usagePartCharges(
   };
 }
 
-/** The billing factor on this part's gross, rounded so that the parts' discounts add up to the one of their sum. */
-export function applyPartBillingFactor(priorCredits: bigint, gross: bigint, factor: number) {
-  const discount =
-    applyBillingFactor(priorCredits + gross, factor).discount - applyBillingFactor(priorCredits, factor).discount;
-  return { amount: Number(gross - BigInt(discount)), discount };
+/** What a running part will be billed with: the figures an estimate cannot derive from the part itself. */
+export function runningPartBilling(
+  usage: UsagePartTimes,
+  rates: UsagePartRates,
+  previous: ContinuedUsagePart[] = [],
+): RunningPartBilling {
+  const { flatCredits, priorCredits } = usagePartCharges(usage, rates, previous);
+  return {
+    flatCredits,
+    roundingStartTime: previous[previous.length - 1]?.startTime ?? usage.startTime,
+    priorCredits: Number(priorCredits),
+  };
 }

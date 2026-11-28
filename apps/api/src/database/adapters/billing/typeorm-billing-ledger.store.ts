@@ -3,12 +3,13 @@ import {
   ResourceMeteringSessionStatus,
   type BillingTransactionDetail,
   type BillingTransactionRecord,
+  type SwitchedSessionCharge,
   type UsageReceiptSource,
 } from '@attraccess/application-models';
-import { BillingTransaction, BillingTransactionItem, User } from '@attraccess/database-entities';
+import { BillingTransaction, BillingTransactionItem, ResourceUsage, User } from '@attraccess/database-entities';
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { AUDIT_RECORDER, type AuditRecorder } from '../../../audit/recorder/audit-event';
 import {
   BillingAuditFactory,
@@ -17,7 +18,9 @@ import {
   NewBillingTransaction,
   SettleUsageChargeInput,
   ContinuedUsagePart,
+  RunningUsagePricing,
 } from '../../../billing/ports/billing-ledger.port';
+import { findSwitchedSessionCharge } from './switched-session-queries';
 import { TransactionContextResolver } from '../transaction-context';
 import { toTransactionDetail, toTransactionRecord, toUsageReceipt } from './billing-mappers';
 import { findRelations } from '../find-options';
@@ -125,6 +128,30 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
        FROM "chain" ORDER BY "depth"`,
       [usageId],
     );
+  }
+
+  async findRunningUsagePricing(
+    usageId: number,
+    context: BillingTransactionContext,
+  ): Promise<RunningUsagePricing | null> {
+    return this.contexts.manager(context).findOne(ResourceUsage, {
+      where: { id: usageId, endTime: IsNull() },
+      select: {
+        id: true,
+        userId: true,
+        resourceId: true,
+        startTime: true,
+        previousUsageId: true,
+        projectSwitchCharging: true,
+        creditsPerUsage: true,
+        sessionDurationCreditsPerMinute: true,
+        operatingDurationCreditsPerMinute: true,
+      },
+    });
+  }
+
+  findSwitchedSessionCharge(usageId: number, userId: number): Promise<SwitchedSessionCharge | null> {
+    return findSwitchedSessionCharge(this.transactions.manager, usageId, userId);
   }
 
   async findUsageTransaction(

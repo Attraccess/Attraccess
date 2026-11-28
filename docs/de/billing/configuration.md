@@ -45,6 +45,13 @@ Bei **Sitzung fortsetzen** sind die berechneten Minuten eines Abschnitts die ang
 
 Preise und Abrechnungsfaktor bleiben die beim Sitzungsstart gespeicherten; die geltende Option wird mit jedem Wechsel gespeichert. Zählerverbrauch und von Flows ergänzte Posten werden in dem Abschnitt berechnet, in dem sie anfallen; jeder Zähleranteil wird je Abschnitt auf ganze Credits gerundet, wie bei zwei Sitzungen, und auf [gemeinsam genutzten Maschinen](#gemeinsam-genutzte-maschinen) werden Anteile einmal pro Zeitsegment gerundet, ein Wechsel fügt also eine Segmentgrenze hinzu. Ein Abschnitt ohne Kosten hinterlässt keine Transaktion.
 
+### Was die Benutzer sehen
+
+- **Beim Wechsel** zeigt die Web-App **Projekt gewechselt** mit den Kosten des beendeten Abschnitts und sagt, dass die Sitzung weiterlief. Bei einem Abschnitt ohne Kosten erscheint nichts.
+- **Während die Sitzung läuft**, bezieht sich die Abrechnungsansicht **Laufende Sitzung** einer Fortsetzung nur auf den Abschnitt seit dem letzten Wechsel: **Zeit seit dem Projektwechsel** und **Voraussichtliche Kosten seit dem Wechsel**. Die Schätzung folgt der Option oben, enthält also keine Gebühr pro Nutzung und keine angefangene Minute, die ein früherer Abschnitt schon bezahlt hat. Außer der Person, der die Sitzung gehört, erhalten nur Abrechnungs- und Ressourcenverwaltende diese Schätzung.
+- **Wenn die Sitzung endet**, zeigt die **Abrechnung deiner Sitzung**, was alle Abschnitte zusammen gekostet haben, auch wenn der letzte Abschnitt nichts gekostet hat.
+- **Belege per E-Mail** werden für jeden kostenpflichtigen Abschnitt verschickt, wie für eine eigene Sitzung, mit den Zeiten und dem Betrag dieses Abschnitts.
+
 ## Zählerverbrauch
 
 Jeder benannte Zähler kann in den Abrechnungseinstellungen einen Preis pro Messwert erhalten. Mehrere Zähler können gemeinsam abgerechnet werden. Namen und Preise werden beim Sitzungsstart gespeichert. Nur Sitzungsverbrauch wird berechnet; Leerlaufverbrauch erhöht den Gesamtverbrauch. Ein Preis von null deaktiviert nur die Abrechnung.

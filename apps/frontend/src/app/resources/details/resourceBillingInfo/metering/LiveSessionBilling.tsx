@@ -2,11 +2,16 @@ import { useMeterValueFormatter } from '../../../../../hooks/useMeterValueFormat
 import { useCreditsFormatter } from '../../../../../hooks/useCreditsFormatter';
 import { Fragment, useEffect, useState } from 'react';
 import { Activity } from 'lucide-react';
-import { useGetResourceMeteringLive, useResourceUsageGetActiveSession } from '@attraccess/react-query-client';
+import {
+  useGetResourceMeteringLive,
+  useGetRunningPartBilling,
+  useResourceUsageGetActiveSession,
+} from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { applyBillingFactor, formatDurationMs, toExactCredits } from '@attraccess/shared';
+import { formatDurationMs } from '@attraccess/shared';
 import { AllocationBreakdown, useAllocationShareLine } from '../../../../../components/allocationBreakdown';
+import { estimateLiveBill } from './estimateLiveBill';
 import de from './de.json';
 import en from './en.json';
 
@@ -39,6 +44,13 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
   const { data: live } = useGetResourceMeteringLive({ path: { resourceId } }, undefined, {
     enabled: !!usage,
     refetchInterval: 10_000,
+  });
+
+  // After a project switch the running record is only the latest part of the session. What it will be billed with
+  // (fee per use, where the minutes are rounded from, what the earlier parts charged) only the server knows.
+  const continuation = usage?.projectSwitchCharging != null;
+  const partBilling = useGetRunningPartBilling({ path: { usageId: usage?.id ?? 0 } }, undefined, {
+    enabled: continuation,
   });
 
   const [now, setNow] = useState(() => Date.now());
@@ -86,16 +98,15 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
         !live.meters.some((meter) => meter.id === rate.meterId && heldElsewhere(meter.session)) &&
         !meters.some((meter) => meter.id === rate.meterId && !awaitsCharge(meter)),
     );
-  let estimate: number | null = null;
-  try {
-    const gross =
-      toExactCredits(usage.creditsPerUsage ?? 0) +
-      toExactCredits(usage.sessionDurationCreditsPerMinute ?? 0) * toExactCredits(Math.ceil(elapsedMs / 60_000)) +
-      meters.reduce((sum, meter) => sum + toExactCredits(meter.chargeCredits ?? 0), BigInt(0));
-    if (!waitingForMeters) estimate = applyBillingFactor(gross, usage.billingFactor ?? 100).amount;
-  } catch {
-    // A running estimate must not crash the resource page or show an imprecise charge.
-  }
+  const pricing = continuation
+    ? partBilling.data
+    : { flatCredits: usage.creditsPerUsage ?? 0, roundingStartTime: usage.startTime, priorCredits: 0 };
+  const estimate = waitingForMeters || !pricing ? null : estimateLiveBill({ usage, pricing, elapsedMs, meters });
+  const estimateText = () => {
+    if (waitingForMeters) return t('live.estimateWaiting');
+    if (!pricing) return t(partBilling.isError ? 'live.estimatePartUnavailable' : 'live.estimateLoading');
+    return estimate == null ? t('live.estimateUnavailable') : money(estimate);
+  };
   const hasBillableRates =
     (usage.creditsPerUsage ?? 0) > 0 ||
     (usage.sessionDurationCreditsPerMinute ?? 0) > 0 ||
@@ -109,7 +120,7 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
         {t('live.title')}
       </div>
       <dl className={dlClass}>
-        <dt>{t('live.sessionTime')}</dt>
+        <dt>{t(continuation ? 'live.partTime' : 'live.sessionTime')}</dt>
         <dd className={valueClass}>{formatDurationMs(elapsedMs)}</dd>
         {meters.map((meter) => (
           <Fragment key={meter.id}>
@@ -149,13 +160,9 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
         ))}
         {hasBillableRates && (
           <>
-            <dt>{t('live.estimate')}</dt>
+            <dt>{t(continuation ? 'live.partEstimate' : 'live.estimate')}</dt>
             <dd className={`${valueClass} font-semibold`} data-cy="live-bill-estimate">
-              {waitingForMeters
-                ? t('live.estimateWaiting')
-                : estimate == null
-                  ? t('live.estimateUnavailable')
-                  : money(estimate)}
+              {estimateText()}
             </dd>
           </>
         )}
@@ -176,7 +183,9 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
         formatMeterValue={formatValue}
         formatCredits={(credits) => money(Number(credits))}
       />
-      {hasBillableRates && <small className="text-foreground-500">{t('live.estimateNote')}</small>}
+      {hasBillableRates && (
+        <small className="text-foreground-500">{t(continuation ? 'live.partEstimateNote' : 'live.estimateNote')}</small>
+      )}
     </div>
   );
 }

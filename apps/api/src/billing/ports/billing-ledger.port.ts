@@ -4,6 +4,7 @@ import type {
   BillingTransactionRecord,
   BillingTransactionStatus,
   ProjectSwitchCharging,
+  SwitchedSessionCharge,
   UsageReceiptSource,
 } from '@attraccess/application-models';
 import type { TransactionScope } from '../../database/unit-of-work';
@@ -56,6 +57,18 @@ export interface ContinuedUsagePart {
   projectSwitchCharging: ProjectSwitchCharging | null;
 }
 
+/** A usage that has not ended, with what pricing it reads. */
+export interface RunningUsagePricing {
+  userId: number | null;
+  resourceId: number;
+  startTime: Date;
+  previousUsageId: number | null;
+  projectSwitchCharging: ProjectSwitchCharging | null;
+  creditsPerUsage: number | null;
+  sessionDurationCreditsPerMinute: number | null;
+  operatingDurationCreditsPerMinute: number | null;
+}
+
 /**
  * The billing ledger as the application needs it. Balances live on the user row and are changed by database
  * triggers when a completed transaction is written, so every write below changes the balance atomically with the
@@ -73,6 +86,15 @@ export interface BillingLedgerStore {
    * walk ends at the first part that is not charged in the `continue` mode.
    */
   findContinuedUsageParts(usageId: number, context: BillingTransactionContext): Promise<ContinuedUsagePart[]>;
+
+  /** The running usage `usageId`, or null when it does not exist or has ended. */
+  findRunningUsagePricing(usageId: number, context: BillingTransactionContext): Promise<RunningUsagePricing | null>;
+
+  /**
+   * The user's charge of the session as far as the part `usageId`, and whether a later part continues it. Null when
+   * the session was never switched.
+   */
+  findSwitchedSessionCharge(usageId: number, userId: number): Promise<SwitchedSessionCharge | null>;
 
   /** Newest first. */
   listTransactionsForUser(

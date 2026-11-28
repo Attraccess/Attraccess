@@ -1,12 +1,8 @@
 import { ProjectSwitchCharging } from '@attraccess/application-models';
+import { applyPartBillingFactor } from '@attraccess/shared';
 import type { ContinuedUsagePart } from '../ports/billing-ledger.port';
 import type { BillableUsage } from './billable-usage';
-import {
-  applyPartBillingFactor,
-  roundsWithPreviousParts,
-  usagePartCharges,
-  type UsagePartRates,
-} from './project-switch-charges';
+import { roundsWithPreviousParts, usagePartCharges, type UsagePartRates } from './project-switch-charges';
 
 const { CONTINUE, CONTINUE_PER_PART_ROUNDING: PER_PART, NEW_SESSION } = ProjectSwitchCharging;
 const RATES: UsagePartRates = { creditsPerUsage: 10, creditsPerMinute: 2, creditsPerOperatingMinute: 3 };

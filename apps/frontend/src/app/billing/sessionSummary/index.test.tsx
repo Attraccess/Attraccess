@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BillingTransaction } from '@attraccess/react-query-client';
 import { SessionBillingSummary } from './index';
 
@@ -8,6 +8,8 @@ const state = vi.hoisted(() => ({
   configuration: { currency: 'EUR', minorUnit: 2 } as { currency: string; minorUnit: number } | undefined,
   isError: false,
   refetch: vi.fn(),
+  details: undefined as { resourceUsage: { resource: { name: string } } } | undefined,
+  detailsEnabled: false,
 }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 7 } }) }));
 vi.mock('../dashboard/summary/live-updates', () => ({
@@ -17,9 +19,10 @@ vi.mock('../dashboard/summary/live-updates', () => ({
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   BillingTransactionStatus: { COMPLETED: 'completed' },
-  useGetBillingTransaction: () => ({
-    data: { resourceUsage: { resource: { name: 'Laser cutter' } } },
-  }),
+  useGetBillingTransaction: (_path: unknown, _key: unknown, options: { enabled: boolean }) => {
+    state.detailsEnabled = options.enabled;
+    return { data: state.details };
+  },
   useGetBillingConfiguration: () => ({
     data: state.configuration,
     isError: state.isError,
@@ -38,6 +41,7 @@ afterEach(cleanup);
 beforeEach(() => {
   state.configuration = { currency: 'EUR', minorUnit: 2 };
   state.isError = false;
+  state.details = { resourceUsage: { resource: { name: 'Laser cutter' } } };
   vi.clearAllMocks();
 });
 
@@ -104,4 +108,73 @@ it('does not show a zero-cost finalized receipt', () => {
   render(<SessionBillingSummary />);
   emit({ amount: 0 });
   expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+describe('a session whose project was switched', () => {
+  const switched = (continues: boolean, sessionAmount: number) => ({
+    switchedSession: { continues, sessionAmount, resourceName: 'CNC mill' },
+  });
+
+  it('calls the charge at a switch the charge of the ended part, not the total of the session', () => {
+    render(<SessionBillingSummary />);
+    emit({ amount: -1100, ...switched(true, -1100) });
+
+    expect(screen.getByText('part.title')).toBeTruthy();
+    expect(screen.getByText('part.total')).toBeTruthy();
+    expect(screen.getByText('part.continues')).toBeTruthy();
+    expect(screen.getByText('11.00 EUR')).toBeTruthy();
+    expect(screen.queryByText('title')).toBeNull();
+    expect(screen.queryByText('total')).toBeNull();
+  });
+
+  it('opens nothing for an ended part without a charge', () => {
+    render(<SessionBillingSummary />);
+    emit({ amount: 0, ...switched(true, -1100) });
+    // The removal of its pending bill.
+    emit({ id: 2, amount: 0, status: 'pending' as BillingTransaction['status'], ...switched(true, -1100) });
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('shows what the whole session cost when it ends', () => {
+    render(<SessionBillingSummary />);
+    emit({ amount: -300, ...switched(false, -2200) });
+
+    expect(screen.getByText('title')).toBeTruthy();
+    expect(screen.getByText('total')).toBeTruthy();
+    expect(screen.getByText('allParts')).toBeTruthy();
+    expect(screen.getByText('22.00 EUR')).toBeTruthy();
+    expect(screen.queryByText('3.00 EUR')).toBeNull();
+  });
+
+  it.each([
+    ['a removed pending bill', 'pending', 'CNC mill'],
+    ['a completed bill of 0', 'completed', 'CNC mill'],
+  ])('shows the total although the last part is free (%s)', (_name, status, resourceName) => {
+    state.details = undefined;
+    render(<SessionBillingSummary />);
+    emit({ amount: 0, status: status as BillingTransaction['status'], ...switched(false, -1200) });
+
+    expect(screen.getByText('12.00 EUR')).toBeTruthy();
+    expect(screen.getByText(resourceName)).toBeTruthy();
+    // A removed bill cannot be read any more.
+    expect(state.detailsEnabled).toBe(status === 'completed');
+  });
+
+  it('opens nothing when no part of the session was charged', () => {
+    render(<SessionBillingSummary />);
+    emit({ amount: 0, status: 'pending' as BillingTransaction['status'], ...switched(false, 0) });
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('leaves a session that was never switched as it was', () => {
+    render(<SessionBillingSummary />);
+    emit();
+
+    expect(screen.getByText('title')).toBeTruthy();
+    expect(screen.getByText('total')).toBeTruthy();
+    expect(screen.queryByText('allParts')).toBeNull();
+    expect(screen.queryByText('part.continues')).toBeNull();
+  });
 });
