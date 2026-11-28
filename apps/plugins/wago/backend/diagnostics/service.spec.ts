@@ -212,7 +212,7 @@ describe('controller diagnostics', () => {
         expect(writes()).toBe(1);
         await send(201, '0.2.0');
         expect(writes()).toBe(2);
-        expect(await storage.tables.controllers.get(1)).toMatchObject({ lastSequence: 201, runtimeVersion: '0.2.0' });
+        expect(await storage.tables.controllers.get(1)).toMatchObject({ lastSequence: '201', runtimeVersion: '0.2.0' });
       } finally {
         jest.useRealTimers();
       }
