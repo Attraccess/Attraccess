@@ -4,6 +4,7 @@ import {
   autoEndReason,
   computeExtension,
   computeStartDeadline,
+  extensionCap,
   initialWarnedOffset,
   normalizeSessionDurationSettings,
   sessionDurationSettingsProblem,
@@ -46,9 +47,9 @@ describe('computeStartDeadline', () => {
   });
 
   it('requires an estimate from a client that can ask, and names the maximum', () => {
-    expect(codeOf(() => computeStartDeadline(machine({ requireSessionDurationEstimate: true }), start, undefined, true))).toBe(
-      SessionDurationErrorCode.ESTIMATE_REQUIRED,
-    );
+    expect(
+      codeOf(() => computeStartDeadline(machine({ requireSessionDurationEstimate: true }), start, undefined, true)),
+    ).toBe(SessionDurationErrorCode.ESTIMATE_REQUIRED);
     try {
       computeStartDeadline(
         machine({ requireSessionDurationEstimate: true, maxSessionDurationMinutes: 90 }),
@@ -64,13 +65,19 @@ describe('computeStartDeadline', () => {
 
   it('treats a null estimate as a missing one, so it cannot lift the limits', () => {
     const both = machine({ requireSessionDurationEstimate: true, maxSessionDurationMinutes: 120 });
-    expect(codeOf(() => computeStartDeadline(both, start, null, true))).toBe(SessionDurationErrorCode.ESTIMATE_REQUIRED);
+    expect(codeOf(() => computeStartDeadline(both, start, null, true))).toBe(
+      SessionDurationErrorCode.ESTIMATE_REQUIRED,
+    );
     expect(computeStartDeadline(both, start, null, false).autoEndAt).toEqual(addMinutes(start, 120));
   });
 
   it('ends an estimate-only session at start + estimate with no cap', () => {
     const deadline = computeStartDeadline(machine({ requireSessionDurationEstimate: true }), start, 45, true);
-    expect(deadline).toMatchObject({ autoEndAt: addMinutes(start, 45), maxAutoEndAt: null, estimatedDurationMinutes: 45 });
+    expect(deadline).toMatchObject({
+      autoEndAt: addMinutes(start, 45),
+      maxAutoEndAt: null,
+      estimatedDurationMinutes: 45,
+    });
   });
 
   it('refuses an estimate above the maximum', () => {
@@ -106,8 +113,12 @@ describe('computeStartDeadline', () => {
     });
     it('uses the default estimate without a maximum', () => {
       expect(
-        computeStartDeadline(machine({ ...require, defaultSessionDurationEstimateMinutes: 30 }), start, undefined, false)
-          .autoEndAt,
+        computeStartDeadline(
+          machine({ ...require, defaultSessionDurationEstimateMinutes: 30 }),
+          start,
+          undefined,
+          false,
+        ).autoEndAt,
       ).toEqual(addMinutes(start, 30));
     });
     it('falls back to 60 minutes', () => {
@@ -194,6 +205,29 @@ describe('computeExtension', () => {
     );
   });
 
+  it('counts the 30 days of a continuation from the start of the session that was switched, not of the part', () => {
+    const switchedAt = addMinutes(start, 600);
+    const continuation = session({
+      startTime: switchedAt,
+      sessionStartTime: start,
+      maxAutoEndAt: null,
+      autoEndAt: addMinutes(start, 43_200 - 60),
+    });
+    expect(extensionCap(continuation)).toEqual(addMinutes(start, 43_200));
+    expect(computeExtension(continuation, { extendByMinutes: 60 }, switchedAt)).toEqual(addMinutes(start, 43_200));
+    expect(codeOf(() => computeExtension(continuation, { extendByMinutes: 120 }, switchedAt))).toBe(
+      SessionDurationErrorCode.EXTENSION_EXCEEDS_MAXIMUM,
+    );
+    // A record without a chain start (from before switching existed) counts from its own start.
+    expect(extensionCap({ startTime: switchedAt, sessionStartTime: null, maxAutoEndAt: null })).toEqual(
+      addMinutes(switchedAt, 43_200),
+    );
+    // A machine maximum is already absolute; the chain start does not move it.
+    expect(
+      extensionCap({ startTime: switchedAt, sessionStartTime: start, maxAutoEndAt: addMinutes(start, 240) }),
+    ).toEqual(addMinutes(start, 240));
+  });
+
   it('refuses a session without deadline, a passed deadline and a step that is not offered', () => {
     expect(codeOf(() => computeExtension(session({ autoEndAt: null }), { extendByMinutes: 60 }, now))).toBe(
       SessionDurationErrorCode.EXTENSION_NOT_POSSIBLE,
@@ -219,10 +253,14 @@ describe('autoEndReason', () => {
 describe('resource settings', () => {
   it('rejects a default estimate above the maximum', () => {
     expect(
-      sessionDurationSettingsProblem(machine({ maxSessionDurationMinutes: 30, defaultSessionDurationEstimateMinutes: 60 })),
+      sessionDurationSettingsProblem(
+        machine({ maxSessionDurationMinutes: 30, defaultSessionDurationEstimateMinutes: 60 }),
+      ),
     ).toMatch(/default estimate/);
     expect(
-      sessionDurationSettingsProblem(machine({ maxSessionDurationMinutes: 60, defaultSessionDurationEstimateMinutes: 60 })),
+      sessionDurationSettingsProblem(
+        machine({ maxSessionDurationMinutes: 60, defaultSessionDurationEstimateMinutes: 60 }),
+      ),
     ).toBeNull();
   });
 
