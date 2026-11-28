@@ -250,18 +250,19 @@ export class BillingController {
     operationId: 'getRunningPartBilling',
   })
   @ApiResponse({ status: 200, description: 'The figures the part will be billed with.', type: RunningPartBillingDto })
-  @ApiResponse({ status: 403, description: 'Forbidden - The session belongs to somebody else' })
-  @ApiResponse({ status: 404, description: 'No such running usage session' })
+  @ApiResponse({ status: 404, description: 'No such running usage session, or not one you may see' })
   async getRunningPartBilling(
     @Param('usageId', ParseIntPipe) usageId: number,
     @Req() request: AuthenticatedRequest,
   ): Promise<RunningPartBillingDto> {
+    // Somebody else's session is answered like a missing one, so the answer does not tell which usages run.
+    const notFound = () => new NotFoundException('No running usage session found');
     const part = await this.billingService.getRunningPartBilling(usageId);
-    if (!part) throw new NotFoundException('No running usage session found');
+    if (!part) throw notFound();
     const { userId, ...billing } = part;
     const { user } = request;
     if (userId !== user.id && !user.effectivePermissions?.has('billing.manage') && !isResourceManager(user)) {
-      throw new ForbiddenException('You are not allowed to see how this usage session is billed.');
+      throw notFound();
     }
     return billing;
   }

@@ -101,12 +101,19 @@ describe('BillingController', () => {
       expect(fixture.service.getRunningPartBilling).toHaveBeenCalledWith(8);
     });
 
-    it("refuses somebody else's session", async () => {
+    it("answers somebody else's running session exactly like one that does not run", async () => {
       fixture.service.getRunningPartBilling.mockResolvedValue({ userId: 1, ...figures });
+      const othersSession = await fixture.controller
+        .getRunningPartBilling(8, fixture.baseReq({ id: 2 }))
+        .catch((error: unknown) => error);
+      fixture.service.getRunningPartBilling.mockResolvedValue(null);
+      const missing = await fixture.controller
+        .getRunningPartBilling(8, fixture.baseReq({ id: 2 }))
+        .catch((error: unknown) => error);
 
-      await expect(fixture.controller.getRunningPartBilling(8, fixture.baseReq({ id: 2 }))).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+      expect(othersSession).toBeInstanceOf(NotFoundException);
+      expect(missing).toBeInstanceOf(NotFoundException);
+      expect((othersSession as NotFoundException).getResponse()).toEqual((missing as NotFoundException).getResponse());
     });
 
     it('does not find a usage that does not run', async () => {
