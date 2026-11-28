@@ -99,6 +99,7 @@ describe('MachineTab max parallel sessions', () => {
     state.warnings = [];
     state.warningsFailed = false;
     state.warningsEnabled = [];
+    state.modules = [];
   });
 
   it('sets the clamped limit', () => {

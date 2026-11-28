@@ -119,9 +119,8 @@ describe('"Is the machine OK?" before ending your own session', () => {
 
   it('comes after the notes of "End with notes"', async () => {
     renderActive();
-    // The icon-only trigger next to "End session" opens the menu with "End with notes".
-    const trigger = document.querySelector('[aria-haspopup]') as HTMLElement;
-    await userEvent.click(trigger);
+    // The icon-only trigger next to "End session" (the only collapsed menu button) opens "End with notes".
+    await userEvent.click(screen.getByRole('button', { expanded: false }));
     await userEvent.click(
       await screen.findByRole('menuitem', { name: 'alternativeEndSessionOptionsMenu.endWithNotes.label' }),
     );
@@ -193,7 +192,7 @@ describe('"Is the machine OK?" before ending your own session', () => {
     expect(state.toast.warning).not.toHaveBeenCalled();
   });
 
-  const renderParallel = (userId: number) => {
+  const mountParallel = (userId: number) => {
     const usage = { id: 31, userId, startTime: '2026-09-01T12:00:00Z', user: { id: userId, username: 'x' } };
     render(
       <MemoryRouter>
@@ -205,9 +204,32 @@ describe('"Is the machine OK?" before ending your own session', () => {
         />
       </MemoryRouter>,
     );
+  };
+  const renderParallel = (userId: number) => {
+    mountParallel(userId);
     press('endSession.ariaLabel');
     press('Confirm notes');
   };
+
+  it('confirms a filed request after ending in the parallel session list, and warns when it was not filed', () => {
+    mountParallel(1);
+    const ended = state.endOptions.at(-1);
+
+    ended?.onSuccess?.({ maintenanceRequestFiled: false });
+    expect(state.toast.warning).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'notFiled.title', description: 'notFiled.description' }),
+    );
+    expect(state.toast.success).toHaveBeenCalledTimes(1); // only "session ended"
+    expect(state.toast.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'endSession.successful' }));
+    expect(state.invalidate).not.toHaveBeenCalledWith({ queryKey: ['maintenance-requests'] });
+
+    state.toast.success.mockReset();
+    state.toast.warning.mockReset();
+    ended?.onSuccess?.({ maintenanceRequestFiled: true });
+    expect(state.toast.success).toHaveBeenCalledWith({ title: 'filed.title', description: 'filed.description' });
+    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['maintenance-requests'] });
+    expect(state.toast.warning).not.toHaveBeenCalled();
+  });
 
   it('asks in the parallel session list when the session is your own', async () => {
     renderParallel(1);

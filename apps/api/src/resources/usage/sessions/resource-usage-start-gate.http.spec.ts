@@ -29,11 +29,13 @@ describe('POST /resources/:id/usage/start through the pre-start gate', () => {
 
   const applyDefault = jest.fn();
   const endSession = jest.fn();
+  const fileAfterEnd = jest.fn();
 
   beforeEach(async () => {
     principal = { authenticationMethod: 'session' };
     applyDefault.mockReset();
     endSession.mockReset().mockResolvedValue({ id: 12, userId: 7 });
+    fileAfterEnd.mockReset().mockResolvedValue(undefined);
     gateHttp.mockReset();
     startSession.mockReset().mockResolvedValue({ id: 99 });
     const moduleRef = await Test.createTestingModule({
@@ -44,7 +46,7 @@ describe('POST /resources/:id/usage/start through the pre-start gate', () => {
         { provide: ResourceActivityVisibilityService, useValue: {} },
         { provide: PreStartService, useValue: { gateHttp } },
         { provide: SessionEndNotifier, useValue: { applyDefault } },
-        { provide: SessionEndMaintenanceRequests, useValue: { fileAfterEnd: jest.fn() } },
+        { provide: SessionEndMaintenanceRequests, useValue: { fileAfterEnd } },
         { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
       ],
     })
@@ -145,5 +147,37 @@ describe('POST /resources/:id/usage/start through the pre-start gate', () => {
     expect(response.status).toBe(200);
     expect(gateHttp).not.toHaveBeenCalled();
     expect(applyDefault).toHaveBeenCalledWith({ resourceId: 5, userId: 7, sessionId: 12 }, 'api', 'de');
+  });
+
+  it.each([true, false])(
+    'passes a valid maintenanceRequest to the filing after the end and answers maintenanceRequestFiled %s',
+    async (filed) => {
+      fileAfterEnd.mockResolvedValue(filed);
+      const response = await request(app.getHttpServer())
+        .put('/resources/5/usage/end')
+        .send({ maintenanceRequest: { reason: 'Blade is dull' } });
+      expect(response.status).toBe(200);
+      expect(endSession).toHaveBeenCalledTimes(1);
+      expect(fileAfterEnd).toHaveBeenCalledWith(5, 7, { reason: 'Blade is dull' });
+      expect(response.body).toMatchObject({ id: 12, maintenanceRequestFiled: filed });
+    },
+  );
+
+  it('leaves maintenanceRequestFiled out when no request was filed', async () => {
+    const response = await request(app.getHttpServer()).put('/resources/5/usage/end').send({});
+    expect(response.status).toBe(200);
+    expect(fileAfterEnd).toHaveBeenCalledWith(5, 7, undefined);
+    expect(response.body).not.toHaveProperty('maintenanceRequestFiled');
+  });
+
+  it.each([
+    ['a reason shorter than 3 characters', { reason: 'ab' }],
+    ['a missing reason', {}],
+    ['a reason that is not a string', { reason: 42 }],
+  ])('answers 400 for %s and ends nothing', async (_label, maintenanceRequest) => {
+    const response = await request(app.getHttpServer()).put('/resources/5/usage/end').send({ maintenanceRequest });
+    expect(response.status).toBe(400);
+    expect(endSession).not.toHaveBeenCalled();
+    expect(fileAfterEnd).not.toHaveBeenCalled();
   });
 });

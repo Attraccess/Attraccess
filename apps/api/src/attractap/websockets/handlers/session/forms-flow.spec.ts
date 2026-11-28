@@ -80,6 +80,7 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
   let startSession: jest.Mock;
   let endSession: jest.Mock;
   let createRequest: jest.Mock;
+  let verifyLicense: jest.Mock;
   let imageStore: InMemoryFormImageStore;
   let handoffs: {
     canIssue: jest.Mock;
@@ -97,6 +98,7 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
   beforeEach(async () => {
     startSession = jest.fn().mockResolvedValue({ id: 999 });
     createRequest = jest.fn().mockResolvedValue({ id: 1 });
+    verifyLicense = jest.fn().mockResolvedValue({});
     endSession = jest
       .fn()
       .mockResolvedValue({ id: 999, userId: 7, startTime: new Date(0), endTime: new Date(1426999) });
@@ -159,7 +161,7 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
         { provide: ResourceOperatingAttributionService, useValue: {} },
         SessionEndMaintenanceRequests,
         { provide: MaintenanceRequestService, useValue: { createRequest } },
-        { provide: LicenseService, useValue: { verifyLicense: jest.fn().mockResolvedValue({}) } },
+        { provide: LicenseService, useValue: { verifyLicense } },
       ],
     }).compile();
 
@@ -283,6 +285,24 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
     expect(socket.sendMessage.mock.calls.at(-1)[0].data.payload).toMatchObject({
       success: true,
       maintenanceRequestFiled: true,
+    });
+  });
+
+  it.each([
+    ['the request store fails', () => createRequest.mockRejectedValue(new Error('database down'))],
+    ['the maintenance module is not licensed', () => verifyLicense.mockRejectedValue(new Error('no license'))],
+  ])('still ends the session but answers maintenanceRequestFiled false when %s', async (_label, breakFiling) => {
+    breakFiling();
+    const socket = makeSocket();
+    await sessionHandler.handleStopResourceUsageSession(socket, {
+      payload: { resourceId: RESOURCE_ID, requestId: 17, maintenanceRequest: { reason: 'Blade is dull' } },
+    } as unknown as AttractapEvent['data']);
+
+    expect(endSession).toHaveBeenCalledTimes(1);
+    expect(socket.sendMessage.mock.calls.at(-1)[0].data.payload).toMatchObject({
+      success: true,
+      requestId: 17,
+      maintenanceRequestFiled: false,
     });
   });
 
