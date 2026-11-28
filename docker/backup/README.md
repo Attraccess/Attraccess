@@ -8,12 +8,12 @@ config-ui) to an encrypted restic repository and prunes old snapshots.
 On start (`run`) the container checks only its settings, not the repository, so it also starts while the target cannot
 be reached (internet down at boot). Then it writes `enabled` to `/var/lib/backup-status/status` (volume
 `backup-status`). The `attraccess` service of the balena stack mounts that volume read-only and only starts once the
-file exists. Without `BACKUP_REPOSITORY`, `BACKUP_PASSWORD` or `DATABASE_URL`, with a database URL (`DATABASE_URL`, or
-`BACKUP_DATABASE_URL` when set) that is not a `postgres://` or `postgresql://` URL, or with an invalid
-`BACKUP_SCHEDULE`, `BACKUP_MAX_AGE_HOURS` or `BACKUP_CONNECT_TIMEOUT_SECONDS`, the container exits with an error (and
-is restarted): a device without backups does not go unnoticed. `BACKUP_DISABLED=true` switches backups off on purpose:
-the container logs one warning, writes `disabled` and waits. The status file is removed when the container starts and
-when it stops. After a power cut a leftover file can let `attraccess` start before the sidecar has removed it; that only
+file exists. Without `BACKUP_REPOSITORY`, `BACKUP_PASSWORD` or a database URL (`DATABASE_URL`, or
+`BACKUP_DATABASE_URL` when set), with a database URL that is not a `postgres://` or `postgresql://` URL, or with an
+invalid `BACKUP_SCHEDULE`, `BACKUP_MAX_AGE_HOURS` or `BACKUP_CONNECT_TIMEOUT_SECONDS`, the container exits with an
+error (and is restarted): a device without backups does not go unnoticed. `BACKUP_DISABLED=true` switches backups off
+on purpose: the container logs one warning, writes `disabled` and waits. The status file is removed when the container
+starts and when it stops. After a power cut a leftover file can let `attraccess` start before the sidecar has removed it; that only
 matters when the settings became invalid in between, and after a settings change the balena Supervisor restarts the
 services in order.
 
