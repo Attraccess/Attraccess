@@ -36,10 +36,11 @@ export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<Swi
   // Not while busy: the live update of this dialog's own switch can arrive before its answer.
   const isReplaced = !isBusy && usage.id !== openedFor.id;
 
+  // The current project is not offered; nothing else is a switch either.
   const unchanged = selected === undefined || selected === currentProjectId;
 
   const confirm = async () => {
-    if (selected === undefined || unchanged) return;
+    if (unchanged) return;
     setIsCollectingForms(true);
     let formSubmissions: FormSubmissionRequestDto[];
     try {
@@ -86,9 +87,9 @@ export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<Swi
                 includeUnassignedOption
                 unassignedLabel={t('noProject')}
                 isDisabled={isBusy}
+                disabledKeys={[currentProjectId]}
               />
               <ProjectListStatus />
-              {selected !== undefined && unchanged && <p className="text-sm text-muted">{t('dialog.unchanged')}</p>}
             </>
           )}
         </ModalBody>

@@ -14,6 +14,8 @@ interface Props {
   unassignedLabel?: string;
   isDisabled?: boolean;
   includeArchived?: boolean;
+  /** Projects that are listed but cannot be picked; `null` stands for the unassigned option. */
+  disabledKeys?: ReadonlyArray<number | null>;
 }
 
 export function ProjectsSelect(props: Props) {
@@ -25,6 +27,7 @@ export function ProjectsSelect(props: Props) {
     unassignedLabel,
     isDisabled,
     includeArchived,
+    disabledKeys,
     ...selectProps
   } = props;
   const handleChange = onValueChange ?? onChange ?? (() => undefined);
@@ -43,6 +46,7 @@ export function ProjectsSelect(props: Props) {
       {...selectProps}
       items={items}
       isDisabled={isDisabled}
+      disabledKeys={disabledKeys?.map((key) => (key === null ? UNASSIGNED_KEY : key.toString()))}
       placeholder={projects?.data?.find((r) => r.id === resolvedValue)?.name ?? props.placeholder}
       value={selectedKey}
       onChange={(key) => {

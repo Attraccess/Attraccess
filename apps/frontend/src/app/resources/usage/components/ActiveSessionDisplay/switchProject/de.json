@@ -7,7 +7,6 @@
     "description": "Die Maschine läuft weiter. Die Nutzung bis jetzt wird dem aktuellen Projekt zugeordnet, alles danach dem neuen.",
     "select": "Neues Projekt",
     "placeholder": "Projekt wählen",
-    "unchanged": "Die Sitzung gehört bereits zu diesem Projekt.",
     "cancel": "Abbrechen",
     "confirm": "Projekt wechseln",
     "replaced": {

@@ -6,7 +6,6 @@ import { NetworkRestrictedAction } from '@attraccess/application-models';
 import { useNetworkRestriction } from '../../../../../hooks/useNetworkRestriction';
 import { NetworkRestrictedHint } from '../../../../../components/networkRestriction/NetworkRestrictedHint';
 import { SwitchProjectDialog } from './SwitchProjectDialog';
-import { ProjectListStatus } from './ProjectListStatus';
 import en from './switchProject/en.json';
 import de from './switchProject/de.json';
 
@@ -23,10 +22,11 @@ export function SessionProjectSection({ resourceId, usage }: Readonly<SessionPro
   // Switching books further usage, so it follows the rule for starting a session.
   const restricted = isRestricted(NetworkRestrictedAction.UsageStart);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { data: projects } = useFindManyProjects({ query: {} });
+  const { data: projects, isLoading } = useFindManyProjects({ query: {} });
 
-  // Somebody without any project, in a session without one, has nothing to switch between.
-  if (!usage.project && projects && !projects.data.length) return null;
+  // Somebody without any project, in a session without one, has nothing to switch between. Until the list is there
+  // that is unknown, so the card stays as it is rather than showing the section and taking it away again.
+  if (!usage.project && (isLoading || projects?.data.length === 0)) return null;
 
   return (
     <div className="border-t border-divider pt-4 flex flex-col gap-2">
@@ -40,8 +40,7 @@ export function SessionProjectSection({ resourceId, usage }: Readonly<SessionPro
         <Button
           size="sm"
           variant="secondary"
-          // Without a project and without the list there is nothing to pick from.
-          isDisabled={restricted || (!usage.project && !projects)}
+          isDisabled={restricted}
           onPress={() => setIsDialogOpen(true)}
           data-cy="active-session-switch-project"
         >
@@ -49,8 +48,6 @@ export function SessionProjectSection({ resourceId, usage }: Readonly<SessionPro
           {t('change')}
         </Button>
       </div>
-      {/* The dialog shows the state of the list itself. */}
-      {!isDialogOpen && !projects && <ProjectListStatus />}
       {restricted && <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageStart} />}
       {isDialogOpen && (
         <SwitchProjectDialog resourceId={resourceId} usage={usage} onClose={() => setIsDialogOpen(false)} />

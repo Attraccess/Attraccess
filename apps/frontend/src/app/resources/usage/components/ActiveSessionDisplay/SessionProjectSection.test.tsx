@@ -15,7 +15,7 @@ const state = vi.hoisted(() => ({
   listState: 'ready' as 'ready' | 'loading' | 'error',
   refetch: vi.fn(),
   warning: vi.fn(),
-  selectProps: {} as { value?: number | null; label?: string; ariaLabel?: string },
+  selectProps: {} as { value?: number | null; label?: string; ariaLabel?: string; disabledKeys?: unknown },
 }));
 
 vi.mock('../../../../../hooks/useNetworkRestriction', () => ({
@@ -49,6 +49,7 @@ vi.mock('../../../../../components/projectsSelect', () => ({
     value?: number | null;
     label?: string;
     ariaLabel?: string;
+    disabledKeys?: unknown;
   }) => {
     state.selectProps = props;
     return (
@@ -124,11 +125,19 @@ describe('switching the project of the running session', () => {
     await user.click(screen.getByRole('button', { name: 'change' }));
 
     expect(confirmButton()).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: 'pick current' }));
-    expect(confirmButton()).toBeDisabled();
-    expect(screen.getByText('dialog.unchanged')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'pick other' }));
     expect(confirmButton()).toBeEnabled();
+  });
+
+  it.each([
+    ['its project', current, 7],
+    ['"No project"', null, null],
+  ])('does not offer the session %s as the new project', async (_name, project, disabledKey) => {
+    const user = userEvent.setup();
+    mount(project);
+    await user.click(screen.getByRole('button', { name: 'change' }));
+
+    expect(state.selectProps.disabledKeys).toEqual([disabledKey]);
   });
 
   it.each([
@@ -256,21 +265,37 @@ describe('switching the project of the running session', () => {
     expect(state.warning).not.toHaveBeenCalled();
   });
 
-  it.each([null, current])('shows that the projects are loading (session project %j)', (project) => {
+  it('shows nothing while it is unknown whether somebody in a session without a project has projects', () => {
     state.listState = 'loading';
-    mount(project);
+    const { container } = mount(null);
 
-    expect(screen.getByText('projects.loading')).toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it('says that the projects could not be loaded and offers to retry', async () => {
+  it.each(['loading', 'error'] as const)(
+    'keeps the state of the project list (%s) out of the session card',
+    async (listState) => {
+      state.listState = listState;
+      const user = userEvent.setup();
+      mount(current);
+
+      expect(screen.getByText('Rocket')).toBeInTheDocument();
+      expect(screen.queryByText('projects.loading')).not.toBeInTheDocument();
+      expect(screen.queryByText('projects.loadError')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'change' }));
+      expect(screen.getByRole('dialog')).toHaveTextContent(
+        listState === 'loading' ? 'projects.loading' : 'projects.loadError',
+      );
+    },
+  );
+
+  it('offers to retry loading the projects in the dialog', async () => {
     state.listState = 'error';
     const user = userEvent.setup();
     mount(null);
-
-    expect(screen.getByRole('button', { name: 'change' })).toBeDisabled();
-    expect(screen.getByText('projects.loadError')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'change' }));
     await user.click(screen.getByRole('button', { name: 'projects.retry' }));
+
     expect(state.refetch).toHaveBeenCalledTimes(1);
   });
 

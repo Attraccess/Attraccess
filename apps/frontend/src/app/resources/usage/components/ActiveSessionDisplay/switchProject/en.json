@@ -7,7 +7,6 @@
     "description": "The machine keeps running. Usage up to now is booked to the current project, everything after it to the new one.",
     "select": "New project",
     "placeholder": "Choose a project",
-    "unchanged": "The session already belongs to this project.",
     "cancel": "Cancel",
     "confirm": "Switch project",
     "replaced": {

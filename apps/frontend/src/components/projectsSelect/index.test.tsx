@@ -69,3 +69,24 @@ it('is named by its visible label alone, once', () => {
   render(<ProjectsSelect value={7} label="New project" />);
   expect(screen.getByRole('button', { name: /^Workshop New project$|^New project Workshop$/ })).toBeTruthy();
 });
+it.each([
+  [8, 'Research'],
+  [null, 'No project'],
+])('lists a disabled project (%j) without letting it be picked', async (disabled, name) => {
+  const change = vi.fn();
+  render(
+    <ProjectsSelect
+      value={undefined}
+      placeholder="Choose project"
+      onChange={change}
+      includeUnassignedOption
+      unassignedLabel="No project"
+      disabledKeys={[disabled]}
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: /Choose project/ }));
+  const option = await screen.findByRole('option', { name });
+  expect(option.getAttribute('aria-disabled')).toBe('true');
+  fireEvent.click(option);
+  expect(change).not.toHaveBeenCalled();
+});
