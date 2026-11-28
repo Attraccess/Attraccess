@@ -1,11 +1,6 @@
 import { MachineBusyError } from '../errors/machine-busy.error';
 import { ProjectSwitchPendingError } from '../errors/project-switch-pending.error';
-import {
-  acrossProjectSwitches,
-  PROJECT_SWITCH_WAIT_MS,
-  RETRY_FIRST_MS,
-  RETRY_MAX_MS,
-} from './across-project-switches';
+import { acrossProjectSwitches, PROJECT_SWITCH_WAIT_MS, RETRY_FIRST_MS, RETRY_MAX_MS } from './across-project-switches';
 
 /** A chain of parts and whether a switch is pending on the machine, as the store reports them. */
 class FakeStore {

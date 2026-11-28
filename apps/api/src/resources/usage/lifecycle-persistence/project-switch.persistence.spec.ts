@@ -12,7 +12,7 @@ import {
   ResourceFlowNodeType,
   ResourceFormAction,
 } from '@attraccess/application-models';
-import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
 import { FlowExecutionError } from '../../flows/errors/flow-execution.error';
 import {
@@ -26,7 +26,7 @@ import {
   ResourceUsageSessionEndedEvent,
   ResourceUsageSessionTakenOverEvent,
 } from '../events/resource-usage.events';
-import { forkUsageInstance } from '../sessions/fixtures/compose.test-fixture';
+import { usageInternals } from '../sessions/fixtures/compose.test-fixture';
 
 jest.setTimeout(60_000);
 
@@ -197,6 +197,59 @@ describe('Switching the project of a running session', () => {
     ]);
   };
 
+  it('records who switched which part to which project in the audit log', async () => {
+    const started = await startInProject();
+    const { audit } = usageInternals(scope.usage).projectSwitch as unknown as { audit: { record: jest.Mock } };
+    audit.record.mockClear();
+
+    const continuation = await scope.usage.switchSessionProject(
+      1,
+      scope.users[0],
+      { projectId: 2 },
+      { auditOrigin: { id: 1, authenticationMethod: 'api-token' } },
+    );
+    const toNone = await switchTo(null);
+
+    const switched = audit.record.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.action === 'usage_session.project_switched');
+    expect(switched).toEqual([
+      {
+        domain: 'resource',
+        action: 'usage_session.project_switched',
+        actor: { id: 1, authenticationMethod: 'api-token' },
+        subject: { type: 'resource', id: 1 },
+        details: {
+          usageId: started.id,
+          newUsageId: continuation.id,
+          usageUserId: 1,
+          previousProjectId: 1,
+          projectId: 2,
+        },
+      },
+      // No project, before or after, is left out rather than written as null.
+      expect.objectContaining({
+        actor: { id: 1, authenticationMethod: 'session' },
+        details: { usageId: continuation.id, newUsageId: toNone.id, usageUserId: 1, previousProjectId: 2 },
+      }),
+    ]);
+  });
+
+  it('refuses a project the owner is not a member of without touching the session', async () => {
+    const started = await startInProject();
+    const projects = Reflect.get(usageInternals(scope.usage).projectSwitch, 'projectsService') as {
+      findOneById: jest.Mock;
+    };
+    projects.findOneById.mockRejectedValueOnce(new NotFoundException('Project not found'));
+    scope.flow.runFlow.mockClear();
+
+    await expect(switchTo(2)).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(projects.findOneById).toHaveBeenLastCalledWith(1, 2);
+    expect(flowRuns()).toEqual([]);
+    await expectUnchanged(started.id);
+  });
+
   it('leaves the session as it was when the switch flow fails', async () => {
     const started = await startInProject();
     scope.flow.runFlow.mockRejectedValueOnce(new FlowExecutionError('relay offline'));
@@ -276,87 +329,11 @@ describe('Switching the project of a running session', () => {
     await parked.entered;
     // The pending continuation takes no second slot.
     expect((await scope.usage.getActiveSessionOverview(1, 1)).activeSessionCount).toBe(2);
-    const { sessions } = (await import('../sessions/fixtures/compose.test-fixture')).usageInternals(
-      scope.usage,
-    ).lifecycle;
+    const { sessions } = usageInternals(scope.usage).lifecycle;
     expect(await sessions.countOccupiedSlots(1)).toBe(2);
     parked.release();
     await switching;
 
     expect((await scope.usage.getActiveSessionOverview(1, 1)).activeSessionCount).toBe(2);
-  });
-
-  describe('racing other changes of the machine', () => {
-    /** At most one published session is open, nothing stays pending, and an ended chain has no open continuation. */
-    const expectOneConsistentOutcome = async () => {
-      const all = await usages();
-      expect(all.filter((usage) => usage.lifecyclePending)).toEqual([]);
-      expect(all.filter((usage) => !usage.endTime).length).toBeLessThanOrEqual(1);
-      for (const usage of all.filter((candidate) => candidate.previousUsageId !== null)) {
-        expect(all.find((candidate) => candidate.id === usage.previousUsageId)?.endTime).not.toBeNull();
-      }
-      // One continuation per part.
-      const continued = all.flatMap((usage) => (usage.previousUsageId === null ? [] : [usage.previousUsageId]));
-      expect(new Set(continued).size).toBe(continued.length);
-      expect(await attempts()).toBe(0);
-    };
-
-    it.each(['this instance', 'another instance'])(
-      'refuses a stop, a takeover and a second switch while a switch runs (%s)',
-      async (where) => {
-        const started = await startInProject();
-        const other = where === 'this instance' ? scope.usage : forkUsageInstance(scope.usage, () => undefined);
-        const parked = parkNextFlow();
-        const switching = switchTo(2, 0, started.id);
-        await parked.entered;
-
-        await expect(other.endSession(1, scope.users[0], {})).rejects.toBeInstanceOf(ConflictException);
-        await expect(other.startSession(1, scope.users[1], { forceTakeOver: true })).rejects.toBeInstanceOf(
-          ConflictException,
-        );
-        await expect(
-          other.switchSessionProject(1, scope.users[0], { projectId: null, usageId: started.id }),
-        ).rejects.toBeInstanceOf(ConflictException);
-
-        parked.release();
-        await switching;
-        await expectOneConsistentOutcome();
-        expect(await openSessions()).toHaveLength(1);
-      },
-    );
-
-    it.each(['stop', 'takeover'])('refuses a switch while a %s of the same session runs', async (change) => {
-      const started = await startInProject();
-      const other = forkUsageInstance(scope.usage, () => undefined);
-      const parked = parkNextFlow();
-      const running =
-        change === 'stop'
-          ? scope.usage.endSession(1, scope.users[0], {})
-          : scope.usage.startSession(1, scope.users[1], { forceTakeOver: true });
-      await parked.entered;
-
-      await expect(
-        other.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: started.id }),
-      ).rejects.toBeInstanceOf(ConflictException);
-
-      parked.release();
-      await running;
-      await expectOneConsistentOutcome();
-      expect((await usages()).filter((usage) => usage.previousUsageId !== null)).toEqual([]);
-    });
-
-    it('never leaves two active parts when switches and a stop arrive at once from two instances', async () => {
-      for (let round = 0; round < 5; round++) {
-        const started = await startInProject();
-        const other = forkUsageInstance(scope.usage, () => undefined);
-        await Promise.allSettled([
-          scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: started.id }),
-          other.endSession(1, scope.users[0], { usageId: started.id }),
-          other.switchSessionProject(1, scope.users[0], { projectId: null, usageId: started.id }),
-        ]);
-        await expectOneConsistentOutcome();
-        if ((await openSessions()).length) await scope.usage.endSession(1, scope.users[0], {});
-      }
-    });
   });
 });

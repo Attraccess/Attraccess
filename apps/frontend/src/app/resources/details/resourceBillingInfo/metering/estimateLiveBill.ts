@@ -1,7 +1,5 @@
-import { applyPartBillingFactor, toExactCredits } from '@attraccess/shared';
+import { applyPartBillingFactor, cumulativeStartedMinutes, toExactCredits } from '@attraccess/shared';
 import type { ResourceUsage, RunningPartBilling } from '@attraccess/react-query-client';
-
-const MINUTE_MS = 60_000;
 
 interface LiveBillInput {
   usage: Pick<ResourceUsage, 'startTime' | 'sessionDurationCreditsPerMinute' | 'billingFactor'>;
@@ -17,10 +15,8 @@ interface LiveBillInput {
 export function estimateLiveBill({ usage, pricing, elapsedMs, meters }: LiveBillInput): number | null {
   try {
     const roundingStart = new Date(pricing.roundingStartTime).getTime();
-    const startedMinutes = (ms: number) => Math.ceil(Math.max(0, ms - roundingStart) / MINUTE_MS);
-    const partStart = new Date(usage.startTime).getTime();
     // Minutes the earlier parts of the same rounding already started are theirs.
-    const minutes = startedMinutes(partStart + elapsedMs) - startedMinutes(partStart);
+    const minutes = cumulativeStartedMinutes(new Date(usage.startTime).getTime() - roundingStart, elapsedMs);
     const gross =
       toExactCredits(pricing.flatCredits) +
       toExactCredits(usage.sessionDurationCreditsPerMinute ?? 0) * toExactCredits(minutes) +
