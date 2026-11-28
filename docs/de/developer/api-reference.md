@@ -81,6 +81,14 @@ Antwort ohne Gebühr (einschließlich Nullbeträgen):
 {"event":"EVENT","data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"success":true,"requestId":43,"endedOwnSession":true,"durationSeconds":1440}}}
 ```
 
+**Wartungsabfrage.** Ein Leser, der „Ist die Maschine in Ordnung?“ gefragt und „Wartung nötig“ als Antwort bekommen hat, ergänzt den STOP-Payload um `maintenanceRequest: { reason: string }` (3–2000 Zeichen) und sendet dieselbe Antwort mit dem STOP nach den Endformularen erneut. Der Server legt die Anfrage im Namen der Karteninhaberin oder des Karteninhabers erst an, wenn die Sitzung beendet ist; ein fehlgeschlagenes Beenden legt nichts an. Die Erfolgsantwort enthält dann `maintenanceRequestFiled: boolean`. Der Wert ist `false` ohne das Lizenzmodul für Wartung, bei einem ungültigen Grund oder wenn das Anlegen fehlschlug; die Sitzung ist trotzdem beendet. Ohne `maintenanceRequest` fehlt das Feld. Der Web-Aufruf zum Beenden (`POST /api/resources/{resourceId}/usage/end`) nimmt dasselbe `maintenanceRequest` an und antwortet mit demselben Feld. Der Server verlangt die Antwort nie.
+
+## Attractap-WebSocket: Problem melden
+
+Der Leser sendet `data.type: "CREATE_MAINTENANCE_REQUEST"` mit `data.payload: { resourceId: number, reason: string, requestId?: number }`, während eine Karte angemeldet ist. Der Server legt für diese Person eine Wartungsanfrage an, wie `POST /api/resources/{resourceId}/maintenance-requests`, mit denselben Benachrichtigungen. Er antwortet mit demselben Ereignistyp, der übernommenen Anfrage-ID und entweder `success: true` oder `error: string`: den Codes der anderen Leser-Aktionen (zum Beispiel `RESOURCE_NOT_ASSOCIATED_WITH_READER` oder `USER_NOT_AUTHENTICATED`), `MAINTENANCE_NOT_LICENSED`, `INVALID_REASON` (nicht 3–2000 Zeichen) oder `REQUEST_FAILED`.
+
+Die Ressourcenliste sagt der angemeldeten Karte je Ressource, ob das angeboten wird: `canRequestMaintenance` (Lizenzmodul für Wartung, und die Person kann die Wartung der Ressource nicht selbst verwalten) und `askMaintenanceCheckOnEnd` (`canRequestMaintenance` und die Ressourceneinstellung `askMaintenanceCheckOnSessionEnd`).
+
 ## Sitzungsdauer und Verlängerung
 
 Maschinen können eine **maximale Sitzungsdauer** haben und eine **Dauerschätzung verlangen** (Ressourcenfelder `maxSessionDurationMinutes`, `requireSessionDurationEstimate` und `defaultSessionDurationEstimateMinutes`; nur Maschinen, Türen ignorieren sie). Eine Sitzung speichert ihr Ende beim Start: `autoEndAt` (wann der Server sie beendet), `maxAutoEndAt` (das späteste Ende, auf das verlängert werden kann; `null` ohne maximale Sitzungsdauer, dann gilt die Grenze von 30 Tagen) und `estimatedDurationMinutes`. Spätere Änderungen der Ressourceneinstellungen ändern laufende Sitzungen nicht.

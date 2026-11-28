@@ -213,6 +213,7 @@ export class TypeOrmResourceStore implements ResourceStore {
       documentationUrl: record.documentationUrl,
       metadata: record.metadata,
       allowTakeOver: record.allowTakeOver,
+      askMaintenanceCheckOnSessionEnd: record.askMaintenanceCheckOnSessionEnd,
       maxParallelSessions: record.maxParallelSessions,
       maxSessionDurationMinutes: record.maxSessionDurationMinutes,
       requireSessionDurationEstimate: record.requireSessionDurationEstimate,

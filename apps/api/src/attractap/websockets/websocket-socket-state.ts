@@ -58,6 +58,8 @@ export enum AttractapEventType {
   READER_SESSION_ENDED = 'READER_SESSION_ENDED',
   START_RESOURCE_USAGE_SESSION = 'START_RESOURCE_USAGE_SESSION',
   STOP_RESOURCE_USAGE_SESSION = 'STOP_RESOURCE_USAGE_SESSION',
+  /** Reader → server: the card holder reports a problem ({ resourceId, reason }); answered with success or error. */
+  CREATE_MAINTENANCE_REQUEST = 'CREATE_MAINTENANCE_REQUEST',
   /** Reader → server (capabilities.sessionDuration): move the automatic end of the card holder's session later. */
   EXTEND_RESOURCE_USAGE_SESSION = 'EXTEND_RESOURCE_USAGE_SESSION',
   LOCK_DOOR = 'LOCK_DOOR',

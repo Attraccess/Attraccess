@@ -20,6 +20,7 @@ import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceForm
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { useRefreshNetworkRestrictionOnError } from '../../../../../hooks/useRefreshNetworkRestrictionOnError';
 import { SessionAutoEnd } from '../SessionAutoEnd';
+import { useMaintenanceCheck } from '../../hooks/useMaintenanceCheck';
 import { useCanEndOtherSessions } from '../../hooks/useCanEndOtherSessions';
 import en from './translations/en.json';
 import de from './translations/de.json';
@@ -55,13 +56,19 @@ export function ParallelSessionsDisplay({
   const [usageToEnd, setUsageToEnd] = useState<ResourceUsage | null>(null);
   const [contactingUserId, setContactingUserId] = useState<number | null>(null);
   const { canEndSession } = useCanEndOtherSessions(resourceId);
+  const {
+    requestMaintenanceCheck,
+    showMaintenanceRequestResult,
+    modal: maintenanceCheckModal,
+  } = useMaintenanceCheck(resourceId);
 
   const endSession = useResourceUsageEndSession(undefined, {
-    onSuccess: () => {
+    onSuccess: (ended) => {
       clearFormsDraft();
       setUsageToEnd(null);
       invalidateSessionHistory();
       success({ title: t('endSession.successful'), description: t('endSession.successfulDescription') });
+      showMaintenanceRequestResult(ended?.maintenanceRequestFiled);
     },
     onError: (err) => {
       refreshNetworkRestriction(err);
@@ -82,6 +89,9 @@ export function ParallelSessionsDisplay({
   const confirmEnd = useCallback(
     async (notes: string) => {
       if (!usageToEnd) return;
+      // Only asked when the session is the viewer's own.
+      const checkAnswer = await requestMaintenanceCheck(usageToEnd.userId);
+      if (!checkAnswer) return;
       let formSubmissions: FormSubmissionRequestDto[];
       try {
         formSubmissions = await requestForms('end');
@@ -91,9 +101,10 @@ export function ParallelSessionsDisplay({
         }
         throw error;
       }
-      endSession.mutate({ path: { resourceId }, body: { usageId: usageToEnd.id, notes, formSubmissions } });
+      const body = { ...checkAnswer, usageId: usageToEnd.id, notes, formSubmissions };
+      endSession.mutate({ path: { resourceId }, body });
     },
-    [endSession, requestForms, resourceId, usageToEnd],
+    [endSession, requestForms, requestMaintenanceCheck, resourceId, usageToEnd],
   );
 
   const isFull = activeSessionCount >= maxParallelSessions;
@@ -189,6 +200,7 @@ export function ParallelSessionsDisplay({
             : undefined
         }
       />
+      {maintenanceCheckModal}
       {formsModal}
     </>
   );

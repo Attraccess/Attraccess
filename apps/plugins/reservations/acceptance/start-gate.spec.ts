@@ -10,6 +10,7 @@ import { ResourceUsageController } from '../../../api/src/resources/usage/sessio
 import { ResourceListVisibilityService } from '../../../api/src/resources/visibility/resource-list-visibility.service';
 import { ResourceUsageService } from '../../../api/src/resources/usage/sessions/resource-usage.service';
 import { SessionEndNotifier } from '../../../api/src/resources/usage/pre-start/session-end-notifier.service';
+import { SessionEndMaintenanceRequests } from '../../../api/src/resources/usage/sessions/session-end-maintenance-requests';
 import { ReaderUiHooksService } from '../../../api/src/plugin-system/reader-ui/reader-ui-hooks.service';
 import { preStartHook, publishHookServices, startBlockedQuery } from '../backend/hooks/runtime';
 import { createBackgroundServices } from '../backend/testing/background-services.test-utils';
@@ -119,6 +120,7 @@ describe.each([['session' as const], ['api-token' as const]])('host start gate w
         { provide: ResourceActivityVisibilityService, useValue: {} },
         { provide: HostPreStartService, useValue: hostPreStart },
         { provide: SessionEndNotifier, useValue: {} },
+        { provide: SessionEndMaintenanceRequests, useValue: {} },
         // Machine list visibility (ATT-843) is not what this gate tests: every machine is visible here.
         { provide: ResourceListVisibilityService, useValue: { canSee: async () => true } },
         { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },

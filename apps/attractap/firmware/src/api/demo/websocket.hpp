@@ -97,7 +97,7 @@ private:
     void handleExtendSession(JsonObjectConst payload);
     // The shared 3D printer asks for an estimate and has a maximum session time (ATT-43).
     void addDurationSettings(JsonObject resource, uint32_t resourceId) const;
-    void handleStopSession(uint32_t resourceId, uint32_t usageId);
+    void handleStopSession(uint32_t resourceId, uint32_t usageId, bool maintenanceRequested);
     void respondActionError(const std::string &type, const char *error);
     void respondFormRequest(uint32_t resourceId);
     void respondFormFields(uint32_t resourceId, const char *action, uint32_t formId, uint32_t offset);

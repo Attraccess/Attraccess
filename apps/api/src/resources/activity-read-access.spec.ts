@@ -37,6 +37,7 @@ import { supervisionModesFrom } from './usage/authorization/supervision-modes.te
 import { ResourceActivityVisibilityService } from './usage/authorization/resource-activity-visibility.service';
 import { PreStartService } from './usage/pre-start/pre-start.service';
 import { SessionEndNotifier } from './usage/pre-start/session-end-notifier.service';
+import { SessionEndMaintenanceRequests } from './usage/sessions/session-end-maintenance-requests';
 import { RESOURCE_STORE } from './resource-store.port';
 import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
 import { LiveTopicsService } from '../live-updates/live-topics.service';
@@ -220,12 +221,16 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
         { provide: USAGE_SESSION_STORE, useValue: supervisionModesFrom(supervisionFind) },
         {
           provide: RESOURCE_STORE,
-          useValue: { existingIds: jest.fn(async (ids: number[]) => ids), permittedIds: jest.fn(async (_user: number, ids: number[]) => ids) },
+          useValue: {
+            existingIds: jest.fn(async (ids: number[]) => ids),
+            permittedIds: jest.fn(async (_user: number, ids: number[]) => ids),
+          },
         },
         { provide: LiveTopicsService, useValue: { register: jest.fn() } },
         { provide: FlowLogRecorderService, useValue: {} },
         { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+        { provide: SessionEndMaintenanceRequests, useValue: { fileAfterEnd: jest.fn() } },
         { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
       ],
     })

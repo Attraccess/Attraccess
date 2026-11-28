@@ -61,6 +61,7 @@ void ResourceDetailsScreen::init()
    this->createDoorControls();
 
    this->createStatusPanels();
+   this->createReportProblemButton();
    this->createUiSlotContainer(UiSlotKind::Body);
 
    // Slots first, deferred: applyCachedState() then finds them current and does not build them a second time.
@@ -178,7 +179,7 @@ void ResourceDetailsScreen::destroy()
    this->clearProjectButton = nullptr;
    this->startSessionButton = nullptr;
    this->startSessionButtonLabel = nullptr;
-   this->stopSessionButton = nullptr;
+   this->stopSessionRow = this->stopSessionButton = nullptr;
    this->stopSessionButtonLabel = nullptr;
    this->stopOtherUserNote = nullptr;
    this->autoEndLabel = this->extendButton = nullptr;
@@ -201,6 +202,7 @@ void ResourceDetailsScreen::destroy()
    this->unlockDoorButton = nullptr;
    this->unlatchDoorButton = nullptr;
    this->flowButtons.clear();
+   this->reportProblemButton = nullptr;
 }
 void ResourceDetailsScreen::applyCachedState()
 {
@@ -532,6 +534,8 @@ void ResourceDetailsScreen::refreshAccessState()
    }
    // The countdown and Extend follow who may stop the session (the own one, or a manager's force-stop).
    this->updateAutoEnd();
+   // Last: it follows which controls show.
+   this->updateReportProblemButton();
    // A failure waiting for this refresh goes back on its button, if it still means the same.
    this->applyActionError();
 }

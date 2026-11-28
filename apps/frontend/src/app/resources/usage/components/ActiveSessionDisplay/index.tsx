@@ -28,6 +28,7 @@ import { FlowButtons } from './flowButtons';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
+import { useMaintenanceCheck } from '../../hooks/useMaintenanceCheck';
 import { PluginSlot } from '../../../../plugins/PluginSlot';
 import { RESOURCE_ACTIVE_SESSION_SLOT, ResourceActiveSessionSlotContext } from '@attraccess/plugins-frontend-sdk';
 
@@ -56,9 +57,14 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
 
   const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);
+  const {
+    requestMaintenanceCheck,
+    showMaintenanceRequestResult,
+    modal: maintenanceCheckModal,
+  } = useMaintenanceCheck(resourceId);
 
   const endSession = useResourceUsageEndSession(undefined, {
-    onSuccess: () => {
+    onSuccess: (ended) => {
       clearFormsDraft();
       recordUsefulAction();
       setIsNotesModalOpen(false);
@@ -82,6 +88,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
         title: t('sessionEnded.success.title'),
         description: t('sessionEnded.success.description'),
       });
+      showMaintenanceRequestResult(ended?.maintenanceRequestFiled);
     },
     onError: (err) => {
       console.error('Error ending session:', err);
@@ -95,8 +102,17 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
     },
   });
 
+  const { data: activeSessionResponse } = useResourceUsageGetActiveSession({ path: { resourceId } });
+  // my own session by id: with parallel sessions `usage` may not be the one shown here
+  const myUsage =
+    activeSessionResponse?.usages?.find((usage) => usage.id === usageId) ??
+    (activeSessionResponse?.usage?.id === usageId ? activeSessionResponse.usage : undefined);
+
   const runEndSession = useCallback(
     async (body: { notes?: string }) => {
+      const checkAnswer = await requestMaintenanceCheck(myUsage?.userId);
+      if (!checkAnswer) return;
+
       let formSubmissions: FormSubmissionRequestDto[];
       try {
         formSubmissions = await requestForms('end');
@@ -107,9 +123,9 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
         throw error;
       }
 
-      endSession.mutate({ path: { resourceId }, body: { ...body, usageId, formSubmissions } });
+      endSession.mutate({ path: { resourceId }, body: { ...body, ...checkAnswer, usageId, formSubmissions } });
     },
-    [endSession, requestForms, resourceId, usageId],
+    [endSession, myUsage?.userId, requestForms, requestMaintenanceCheck, resourceId, usageId],
   );
 
   const immediatelyEndSession = useCallback(() => {
@@ -123,12 +139,6 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
   const handleOpenEndSessionModal = () => {
     setIsNotesModalOpen(true);
   };
-
-  const { data: activeSessionResponse } = useResourceUsageGetActiveSession({ path: { resourceId } });
-  // my own session by id: with parallel sessions `usage` may not be the one shown here
-  const myUsage =
-    activeSessionResponse?.usages?.find((usage) => usage.id === usageId) ??
-    (activeSessionResponse?.usage?.id === usageId ? activeSessionResponse.usage : undefined);
 
   return (
     <>
@@ -201,6 +211,7 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
         mode={SessionModalMode.END}
         isSubmitting={endSession.isPending}
       />
+      {maintenanceCheckModal}
       {formsModal}
     </>
   );

@@ -13,6 +13,7 @@ export function createMockResource(overrides?: Partial<Resource>): Resource {
     description: 'Test Description',
     imageFilename: 'test.jpg',
     allowTakeOver: false,
+    askMaintenanceCheckOnSessionEnd: true,
     maxParallelSessions: 1,
     maxSessionDurationMinutes: null,
     requireSessionDurationEstimate: false,

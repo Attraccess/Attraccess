@@ -55,6 +55,14 @@ vi.mock('@attraccess/plugins-frontend-ui', () => ({
 vi.mock('../../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: vi.fn(), error: vi.fn(), apiError: state.apiError }),
 }));
+// The maintenance check stays off here: MaintenanceCheckDialog/endSessionFlow.test.tsx covers it.
+vi.mock('../../hooks/useMaintenanceCheck', () => ({
+  useMaintenanceCheck: () => ({
+    requestMaintenanceCheck: () => Promise.resolve({}),
+    showMaintenanceRequestResult: () => undefined,
+    modal: null,
+  }),
+}));
 vi.mock('@attraccess/react-query-client', () => ({
   // Introducers and maintainers of the resource; the current user is id 1.
   useResourceIntroducersGetNames: () => ({

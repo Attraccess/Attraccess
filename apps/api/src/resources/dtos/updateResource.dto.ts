@@ -140,6 +140,18 @@ export class UpdateResourceDto extends UpdateResourceDtoDocumentation {
   allowTakeOver?: boolean;
 
   @ApiProperty({
+    description:
+      'Whether ending your own session first asks "Is the machine OK?" (web and Attractap readers). Needs the maintenance license module. Not enforced by the API.',
+    required: false,
+    example: true,
+    type: Boolean,
+  })
+  @IsBoolean()
+  @ToBoolean()
+  @IsOptional()
+  askMaintenanceCheckOnSessionEnd?: boolean;
+
+  @ApiProperty({
     description: 'Maximum number of people who can use this machine at the same time (machines only)',
     required: false,
     example: 1,

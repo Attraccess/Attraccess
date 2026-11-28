@@ -91,11 +91,25 @@ describe('ResourceUsage API description', () => {
     const usage = { $ref: '#/components/schemas/ResourceUsage' };
 
     expect(responseRef('/resources/{resourceId}/usage/start', 'post', '201')).toEqual(usage);
-    expect(responseRef('/resources/{resourceId}/usage/end', 'put', '200')).toEqual(usage);
     expect(responseRef('/resources/{resourceId}/usage/lock', 'post', '200')).toEqual(usage);
     expect(responseRef('/resources/{resourceId}/usage/{usageId}', 'get', '200')).toEqual(usage);
     expect(responseRef('/resources/{resourceId}/usage/supervision/request', 'post', '201')).toEqual(usage);
     expect(responseRef('/resources/supervision/requests/{requestId}/approve', 'post', '201')).toEqual(usage);
+  });
+
+  it('answers an end with the same usage session plus what became of its maintenance request', () => {
+    type Described = { properties: Record<string, unknown>; required: string[] };
+    const usage = schema('ResourceUsage') as unknown as Described;
+    const ended = schema('EndedResourceUsage') as unknown as Described;
+
+    expect(responseRef('/resources/{resourceId}/usage/end', 'put', '200')).toEqual({
+      $ref: '#/components/schemas/EndedResourceUsage',
+    });
+    // Only an addition: whoever reads the response as a ResourceUsage still gets every field it describes.
+    const { maintenanceRequestFiled, ...sessionFields } = ended.properties;
+    expect(maintenanceRequestFiled).toMatchObject({ type: 'boolean' });
+    expect(sessionFields).toEqual(usage.properties);
+    expect(ended.required).toEqual(usage.required);
   });
 
   it('keeps the history and active-session responses', () => {

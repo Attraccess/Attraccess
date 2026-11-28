@@ -17,6 +17,10 @@ import { AttractapFormsHandler } from '../forms/forms.handler';
 import { ReaderStartGate } from './reader-start-gate.service';
 import { CardSessionService } from '../ui/card-session.service';
 import { AttractapSessionHandler } from './session.handler';
+import { SessionEndMaintenanceRequests } from '../../../../resources/usage/sessions/session-end-maintenance-requests';
+import { MaintenanceRequestService } from '../../../../resources/maintenances/maintenance-request.service';
+import { LicenseService } from '../../../../license/license.service';
+import { MachineBusyError } from '../../../../resources/usage/errors/machine-busy.error';
 import { ResourceActionGuard } from '../resource-action.guard';
 import { AttractapService } from '../../../attractap.service';
 import { UsersService } from '../../../../users-and-auth/users/users.service';
@@ -75,6 +79,8 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
   let sessionHandler: AttractapSessionHandler;
   let startSession: jest.Mock;
   let endSession: jest.Mock;
+  let createRequest: jest.Mock;
+  let verifyLicense: jest.Mock;
   let imageStore: InMemoryFormImageStore;
   let handoffs: {
     canIssue: jest.Mock;
@@ -91,6 +97,8 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
 
   beforeEach(async () => {
     startSession = jest.fn().mockResolvedValue({ id: 999 });
+    createRequest = jest.fn().mockResolvedValue({ id: 1 });
+    verifyLicense = jest.fn().mockResolvedValue({});
     endSession = jest
       .fn()
       .mockResolvedValue({ id: 999, userId: 7, startTime: new Date(0), endTime: new Date(1426999) });
@@ -151,6 +159,9 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
         { provide: CardSessionService, useValue: new CardSessionService() },
         { provide: ResourceMeteringService, useValue: {} },
         { provide: ResourceOperatingAttributionService, useValue: {} },
+        SessionEndMaintenanceRequests,
+        { provide: MaintenanceRequestService, useValue: { createRequest } },
+        { provide: LicenseService, useValue: { verifyLicense } },
       ],
     }).compile();
 
@@ -240,6 +251,59 @@ describe('ATT-545 attractap paged form session flow (server does not re-request 
       durationSeconds: 1426,
     });
     expect(sentTypes(socket)).not.toContain(AttractapEventType.RESOURCE_USAGE_FORM_REQUEST);
+  });
+
+  it('files exactly one maintenance request for a stop that goes through end forms and a busy retry', async () => {
+    form.isRequiredOnResourceUsageEnd = true;
+    endSession.mockRejectedValueOnce(new MachineBusyError());
+    const socket = makeSocket();
+    // The reader resends the stored answer with every STOP of this stop.
+    const request = {
+      payload: { resourceId: RESOURCE_ID, requestId: 17, maintenanceRequest: { reason: 'Blade is dull' } },
+    } as unknown as AttractapEvent['data'];
+
+    await sessionHandler.handleStopResourceUsageSession(socket, request);
+    expect(createRequest).not.toHaveBeenCalled(); // only the end forms were requested
+    for (const [offset, answers] of [
+      [0, [{ fieldId: 11, value: 'Alice' }]],
+      [1, []],
+      [2, [{ fieldId: 13, value: true }]],
+      [3, [{ fieldId: 14, value: 'red' }]],
+    ] as const) {
+      await formsHandler.handleResourceUsageFormSubmitPage(socket, {
+        payload: { resourceId: RESOURCE_ID, action: ResourceFormAction.END, formId: FORM_ID, offset, answers },
+      } as unknown as AttractapEvent['data']);
+    }
+
+    await sessionHandler.handleStopResourceUsageSession(socket, request); // refused: the machine is busy
+    expect(createRequest).not.toHaveBeenCalled();
+    expect(socket.sendMessage.mock.calls.at(-1)[0].data.payload).toHaveProperty('error');
+
+    await sessionHandler.handleStopResourceUsageSession(socket, request);
+    expect(createRequest).toHaveBeenCalledTimes(1);
+    expect(createRequest).toHaveBeenCalledWith(RESOURCE_ID, 7, 'Blade is dull');
+    expect(socket.sendMessage.mock.calls.at(-1)[0].data.payload).toMatchObject({
+      success: true,
+      maintenanceRequestFiled: true,
+    });
+  });
+
+  it.each([
+    ['the request store fails', () => createRequest.mockRejectedValue(new Error('database down'))],
+    ['the maintenance module is not licensed', () => verifyLicense.mockRejectedValue(new Error('no license'))],
+  ])('still ends the session but answers maintenanceRequestFiled false when %s', async (_label, breakFiling) => {
+    breakFiling();
+    const socket = makeSocket();
+    await sessionHandler.handleStopResourceUsageSession(socket, {
+      payload: { resourceId: RESOURCE_ID, requestId: 17, maintenanceRequest: { reason: 'Blade is dull' } },
+    } as unknown as AttractapEvent['data']);
+
+    expect(endSession).toHaveBeenCalledTimes(1);
+    expect(socket.sendMessage.mock.calls.at(-1)[0].data.payload).toMatchObject({
+      success: true,
+      requestId: 17,
+      maintenanceRequestFiled: false,
+    });
   });
 
   it('starts with an empty form after cancellation', async () => {

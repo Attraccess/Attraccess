@@ -54,4 +54,6 @@ export interface StopResourceUsageSessionPayload {
   durationSeconds?: number;
   endedOwnSession: boolean;
   billingSummary?: { amount: number; total: string };
+  /** Only when the stop carried `maintenanceRequest`: whether the request was filed. */
+  maintenanceRequestFiled?: boolean;
 }

@@ -224,7 +224,7 @@ bool Application::processCardFlowState()
       // The post-stop question holds the summary (auto-dismiss, touch, sign-out) until answered or expired.
       this->tickUiStep();
       if (!this->uiStepOpen && (this->sessionSummaryDismissRequested || (this->sessionSummaryVisible &&
-          millis() - this->sessionSummaryShownAt >= 3500))) this->dismissSessionSummary();
+          millis() - this->sessionSummaryShownAt >= Display::sessionSummaryScreen.displayDurationMs()))) this->dismissSessionSummary();
       else return true;
     }
   }

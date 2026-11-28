@@ -10,6 +10,9 @@ import { isResourceManager } from './is-resource-manager';
 /** `all`: the viewer sees every machine. `permitted`: the list is narrowed to the machines the viewer may see. */
 export type ResourceListScope = 'all' | 'permitted';
 
+/** What the visibility rule reads of a viewer: also met by a card holder on a reader, who has no web session. */
+export type ResourceListViewer = Pick<AuthenticatedUser, 'id' | 'effectivePermissions'>;
+
 /**
  * The single rule behind "who can see the machine list" (ATT-843), used by the lists, the per-machine routes, the
  * dashboard and the live updates.
@@ -26,23 +29,23 @@ export class ResourceListVisibilityService {
     @Inject(RESOURCE_STORE) private readonly store: ResourceStore,
   ) {}
 
-  async scopeOf(user: AuthenticatedUser): Promise<ResourceListScope> {
+  async scopeOf(user: ResourceListViewer): Promise<ResourceListScope> {
     if (isResourceManager(user)) return 'all';
     if (user.effectivePermissions?.has('resources.read') !== true) return 'permitted';
     return (await this.settings.getResourceListVisibility()) === 'authenticated' ? 'all' : 'permitted';
   }
 
   /** The user id the machine query must narrow to, or undefined when the viewer sees every machine. */
-  async permittedForUserId(user: AuthenticatedUser): Promise<number | undefined> {
+  async permittedForUserId(user: ResourceListViewer): Promise<number | undefined> {
     return (await this.scopeOf(user)) === 'permitted' ? user.id : undefined;
   }
 
-  async canSee(user: AuthenticatedUser, resourceId: number): Promise<boolean> {
+  async canSee(user: ResourceListViewer, resourceId: number): Promise<boolean> {
     return (await this.filterVisible(user, [resourceId])).includes(resourceId);
   }
 
   /** The ids the viewer may see, in the order given. Ids of machines that do not exist are never visible to a narrowed viewer. */
-  async filterVisible(user: AuthenticatedUser, resourceIds: number[]): Promise<number[]> {
+  async filterVisible(user: ResourceListViewer, resourceIds: number[]): Promise<number[]> {
     const ids = [...new Set(resourceIds)];
     if (ids.length === 0 || (await this.scopeOf(user)) === 'all') return ids;
     const permitted = new Set(await this.store.permittedIds(user.id, ids));

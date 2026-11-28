@@ -4,7 +4,9 @@
 #include "display/fonts/attractap_fonts.hpp"
 #include <cstdio>
 
-void SessionSummaryScreen::setSummary(const std::string &username, uint32_t seconds, const std::string &total) {
+void SessionSummaryScreen::setSummary(const std::string &username, uint32_t seconds, const std::string &total,
+                                      int8_t maintenanceRequestFiled) {
+    maintenance = maintenanceRequestFiled;
     name = username;
     charge = total;
     char text[32];
@@ -13,7 +15,7 @@ void SessionSummaryScreen::setSummary(const std::string &username, uint32_t seco
     duration = text;
 }
 
-void SessionSummaryScreen::clearSummary() { name.clear(); duration.clear(); charge.clear(); }
+void SessionSummaryScreen::clearSummary() { name.clear(); duration.clear(); charge.clear(); maintenance = -1; }
 
 void SessionSummaryScreen::init() {
     if (screen) return;
@@ -58,7 +60,10 @@ void SessionSummaryScreen::init() {
         // Long formatted charges remain fully available without crossing columns.
         lv_label_set_long_mode(total, LV_LABEL_LONG_SCROLL_CIRCULAR);
     }
-    label(FirmwareI18n::Message::SummaryFarewell, 20, 363, 440, &attractap_font_montserrat_latin1_18, DisplayTheme::muted());
+    if (maintenance >= 0)
+        label(maintenance ? FirmwareI18n::Message::MaintainersNotified : FirmwareI18n::Message::ReportNotSentAfterStop,
+              20, 345, 440, &attractap_font_montserrat_latin1_16, maintenance ? DisplayTheme::success() : DisplayTheme::warning());
+    label(FirmwareI18n::Message::SummaryFarewell, 20, maintenance >= 0 ? 385 : 363, 440, &attractap_font_montserrat_latin1_18, DisplayTheme::muted());
     auto *brand = label(FirmwareI18n::Text::literal("Attractap") /* i18n-data: Language-neutral product name. */, 20, 452, 140, &lv_font_montserrat_14, DisplayTheme::muted());
     lv_obj_set_style_text_align(brand, LV_TEXT_ALIGN_LEFT, 0);
     auto *variant = label(FirmwareI18n::Text::literal(FIRMWARE_VARIANT_FRIENDLY_NAME) /* i18n-data: Build-provided device variant name; preserve exact contents. */, 240, 452, 220, &lv_font_montserrat_14, DisplayTheme::muted());

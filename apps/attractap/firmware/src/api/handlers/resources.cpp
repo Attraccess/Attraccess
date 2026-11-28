@@ -90,7 +90,19 @@ void API::extendResourceUsageSession(uint32_t resourceId, uint32_t usageId, uint
     this->sendResourceAction("EXTEND_RESOURCE_USAGE_SESSION", payload);
 }
 
-void API::stopResourceUsageSession(uint32_t resourceId, uint32_t usageId)
+void API::createMaintenanceRequest(uint32_t resourceId, const char *reason)
+{
+    this->logger.info("Requesting maintenance");
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    payload["resourceId"] = resourceId;
+    payload["reason"] = reason;
+    CardSessionIdBuf cardSession;
+    if (copyCardSessionId(cardSession)) payload["cardSessionId"] = cardSession;
+    this->sendResourceAction("CREATE_MAINTENANCE_REQUEST", payload);
+}
+
+void API::stopResourceUsageSession(uint32_t resourceId, uint32_t usageId, const char *maintenanceReason)
 {
     this->logger.info("Stopping resource usage session");
     JsonDocument doc;
@@ -100,6 +112,7 @@ void API::stopResourceUsageSession(uint32_t resourceId, uint32_t usageId)
     {
         payload["usageId"] = usageId;
     }
+    if (maintenanceReason && *maintenanceReason) payload["maintenanceRequest"]["reason"] = maintenanceReason;
     CardSessionIdBuf cardSession;
     if (copyCardSessionId(cardSession)) payload["cardSessionId"] = cardSession; // keeps the server's card session alive
     this->sendResourceAction("STOP_RESOURCE_USAGE_SESSION", payload);
@@ -275,6 +288,8 @@ void API::onResourceList(JsonObject data)
         dst.canManageResource = resource["canManageResource"] | false;
         dst.canEndOtherSessions = resource["canEndOtherSessions"] | false;
         dst.requiresSupervisor = resource["requiresSupervisor"] | false;
+        dst.canRequestMaintenance = resource["canRequestMaintenance"] | false;
+        dst.askMaintenanceCheckOnEnd = resource["askMaintenanceCheckOnEnd"] | false;
 
         const char *name = resource["name"].as<const char *>();
         const char *desc = resource["description"].as<const char *>();

@@ -225,6 +225,8 @@ describe('ResourcesService', () => {
         documentationMarkdown: createDto.documentationMarkdown || null,
         documentationUrl: createDto.documentationUrl || null,
         allowTakeOver: createDto.allowTakeOver || false,
+        // On unless the creator says otherwise.
+        askMaintenanceCheckOnSessionEnd: true,
         maxParallelSessions: createDto.maxParallelSessions ?? 1,
         maxSessionDurationMinutes: null,
         requireSessionDurationEstimate: false,
@@ -240,6 +242,18 @@ describe('ResourcesService', () => {
         autoIntroductionTarget: null,
         autoIntroductionGroupId: null,
       });
+    });
+
+    it('creates a resource without the maintenance check when asked to', async () => {
+      store.create.mockResolvedValue(createMockResource({ id: 1 }));
+
+      await service.createResource({
+        name: 'Lathe',
+        type: ResourceType.Machine,
+        askMaintenanceCheckOnSessionEnd: false,
+      });
+
+      expect(store.create).toHaveBeenCalledWith(expect.objectContaining({ askMaintenanceCheckOnSessionEnd: false }));
     });
 
     it('audits only the safe resource projection when an actor is available', async () => {

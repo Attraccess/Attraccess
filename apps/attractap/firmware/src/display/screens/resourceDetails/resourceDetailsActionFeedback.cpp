@@ -49,6 +49,7 @@ lv_obj_t *ResourceDetailsScreen::buttonFor(button_click_type_t type, const std::
    case BUTTON_CLICK_TYPE_LOCK_DOOR: button = this->lockDoorButton; break;
    case BUTTON_CLICK_TYPE_UNLOCK_DOOR: button = this->unlockDoorButton; break;
    case BUTTON_CLICK_TYPE_UNLATCH_DOOR: button = this->unlatchDoorButton; break;
+   case BUTTON_CLICK_TYPE_REPORT_PROBLEM: button = this->reportProblemButton; break;
    case BUTTON_CLICK_TYPE_FLOW_BUTTON:
       for (const auto &flow : this->flowButtons)
          if (flow.first == flowId) button = flow.second;

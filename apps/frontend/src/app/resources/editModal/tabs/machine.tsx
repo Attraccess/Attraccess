@@ -11,6 +11,7 @@ import {
   TextField,
 } from '@heroui/react';
 import {
+  useGetLicenseInformation,
   useGetNodeSchemas,
   useGetSharedMachineFlowWarnings,
   useResourceUsageGetActiveSession,
@@ -48,6 +49,7 @@ function useFlowNodeTitle(resourceId: number | undefined, enabled: boolean) {
 export function MachineTab(props: EditorTabProps) {
   const { formData, setField, resource } = props;
   const { t } = useTranslations({ en, de });
+  const { data: license } = useGetLicenseInformation();
 
   const maxParallelSessions = formData.maxParallelSessions ?? 1;
   // Lets the field be emptied while typing; the stored value is always a valid number
@@ -152,6 +154,19 @@ export function MachineTab(props: EditorTabProps) {
       )}
 
       <SessionDurationSettings formData={formData} setField={setField} />
+
+      {license?.modules.includes('maintenance') && (
+        <LabeledSwitch
+          isSelected={formData.askMaintenanceCheckOnSessionEnd ?? true}
+          onChange={(value) => setField('askMaintenanceCheckOnSessionEnd', value)}
+          data-cy="resource-edit-modal-maintenance-check-switch"
+        >
+          <div className="flex flex-col">
+            <span className="text-small">{t('inputs.machine.maintenanceCheck.label')}</span>
+            <span className="text-tiny text-default-400">{t('inputs.machine.maintenanceCheck.description')}</span>
+          </div>
+        </LabeledSwitch>
+      )}
     </div>
   );
 }

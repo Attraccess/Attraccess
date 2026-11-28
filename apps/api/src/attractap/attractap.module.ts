@@ -24,6 +24,7 @@ import { AttractapCardHandler } from './websockets/handlers/card/card.handler';
 import { AttractapFormsHandler } from './websockets/handlers/forms/forms.handler';
 import { ReaderFormImages } from './websockets/handlers/forms/reader-form-images.service';
 import { AttractapSessionHandler } from './websockets/handlers/session/session.handler';
+import { AttractapMaintenanceRequestHandler } from './websockets/handlers/maintenance/maintenance-request.handler';
 import { AttractapBillingHandler } from './websockets/handlers/billing/billing.handler';
 import { AttractapProjectsHandler } from './websockets/handlers/projects/projects.handler';
 import { AttractapSupervisionHandler } from './websockets/handlers/supervision/supervision.handler';
@@ -170,6 +171,7 @@ import { ResourceListVisibilityModule } from '../resources/visibility/resource-l
     AttractapFormsHandler,
     ReaderFormImages,
     AttractapSessionHandler,
+    AttractapMaintenanceRequestHandler,
     AttractapBillingHandler,
     AttractapProjectsHandler,
     AttractapSupervisionHandler,

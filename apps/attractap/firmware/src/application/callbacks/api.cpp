@@ -232,6 +232,12 @@ void Application::setupActionCallbacks()
       auto *payload = static_cast<Payload *>(data);
       auto *self = payload->self;
       const auto &result = payload->result;
+      // A filed request needs no kept reason any more, nor does a session of its resource that ended without one.
+      if (result.success &&
+          (result.type == "CREATE_MAINTENANCE_REQUEST" || result.maintenanceRequestFiled > 0 ||
+           (result.type == "STOP_RESOURCE_USAGE_SESSION" && result.maintenanceRequestFiled < 0 &&
+            self->pendingActionResourceId == self->maintenanceReasonDraftResourceId)))
+        self->clearMaintenanceReasonDraft();
       // While a usage form is open the server refuses its fields or pages as a START error
       // without a request id, also in stop flows: that is the form failing, not the action.
       if (self->unlocked && self->hasPendingFormRequest && !result.success && self->api.isCurrentResourceAction(result.requestId) &&
@@ -252,6 +258,9 @@ void Application::setupActionCallbacks()
         const std::string resourceName = self->resourceNameOf(resourceId);
         const bool returnToList = self->returnToListAfterAction;
         self->finishReaderAction(result.success);
+        if (result.success && result.maintenanceRequestFiled > 0)
+          self->actionCompletionMessage = FirmwareI18n::Message::MaintainersNotified;
+        self->actionCompletionIsWarning = result.success && result.maintenanceRequestFiled == 0;
         if (result.success) {
           self->completedResourceName = resourceName;
           self->onActionResult(result.type);

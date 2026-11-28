@@ -17,9 +17,11 @@ const state = vi.hoisted(() => ({
   warnings: [] as Warning[],
   warningsFailed: false,
   warningsEnabled: [] as boolean[],
+  modules: [] as string[],
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
+  useGetLicenseInformation: () => ({ data: { modules: state.modules } }),
   useResourceUsageGetActiveSession: () => ({
     data: { activeSessionCount: state.activeSessionCount },
   }),
@@ -70,12 +72,34 @@ function mount(maxParallelSessions: number) {
   return setField;
 }
 
+describe('MachineTab maintenance check', () => {
+  beforeEach(() => {
+    state.warnings = [];
+    state.modules = ['maintenance'];
+  });
+  const toggle = () => screen.queryByRole('switch', { name: /inputs.machine.maintenanceCheck.label/ });
+
+  it('is on by default and saves what the admin chooses', () => {
+    const setField = mount(1);
+    expect(toggle()).toBeChecked();
+    fireEvent.click(toggle() as HTMLElement);
+    expect(setField).toHaveBeenLastCalledWith('askMaintenanceCheckOnSessionEnd', false);
+  });
+
+  it('is only shown with the maintenance license', () => {
+    state.modules = [];
+    mount(1);
+    expect(toggle()).toBeNull();
+  });
+});
+
 describe('MachineTab max parallel sessions', () => {
   beforeEach(() => {
     state.activeSessionCount = 0;
     state.warnings = [];
     state.warningsFailed = false;
     state.warningsEnabled = [];
+    state.modules = [];
   });
 
   it('sets the clamped limit', () => {

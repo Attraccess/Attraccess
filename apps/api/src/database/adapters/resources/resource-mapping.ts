@@ -20,6 +20,7 @@ export const toResourceRecord = (entity: Resource): ResourceRecord => {
     documentationUrl: entity.documentationUrl,
     metadata: entity.metadata,
     allowTakeOver: entity.allowTakeOver,
+    askMaintenanceCheckOnSessionEnd: entity.askMaintenanceCheckOnSessionEnd,
     maxParallelSessions: entity.maxParallelSessions,
     maxSessionDurationMinutes: entity.maxSessionDurationMinutes,
     requireSessionDurationEstimate: entity.requireSessionDurationEstimate,

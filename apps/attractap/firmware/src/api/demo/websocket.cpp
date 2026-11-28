@@ -131,7 +131,8 @@ void DemoWebsocket::processOutbound(const char *data, size_t len)
 
     if (strcmp(type, "START_RESOURCE_USAGE_SESSION") == 0 || strcmp(type, "STOP_RESOURCE_USAGE_SESSION") == 0 ||
         strcmp(type, "EXTEND_RESOURCE_USAGE_SESSION") == 0 || strcmp(type, "LOCK_DOOR") == 0 || strcmp(type, "UNLOCK_DOOR") == 0 ||
-        strcmp(type, "UNLATCH_DOOR") == 0 || strcmp(type, "TRIGGER_FLOW_BUTTON") == 0)
+        strcmp(type, "UNLATCH_DOOR") == 0 || strcmp(type, "TRIGGER_FLOW_BUTTON") == 0 ||
+        strcmp(type, "CREATE_MAINTENANCE_REQUEST") == 0)
         _actionRequestId = doc["data"]["payload"]["requestId"] | 0u;
 
     if (strcmp(type, "START_RESOURCE_USAGE_SESSION") == 0)
@@ -148,7 +149,8 @@ void DemoWebsocket::processOutbound(const char *data, size_t len)
 
     if (strcmp(type, "STOP_RESOURCE_USAGE_SESSION") == 0)
     {
-        handleStopSession(doc["data"]["payload"]["resourceId"] | 0u, doc["data"]["payload"]["usageId"] | 0u);
+        handleStopSession(doc["data"]["payload"]["resourceId"] | 0u, doc["data"]["payload"]["usageId"] | 0u,
+                          doc["data"]["payload"]["maintenanceRequest"].is<JsonObject>());
         return;
     }
 
@@ -171,7 +173,8 @@ void DemoWebsocket::processOutbound(const char *data, size_t len)
     if (strcmp(type, "LOCK_DOOR") == 0 ||
         strcmp(type, "UNLOCK_DOOR") == 0 ||
         strcmp(type, "UNLATCH_DOOR") == 0 ||
-        strcmp(type, "TRIGGER_FLOW_BUTTON") == 0)
+        strcmp(type, "TRIGGER_FLOW_BUTTON") == 0 ||
+        strcmp(type, "CREATE_MAINTENANCE_REQUEST") == 0)
     {
         respondActionSuccess(type);
         return;
@@ -260,6 +263,9 @@ void DemoWebsocket::respondResourceList(uint32_t requestId, const char *language
             // Mirrors handleStopSession: only managers may end another person's session.
             obj["canEndOtherSessions"] = _currentCanManage;
             obj["canManageMaintenance"] = _currentCanManage;
+            // Like the server: whoever cannot manage maintenance reports problems and is asked before ending.
+            obj["canRequestMaintenance"] = !_currentCanManage;
+            obj["askMaintenanceCheckOnEnd"] = !_currentCanManage;
             obj["requiresSupervisor"] = false;
         }
         obj["isHealthy"] = true;

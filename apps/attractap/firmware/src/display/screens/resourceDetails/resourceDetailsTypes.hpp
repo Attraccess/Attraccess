@@ -21,6 +21,7 @@ enum button_click_type_t
         BUTTON_CLICK_TYPE_FLOW_BUTTON,
         BUTTON_CLICK_TYPE_LOGOUT,
         BUTTON_CLICK_TYPE_BACK,
+        BUTTON_CLICK_TYPE_REPORT_PROBLEM,
     };
 
 struct UserDetails

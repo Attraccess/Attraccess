@@ -229,10 +229,10 @@ void ResourceDetailsScreen::createSessionControls()
    lv_obj_set_style_text_font(this->stopOtherUserNote, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_add_flag(this->stopOtherUserNote, LV_OBJ_FLAG_HIDDEN);
 
-   this->stopSessionButton = lv_button_create(this->sessionControls);
+   this->stopSessionRow = this->createStopSessionRow();
+   this->stopSessionButton = lv_button_create(this->stopSessionRow);
    lv_obj_set_height(this->stopSessionButton, 50);
-   lv_obj_set_width(this->stopSessionButton, lv_pct(100));
-   lv_obj_set_align(this->stopSessionButton, LV_ALIGN_CENTER);
+   lv_obj_set_flex_grow(this->stopSessionButton, 1);
    lv_obj_add_flag(this->stopSessionButton, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
    lv_obj_remove_flag(this->stopSessionButton, LV_OBJ_FLAG_SCROLLABLE);
    DisplayTheme::button(this->stopSessionButton, DisplayTheme::danger(), DisplayTheme::onPrimary());
@@ -240,7 +240,10 @@ void ResourceDetailsScreen::createSessionControls()
    lv_obj_add_event_cb(this->stopSessionButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, new ButtonClickEventData{this, BUTTON_CLICK_TYPE_STOP_SESSION, {}});
 
    this->stopSessionButtonLabel = lv_label_create(this->stopSessionButton);
-   lv_obj_set_width(this->stopSessionButtonLabel, LV_SIZE_CONTENT);
+   // Wraps: at half the width a long caption ("End other user's session") needs two lines.
+   lv_obj_set_width(this->stopSessionButtonLabel, lv_pct(100));
+   lv_label_set_long_mode(this->stopSessionButtonLabel, LV_LABEL_LONG_WRAP);
+   lv_obj_set_style_text_align(this->stopSessionButtonLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_height(this->stopSessionButtonLabel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->stopSessionButtonLabel, LV_ALIGN_CENTER);
    FirmwareI18n::setLabel(this->stopSessionButtonLabel, FirmwareI18n::Message::EndSession);

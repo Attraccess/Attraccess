@@ -9,6 +9,7 @@ import { formatUserDisplayName } from '@attraccess/shared';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
 import { getSessionCapacity } from '../../../../resources/usage/sessions/active-usage';
 import { extensionCap } from '../../../../resources/usage/session-duration/session-duration.rules';
+import { isMaintenanceLicensed } from '../../../../resources/maintenances/maintenance-license';
 import type { ResourceListService } from './resource-list.service';
 
 interface ResourceListServiceResourceListPayloadContext {
@@ -23,6 +24,8 @@ interface ResourceListServiceResourceListPayloadContext {
   usersService: ResourceListService['usersService'];
   readerTimeZone: ResourceListService['readerTimeZone'];
   rbacService: ResourceListService['rbacService'];
+  licenseService: ResourceListService['licenseService'];
+  listVisibility: ResourceListService['listVisibility'];
   logger: ResourceListService['logger'];
 }
 /** What the reader's session list reads of a running usage session. */
@@ -190,6 +193,8 @@ export async function sendResourceListToSockets(
     number,
     Promise<typeof resourceListPayload & { authenticatedUsername: string; authenticatedDisplayName: string }>
   >();
+  // Asked once per list, and only when somebody is signed in. A changed license reaches readers with their next list.
+  let maintenanceLicense: Promise<boolean> | undefined;
   const forUser = async (userId: number) => {
     const user = await context.usersService.findOne({ id: userId });
     if (!user) return { ...resourceListPayload, authenticatedUsername: '', authenticatedDisplayName: '' };
@@ -199,6 +204,11 @@ export async function sendResourceListToSockets(
       resourceIds,
       permissions,
     );
+    const maintenanceLicensed = await (maintenanceLicense ??= isMaintenanceLicensed(context.licenseService));
+    // Like the web: only who may see the machine may report a problem with it.
+    const visibleIds = maintenanceLicensed
+      ? new Set(await context.listVisibility.filterVisible({ id: userId, effectivePermissions: permissions }, resourceIds))
+      : new Set<number>();
     const personalized = await Promise.all(
       resources.map(async (resource, index) => {
         const hasIntroduction = await context.resourceUsageService.canControllResource(resource.id, user);
@@ -207,6 +217,10 @@ export async function sendResourceListToSockets(
         const own = activeSessions.find((session) => session.userId === userId);
         const ownUsageSession = own ? toReaderSession(own, offsetMinutes) : null;
         const canManageResource = permissions.has('resources.update');
+        const canManageMaintenance = maintenanceManagedResourceIds.has(resource.id);
+        // The web's "Report a problem" rule: licensed, the machine visible, and not somebody who manages the
+        // maintenance anyway.
+        const canRequestMaintenance = visibleIds.has(resource.id) && !canManageMaintenance;
         return {
           ...base,
           // At limit 1 this is today's single session; with several sessions the caller's own comes first.
@@ -217,7 +231,10 @@ export async function sendResourceListToSockets(
             : base.activeUsageSessions,
           canStart: base.canStart && !own,
           hasIntroduction,
-          canManageMaintenance: maintenanceManagedResourceIds.has(resource.id),
+          canManageMaintenance,
+          canRequestMaintenance,
+          // Ask "Is the machine OK?" before the card holder ends their own session.
+          askMaintenanceCheckOnEnd: canRequestMaintenance && resources[index].askMaintenanceCheckOnSessionEnd,
           isIntroducer: (introducersByResourceId.get(resource.id) ?? []).some((role) => role.userId === userId),
           canManageResource,
           // Same rule endSession applies to ending somebody else's chosen session. Only looked up while

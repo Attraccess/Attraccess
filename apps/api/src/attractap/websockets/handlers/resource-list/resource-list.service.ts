@@ -6,7 +6,9 @@ import { ResourceIntroducersService } from '../../../../resources/introducers/re
 import { ResourceMaintenanceService } from '../../../../resources/maintenances/maintenance.service';
 import { ResourceUsageService } from '../../../../resources/usage/sessions/resource-usage.service';
 import { RbacService } from '../../../../users-and-auth/rbac/rbac.service';
+import { LicenseService } from '../../../../license/license.service';
 import { UsersService } from '../../../../users-and-auth/users/users.service';
+import { ResourceListVisibilityService } from '../../../../resources/visibility/resource-list-visibility.service';
 import { AttractapService } from '../../../attractap.service';
 import { ReaderTimeZoneService } from '../../reader-time-zone.service';
 import { WebsocketService } from '../../websocket.service';
@@ -45,6 +47,12 @@ export class ResourceListService implements OnModuleInit {
 
   @Inject(RbacService)
   private rbacService: RbacService;
+
+  @Inject(LicenseService)
+  private licenseService: LicenseService;
+
+  @Inject(ResourceListVisibilityService)
+  private listVisibility: ResourceListVisibilityService;
 
   @Inject(ReaderTimeZoneService)
   private readerTimeZone: ReaderTimeZoneService;
@@ -197,6 +205,12 @@ export class ResourceListService implements OnModuleInit {
         },
         set rbacService(value: ResourceListService['rbacService']) {
           getContextOwner().rbacService = value;
+        },
+        get licenseService() {
+          return getContextOwner().licenseService;
+        },
+        get listVisibility() {
+          return getContextOwner().listVisibility;
         },
         logger: getContextOwner().logger,
       },

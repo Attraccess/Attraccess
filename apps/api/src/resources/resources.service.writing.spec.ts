@@ -309,6 +309,24 @@ describe('ResourcesService', () => {
       );
     });
 
+    it('saves and audits a changed maintenance check setting', async () => {
+      const existingResource = createMockResource({ id: 1, askMaintenanceCheckOnSessionEnd: true });
+      jest.spyOn(updateResourceScope.service, 'getResourceById').mockResolvedValue(existingResource);
+      updateResourceScope.resourceRepository.save.mockImplementation(async (resource) => resource);
+
+      const saved = await updateResourceScope.service.updateResource(
+        1,
+        { askMaintenanceCheckOnSessionEnd: false },
+        undefined,
+        { id: 9 },
+      );
+
+      expect(saved.askMaintenanceCheckOnSessionEnd).toBe(false);
+      expect(updateResourceScope.audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({ details: { changedFields: '["askMaintenanceCheckOnSessionEnd"]' } }),
+      );
+    });
+
     it('does not audit an unchanged resubmission', async () => {
       const resource = createMockResource({ id: 1, allowTakeOver: false });
       jest.spyOn(updateResourceScope.service, 'getResourceById').mockResolvedValue(resource);

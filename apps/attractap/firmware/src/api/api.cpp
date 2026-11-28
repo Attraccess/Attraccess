@@ -314,7 +314,7 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
         strcmp(eventType, "LOCK_DOOR") == 0 ||
         strcmp(eventType, "UNLOCK_DOOR") == 0 ||
         strcmp(eventType, "UNLATCH_DOOR") == 0 ||
-        strcmp(eventType, "TRIGGER_FLOW_BUTTON") == 0)
+        strcmp(eventType, "TRIGGER_FLOW_BUTTON") == 0 || strcmp(eventType, "CREATE_MAINTENANCE_REQUEST") == 0)
     {
         // Generic action result handling
         bool success = false;
@@ -338,6 +338,7 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
             result.hasDuration = payload["durationSeconds"].is<uint32_t>();
             if (result.hasDuration) result.durationSeconds = payload["durationSeconds"].as<uint32_t>();
             result.warning = payload["warning"] | false;
+            if (payload["maintenanceRequestFiled"].is<bool>()) result.maintenanceRequestFiled = payload["maintenanceRequestFiled"].as<bool>();
             result.hasOwnership = payload["endedOwnSession"].is<bool>();
             if (result.hasOwnership) result.endedOwnSession = payload["endedOwnSession"].as<bool>();
             this->actionResultCallback(result);
@@ -464,7 +465,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
         strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 || strcmp(eventType, "EXTEND_RESOURCE_USAGE_SESSION") == 0 ||
         strcmp(eventType, "LOCK_DOOR") == 0 ||
         strcmp(eventType, "UNLOCK_DOOR") == 0 || strcmp(eventType, "UNLATCH_DOOR") == 0 ||
-        strcmp(eventType, "TRIGGER_FLOW_BUTTON") == 0;
+        strcmp(eventType, "TRIGGER_FLOW_BUTTON") == 0 || strcmp(eventType, "CREATE_MAINTENANCE_REQUEST") == 0;
     // UI_* types carry the server's messageId back in their ACK; every path below that acks uses it.
     const bool isUiEvent = strncmp(eventType, "UI_", 3) == 0;
     const uint32_t ackMessageId = isUiEvent ? (inboundDoc["data"]["messageId"] | 0u) : 0u;

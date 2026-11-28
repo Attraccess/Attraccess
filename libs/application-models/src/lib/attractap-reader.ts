@@ -77,6 +77,7 @@ export interface AttractapLinkedResource {
   documentationUrl: string | null;
   metadata: Record<string, unknown> | null;
   allowTakeOver: boolean;
+  askMaintenanceCheckOnSessionEnd: boolean;
   maxParallelSessions: number;
   /** Longest a session may run, in minutes; null means no limit. Machines only. */
   maxSessionDurationMinutes: number | null;

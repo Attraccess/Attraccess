@@ -121,6 +121,7 @@ void Application::onActionResult(const std::string &eventType) {
     this->hasPendingServerFormFlow = false;
     this->formFlowSubmitted = false;
     this->formImagePolling = false;
+    this->pendingActionMaintenanceReason.clear();
     this->leaveForms();
   }
 }
@@ -398,7 +399,8 @@ void Application::finishFormFlow() {
                                         this->pendingActionProjectId, this->pendingActionIsTakeover, nullptr, nullptr,
                                         this->pendingActionEstimateMinutes);
   } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
-    this->api.stopResourceUsageSession(this->pendingActionResourceId, this->pendingActionUsageId);
+    this->api.stopResourceUsageSession(this->pendingActionResourceId, this->pendingActionUsageId,
+                                       this->pendingActionMaintenanceReason.c_str());
   } else {
     this->handleFormsCancel();
   }

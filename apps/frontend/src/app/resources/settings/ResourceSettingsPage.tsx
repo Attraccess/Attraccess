@@ -38,6 +38,7 @@ export function fromResource(resource: Resource): FormData {
     name: resource.name,
     description: resource.description ?? '',
     allowTakeOver: resource.allowTakeOver ?? false,
+    askMaintenanceCheckOnSessionEnd: resource.askMaintenanceCheckOnSessionEnd ?? true,
     maxParallelSessions: resource.maxParallelSessions ?? 1,
     maxSessionDurationMinutes: resource.maxSessionDurationMinutes ?? null,
     requireSessionDurationEstimate: resource.requireSessionDurationEstimate ?? false,

@@ -228,6 +228,7 @@ struct ReaderWorkflow
     void testScreenOwnedUi();
     void testParallelSessions();
     void testSessionDuration();
+    void testMaintenance();
     void testWallClock();
     void testTimeouts();
     void testUiPlugins();

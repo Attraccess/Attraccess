@@ -53,6 +53,7 @@ describe('Fresh PostgreSQL install (e2e)', () => {
       'BillingTransactionReferenceIndexes1796400000000',
       'DiscardZeroUsageBills1796400000001',
       'ResourceMeterArchive1796400000002',
+      'ResourceMaintenanceCheck1796500000000',
       'NfcCardUniqueUid1796500000100',
     ]);
     expect(postgresBackend.migrationTrack.tableName).toBe('migrations');

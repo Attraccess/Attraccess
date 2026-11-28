@@ -36,6 +36,7 @@ export function toLinkedResource(resource: Resource): AttractapLinkedResource {
     documentationUrl: resource.documentationUrl,
     metadata: resource.metadata,
     allowTakeOver: resource.allowTakeOver,
+    askMaintenanceCheckOnSessionEnd: resource.askMaintenanceCheckOnSessionEnd,
     maxParallelSessions: resource.maxParallelSessions,
     maxSessionDurationMinutes: resource.maxSessionDurationMinutes,
     requireSessionDurationEstimate: resource.requireSessionDurationEstimate,

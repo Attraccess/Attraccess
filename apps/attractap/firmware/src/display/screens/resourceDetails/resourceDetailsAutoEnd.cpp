@@ -40,8 +40,8 @@ void ResourceDetailsScreen::createAutoEnd()
    lv_obj_set_style_text_font(label, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    FirmwareI18n::setLabel(label, FirmwareI18n::Message::ExtendSession);
 
-   // Above the stop button, so the countdown and Extend sit with the other controls of the running session.
-   const uint32_t stopIndex = lv_obj_get_index(this->stopSessionButton);
+   // Above the stop button's row, so the countdown and Extend sit with the other controls of the running session.
+   const uint32_t stopIndex = lv_obj_get_index(this->stopSessionRow);
    lv_obj_move_to_index(this->autoEndLabel, stopIndex);
    lv_obj_move_to_index(this->extendButton, stopIndex + 1);
 }

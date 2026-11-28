@@ -38,7 +38,9 @@ import { ResourceActionGuard } from '../resource-action.guard';
 
 import { ResourceListService } from '../resource-list/resource-list.service';
 
-import { formatCredits, dbCurrencyToUserCurrency } from '@attraccess/shared';
+import { formatCredits } from '@attraccess/shared';
+import { SessionEndMaintenanceRequests } from '../../../../resources/usage/sessions/session-end-maintenance-requests';
+import { readerBillingSummary } from './reader-billing-summary';
 
 import { ResourceFormAction } from '@attraccess/application-models';
 
@@ -94,6 +96,9 @@ export class AttractapSessionHandler {
 
   @Inject(ResourceOperatingAttributionService)
   protected operatingAttributionService: ResourceOperatingAttributionService;
+
+  @Inject(SessionEndMaintenanceRequests)
+  protected endMaintenanceRequests: SessionEndMaintenanceRequests;
 
   public async handleResourceUsageStats(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     const { resourceId } = data.payload ?? {};
@@ -506,10 +511,12 @@ export class AttractapSessionHandler {
   public async handleStopResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
     const userId = socket.state.verifiedUserId;
-    const { resourceId, usageId } = data.payload as {
+    const { resourceId, usageId, maintenanceRequest } = data.payload as {
       resourceId: number;
       /** Force-stop of a chosen session of someone else; without it the card holder's own session ends. */
       usageId?: number;
+      /** The "Is the machine OK?" answer; the reader resends it with the STOP that follows the end forms. */
+      maintenanceRequest?: unknown;
     };
     this.resumeCardSession(socket, data);
 
@@ -558,29 +565,21 @@ export class AttractapSessionHandler {
       const end = usage?.endTime ? new Date(usage.endTime).getTime() : NaN;
       const durationSeconds =
         Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, Math.floor((end - start) / 1000)) : undefined;
-      // Billing lookup failures must not turn an already-ended session into a failed action.
-      let billingSummary: { amount: number; total: string } | undefined;
-      try {
-        if (usage?.userId === user.id) {
-          const charge = await this.billingService.getResourceUsageCharge(usage.id, user.id);
-          if (charge && charge.amount !== 0) {
-            const configuration = await this.billingService.getConfiguration();
-            const amount = -charge.amount;
-            const total = new Intl.NumberFormat('de-DE', {
-              minimumFractionDigits: configuration.minorUnit,
-              maximumFractionDigits: configuration.minorUnit,
-            }).format(dbCurrencyToUserCurrency(amount, configuration.minorUnit));
-            billingSummary = { amount, total: `${total} ${configuration.currency}` };
-          }
-        }
-      } catch (error) {
-        this.logger.warn(`Failed to load session billing summary: ${error.message}`);
-      }
+      const maintenanceRequestFiled = await this.endMaintenanceRequests.fileAfterEnd(
+        resourceId,
+        user.id,
+        maintenanceRequest,
+      );
+      const billingSummary =
+        usage?.userId === user.id
+          ? await readerBillingSummary(this.billingService, this.logger, usage.id, user.id)
+          : undefined;
       await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, {
         success: true,
         endedOwnSession: usage?.userId === user.id,
         ...(durationSeconds !== undefined ? { durationSeconds } : {}),
         ...(billingSummary ? { billingSummary } : {}),
+        ...(maintenanceRequestFiled === undefined ? {} : { maintenanceRequestFiled }),
       } satisfies StopResourceUsageSessionPayload);
       if (usage?.userId === user.id) {
         void this.startGate.afterStop(socket, { resourceId, userId: user.id, sessionId: usage.id });

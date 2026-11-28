@@ -32,6 +32,8 @@ import { RESOURCE_USAGE_COLLABORATORS } from './resource-usage.collaborators';
 import { ResourceUsageFlowsBridge } from './sessions/resource-usage-flows.bridge';
 import { ResourceListVisibilityModule } from '../visibility/resource-list-visibility.module';
 import { SessionAutoEndService } from './session-duration/session-auto-end.service';
+import { SessionEndMaintenanceRequests } from './sessions/session-end-maintenance-requests';
+import { LicenseModule } from '../../license/license.module';
 
 @Module({
   imports: [
@@ -48,6 +50,7 @@ import { SessionAutoEndService } from './session-duration/session-auto-end.servi
     ResourceGroupsModule,
     ResourceRetrainingModule,
     ResourceMaintenanceModule,
+    LicenseModule,
     BillingModule,
     ResourceFlowsModule,
     ResourceMeteringModule,
@@ -70,7 +73,14 @@ import { SessionAutoEndService } from './session-duration/session-auto-end.servi
     SessionEndNotifier,
     ResourceUsageFlowsBridge,
     SessionAutoEndService,
+    SessionEndMaintenanceRequests,
   ],
-  exports: [ResourceUsageService, ResourceActivityVisibilityService, PreStartService, SessionEndNotifier],
+  exports: [
+    ResourceUsageService,
+    ResourceActivityVisibilityService,
+    PreStartService,
+    SessionEndNotifier,
+    SessionEndMaintenanceRequests,
+  ],
 })
 export class ResourceUsageModule {}

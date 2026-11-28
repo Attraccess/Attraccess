@@ -99,6 +99,22 @@ describe('TypeOrmResourceStore on real PostgreSQL', () => {
     expect((await store.findDetailed([door.id]))[0].accessOnly).toBe(false);
   });
 
+  it('stores whether the machine check is asked at session end, asked by default', async () => {
+    const quiet = await store.create(base('Saw', { askMaintenanceCheckOnSessionEnd: false }));
+    expect(quiet.askMaintenanceCheckOnSessionEnd).toBe(false);
+
+    const [detailed] = await store.findDetailed([quiet.id]);
+    expect(detailed.askMaintenanceCheckOnSessionEnd).toBe(false);
+    await store.save({ ...detailed, askMaintenanceCheckOnSessionEnd: true });
+    expect((await store.findDetailed([quiet.id]))[0].askMaintenanceCheckOnSessionEnd).toBe(true);
+
+    // A resource created without the setting takes the column default.
+    const withoutSetting: Partial<NewResource> = base('Mill');
+    delete withoutSetting.askMaintenanceCheckOnSessionEnd;
+    const asked = await store.create(withoutSetting as NewResource);
+    expect((await store.findDetailed([asked.id]))[0].askMaintenanceCheckOnSessionEnd).toBe(true);
+  });
+
   it('deletes the dashboard pins of a soft-deleted resource only', async () => {
     const [user] = await source.getRepository(User).save([{ username: 'pinner', email: 'pinner@example.com' } as User]);
     const laser = await store.create(base('Laser'));

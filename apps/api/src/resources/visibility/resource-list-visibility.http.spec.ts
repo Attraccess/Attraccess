@@ -27,6 +27,7 @@ import { supervisionModesFrom } from '../usage/authorization/supervision-modes.t
 import { ResourceActivityVisibilityService } from '../usage/authorization/resource-activity-visibility.service';
 import { PreStartService } from '../usage/pre-start/pre-start.service';
 import { SessionEndNotifier } from '../usage/pre-start/session-end-notifier.service';
+import { SessionEndMaintenanceRequests } from '../usage/sessions/session-end-maintenance-requests';
 import { SettingsService } from '../../settings/settings.service';
 import { ResourceListVisibilityService } from './resource-list-visibility.service';
 
@@ -136,6 +137,7 @@ describe('machine list visibility over HTTP (ATT-843)', () => {
         // Network restriction is not what this spec tests: every action is allowed.
         { provide: NetworkRestrictionService, useValue: { assertAllowed: jest.fn() } },
         { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+        { provide: SessionEndMaintenanceRequests, useValue: { fileAfterEnd: jest.fn() } },
       ],
     })
       .overrideGuard(DualAuthGuard)

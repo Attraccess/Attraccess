@@ -87,6 +87,12 @@ private:
     void createSessionControls();
     void createDoorControls();
     void createStatusPanels();
+    void createReportProblemButton(); // resourceDetailsMaintenance.cpp
+    void updateReportProblemButton();
+    void placeReportProblemButton(bool stopShown);
+    lv_obj_t *createStopSessionRow();
+    lv_obj_t *stopSessionRow = nullptr;
+    lv_obj_t *reportProblemButton = nullptr;
     Logger logger;
     lv_obj_t *screen = nullptr;
     lv_obj_t *body = nullptr; // the scrolling part under the session header

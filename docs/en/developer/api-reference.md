@@ -83,6 +83,14 @@ Unbilled reply (including zero charges):
 {"event":"EVENT","data":{"type":"STOP_RESOURCE_USAGE_SESSION","payload":{"success":true,"requestId":43,"endedOwnSession":true,"durationSeconds":1440}}}
 ```
 
+**Maintenance check.** A reader that asked "Is the machine OK?" and got "Needs maintenance" adds `maintenanceRequest: { reason: string }` (3–2000 characters) to the STOP payload, and sends the same answer again with the STOP that follows the end forms. The server files the request in the name of the card holder only after the session ended; a failed stop files nothing. The success reply then contains `maintenanceRequestFiled: boolean`. It is `false` without the maintenance license module, for an invalid reason, or when filing failed; the session is ended anyway. Without `maintenanceRequest` the field is absent. The web end call (`POST /api/resources/{resourceId}/usage/end`) takes the same `maintenanceRequest` and answers with the same field. The server never requires the answer.
+
+## Attractap WebSocket: report a problem
+
+The reader sends `data.type: "CREATE_MAINTENANCE_REQUEST"` with `data.payload: { resourceId: number, reason: string, requestId?: number }` while a card holder is signed in. The server files a maintenance request for that user, like `POST /api/resources/{resourceId}/maintenance-requests`, with the same notifications. It answers with the same event type, the echoed request ID and either `success: true` or `error: string`: the codes of the other reader actions (for example `RESOURCE_NOT_ASSOCIATED_WITH_READER` or `USER_NOT_AUTHENTICATED`), `MAINTENANCE_NOT_LICENSED`, `INVALID_REASON` (not 3–2000 characters) or `REQUEST_FAILED`.
+
+The resource list tells the signed-in card holder per resource whether to offer this: `canRequestMaintenance` (maintenance license module, and the user cannot manage the maintenance of the resource) and `askMaintenanceCheckOnEnd` (`canRequestMaintenance` and the resource setting `askMaintenanceCheckOnSessionEnd`).
+
 ## Session duration and extension
 
 Machines can have a **max session time** and can **require a duration estimate** (resource fields `maxSessionDurationMinutes`, `requireSessionDurationEstimate` and `defaultSessionDurationEstimateMinutes`; machines only, doors ignore them). A session stores its deadline when it starts: `autoEndAt` (when the server ends it), `maxAutoEndAt` (the latest the end can be extended to; `null` without a max session time, then the 30 day limit applies) and `estimatedDurationMinutes`. Changing the resource settings later does not change running sessions.
