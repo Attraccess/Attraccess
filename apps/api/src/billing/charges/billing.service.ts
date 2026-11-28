@@ -1,4 +1,5 @@
 import {
+  BillingTransactionItemCreateSchema,
   BillingTransactionDetail,
   BillingTransactionPage,
   BillingTransactionRecord,
@@ -43,6 +44,9 @@ import {
   usagePartCharges,
   type UsagePartRates,
 } from './project-switch-charges';
+
+/** The price a flow's billing item node adds, as the node's schema reads it. */
+const BILLING_ITEM_PRICE = BillingTransactionItemCreateSchema.pick({ unitPrice: true });
 
 @Injectable()
 export class BillingService {
@@ -114,7 +118,10 @@ export class BillingService {
       type,
       context,
     );
-    return [...own, ...global].some((node) => Number((node.data as { unitPrice?: unknown } | null)?.unitPrice) < 0);
+    return [...own, ...global].some((node) => {
+      const item = BILLING_ITEM_PRICE.safeParse(node.data);
+      return item.success && item.data.unitPrice < 0;
+    });
   }
 
   /**

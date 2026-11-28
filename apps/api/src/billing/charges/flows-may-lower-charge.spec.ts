@@ -19,4 +19,14 @@ describe('BillingService.flowsMayLowerCharge', () => {
       undefined,
     );
   });
+
+  it('reads the price as the billing item schema does and skips a node without one', async () => {
+    const { service, flows } = createBillingServiceFixture();
+    flows.getNodes.mockResolvedValue([{ data: null }, { data: { name: 'Rebate' } }, { data: { unitPrice: 'x' } }]);
+    await expect(service.flowsMayLowerCharge(205)).resolves.toBe(false);
+
+    // Only the price counts: a node whose quantity comes from its input still lowers the charge.
+    flows.getGlobalNodesOfFlowsWith.mockResolvedValue([{ data: { unitPrice: -2 } }]);
+    await expect(service.flowsMayLowerCharge(205)).resolves.toBe(true);
+  });
 });

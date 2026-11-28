@@ -88,14 +88,18 @@ export class TypeOrmFlowGraphStore implements FlowGraphStore {
     return (await this.nodes.find({ where: { flowId } })).map(toNodeRecord);
   }
 
-  async loadEnabledGlobalCanvases(scope?: TransactionScope): Promise<Array<{ flow: FlowRecord; canvas: FlowCanvas }>> {
+  async loadEnabledGlobalCanvases(
+    scope?: TransactionScope,
+    options: { edges?: boolean } = {},
+  ): Promise<Array<{ flow: FlowRecord; canvas: FlowCanvas }>> {
     const manager = scope ? this.unitOfWork.handleOf(scope) : this.dataSource.manager;
     const flows = await manager.find(Flow, { where: { enabled: true, ...GLOBAL_SCOPE }, order: { id: 'ASC' } });
     if (flows.length === 0) return [];
     const flowIds = flows.map((flow) => flow.id);
     // One after the other: a transaction has a single connection.
     const nodes = await manager.find(ResourceFlowNode, { where: { flowId: In(flowIds) } });
-    const edges = await manager.find(ResourceFlowEdge, { where: { flowId: In(flowIds) } });
+    const edges =
+      options.edges === false ? [] : await manager.find(ResourceFlowEdge, { where: { flowId: In(flowIds) } });
     return flows.map((flow) => ({
       flow: toFlowRecord(flow),
       canvas: {

@@ -211,7 +211,7 @@ export class ResourceFlowsService {
     type: ResourceFlowNodeType,
     scope?: TransactionScope,
   ): Promise<FlowNodeRecord[]> {
-    return (await this.graph.loadEnabledGlobalCanvases(scope))
+    return (await this.graph.loadEnabledGlobalCanvases(scope, { edges: false }))
       .filter(({ canvas }) => canvas.nodes.some((node) => node.type === trigger))
       .flatMap(({ canvas }) => canvas.nodes.filter((node) => node.type === type));
   }

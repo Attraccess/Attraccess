@@ -248,6 +248,12 @@ describe('flow adapters on real PostgreSQL', () => {
         ['One', 2, 1],
         ['Two', 1, 0],
       ]);
+      // Without edges for a caller that only looks at nodes.
+      const nodesOnly = await graph.loadEnabledGlobalCanvases(undefined, { edges: false });
+      expect(nodesOnly.map(({ canvas: own }) => [own.nodes.length, own.edges.length])).toEqual([
+        [2, 0],
+        [1, 0],
+      ]);
     });
 
     it('finds nodes by type for one resource or several', async () => {
