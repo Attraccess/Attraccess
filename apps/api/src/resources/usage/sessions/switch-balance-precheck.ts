@@ -30,12 +30,9 @@ export async function assertNewSessionPayableAfterCharge(
   try {
     await lifecycle.transaction(async (scope) => {
       if (await billing.flowsMayLowerCharge(resourceId, scope)) return;
-      const { sessions } = lifecycle;
       // A session that changed meanwhile is the commit's to report.
       const end = { endTime: switchTime, endNotes: null };
-      if (!(await sessions.endSessionIfOpen(previousUsageId, end, scope))) return;
-      const ended = await sessions.findSessionWithRelations(previousUsageId, 'ended', scope);
-      await lifecycle.settleEndedSession(scope, ended, final);
+      if (!(await lifecycle.endAndSettleIfOpen(scope, previousUsageId, end, final))) return;
       await billing.validateResourceUsageStart(resourceId, continuation, user, scope);
       throw new TrialCharge();
     });

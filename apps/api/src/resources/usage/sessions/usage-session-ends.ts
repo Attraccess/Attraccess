@@ -2,7 +2,7 @@ import { ResourceFlowNodeType, ResourceFormAction, ResourceType } from '@attracc
 import type { UsageFormSubmissionDraft, UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
 import { optionalUserDisplayName } from '@attraccess/shared';
-import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { randomUUID } from 'node:crypto';
 
@@ -210,18 +210,15 @@ export class UsageSessionEnds {
       updatedUsage = await this.lifecycle.transaction(async (scope) => {
         const attempt = await this.lifecycle.getLifecycleAttempt(scope, attemptId, resourceId);
         await this.lifecycle.applyLifecycleDrafts(scope, attempt);
-        const ended = await this.lifecycle.sessions.endSessionIfOpen(
+        const settled = await this.lifecycle.endAndSettle(
+          scope,
           prepared.activeSession.id,
           prepared.updateData,
-          scope,
+          final,
+          'Usage session changed while ending',
         );
-        if (!ended) throw new ConflictException('Usage session changed while ending');
-        const endedSession = await this.lifecycle.sessions.findSessionWithRelations(
-          prepared.activeSession.id,
-          'ended',
-          scope,
-        );
-        chargeTransactionId = await this.lifecycle.settleEndedSession(scope, endedSession, final);
+        chargeTransactionId = settled.chargeTransactionId;
+        const endedSession = settled.ended;
         await this.lifecycle.sessions.deleteAttempt(attemptId, resourceId, scope);
         await this.audit.record(
           {

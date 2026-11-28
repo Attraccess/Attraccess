@@ -16,6 +16,7 @@ import { TransactionScope, UNIT_OF_WORK, UnitOfWork, runWithRetry } from '../../
 import { ResourceUsageLifecycleAbortedEvent } from '../events/resource-usage.events';
 
 import { SessionChangeInterruptedError } from '../errors/session-change-interrupted.error';
+import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
 
 import { ExternalEffectFailureError } from '../../flows/errors/external-effect-failure.error';
 
@@ -92,6 +93,18 @@ export interface StartSessionOptions {
    * estimate sets its deadline instead.
    */
   canAskDuration?: boolean;
+}
+
+/** When and why a running usage ends. */
+export interface SessionEnd {
+  endTime: Date;
+  endNotes: string | null | undefined;
+}
+
+/** A usage that was ended and billed, with its charge transaction (none when nothing was charged). */
+export interface EndedAndSettled {
+  ended: UsageSessionWithParties;
+  chargeTransactionId: number | undefined;
 }
 
 /** Published usage sessions on the machine around a start, stop or takeover, handed to flows as `activeSessions`. */
@@ -181,6 +194,34 @@ export class UsageLifecycle {
       ? await this.billingService.chargeForResourceUsage(endedSession, scope, operatingShare)
       : await this.billingService.chargeForResourceUsage(endedSession, scope);
     return charge?.id;
+  }
+
+  /**
+   * Ends a running usage at `end` and bills it, all in `scope`: the end of a stop, of the session a takeover replaces,
+   * and of the part a project switch closes. `null` when the usage had already ended.
+   */
+  async endAndSettleIfOpen(
+    scope: TransactionScope,
+    usageId: number,
+    end: SessionEnd,
+    final: FinalCollection,
+  ): Promise<EndedAndSettled | null> {
+    if (!(await this.sessions.endSessionIfOpen(usageId, end, scope))) return null;
+    const ended = await this.sessions.findSessionWithRelations(usageId, 'ended', scope);
+    return { ended, chargeTransactionId: await this.settleEndedSession(scope, ended, final) };
+  }
+
+  /** {@link endAndSettleIfOpen}, refused with `conflictMessage` when the usage had already ended. */
+  async endAndSettle(
+    scope: TransactionScope,
+    usageId: number,
+    end: SessionEnd,
+    final: FinalCollection,
+    conflictMessage: string,
+  ): Promise<EndedAndSettled> {
+    const result = await this.endAndSettleIfOpen(scope, usageId, end, final);
+    if (!result) throw new ConflictException(conflictMessage);
+    return result;
   }
 
   async applyLifecycleDrafts(context: TransactionScope, attempt: UsageLifecycleAttempt): Promise<void> {
@@ -392,6 +433,18 @@ export class UsageLifecycle {
   async getLifecycleAttempt(context: TransactionScope, id: string, resourceId: number): Promise<UsageLifecycleAttempt> {
     const attempt = await this.sessions.findAttempt(id, resourceId, context);
     if (!attempt) throw new SessionChangeInterruptedError();
+    return attempt;
+  }
+
+  /** The attempt of a start, takeover or switch that still has `candidateUsageId` as its tentative session. */
+  async getAttemptOfCandidate(
+    context: TransactionScope,
+    id: string,
+    resourceId: number,
+    candidateUsageId: number,
+  ): Promise<UsageLifecycleAttempt> {
+    const attempt = await this.getLifecycleAttempt(context, id, resourceId);
+    if (attempt.candidateUsageId !== candidateUsageId) throw new TentativeSessionCancelledError();
     return attempt;
   }
 

@@ -11,7 +11,7 @@ import type {
   UsageSessionWithParties,
   UsageFormSubmissionDraft,
 } from '@attraccess/application-models';
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
 import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../../audit/recorder/audit-event';
@@ -24,7 +24,6 @@ import type { SwitchUsageSessionProjectDto } from '../dtos/switchUsageSessionPro
 import { MachineBusyError } from '../errors/machine-busy.error';
 import { NoSessionToSwitchError } from '../errors/no-session-to-switch.error';
 import { SessionChangeInterruptedError } from '../errors/session-change-interrupted.error';
-import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
 import { ActiveSessionCounts, UsageLifecycle } from '../lifecycle/usage-lifecycle';
 import { usageFlowPayload } from '../lifecycle/usage-flow-payload';
 import { assertNewSessionPayableAfterCharge } from './switch-balance-precheck';
@@ -265,16 +264,18 @@ export class UsageSessionProjectSwitch {
     final: FinalCollection,
   ) {
     const { sessions } = this.lifecycle;
-    const attempt = await this.lifecycle.getLifecycleAttempt(scope, attemptId, resourceId);
-    if (attempt.candidateUsageId !== continuation.id) throw new TentativeSessionCancelledError();
+    const attempt = await this.lifecycle.getAttemptOfCandidate(scope, attemptId, resourceId, continuation.id);
     await sessions.inheritDeadline(previous.id, continuation.id, scope);
     // Submitted forms belong to the continuation, billing items the flows added to the part that ends.
     await this.lifecycle.applyLifecycleDrafts(scope, attempt);
     // No end notes: the session goes on.
-    const ended = await sessions.endSessionIfOpen(previous.id, { endTime: switchTime, endNotes: null }, scope);
-    if (!ended) throw new ConflictException('Usage session changed during the project switch');
-    const endedSession = await sessions.findSessionWithRelations(previous.id, 'ended', scope);
-    const chargeTransactionId = await this.lifecycle.settleEndedSession(scope, endedSession, final);
+    const { chargeTransactionId } = await this.lifecycle.endAndSettle(
+      scope,
+      previous.id,
+      { endTime: switchTime, endNotes: null },
+      final,
+      'Usage session changed during the project switch',
+    );
     // After the old part's charge, which a charging mode with its own balance check has to see.
     await this.billingService.handleResourceUsageContinuation(resourceId, continuation, user, scope);
     if (!(await sessions.publishSession(continuation.id, scope))) throw new SessionChangeInterruptedError();
