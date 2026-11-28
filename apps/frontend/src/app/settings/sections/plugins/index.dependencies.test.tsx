@@ -78,7 +78,7 @@ describe('plugin dependency confirmations', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Install plugin' }));
     expect(hoisted.installPackageMock).toHaveBeenCalledWith({
       path: { packageName: provider.name, version: '1.0.0' },
-      body: { registryId: 'npm', planToken: 'reviewed-plan' },
+      body: { registryId: 'npm', followHostChannel: true, planToken: 'reviewed-plan' },
     });
   });
 
@@ -294,9 +294,9 @@ describe('plugin version management', () => {
     expect(screen.getByRole('button', { name: 'Downgrade to 1.0.0' })).toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: /^2\.0\.0 / }));
     expect(screen.getByRole('checkbox')).not.toBeChecked();
-    expect(screen.getByRole('switch')).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: /I approve/ })).not.toBeChecked();
     await user.click(screen.getByRole('checkbox'));
-    await user.click(screen.getByRole('switch'));
+    await user.click(screen.getByRole('switch', { name: /I approve/ }));
     await user.click(screen.getByRole('button', { name: 'Update to 2.0.0' }));
     await waitFor(() =>
       expect(hoisted.replaceInstalledPackageMock).toHaveBeenCalledWith({

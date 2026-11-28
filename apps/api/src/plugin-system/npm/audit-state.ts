@@ -6,7 +6,8 @@ import type { AuthenticationMethod } from '@attraccess/application-models';
 
 export interface PendingNpmPluginAudit {
   operationId: string;
-  actorId: number;
+  /** Null when the host acted on its own (an automatic update). */
+  actorId: number | null;
   authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number;
   details: Record<string, string | number>;

@@ -10,13 +10,23 @@ import {
   safeRequestedSpec,
 } from '../audit/policies/administration';
 
-import { AUDIT_RECORDER, AuditActor, AuditDetails, AuditRecorder } from '../audit/recorder/audit-event';
+import {
+  AUDIT_RECORDER,
+  AuditActor,
+  AuditDetails,
+  AuditRecorder,
+  SYSTEM_AUDIT_ACTOR,
+} from '../audit/recorder/audit-event';
 
 import { FileUpload } from '../common/types/file-upload.types';
+
+import { resolvePluginChannel } from '../config/app.config';
 
 import { AddPluginRegistryDto } from './dto/npm-plugin-request.dto';
 
 import { InstalledNpmPlugin, NpmPluginAuditState, NpmPluginService } from './npm-plugin.service';
+
+import { automaticUpdateRefusal } from './npm/package-models';
 
 import { PluginService } from './plugin.service';
 import { isPluginRestartRequired } from './runtime/restart-required';
@@ -31,7 +41,7 @@ type PackageOverride = NonNullable<InstalledNpmPlugin['updateOverride']>;
  * Plugin package, registry and lifecycle changes made by an administrator, and their audit. Without an actor
  * (an internal caller) nothing is audited. Package changes only mark a restart as required
  * (`markPluginRestartRequired`); the administrator restarts with {@link restart}. A retry still restarts
- * at once.
+ * at once, and the update scheduler restarts for its own updates inside the scheduled window.
  */
 @Injectable()
 export class PluginAdministrationService {
@@ -46,9 +56,12 @@ export class PluginAdministrationService {
     const policy = await this.npmPluginService.setUpdatePolicy(body);
     await this.record(actor, 'plugin.update_policy_updated', 1, 'plugin-policy', {
       checksEnabled: policy.checksEnabled ? 1 : 0,
+      automaticUpdates: policy.automaticUpdates ? 1 : 0,
       updateMode: policy.mode,
-      maintenanceStartMinute: policy.maintenanceWindow.startMinute,
-      maintenanceDurationMinutes: policy.maintenanceWindow.durationMinutes,
+      maintenanceWeekdays: policy.schedule.weekdays.join(','),
+      maintenanceStartMinute: policy.schedule.startMinute,
+      maintenanceDurationMinutes: policy.schedule.durationMinutes,
+      maintenanceTimeZone: policy.schedule.timeZone ?? 'UTC',
       prerelease: policy.prerelease ? 1 : 0,
     });
     return policy;
@@ -114,9 +127,52 @@ export class PluginAdministrationService {
     );
   }
 
-  install(packageName: string, spec: string, registryId?: string, planToken?: string, actor?: AuditActor) {
-    return this.installWithAudit(actor, 'plugin.installed', packageName, spec, (state) =>
-      this.npmPluginService.install(packageName, spec, registryId, state, planToken),
+  /**
+   * An update the host installs on its own, audited as the system actor. It goes through the same replacement as a
+   * manual one and approves nothing: no new permissions, no major version, no additional plugins. The restart is left
+   * to the caller (`onRestartRequired`), so that one restart activates several updates.
+   */
+  applyAutomaticUpdate(packageName: string, version: string, onRestartRequired: () => void) {
+    const before = this.npmPluginService.listInstalled().find((plugin) => plugin.name === packageName);
+    return this.installWithAudit(
+      SYSTEM_AUDIT_ACTOR,
+      'plugin.replaced',
+      packageName,
+      before?.requestedSpec ?? version,
+      async (state) => {
+        await this.assertAutomaticUpdateSource(packageName, version, before);
+        const plan = await this.npmPluginService.installPlan(packageName, version, before?.registryId);
+        if (plan.plugins.some((plugin) => plugin.name !== packageName && plugin.action !== 'reuse'))
+          throw new BadRequestException('The update needs other plugins installed or changed; install it manually');
+        return this.npmPluginService.replaceInstalled(packageName, version, [], false, state, plan.token);
+      },
+      before,
+      onRestartRequired,
+    );
+  }
+
+  /** The check of the update offer, repeated right before an unattended install (see `automaticUpdateRefusal`). */
+  private async assertAutomaticUpdateSource(packageName: string, version: string, before?: InstalledNpmPlugin) {
+    if (!before) throw new NotFoundException('Plugin package is not installed');
+    const versions = await this.npmPluginService.installedVersionCandidates(packageName);
+    const candidate = versions.find((item) => item.version === version);
+    if (!candidate) throw new NotFoundException('Package version not found');
+    const refusal = automaticUpdateRefusal(candidate, before, versions);
+    if (refusal) throw new BadRequestException(`${refusal}; install it manually`);
+  }
+
+  /** `recordAs` is the requested spec to remember when it differs from the `spec` that is installed. */
+  install(
+    packageName: string,
+    spec: string | undefined,
+    registryId?: string,
+    planToken?: string,
+    actor?: AuditActor,
+    recordAs?: string,
+  ) {
+    const requestedSpec = recordAs ?? spec ?? resolvePluginChannel();
+    return this.installWithAudit(actor, 'plugin.installed', packageName, requestedSpec, (state) =>
+      this.npmPluginService.install(packageName, spec, registryId, state, planToken, recordAs),
     );
   }
 
@@ -255,7 +311,8 @@ export class PluginAdministrationService {
 
   /**
    * Runs an install or replacement and records its lifecycle state (integrity, migration, activation,
-   * rollback) as the operation filled it in, also when it fails. The operation marks the restart its changes need.
+   * rollback) as the operation filled it in, also when it fails. The operation marks the restart its changes need;
+   * `onRestartRequired` also tells an unattended caller, which has no administrator to trigger it.
    */
   private async installWithAudit(
     actor: AuditActor | undefined,
@@ -264,9 +321,10 @@ export class PluginAdministrationService {
     requestedSpec: string,
     operation: (state: NpmPluginAuditState) => Promise<InstalledNpmPlugin>,
     before?: InstalledNpmPlugin,
+    onRestartRequired?: () => void,
   ) {
     const state: NpmPluginAuditState = {
-      ...(actor?.id
+      ...(actor
         ? {
             context: {
               operationId: randomUUID(),
@@ -295,9 +353,11 @@ export class PluginAdministrationService {
       const installed = await operation(state);
       const outcome = installed.state === 'quarantined' ? 'failed' : 'succeeded';
       await this.record(actor, action, subjectId, 'plugin-package', lifecycle(), outcome, state.context?.operationId);
+      if (state.context && state.restartRequested) onRestartRequired?.();
       return installed;
     } catch (error) {
       await this.record(actor, action, subjectId, 'plugin-package', lifecycle(), 'failed', state.context?.operationId);
+      if (state.context && state.restartRequested) onRestartRequired?.();
       throw error;
     }
   }
@@ -336,7 +396,8 @@ export class PluginAdministrationService {
     outcome: 'succeeded' | 'failed' = 'succeeded',
     operationId?: string,
   ) {
-    if (!actor?.id) return;
+    // Without an actor nothing is audited; the system actor (no user id) is one.
+    if (!actor) return;
     await this.audit.record({
       domain: 'administration',
       action,

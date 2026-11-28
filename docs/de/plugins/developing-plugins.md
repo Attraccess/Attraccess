@@ -1289,6 +1289,17 @@ pnpm nx zip plugin-rabbitmq
 pnpm nx show projects --projects=tag:type:plugin
 ```
 
+**Ladeprüfung der Pakete:** Der `plugins`-Job von Pull Requests, Nightlies und Releases führt nach dem Packen auch
+`pnpm nx run api:verify-packed-plugins` aus. Sie installiert jeden gepackten Plugin-Tarball unter seinem
+npm-Paketnamen (`@attraccess/plugin-<name>`) über den npm-Installationsweg des Hosts, startet einen echten
+API-Host auf PostgreSQL (Core- und Plugin-Migrationen, Plugin-Erkennung, `AppModule`) und schlägt fehl, wenn ein
+Plugin nicht den Zustand „geladen“ erreicht. Lizenzpflichtige Plugins laden, weil die Prüfung die von ihnen
+deklarierten Lizenzmodule gewährt; ihre Storage-Kompilierung und Migrationen laufen also trotzdem. `pack-test`
+prüft nur den Tarball und sieht daher nicht, was ein Host bei Installation oder Laden ablehnt. Der nächtliche
+`publish-plugins`-Job und der Veröffentlichungsschritt des Releases laufen erst, wenn sie bestanden wurde. Lokal führen Sie sie nach
+`pnpm nx run-many --target=pack --projects=tag:type:plugin` aus; sie braucht PostgreSQL und eine administrative
+`TEST_DATABASE_URL`.
+
 PR-Builds laden die ZIPs als Artefakte hoch (mit Sticky-PR-Kommentar); Releases
 hängen sie als Release-Assets an.
 

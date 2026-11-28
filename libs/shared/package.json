@@ -6,6 +6,7 @@
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
   "dependencies": {
+    "@internationalized/date": "^3.12.4",
     "tslib": "^2.8.1"
   }
 }

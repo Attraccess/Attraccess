@@ -140,6 +140,10 @@ jobs:
       - uses: ./.github/actions/setup-browser-tests
       - name: Test and pack all plugins
         run: node scripts/ci-test-projects.mjs --group=plugins
+      # Loads every packed plugin in a real host (PostgreSQL) under its npm package name, as the marketplace installs
+      # it. `pack-test` only inspects the tarball; this fails when a real host refuses the plugin.
+      - name: Load packed official plugins in a real host
+        run: pnpm nx run api:verify-packed-plugins
       - name: Test packed Hello World fixture
         run: pnpm --dir examples/plugin-hello-world run pack-test
 
@@ -223,6 +227,8 @@ jobs:
           ghcr-token: ${{ secrets.GITHUB_TOKEN }}
           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          # Nightly hosts install the `next` plugin builds and offer newer ones (automatic updates stay opt-in).
+          plugin-channel: next
 
       # An older run finishing late must not move nightly-latest backwards; its nightly-<sha7> image stays.
       - name: Move nightly-latest unless a newer commit already owns it

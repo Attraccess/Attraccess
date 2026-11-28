@@ -466,6 +466,10 @@ export class AttractapService {
     return this.decryptCardKey(await this.cardStore.findByUid(uid));
   }
 
+  /**
+   * Stores the card and notifies its owner. Throws `CardAlreadyEnrolledError` (nothing stored, nobody notified) when
+   * another record holds the UID in any letter case.
+   */
   public async createNFCCard(
     user: AttractapCardOwner,
     data: NewAttractapNfcCard,

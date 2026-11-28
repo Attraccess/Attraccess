@@ -385,15 +385,15 @@ describe('client helpers', () => {
   it('builds the full header set with a bearer token only when given', () => {
     const base = {
       attraccessVersion: '2.0.0',
-      pluginVersion: '0.5.0-alpha.0',
-      sidecarVersion: '0.5.0-alpha.0',
+      pluginVersion: '0.5.1-alpha.0',
+      sidecarVersion: '0.5.1-alpha.0',
       correlationId: id,
     };
     expect(buildRequestHeaders({ ...base, deadlineMs: 1500.2, token: 'x'.repeat(32) })).toEqual({
       'x-matter-wire-version': '1',
       'x-attraccess-version': '2.0.0',
-      'x-matter-plugin-version': '0.5.0-alpha.0',
-      'x-matter-sidecar-version': '0.5.0-alpha.0',
+      'x-matter-plugin-version': '0.5.1-alpha.0',
+      'x-matter-sidecar-version': '0.5.1-alpha.0',
       'x-correlation-id': id,
       'x-request-deadline-ms': '1501',
       authorization: `Bearer ${'x'.repeat(32)}`,

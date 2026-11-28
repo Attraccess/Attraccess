@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 import * as semver from 'semver';
+import { resolvePluginChannel } from '../../config/app.config';
 
 import { NpmPluginPackage, parseNpmPluginPackage } from './contract-validation';
 
@@ -12,6 +13,7 @@ import {
   distIntegrity,
   matchesSpec,
   registryPublisher,
+  registryUploader,
   repositoryUrl,
   semverImpact,
   PluginInstallPlan,
@@ -54,15 +56,13 @@ export class NpmInstallationPlan {
     const metadata = (await this.catalog.packageMetadata(name, installed.registryId)) as {
       versions?: Record<string, unknown>;
       time?: Record<string, string>;
-      publisher?: unknown;
-      _npmUser?: unknown;
-      maintainers?: unknown;
     };
 
     return Object.entries(metadata.versions ?? {})
       .filter(([version]) => semver.valid(version))
       .map(([version, pkg]) => {
-        const publisher = registryPublisher(pkg) ?? registryPublisher(metadata) ?? installed.publisher;
+        // The npm user the registry recorded for this upload: a package cannot set it, unlike its own fields.
+        const publisher = registryUploader(pkg);
         try {
           const { manifest } = parseNpmPluginPackage(pkg, this.catalog.hostVersion());
           if (manifest.name !== name)
@@ -132,13 +132,24 @@ export class NpmInstallationPlan {
       homepage: pkg?.homepage ?? null,
       semverImpact: semverImpact(installed.version, version),
       matchesRequestedSpec: matchesSpec(version, installed.requestedSpec),
+      publisher,
     };
   }
 
+  /**
+   * What the requested spec of an installed plugin resolves to. A `next` host records `next` also for a package without
+   * that tag, and the host's channel can change later, so a missing `next` then stands for `latest`.
+   */
+  async resolveRequestedSpec(name: string, spec: string, registry: Registry) {
+    return this.resolveVersion(name, spec, registry, spec === 'next' ? 'latest' : undefined);
+  }
+
+  /** `spec` omitted means the host's plugin channel (see `NpmPackageCatalog.channelVersion`). */
   async resolveVersion(
     name: string,
-    spec: string,
+    spec: string | undefined,
     registry: Registry,
+    fallbackTag?: string,
   ): Promise<{
     version: string;
     metadata: { versions?: Record<string, PackageVersion>; 'dist-tags'?: Record<string, string> };
@@ -147,14 +158,19 @@ export class NpmInstallationPlan {
       versions?: Record<string, PackageVersion>;
       'dist-tags'?: Record<string, string>;
     };
-    const version = metadata.versions?.[spec]
-      ? spec
-      : (metadata['dist-tags']?.[spec] ?? semver.maxSatisfying(Object.keys(metadata.versions ?? {}), spec));
+    const followsChannel = spec === undefined || (spec === 'next' && resolvePluginChannel() === 'next');
+    const version = followsChannel
+      ? this.catalog.channelVersion(metadata)
+      : metadata.versions?.[spec]
+        ? spec
+        : (metadata['dist-tags']?.[spec] ??
+          semver.maxSatisfying(Object.keys(metadata.versions ?? {}), spec) ??
+          (fallbackTag ? metadata['dist-tags']?.[fallbackTag] : undefined));
     if (!version || !metadata.versions?.[version]) throw new NotFoundException('Package version not found');
     return { version, metadata };
   }
 
-  async installPlan(name: string, spec: string, registryId?: string): Promise<PluginInstallPlan> {
+  async installPlan(name: string, spec: string | undefined, registryId?: string): Promise<PluginInstallPlan> {
     const registry = await this.registry.registry(registryId);
     const stateHash = createHash('sha256').update(JSON.stringify(readInstalledNpmPlugins())).digest('hex');
     const installed = this.state.listInstalled();

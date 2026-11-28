@@ -224,7 +224,7 @@ const coreRows: { [D in CoreAuditDomain]: (event: CoreEvent<D>) => AuditRow | nu
   },
 
   administration(event) {
-    if (event.actor.id === null || event.subject.id === null) return null;
+    if (event.subject.id === null) return null;
     const apiTokenId = tokenId(event);
     const snapshot = projectAdministrationAuditEvent({
       action: event.action,
@@ -243,8 +243,8 @@ const coreRows: { [D in CoreAuditDomain]: (event: CoreEvent<D>) => AuditRow | nu
       domain: 'administration',
       pluginId: 'core',
       action: snapshot.action,
-      // The validated method, never null: these domains always stored the session default.
-      authenticationMethod: snapshot.authenticationMethod ?? 'session',
+      // These domains always stored the session default for a user. The system actor has no authentication.
+      authenticationMethod: snapshot.actorId === null ? null : (snapshot.authenticationMethod ?? 'session'),
       apiTokenId: snapshot.apiTokenId ?? null,
       subjectType: snapshot.subjectType,
       subjectId: snapshot.subjectId,

@@ -26,6 +26,17 @@ export function resolveAppVersion(
   return '0.0.0-dev';
 }
 
+export const PLUGIN_CHANNELS = ['latest', 'next'] as const;
+export type PluginChannel = (typeof PLUGIN_CHANNELS)[number];
+
+/**
+ * The npm dist-tag a host installs plugins from by default: `next` on nightly images (see the Dockerfile), `latest`
+ * everywhere else. Blank means unset; any other unknown value is rejected at boot by the app config schema.
+ */
+export function resolvePluginChannel(env: NodeJS.ProcessEnv = process.env): PluginChannel {
+  return env.ATTRACCESS_PLUGIN_CHANNEL?.trim() === 'next' ? 'next' : 'latest';
+}
+
 export function resolvePluginDir(env: NodeJS.ProcessEnv = process.env): string {
   return env.PLUGIN_DIR ?? join(env.STORAGE_ROOT ?? DEFAULT_STORAGE_ROOT, 'plugins');
 }
@@ -71,6 +82,12 @@ export const AppEnvSchema = z
     COMMIT_SHA: z.string().optional(),
     STATIC_FRONTEND_FILE_PATH: z.string().optional(),
     STATIC_DOCS_FILE_PATH: z.string().optional(),
+    /** Plugin release channel: the npm dist-tag marketplace and installs use by default. Blank is the default `latest`. */
+    ATTRACCESS_PLUGIN_CHANNEL: z.preprocess(
+      // Trimmed like `resolvePluginChannel` reads it.
+      (value) => (typeof value === 'string' ? value.trim() || undefined : value),
+      z.enum(PLUGIN_CHANNELS).default('latest'),
+    ),
     PLUGIN_DIR: z.string().min(1).default(resolvePluginDir),
     RESTART_BY_EXIT: z.coerce.boolean().default(false),
     DISABLE_PLUGINS: z.coerce.boolean().default(false),

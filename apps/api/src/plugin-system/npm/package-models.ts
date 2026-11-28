@@ -1,3 +1,4 @@
+import type { PluginUpdatePolicy } from './update-policy';
 import { BadRequestException } from '@nestjs/common';
 import * as semver from 'semver';
 import { randomUUID, createHash } from 'crypto';
@@ -52,6 +53,9 @@ export type InstalledNpmPlugin = {
     error: string | null;
   };
   knownGoodVersion?: string | null;
+  updateSettingsVersion?: number;
+  /** The last version the host failed to install on its own; it is not retried for a while. */
+  autoUpdateFailure?: { version: string; failedAt: string };
 };
 
 export type PluginInstallPlan = {
@@ -112,10 +116,28 @@ export function readInstalledNpmPlugins(): Array<InstalledNpmPlugin & { pendingA
       installedAt: record.installedAt ?? new Date(0).toISOString(),
       activatedAt: record.activatedAt ?? new Date(0).toISOString(),
       lastError: record.lastError ?? null,
-      updateOverride: record.updateOverride ?? 'inherit',
+      updateOverride: storedUpdateOverride(record),
       updateCheck: record.updateCheck ?? null,
       knownGoodVersion: record.knownGoodVersion ?? null,
+      updateSettingsVersion: UPDATE_SETTINGS_VERSION,
     }));
+  } catch {
+    return [];
+  }
+}
+
+/** The stored records from before the opt-in, with the override each loses by it (null when it keeps its meaning). */
+export function pluginsWithLegacyUpdateSettings(): Array<{ name: string; override: string | null }> {
+  const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
+  if (!existsSync(statePath)) return [];
+  try {
+    const records = JSON.parse(readFileSync(statePath, 'utf8')) as InstalledNpmPlugin[];
+    return records
+      .filter((record) => record.updateSettingsVersion !== UPDATE_SETTINGS_VERSION)
+      .map(({ name, updateOverride }) => ({
+        name,
+        override: updateOverride && !['inherit', 'off'].includes(updateOverride) ? updateOverride : null,
+      }));
   } catch {
     return [];
   }
@@ -275,6 +297,8 @@ export type InstalledNpmPluginVersion = {
   homepage: string | null;
   semverImpact: 'major' | 'minor' | 'patch' | 'prerelease' | 'none';
   matchesRequestedSpec: boolean;
+  /** The npm user the registry recorded as this version's uploader (`_npmUser`), or null when it records none. */
+  publisher: string | null;
 };
 
 export type MarketplacePlugin = {
@@ -313,6 +337,12 @@ export function registryPublisher(value: unknown): string | null {
   return metadata.maintainers.map(publisherName).find((name): name is string => name !== null) ?? null;
 }
 
+/** The uploader the registry recorded for one version. Unlike `publisher` or `maintainers`, the package cannot set it. */
+export function registryUploader(versionMetadata: unknown): string | null {
+  if (!versionMetadata || typeof versionMetadata !== 'object') return null;
+  return publisherName((versionMetadata as { _npmUser?: unknown })._npmUser);
+}
+
 export function publisherName(value: unknown): string | null {
   if (typeof value === 'string') return value;
   if (!value || typeof value !== 'object') return null;
@@ -337,31 +367,54 @@ export function packageName(value: unknown): string | null {
   return typeof name === 'string' ? name : null;
 }
 
-export const UPDATE_POLICY_KEY = 'update-policy';
+export {
+  DEFAULT_PLUGIN_UPDATE_POLICY,
+  PluginUpdatePolicy,
+  UPDATE_POLICY_KEY,
+  patchUpdatePolicy,
+  readStoredUpdatePolicy,
+  sameUpdatePolicy,
+} from './update-policy';
 
-export type PluginUpdatePolicy = {
-  checksEnabled: boolean;
-  mode: 'off' | 'patch' | 'minor' | 'follow';
-  maintenanceWindow: { startMinute: number; durationMinutes: number };
-  prerelease: boolean;
-};
+/** Marks records whose `updateOverride` was written since automatic updates became opt-in. */
+export const UPDATE_SETTINGS_VERSION = 2;
 
-export const DEFAULT_PLUGIN_UPDATE_POLICY: PluginUpdatePolicy = {
-  checksEnabled: true,
-  mode: 'minor',
-  maintenanceWindow: { startMinute: 180, durationMinutes: 120 },
-  prerelease: false,
-};
+/** An earlier override other than off could install on its own, so it falls back to the global (off) setting. */
+function storedUpdateOverride(record: InstalledNpmPlugin): NonNullable<InstalledNpmPlugin['updateOverride']> {
+  const override = record.updateOverride ?? 'inherit';
+  return record.updateSettingsVersion === UPDATE_SETTINGS_VERSION || override === 'off' ? override : 'inherit';
+}
 export function samePermissions(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((permission) => right.includes(permission));
 }
 export function semverImpact(current: string, target: string): InstalledNpmPluginVersion['semverImpact'] {
   if (!semver.valid(current) || !semver.valid(target) || semver.eq(current, target)) return 'none';
-  const difference = semver.diff(current, target);
-  if (difference === 'major' || difference === 'premajor') return 'major';
-  if (difference === 'minor' || difference === 'preminor') return 'minor';
+  // Compares the version numbers, not `semver.diff`: it calls `1.0.0-nightly.1` -> `1.0.0` (the release of the same
+  // line) and even `1.0.0-nightly.1` -> `1.3.0` major, so a `patch` override would let a minor update through.
+  if (semver.major(current) !== semver.major(target)) return 'major';
+  if (semver.minor(current) !== semver.minor(target)) return 'minor';
   if (semver.prerelease(target)) return 'prerelease';
   return 'patch';
+}
+/**
+ * Why the host must not install `candidate` on its own although the update policy allows it, or null. Nobody reviews
+ * an automatic update, so it only comes over HTTPS (or from this machine) and from the npm user who uploaded the
+ * installed version. `versions` are the registry's versions of the package, the installed one included: both uploaders
+ * come from the same registry response.
+ */
+export function automaticUpdateRefusal(
+  candidate: InstalledNpmPluginVersion,
+  installed: InstalledNpmPlugin,
+  versions: readonly InstalledNpmPluginVersion[],
+): string | null {
+  const { protocol, hostname } = new URL(installed.registryUrl);
+  if (protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(hostname))
+    return `${installed.registryUrl} does not use HTTPS`;
+  const current = versions.find(({ version }) => version === installed.version);
+  if (!current) return `the registry no longer lists the installed version ${installed.version}`;
+  if (candidate.publisher !== current.publisher)
+    return `${candidate.version} was published by ${candidate.publisher ?? 'an unknown npm user'}, not ${current.publisher ?? 'an unknown npm user'}`;
+  return null;
 }
 export function matchesSpec(
   version: string,
@@ -371,60 +424,38 @@ export function matchesSpec(
 ): boolean {
   return version === resolvedVersion || version === spec || semver.satisfies(version, spec, { includePrerelease });
 }
-export function normalizeUpdatePolicy(value: unknown): PluginUpdatePolicy {
-  const candidate = value as Partial<PluginUpdatePolicy>;
-  const mode = ['off', 'patch', 'minor', 'follow'].includes(candidate?.mode ?? '')
-    ? (candidate.mode as PluginUpdatePolicy['mode'])
-    : DEFAULT_PLUGIN_UPDATE_POLICY.mode;
-  const startMinute = candidate?.maintenanceWindow?.startMinute;
-  const durationMinutes = candidate?.maintenanceWindow?.durationMinutes;
-  if (!Number.isInteger(startMinute) || startMinute < 0 || startMinute >= 24 * 60)
-    throw new BadRequestException('Maintenance window start must be a minute of the day');
-  if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 24 * 60)
-    throw new BadRequestException('Maintenance window duration must be between 1 and 1440 minutes');
-  return {
-    checksEnabled:
-      typeof candidate?.checksEnabled === 'boolean'
-        ? candidate.checksEnabled
-        : DEFAULT_PLUGIN_UPDATE_POLICY.checksEnabled,
-    mode,
-    prerelease:
-      typeof candidate?.prerelease === 'boolean' ? candidate.prerelease : DEFAULT_PLUGIN_UPDATE_POLICY.prerelease,
-    maintenanceWindow: { startMinute, durationMinutes },
-  };
-}
 export function eligibleForPolicy(
   candidate: InstalledNpmPluginVersion,
   installed: InstalledNpmPlugin,
   policy: PluginUpdatePolicy,
   resolvedRequestedVersion?: string,
+  /** On a `next` host, plugins that request `next` follow it through prereleases. */
+  nextHost = false,
 ): boolean {
   const override = installed.updateOverride ?? 'inherit';
   const checksEnabled = override !== 'off' && policy.checksEnabled;
   const mode = effectiveUpdateMode(policy.mode, override);
   if (!checksEnabled || mode === 'off' || candidate.deprecated || candidate.permissionAdditions.length > 0)
     return false;
-  if (!policy.prerelease && semver.prerelease(candidate.version)) return false;
+  // This says what may be offered. Whether the host installs it is the global switch's and the schedule's decision.
+  const followsChannel =
+    nextHost && installed.requestedSpec === 'next' && candidate.version === resolvedRequestedVersion;
+  if (!policy.prerelease && !followsChannel && semver.prerelease(candidate.version)) return false;
   if (candidate.semverImpact === 'major') return false;
-  if (mode === 'patch') return candidate.semverImpact === 'patch';
-  if (mode === 'minor') return candidate.semverImpact === 'patch' || candidate.semverImpact === 'minor';
+  if (followsChannel && mode === 'minor') return true;
+  // `prerelease` is the step to a prerelease on the installed minor line: nothing is smaller than a patch step, so
+  // once prereleases are allowed it counts as one.
+  const step = policy.prerelease && candidate.semverImpact === 'prerelease' ? 'patch' : candidate.semverImpact;
+  if (mode === 'patch') return step === 'patch';
+  if (mode === 'minor') return step === 'patch' || step === 'minor';
   return matchesSpec(candidate.version, installed.requestedSpec, policy.prerelease, resolvedRequestedVersion);
 }
 export function effectiveUpdateMode(
   globalMode: PluginUpdatePolicy['mode'],
   override: NonNullable<InstalledNpmPlugin['updateOverride']>,
-): PluginUpdatePolicy['mode'] {
+): NonNullable<InstalledNpmPlugin['updateOverride']> | PluginUpdatePolicy['mode'] {
   if (override === 'inherit') return globalMode;
   return override;
-}
-export function sameUpdatePolicy(left: PluginUpdatePolicy, right: PluginUpdatePolicy): boolean {
-  return (
-    left.checksEnabled === right.checksEnabled &&
-    left.mode === right.mode &&
-    left.prerelease === right.prerelease &&
-    left.maintenanceWindow.startMinute === right.maintenanceWindow.startMinute &&
-    left.maintenanceWindow.durationMinutes === right.maintenanceWindow.durationMinutes
-  );
 }
 export function isDistTag(spec: string): boolean {
   return !semver.valid(spec) && !semver.validRange(spec);

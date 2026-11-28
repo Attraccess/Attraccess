@@ -100,6 +100,28 @@
         "output-path": "dist/apps/api-swagger"
       }
     },
+    "verify-packed-plugins-build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["^build"],
+      "inputs": ["production", "^production"],
+      "outputs": ["{workspaceRoot}/dist/apps/api-verify-plugins"],
+      "options": {
+        "command": "webpack-cli build",
+        "config": "apps/api/webpack.config.verify-plugins.js",
+        "args": ["node-env=production"],
+        "output-path": "dist/apps/api-verify-plugins"
+      }
+    },
+    "verify-packed-plugins": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["verify-packed-plugins-build"],
+      "options": {
+        "command": "node dist/apps/api-verify-plugins/main.js",
+        "cwd": "."
+      }
+    },
     "serve": {
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",

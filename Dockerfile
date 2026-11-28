@@ -135,6 +135,9 @@ COPY --from=builder /app/monitoring /app/share/monitoring
 # Commit the image was built from, shown on the About page (version.service)
 ARG COMMIT_SHA=
 ENV COMMIT_SHA=${COMMIT_SHA}
+# Plugin release channel (`latest` or `next`). Only the nightly image sets it; blank keeps the host default `latest`.
+ARG ATTRACCESS_PLUGIN_CHANNEL=
+ENV ATTRACCESS_PLUGIN_CHANNEL=${ATTRACCESS_PLUGIN_CHANNEL}
 
 # Set environment variable to tell API about frontend location
 ENV NODE_ENV=production

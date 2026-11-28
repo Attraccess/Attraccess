@@ -37,6 +37,16 @@ export class InstallPluginDto extends DependencyConfirmationDto {
   @IsOptional()
   @IsString()
   registryId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'The version was offered by the host, not chosen by the admin (marketplace install). A `next` host then records `next` as requested spec, so the plugin keeps following that channel; a `latest` host records the version.',
+  })
+  @IsOptional()
+  // Preserve the JSON value so global implicit conversion cannot turn "false" into true.
+  @Transform(({ obj, key }) => obj[key])
+  @IsBoolean()
+  followHostChannel?: boolean;
 }
 
 export class ReplaceInstalledPluginDto extends DependencyConfirmationDto {
