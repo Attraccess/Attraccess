@@ -34,7 +34,11 @@ void Application::openMaintenanceCheck(uint32_t usageId) {
            this->continueStopAfterCheck(reason);
          });
        },
-       [this] { this->cancelMaintenanceInput(); }});
+       // Cancel here keeps a reason kept from before: this screen never showed it.
+       [this] {
+         this->returnToListAfterAction = false;
+         Display::returnFromTransient();
+       }});
   Display::transitionToScreen(&Display::maintenanceCheckScreen);
 }
 

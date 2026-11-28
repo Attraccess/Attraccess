@@ -128,7 +128,10 @@ void ReaderWorkflow::testMaintenance()
     // Cancelling the end forms drops the answer: the next stop asks again and starts empty.
     login(false);
     maintenanceList(ownSession);
+    // The unfiled reason comes back, also after Cancel on the question, which never showed it.
+    click("Stop"); click("Abbrechen");
     click("Stop"); click("Wartung nötig");
+    assert(Display::maintenanceReasonScreen.reason() == "Rauch");
     Display::maintenanceReasonScreen.setText("Lüfter laut");
     click("Weiter");
     formRequest();
