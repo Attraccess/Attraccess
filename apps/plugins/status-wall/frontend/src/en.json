@@ -43,6 +43,13 @@
     "resources": "Resources",
     "selectedCount": "{{count}} selected",
     "needSelection": "Choose at least one group or resource.",
+    "unlistedGroups": "Selected groups that are not in this list: {{count}}. They are hidden from you or no longer exist.",
+    "removeUnlistedGroups": "Remove them from the selection",
+    "errors": {
+      "resourceUnavailable": "The selection contains a resource you cannot see. It is hidden from you or no longer exists. Clear the resource selection, choose the resources again, then save.",
+      "groupUnavailable": "The selection contains a group you cannot see. It is hidden from you or no longer exists. Remove it from the selection, then save.",
+      "allNeedsWholeList": "You can only show all resources if you can see the whole machine list. Switch off \"Show all resources\" and choose groups or resources."
+    },
     "create": "Create"
   },
   "link": {

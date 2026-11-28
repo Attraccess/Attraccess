@@ -14,6 +14,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { createWall, listResourceGroups, updateWall, type Wall, type WallSelection } from '../api';
 import { useStatusWallTranslations } from '../i18n';
+import { describeSaveError } from './saveError';
 
 const EMPTY: WallSelection = { all: true, resourceIds: [], groupIds: [] };
 
@@ -56,8 +57,11 @@ export function WallFormModal({ isOpen, wall, onOpenChange, onSaved }: Readonly<
       onSaved(saved, wall === null);
       onOpenChange(false);
     },
-    onError: (failure) => setError(failure instanceof Error ? failure.message : String(failure)),
+    onError: (failure) => setError(describeSaveError(failure, t)),
   });
+
+  // Stored groups the list does not offer (hidden from this manager or deleted) have no switch to turn them off.
+  const unlistedGroupIds = selection.groupIds.filter((id) => groups.data?.every((group) => group.id !== id));
 
   const hasSelection = selection.all || selection.resourceIds.length > 0 || selection.groupIds.length > 0;
   const canSave = name.trim().length > 0 && hasSelection;
@@ -89,7 +93,31 @@ export function WallFormModal({ isOpen, wall, onOpenChange, onSaved }: Readonly<
                     {group.name}
                   </LabeledSwitch>
                 ))}
-                {groups.data?.length === 0 && <p className="sw:text-sm sw:text-muted">{t('form.noGroups')}</p>}
+                {groups.data?.length === 0 && unlistedGroupIds.length === 0 && (
+                  <p className="sw:text-sm sw:text-muted">{t('form.noGroups')}</p>
+                )}
+                {unlistedGroupIds.length > 0 && (
+                  <div
+                    className="sw:flex sw:flex-col sw:items-start sw:gap-2"
+                    data-cy="status-wall-form-unlisted-groups"
+                  >
+                    <p className="sw:text-sm sw:text-muted">
+                      {t('form.unlistedGroups', { count: unlistedGroupIds.length })}
+                    </p>
+                    <Button
+                      variant="tertiary"
+                      size="sm"
+                      onPress={() =>
+                        setSelection({
+                          ...selection,
+                          groupIds: selection.groupIds.filter((id) => !unlistedGroupIds.includes(id)),
+                        })
+                      }
+                    >
+                      {t('form.removeUnlistedGroups')}
+                    </Button>
+                  </div>
+                )}
               </Fieldset>
               <Fieldset>
                 <Fieldset.Legend>{t('form.resources')}</Fieldset.Legend>
