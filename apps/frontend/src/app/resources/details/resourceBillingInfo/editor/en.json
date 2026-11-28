@@ -31,7 +31,7 @@
     },
     "projectSwitchCharging": {
       "label": "Charging on project switch",
-      "description": "How a running session is charged when its owner switches to another project. Each project is billed for its own part.",
+      "description": "How a running session is charged when its owner changes its project. Each part is billed separately and counted for its own project.",
       "options": {
         "continue": "Continue the session",
         "continue-per-part-rounding": "Continue, round each part",

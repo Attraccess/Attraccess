@@ -33,13 +33,13 @@ Pauschale, beide zeitabhängigen Tarife und der Abrechnungsfaktor des Benutzers 
 
 ## Abrechnung beim Projektwechsel
 
-Wer eine laufende Sitzung besitzt, kann [ihr Projekt wechseln](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln). Jeder Abschnitt wird auf einer eigenen Transaktion desselben Benutzers abgerechnet; „einem Projekt berechnet“ bedeutet, dass er in Nutzungsstatistik, Historie und Exporten dieses Projekts erscheint. **Abrechnung beim Projektwechsel** in den Abrechnungseinstellungen der Ressource legt fest, wie:
+Die Person, der eine laufende Sitzung gehört, kann [ihr Projekt wechseln](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln). Jeder Abschnitt wird auf einer eigenen Transaktion desselben Benutzers abgerechnet; „einem Projekt berechnet“ bedeutet, dass er in Nutzungsstatistik, Historie und Exporten dieses Projekts erscheint. **Abrechnung beim Projektwechsel** in den Abrechnungseinstellungen der Ressource legt fest, wie:
 
 | Option                              | Gebühr pro Nutzung              | Rundung von Sitzungs- und Betriebsminuten                                    | Guthabenprüfung beim Wechsel |
 | ----------------------------------- | ------------------------------- | ---------------------------------------------------------------------------- | ---------------------------- |
-| **Sitzung fortsetzen** (Standard)   | Nur einmal, im ersten Abschnitt | Auf fortlaufenden Grenzen ab dem ersten Start der Sitzung                    | Nein                         |
+| **Sitzung fortsetzen** (Standard)   | Nur einmal, im ersten Abschnitt | Fortlaufend ab dem ersten Start der Sitzung                                  | Nein                         |
 | **Fortsetzen, je Abschnitt runden** | Nur einmal, im ersten Abschnitt | Jeder Abschnitt rundet selbst auf: bis zu eine zusätzliche Minute je Wechsel | Nein                         |
-| **Wie eine neue Sitzung**           | In jedem Abschnitt              | Jeder Abschnitt rundet selbst auf                                            | Ja, wie beim Start           |
+| **Als neue Sitzung abrechnen**      | In jedem Abschnitt              | Jeder Abschnitt rundet selbst auf                                            | Ja, wie beim Start           |
 
 Bei **Sitzung fortsetzen** sind die berechneten Minuten eines Abschnitts die angefangenen Minuten vom ersten Start der Sitzung bis zum Ende des Abschnitts abzüglich derer bis zu seinem Beginn. Alle Abschnitte zusammen kosten daher so viele Zeit-Credits wie eine Sitzung ohne Wechsel; auch der Abrechnungsfaktor wird auf die laufende Summe gerundet. Beispiel mit 10 Credits pro Nutzung und 2 Credits pro Minute: Ein Wechsel nach 2,5 Minuten einer 4-minütigen Sitzung berechnet 10 + 3 × 2 für den ersten und 1 × 2 für den zweiten Abschnitt: 18 Credits, genau wie ohne Wechsel. Für aufgezeichnete Betriebsminuten gilt dieselbe Regel.
 

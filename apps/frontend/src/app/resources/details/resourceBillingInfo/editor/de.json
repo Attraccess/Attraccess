@@ -31,11 +31,11 @@
     },
     "projectSwitchCharging": {
       "label": "Abrechnung beim Projektwechsel",
-      "description": "Wie eine laufende Sitzung abgerechnet wird, wenn zu einem anderen Projekt gewechselt wird. Jedes Projekt zahlt seinen eigenen Abschnitt.",
+      "description": "Wie eine laufende Sitzung abgerechnet wird, wenn ihr Projekt gewechselt wird. Jeder Abschnitt wird getrennt abgerechnet und seinem Projekt zugeordnet.",
       "options": {
         "continue": "Sitzung fortsetzen",
         "continue-per-part-rounding": "Fortsetzen, je Abschnitt runden",
-        "new-session": "Wie eine neue Sitzung"
+        "new-session": "Als neue Sitzung abrechnen"
       },
       "descriptions": {
         "continue": "Keine neue Gebühr pro Nutzung. Minuten werden über alle Abschnitte gerundet, sodass sie zusammen nicht mehr kosten als eine Sitzung ohne Wechsel.",
