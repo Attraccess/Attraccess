@@ -142,6 +142,10 @@ expect_refused "no repository" env -u BACKUP_REPOSITORY
 expect_refused "no password" env -u BACKUP_PASSWORD
 expect_refused "no database" env -u DATABASE_URL
 expect_refused "bad max age" env BACKUP_MAX_AGE_HOURS=soon
+for bad in 0 00 -1 1.5; do
+  expect_refused "max age $bad" env BACKUP_MAX_AGE_HOURS="$bad"
+  printf '%s\n' "$out" | grep -q 'BACKUP_MAX_AGE_HOURS must be' || die "max age '$bad' must be named, got: $out"
+done
 expect_refused "mysql database" env DATABASE_URL="mysql://user:url-secret@db/attraccess"
 grep -q 'DATABASE_URL must be a postgres' <<OUT || die "the refused database URL must be named, got: $out"
 $out
@@ -201,6 +205,21 @@ grep -q '^backup_last_success_timestamp_seconds 1700000000$' "$work/status/backu
 kill -TERM "$enabled_pid"; wait "$enabled_pid" || true
 [ ! -e "$work/status/status" ] || die "stopping must remove the status"
 pass "working configuration: status enabled while running, removed on stop"
+
+# 8e. Leading zeros in BACKUP_MAX_AGE_HOURS are decimal. Shell arithmetic would read them as octal: `010` as 8 hours,
+#     and `08` would end the start before it wrote its metrics, leaving the earlier backup_configured 1 in place.
+for case in 08:28800 010:36000 0009:32400; do
+  hours="${case%:*}"
+  rm -f "$work/status/backup.prom"
+  BACKUP_MAX_AGE_HOURS="$hours" "$lib/entrypoint.sh" run >"$work/zeros.log" 2>&1 &
+  zeros_pid=$!
+  for _ in $(seq 1 40); do [ -s "$work/status/status" ] && break; sleep 0.5; done
+  [ "$(cat "$work/status/status" 2>/dev/null)" = "enabled" ] || { cat "$work/zeros.log"; die "max age '$hours' must be accepted"; }
+  grep -q "^backup_max_age_seconds ${case#*:}\$" "$work/status/backup.prom" ||
+    die "max age '$hours' must be read as decimal: $(grep '^backup_max_age_seconds' "$work/status/backup.prom")"
+  kill -TERM "$zeros_pid"; wait "$zeros_pid" || true
+done
+pass "leading zeros in BACKUP_MAX_AGE_HOURS are read as decimal"
 
 # 9. A wrong password fails loudly and reports failure.
 if BACKUP_PASSWORD=wrong sh "$lib/backup.sh" >"$work/wrong.log" 2>&1; then die "wrong password must fail"; fi

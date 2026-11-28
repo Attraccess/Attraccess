@@ -95,13 +95,26 @@ get_state() {
   cat "$STATE_DIR/$1" 2>/dev/null || true
 }
 
+# True for a whole number above 0 (leading zeros allowed).
+positive_whole_number() {
+  case "$1" in
+    *[!0-9]*) return 1 ;;
+    *[1-9]*) return 0 ;;
+    *) return 1 ;; # empty or only zeros
+  esac
+}
+
 # The longest time without a successful backup before the BackupTooOld alert fires (BACKUP_MAX_AGE_HOURS, default 30:
 # one daily run plus slack).
 max_age_valid() {
-  case "${BACKUP_MAX_AGE_HOURS:-30}" in
-    '' | *[!0-9]* | 0) return 1 ;;
-    *) return 0 ;;
-  esac
+  positive_whole_number "${BACKUP_MAX_AGE_HOURS:-30}"
+}
+
+# That time in seconds; call max_age_valid first. Leading zeros are removed because shell arithmetic reads them as
+# octal: `010` would mean 8 hours, and `08` would end the script before it reports anything.
+max_age_seconds() {
+  hours="${BACKUP_MAX_AGE_HOURS:-30}"
+  echo "$((${hours#"${hours%%[!0]*}"} * 3600))"
 }
 
 # Writes METRICS_FILE from the remembered values. backup_configured is 0 while the service refuses to start for missing
@@ -123,7 +136,7 @@ write_metrics() {
         metric backup_disabled "1 when backups are switched off on purpose (BACKUP_DISABLED=true)." 0
         if max_age_valid; then
           metric backup_max_age_seconds "Longest time without a successful backup before it counts as too old." \
-            "$((${BACKUP_MAX_AGE_HOURS:-30} * 3600))"
+            "$(max_age_seconds)"
         fi
         metric backup_scheduler_start_timestamp_seconds "Unix time the backup scheduler started." "$(get_state started)"
         ;;
@@ -170,12 +183,9 @@ percent_decode() {
 }
 
 # The longest time restic gets to open the repository (see open_repository): unset, or a whole number of seconds above 0.
+# `timeout 0` would wait forever, so zero is refused; `timeout` reads leading zeros as decimal.
 connect_timeout_valid() {
-  case "${BACKUP_CONNECT_TIMEOUT_SECONDS:-120}" in
-    *[!0-9]*) return 1 ;;
-    *[1-9]*) return 0 ;;
-    *) return 1 ;; # only zeros: `timeout 0` would wait forever
-  esac
+  positive_whole_number "${BACKUP_CONNECT_TIMEOUT_SECONDS:-120}"
 }
 
 # Prints why the database URL (BACKUP_DATABASE_URL, else DATABASE_URL) cannot be used, and nothing when it can. Only
