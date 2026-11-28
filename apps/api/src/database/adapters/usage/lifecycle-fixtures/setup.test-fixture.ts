@@ -79,6 +79,7 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
         }),
     ),
     notifyResourceUsageCharge: jest.fn().mockResolvedValue(undefined),
+    flowsMayLowerCharge: jest.fn().mockResolvedValue(false),
   };
   scope.maintenance = {
     hasActiveMaintenance: jest.fn().mockResolvedValue(false),

@@ -23,12 +23,13 @@ export interface TriggeringUsage {
  * The session a flow run outside a usage lifecycle acts on. Lifecycle runs target their candidate instead.
  *
  * - The payload names an active session: that session.
+ * - The payload names a part that a project switch moved on from: the running continuation of that session.
  * - The payload names a session that is no longer active on a machine shared by several people: none, so
  *   a late node (e.g. after a wait) never acts on somebody else's session.
  * - Otherwise (no session named, or a machine limited to one session): the newest session, as before.
  */
 export async function resolveTriggeringUsage(
-  resourceUsageService: Pick<ResourceUsageService, 'getActiveSessionsForResource'>,
+  resourceUsageService: Pick<ResourceUsageService, 'getActiveSessionsForResource' | 'findLatestPartId'>,
   resourceId: number,
   input: object,
   manager?: TransactionContext,
@@ -39,6 +40,9 @@ export async function resolveTriggeringUsage(
   if (triggering) return { triggeringId, session: triggering };
   const resource = sessions[0]?.resource;
   const sharedMachine = resource ? getSessionCapacity(resource, sessions.length).maxParallelSessions > 1 : false;
-  if (triggeringId !== undefined && sharedMachine) return { triggeringId, session: undefined };
+  if (triggeringId !== undefined && sharedMachine) {
+    const latestId = await resourceUsageService.findLatestPartId(triggeringId, manager);
+    return { triggeringId, session: sessions.find(({ id }) => id === latestId) };
+  }
   return { triggeringId, session: sessions[sessions.length - 1] };
 }

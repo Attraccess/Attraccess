@@ -26,6 +26,8 @@ import { UpdateUsageSessionProjectDto } from '../dtos/updateUsageSessionProject.
 
 import { EndSessionOptions, StartSessionOptions, UsageLifecycle } from '../lifecycle/usage-lifecycle';
 
+import { findLatestPartId } from './across-project-switches';
+
 import { UsageDoorActions } from './usage-door-actions';
 
 import { SessionEndTarget, UsageSessionEnds } from './usage-session-ends';
@@ -99,6 +101,11 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     transactionalEntityManager?: TransactionScope,
   ): Promise<UsageSession[]> {
     return this.records.getActiveSessionsForResource(resourceId, transactionalEntityManager);
+  }
+
+  /** The record a session runs on as: the given one, unless its project was switched since. */
+  public findLatestPartId(usageId: number, context?: TransactionScope): Promise<number> {
+    return findLatestPartId(this.lifecycle.sessions, usageId, context);
   }
 
   public async getActiveSessions(resourceIds: number[]): Promise<Map<number, UsageSession[]>> {

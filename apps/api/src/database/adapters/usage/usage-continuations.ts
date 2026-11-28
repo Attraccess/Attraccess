@@ -71,6 +71,15 @@ export async function inheritDeadline(manager: EntityManager, previousUsageId: n
   });
 }
 
+/** The published part that continues this one; a pending switch's continuation is not one yet. */
+export async function findContinuationId(manager: EntityManager, usageId: number): Promise<number | null> {
+  const next = await manager.findOne(ResourceUsage, {
+    where: { previousUsageId: usageId, lifecyclePending: false },
+    select: { id: true },
+  });
+  return next?.id ?? null;
+}
+
 /**
  * The user's completed supervised sessions on the resources. A session whose project was switched is several
  * records but one session: only its last part counts.

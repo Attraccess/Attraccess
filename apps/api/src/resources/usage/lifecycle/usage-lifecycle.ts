@@ -63,6 +63,11 @@ export interface EndSessionOptions {
    * the machine's turn is taken, so an extension that wins the race keeps the session running.
    */
   autoEndReason?: AutoEndReason;
+  /**
+   * Flow ends: nobody is there to try again, so a project switch of the named session does not refuse the end. It
+   * waits and ends the continuation, or the old part when the switch is rolled back.
+   */
+  followProjectSwitch?: boolean;
 }
 
 export interface StartSessionOptions {

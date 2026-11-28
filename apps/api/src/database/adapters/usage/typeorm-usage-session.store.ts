@@ -35,7 +35,12 @@ import { recoverOrphanedUsages } from '../../postgres/postgres-usage-recovery';
 import type { TransactionContext } from '../../transaction-context';
 import { EntityManagerResolver } from '../entity-manager-resolver';
 import { activeUsageWhere, countOccupiedSlots, findOccupyingUserIds } from './active-usage-queries';
-import { countCompletedSupervised, createContinuation, inheritDeadline } from './usage-continuations';
+import {
+  countCompletedSupervised,
+  createContinuation,
+  findContinuationId,
+  inheritDeadline,
+} from './usage-continuations';
 import { toUsageLifecycleAttempt, toUsageSession } from './usage-session-mapping';
 import { toResourceRecord } from '../resources/resource-mapping';
 import { findRelations } from '../find-options';
@@ -316,6 +321,16 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
         .resolve(context)
         .findOne(ResourceUsageLifecycleAttempt, { where: { previousUsageId: usageId } }),
     );
+  }
+
+  isSessionBeingSwitched(usageId: number, context?: TransactionContext): Promise<boolean> {
+    return this.managers
+      .resolve(context)
+      .existsBy(ResourceUsageLifecycleAttempt, { kind: 'project-switch', previousUsageId: usageId });
+  }
+
+  findContinuationId(usageId: number, context?: TransactionContext): Promise<number | null> {
+    return findContinuationId(this.managers.resolve(context), usageId);
   }
 
   async saveAttempt(attempt: UsageLifecycleAttempt, context?: TransactionContext): Promise<UsageLifecycleAttempt> {

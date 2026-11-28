@@ -130,8 +130,12 @@ export interface UsageSessionStore {
   isLifecycleBlocked(resourceId: number, sharedMachine: boolean, context?: TransactionScope): Promise<boolean>;
   /** The attempt; inside a unit of work it stays locked until commit, so attempt changes never interleave. */
   findAttempt(attemptId: string, resourceId: number, context?: TransactionScope): Promise<UsageLifecycleAttempt | null>;
-  /** Whether a stop or takeover attempt is already working on this running session. */
+  /** Whether a stop, takeover or project switch attempt is already working on this running session. */
   isSessionBeingEnded(usageId: number, context?: TransactionScope): Promise<boolean>;
+  /** Whether a project switch of this running session is pending: it still runs on, here or as its continuation. */
+  isSessionBeingSwitched(usageId: number, context?: TransactionScope): Promise<boolean>;
+  /** The published part that continues this one after a project switch, or null. */
+  findContinuationId(usageId: number, context?: TransactionScope): Promise<number | null>;
   saveAttempt(attempt: UsageLifecycleAttempt, context?: TransactionScope): Promise<UsageLifecycleAttempt>;
   deleteAttempt(attemptId: string, resourceId: number, context?: TransactionScope): Promise<void>;
   /** The attempt keeps its reservation, but it no longer has a tentative session. */

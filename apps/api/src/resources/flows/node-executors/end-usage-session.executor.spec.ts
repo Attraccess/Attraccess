@@ -26,6 +26,7 @@ describe('EndUsageSessionExecutor', () => {
       | 'endSession'
       | 'endSessionsOfTarget'
       | 'deferSessionEnds'
+      | 'findLatestPartId'
     >
   >;
   let ctx: NodeExecutionContext;
@@ -43,6 +44,7 @@ describe('EndUsageSessionExecutor', () => {
       endSession: jest.fn(),
       endSessionsOfTarget: jest.fn(),
       deferSessionEnds: jest.fn(),
+      findLatestPartId: jest.fn(async (usageId: number) => usageId),
     };
 
     compileTemplate = jest.fn((tpl: string) => tpl);
@@ -146,7 +148,12 @@ describe('EndUsageSessionExecutor', () => {
       5,
       user,
       { notes: 'compiled notes' },
-      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { id: null, authenticationMethod: null } },
+      {
+        skipFormSubmissions: true,
+        skipNoteNotification: true,
+        auditOrigin: { id: null, authenticationMethod: null },
+        followProjectSwitch: true,
+      },
     );
     expect(result).toEqual({ payload: input });
   });
@@ -164,7 +171,12 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: 'raw value' },
-      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { id: null, authenticationMethod: null } },
+      {
+        skipFormSubmissions: true,
+        skipNoteNotification: true,
+        auditOrigin: { id: null, authenticationMethod: null },
+        followProjectSwitch: true,
+      },
     );
   });
 
@@ -181,7 +193,12 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: '' },
-      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { id: null, authenticationMethod: null } },
+      {
+        skipFormSubmissions: true,
+        skipNoteNotification: true,
+        auditOrigin: { id: null, authenticationMethod: null },
+        followProjectSwitch: true,
+      },
     );
   });
 
@@ -198,7 +215,12 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: '' },
-      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { id: null, authenticationMethod: null } },
+      {
+        skipFormSubmissions: true,
+        skipNoteNotification: true,
+        auditOrigin: { id: null, authenticationMethod: null },
+        followProjectSwitch: true,
+      },
     );
   });
 
@@ -215,7 +237,12 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: '' },
-      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { id: null, authenticationMethod: null } },
+      {
+        skipFormSubmissions: true,
+        skipNoteNotification: true,
+        auditOrigin: { id: null, authenticationMethod: null },
+        followProjectSwitch: true,
+      },
     );
     expect(result).toEqual({ payload: { foo: 'bar' } });
   });
@@ -375,6 +402,19 @@ describe('EndUsageSessionExecutor', () => {
         executor.execute(createNode({ data: { notes: '' } as never }), { usageId: 4 }, ctx),
       ).rejects.toBeInstanceOf(NoUsageSessionError);
       expect(resourceUsageService.endSession).not.toHaveBeenCalled();
+    });
+
+    it('ends the continuation when the project of the triggering session was switched since', async () => {
+      resourceUsageService.findLatestPartId.mockImplementation(async (usageId) => (usageId === 4 ? 6 : usageId));
+
+      await executor.execute(createNode({ data: { notes: '' } as never }), { usageId: 4 }, ctx);
+
+      expect(resourceUsageService.endSession).toHaveBeenCalledWith(
+        1,
+        late.user,
+        { notes: '', usageId: 6 },
+        expect.objectContaining({ followProjectSwitch: true }),
+      );
     });
 
     it('keeps ending the newest session when the run names no session', async () => {

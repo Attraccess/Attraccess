@@ -354,6 +354,17 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return [...this.attempts.values()].some((attempt) => attempt.previousUsageId === usageId);
   }
 
+  async isSessionBeingSwitched(usageId: number, _context?: TransactionScope): Promise<boolean> {
+    return [...this.attempts.values()].some(
+      (attempt) => attempt.kind === 'project-switch' && attempt.previousUsageId === usageId,
+    );
+  }
+
+  async findContinuationId(usageId: number, _context?: TransactionScope): Promise<number | null> {
+    const next = this.sessions.find((stored) => stored.previousUsageId === usageId && !stored.lifecyclePending);
+    return next?.id ?? null;
+  }
+
   async saveAttempt(attempt: UsageLifecycleAttempt, _context?: TransactionScope): Promise<UsageLifecycleAttempt> {
     const saved = { createdAt: new Date(), ...attempt };
     this.attempts.set(attempt.id, saved);

@@ -36,6 +36,7 @@ export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
     handleResourceUsageContinuation: jest.Mock;
     chargeForResourceUsage: jest.Mock;
     notifyResourceUsageCharge: jest.Mock;
+    flowsMayLowerCharge: jest.Mock;
   };
 
   let maintenance: { hasActiveMaintenance: jest.Mock; canManageMaintenance: jest.Mock };

@@ -7,6 +7,7 @@ import { UsageResourceGate } from '../authorization/usage-resource-gate';
 import { ExtendUsageSessionDto } from '../dtos/extendUsageSession.dto';
 import { ResourceUsageSessionExtendedEvent } from '../events/resource-usage.events';
 import { RESOURCE_USAGE_LOG_CONTEXT, UsageLifecycle } from '../lifecycle/usage-lifecycle';
+import { acrossProjectSwitches } from '../sessions/across-project-switches';
 import { pickSessionToEnd } from '../sessions/active-usage';
 import { UsageSessionEnds } from '../sessions/usage-session-ends';
 import { SESSION_DEADLINE_STORE, SessionDeadlineStore } from './session-deadline-store.port';
@@ -29,7 +30,9 @@ export class UsageSessionExtensions {
 
   /**
    * Extends the caller's own session, or the one `dto.usageId` names when the caller may end it. Takes the machine's
-   * turn like a stop, so it never interleaves with an automatic end: whichever commits second sees the first.
+   * turn like a stop, so it never interleaves with an automatic end: whichever commits second sees the first. A
+   * project switch does not refuse it: before the switch commits, the continuation inherits the new deadline; after,
+   * the continuation is what gets extended.
    */
   async extendSession(
     resourceId: number,
@@ -37,10 +40,16 @@ export class UsageSessionExtensions {
     dto: ExtendUsageSessionDto,
     auditOrigin: AuditActor = { id: user.id, authenticationMethod: 'session' },
   ): Promise<UsageSession> {
-    const updated = await this.ends.runSessionChange(resourceId, randomUUID(), () =>
-      this.extendNow(resourceId, user, dto, auditOrigin),
+    const extend = (named: ExtendUsageSessionDto) =>
+      this.ends.runSessionChange(resourceId, randomUUID(), () => this.extendNow(resourceId, user, named, auditOrigin));
+    const updated =
+      dto.usageId === undefined
+        ? await extend(dto)
+        : await acrossProjectSwitches(this.lifecycle.sessions, dto.usageId, (usageId) => extend({ ...dto, usageId }));
+    this.eventEmitter.emit(
+      ResourceUsageSessionExtendedEvent.EVENT_NAME,
+      new ResourceUsageSessionExtendedEvent(updated),
     );
-    this.eventEmitter.emit(ResourceUsageSessionExtendedEvent.EVENT_NAME, new ResourceUsageSessionExtendedEvent(updated));
     return updated;
   }
 
@@ -58,7 +67,13 @@ export class UsageSessionExtensions {
       // Waits for an automatic end of this session running on another instance; what it committed is read after.
       const locked = await this.deadlines.lockDeadline(session.id, scope);
       if (!locked) throw new SessionExtensionNotPossibleException('This session has just ended or changed');
-      if (await this.lifecycle.sessions.isSessionBeingEnded(session.id, scope)) {
+      // A running session has one attempt at most. A pending switch ends nothing: its commit waits for the row locked
+      // above before it reads the deadline.
+      const { sessions: store } = this.lifecycle;
+      if (
+        !(await store.isSessionBeingSwitched(session.id, scope)) &&
+        (await store.isSessionBeingEnded(session.id, scope))
+      ) {
         throw new SessionExtensionNotPossibleException('This session is being ended');
       }
 

@@ -85,6 +85,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
         auditOrigin: SYSTEM_AUDIT_ACTOR,
         // Its stop flow runs on behalf of the user who caused this run.
         triggeredByUserId: ctx.actorUserId,
+        followProjectSwitch: true,
       },
     );
 
