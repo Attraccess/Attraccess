@@ -298,6 +298,9 @@ describe('Matter plugin against the real sidecar', () => {
       'a reconciliation signal after the sidecar restart',
       () => signals.length > 0,
       () => host.service.connection.status(),
+      // The retry that finds the restarted sidecar is due up to the backoff ceiling after it is back, and every
+      // attempt that hit the stopped sidecar doubles that ceiling.
+      15_000,
     );
     expect(signals[0]).toBe('foreign-stream');
     await connected();
