@@ -80,8 +80,8 @@ Dort können Sie ausstehende und kommende Buchungen stornieren, eine laufende Bu
 
 Wird eine Maschine für Sie verborgen (siehe
 [Wer die Maschinenliste sehen darf](settings/overview.md#sichtbarkeit-der-maschinenliste)), bleiben Ihre eigenen
-Buchungen darauf in der Liste und lassen sich weiter öffnen, stornieren, behalten oder vorzeitig beenden. Alles andere zu dieser Maschine,
-etwa ihre Verfügbarkeit oder Buchungen anderer, antwortet mit „nicht gefunden“.
+Buchungen darauf in der Liste und lassen sich weiter öffnen, stornieren, behalten oder vorzeitig beenden. Alles
+andere zu dieser Maschine, etwa ihre Verfügbarkeit oder Buchungen anderer, wird mit „nicht gefunden“ beantwortet.
 
 ## Genehmigung
 

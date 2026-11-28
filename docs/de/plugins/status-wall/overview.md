@@ -37,7 +37,7 @@ auf den Bildschirm, ob die Wand 4 oder 60 Maschinen zeigt, und behalten ihren Pl
    in verborgenen Ressourcengruppen liegen.
 
    Beim Speichern wird die ganze Auswahl geprüft, auch was früher oder von jemand anderem gespeichert wurde. Enthält
-   eine Wand eine Ressource oder eine Gruppe mit Maschinen, die du nicht mehr sehen darfst, kannst du sie erst
+   eine Wand eine Ressource oder eine Gruppe, die du nicht mehr sehen darfst, kannst du sie erst
    speichern (auch nur zum Umbenennen), nachdem du den Eintrag entfernt hast. Der Dialog führt ihn nicht auf: Wähle bei Ressourcen
    **Auswahl leeren** und wähle sie neu aus, bei Gruppen **Aus der Auswahl entfernen**. Das ändert, was die Wand
    zeigt. Soll sie so bleiben, bitte jemanden, der alles darauf sehen darf, sie zu bearbeiten. Gelöschte Ressourcen
