@@ -532,10 +532,11 @@ export class AttractapCardHandler implements OnModuleInit {
   /**
    * One screen flow per reader; any supervision counts, so busy is the same with or without Valkey's claim. An
    * enrollment or reset past its time ends here: its result or the reader's cancel may never arrive (ATT-1426).
+   * Not while a card conversation runs (it has its own deadline): a write in progress still reports its result.
    */
   private isBusyWithCardFlow(socket: AuthenticatedWebSocket): boolean {
     const armed = socket.state.enrollment ?? socket.state.resetNfcCardData;
-    if (armed && armedTooLongAgo(armed.armedAt)) this.endCardFlows(socket);
+    if (armed && armedTooLongAgo(armed.armedAt) && !socket.state.cardConversation) this.endCardFlows(socket);
     const { enrollment, resetNfcCardData, massIntroductionFlow, supervisionFlow } = socket.state;
     return !!(enrollment || resetNfcCardData || massIntroductionFlow || supervisionFlow);
   }

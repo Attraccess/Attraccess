@@ -41,4 +41,17 @@ describe('AttractapCardHandler armed card operations that never finish', () => {
     expect(Boolean(socket.state.enrollment)).toBe(next === 'enrollment');
     expect(Boolean(socket.state.resetNfcCardData)).toBe(next === 'reset');
   });
+
+  it.each(['enrollment', 'reset'] as const)('does not end a %s while a card conversation still runs', async (flow) => {
+    const socket = scope.createMockSocket();
+    scope.websocketService.sockets.set(socket.id, socket);
+    await operations[flow]();
+    socket.state.cardConversation = { purpose: flow } as unknown as typeof socket.state.cardConversation;
+
+    jest.advanceTimersByTime(ARMED_CARD_OPERATION_TTL_MS + 1);
+    await expect(operations[flow]()).rejects.toThrow(new ConflictException('READER_BUSY'));
+
+    socket.state.cardConversation = null;
+    await expect(operations[flow]()).resolves.toBeUndefined();
+  });
 });

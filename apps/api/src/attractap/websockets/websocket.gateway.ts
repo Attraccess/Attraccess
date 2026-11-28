@@ -255,22 +255,24 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     // The connection's login and armed flows end now, not when the close event arrives. The
     // reader id stays until then: the disconnect handler needs it for metrics and mass introduction.
     this.resetReaderConnectionState(socket, readerId, 'READER_UNREACHABLE');
-    // No closing handshake on either transport: a socket in CLOSING would still be found for this reader.
+    // Nothing is routed to it from here on, also before its close event. No closing handshake on either transport.
+    this.websocketService.sockets.delete(socket.id);
     socket.terminate();
   }
 
   /**
    * A reader holds one connection: when it signs in again, its older ones are dead. A reader that restarted never
    * closed them, so they would stay registered with their armed card flows and keep the reader busy (ATT-1426).
-   * Only connections opened before this one go, so a slow handshake never ends a newer session.
+   * The connection opened last stays, so an older handshake that finishes late never ends a newer session.
    */
-  private dropSupersededConnections(current: AuthenticatedWebSocket): void {
-    const openedAt = this.connectedAt.get(current as unknown as object);
-    for (const socket of this.router.localSockets(current.readerId)) {
-      if (this.connectedAt.get(socket as unknown as object) < openedAt) {
-        this.logger.log(`Reader ${current.readerId} signed in again, dropping its older connection ${socket.id}`);
-        this.dropConnection(socket, current.readerId);
-      }
+  private dropSupersededConnections(readerId: number): void {
+    const openedAt = (socket: AuthenticatedWebSocket) => this.connectedAt.get(socket as unknown as object);
+    const sockets = this.router.localSockets(readerId);
+    const newest = sockets.reduce((latest, socket) => (openedAt(socket) > openedAt(latest) ? socket : latest));
+    for (const socket of sockets) {
+      if (socket === newest) continue;
+      this.logger.log(`Reader ${readerId} has a newer connection, dropping connection ${socket.id}`);
+      this.dropConnection(socket, readerId);
     }
   }
 
@@ -509,8 +511,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     // The reader is registered only once its certificate has been accepted.
     await this.readerSessionService.accept(client as unknown as AuthenticatedWebSocket, session, (socket) => {
-      this.dropSupersededConnections(socket);
       this.websocketService.sockets.set(socket.id, socket);
+      if (socket.readerId) this.dropSupersededConnections(socket.readerId);
       this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
       // Other instances route this reader's work here from now on (ATT-1163).
       if (socket.readerId) this.router.cluster.presence.socketConnected(socket.readerId, socket.id);

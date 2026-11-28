@@ -272,6 +272,27 @@ describe('reader session through the real gateway', () => {
     expect(open).toEqual([after.socket]);
   });
 
+  it('keeps the newer connection when the handshake of an older one finishes last', async () => {
+    let release = () => undefined as void;
+    let held = () => undefined as void;
+    const holding = new Promise<void>((resolve) => (held = resolve));
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    jest.spyOn(app.get(CredentialRegistryService), 'isActive').mockImplementationOnce(async () => {
+      held();
+      await gate;
+      return true;
+    });
+    const older = await connectPaired(23);
+    await holding;
+    const newer = await signedIn(23);
+
+    release();
+    await older.reader.closed;
+
+    const open = [...app.get(WebsocketService).sockets.values()].filter((socket) => socket.readerId === 23);
+    expect(open).toEqual([newer.socket]);
+  });
+
   it('ends a card conversation and the verified user as soon as the credential changes', async () => {
     const { reader, socket } = await signedIn(20);
     socket.state.verifiedUserId = 3;
@@ -289,6 +310,8 @@ describe('reader session through the real gateway', () => {
     // Before the socket's close event: nothing of the old login is left.
     expect(socket.state.verifiedUserId).toBeNull();
     expect(socket.state.verifiedCardUid).toBeNull();
+    // Nothing can be routed to the dying connection either.
+    expect(app.get(WebsocketService).sockets.has(socket.id)).toBe(false);
     expect(await conversation).toEqual({ ok: false, reason: 'READER_UNREACHABLE' });
     expect(conversations.activeConversations).toBe(0);
     await reader.closed;
