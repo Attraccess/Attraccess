@@ -94,6 +94,7 @@ describe('findFlowsWithoutSessionCountCheck', () => {
     ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
     ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
     ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_SWITCHED,
   ])('flags the %s trigger', (trigger) => {
     expect(findFlowsWithoutSessionCountCheck([node('t', trigger), node('h', HTTP)], edges(['t', 'h']))).toEqual([
       {
@@ -121,6 +122,15 @@ describe('findFlowsWithoutSessionCountCheck', () => {
   ])('treats %s as an external effect: %s', (type, flagged) => {
     const warnings = findFlowsWithoutSessionCountCheck([node('t', STOPPED), node('x', type)], edges(['t', 'x']));
     expect(warnings).toHaveLength(flagged ? 1 : 0);
+  });
+
+  it('accepts a project-switch flow that checks activeSessions before its effect', () => {
+    const nodes = [
+      node('t', ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_SWITCHED),
+      node('i', IF, afterIsZero),
+      node('h', HTTP),
+    ];
+    expect(findFlowsWithoutSessionCountCheck(nodes, edges(['t', 'i'], ['i', 'h']))).toEqual([]);
   });
 
   it('warns for a plugin output node after a session trigger and accepts it behind a count check', () => {
