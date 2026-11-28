@@ -52,7 +52,8 @@ uint32_t resourceRefreshRequestId = 0;
 
 #if defined(HAS_LVGL_DISPLAY)
     FirmwareI18n::Text actionCompletionMessage;
-    std::string completedResourceName;
+    // What the completion screen names: the resource, or for a project switch where the session is booked now.
+    std::string completionSubject;
     // The billing total screen already answers the action; the completion screen must not replace it.
     bool billingSummaryShown = false;
 #endif

@@ -69,18 +69,4 @@ void Application::startProjectSwitch(uint32_t resourceId, uint32_t usageId, uint
   this->formFlowSubmitted = false;
   this->api.switchSessionProject(resourceId, usageId, projectId);
 }
-
-API::ResourceUsageFormActionType Application::pendingFormAction() const {
-  switch (this->pendingActionType) {
-  case PENDING_ACTION_START_SESSION:
-    return this->pendingActionIsTakeover ? API::ResourceUsageFormActionType::TAKEOVER
-                                         : API::ResourceUsageFormActionType::START;
-  case PENDING_ACTION_STOP_SESSION:
-    return API::ResourceUsageFormActionType::END;
-  case PENDING_ACTION_SWITCH_PROJECT:
-    return API::ResourceUsageFormActionType::PROJECT_SWITCH;
-  default:
-    return API::ResourceUsageFormActionType::UNKNOWN;
-  }
-}
 #endif

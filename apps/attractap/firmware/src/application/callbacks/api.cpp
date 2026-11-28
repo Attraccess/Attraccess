@@ -254,10 +254,10 @@ void Application::setupActionCallbacks()
         const bool returnToList = self->returnToListAfterAction;
         self->finishReaderAction(result.success);
         if (result.success) {
-          self->completedResourceName = resourceName;
+          self->completionSubject = resourceName;
           // The confirmation of a switch names where the session is booked now.
           if (result.type == "SWITCH_SESSION_PROJECT")
-            self->completedResourceName = result.projectName.empty()
+            self->completionSubject = result.projectName.empty()
                 ? FirmwareI18n::messageText(FirmwareI18n::Message::NoProject, State::getActiveLanguage())
                 : result.projectName;
           self->onActionResult(result.type);

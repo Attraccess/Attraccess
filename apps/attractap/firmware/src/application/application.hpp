@@ -157,8 +157,6 @@ private:
     void cancelProjectPicker();
     void closeStaleProjectSwitch(const API::ResourceBrief &resource);
     void startProjectSwitch(uint32_t resourceId, uint32_t usageId, uint32_t projectId);
-    // The form action of the pending start, takeover, stop or project switch.
-    API::ResourceUsageFormActionType pendingFormAction() const;
     // Duration estimate and extension (ATT-43)
     bool needsDurationEstimate(uint32_t resourceId, uint32_t &maxMinutes) const;
     void openDurationInput(uint32_t maxMinutes);
@@ -191,6 +189,8 @@ private:
     void clearProjectSelection();
     void clearSelectedProject();
     void handleProjectSelection(uint32_t projectId, const std::string &projectName);
+    // The form action of the pending start, takeover, stop or project switch.
+    API::ResourceUsageFormActionType pendingFormAction() const;
     void handleFormsRequest(const API::ResourceUsageFormRequest &request);
     void handleFormFields(const API::ResourceUsageFormFieldsPage &page);
     void handleFormPageResult(const API::ResourceUsageFormPageResult &result);

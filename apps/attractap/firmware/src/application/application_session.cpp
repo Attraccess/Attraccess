@@ -61,7 +61,7 @@ void Application::handleResourceListUpdate(
     if (!this->actionCompletionMessage.empty() && !this->billingSummaryShown) {
       // Back on the list when the action was started there; routing does that once the screen is done.
       this->showStatus(StatusScreen::success(this->actionCompletionMessage,
-                                             FirmwareI18n::Text::literal(this->completedResourceName) /* i18n-data: Server-supplied resource name; preserve exact contents. */),
+                                             FirmwareI18n::Text::literal(this->completionSubject) /* i18n-data: Server-supplied resource or project name, or the localized NoProject text; preserve exact contents. */),
                        this->returnToListAfterAction);
     }
     this->billingSummaryShown = false;

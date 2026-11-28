@@ -6,6 +6,21 @@
 #include <string>
 
 #ifdef HAS_LVGL_DISPLAY
+// The form action of the pending start, takeover, stop or project switch.
+API::ResourceUsageFormActionType Application::pendingFormAction() const {
+  switch (this->pendingActionType) {
+  case PENDING_ACTION_START_SESSION:
+    return this->pendingActionIsTakeover ? API::ResourceUsageFormActionType::TAKEOVER
+                                         : API::ResourceUsageFormActionType::START;
+  case PENDING_ACTION_STOP_SESSION:
+    return API::ResourceUsageFormActionType::END;
+  case PENDING_ACTION_SWITCH_PROJECT:
+    return API::ResourceUsageFormActionType::PROJECT_SWITCH;
+  default:
+    return API::ResourceUsageFormActionType::UNKNOWN;
+  }
+}
+
 void Application::handleFormsRequest(
     const API::ResourceUsageFormRequest &request) {
   // Duplicates and retries must not reset or reopen a form; the request for a
