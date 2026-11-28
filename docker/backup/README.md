@@ -8,14 +8,19 @@ config-ui) to an encrypted restic repository and prunes old snapshots.
 On start (`run`) the container checks only its settings, not the repository, so it also starts while the target cannot
 be reached (internet down at boot). Then it writes `enabled` to `/var/lib/backup-status/status` (volume
 `backup-status`). The `attraccess` service of the balena stack mounts that volume read-only and only starts once the
-file exists. Without `BACKUP_REPOSITORY`, `BACKUP_PASSWORD` or `DATABASE_URL`, or with an invalid `BACKUP_SCHEDULE` or
-`BACKUP_MAX_AGE_HOURS`, the container exits with an error (and is restarted): a device without backups does not go
-unnoticed. `BACKUP_DISABLED=true` switches backups off on purpose: the container logs one warning, writes `disabled`
-and waits. The status file is removed when the container starts and when it stops.
+file exists. Without `BACKUP_REPOSITORY`, `BACKUP_PASSWORD` or `DATABASE_URL`, with a database URL (`DATABASE_URL`, or
+`BACKUP_DATABASE_URL` when set) that is not a `postgres://` or `postgresql://` URL, or with an invalid
+`BACKUP_SCHEDULE`, `BACKUP_MAX_AGE_HOURS` or `BACKUP_CONNECT_TIMEOUT_SECONDS`, the container exits with an error (and
+is restarted): a device without backups does not go unnoticed. `BACKUP_DISABLED=true` switches backups off on purpose:
+the container logs one warning, writes `disabled` and waits. The status file is removed when the container starts and
+when it stops. After a power cut a leftover file can let `attraccess` start before the sidecar has removed it; that only
+matters when the settings became invalid in between, and after a settings change the balena Supervisor restarts the
+services in order.
 
 Problems with the target show up in the runs. The first run initialises the repository (`restic init`, also creates a
 missing bucket). A run fails when the repository cannot be opened (wrong password, address or credentials) or does not
-answer within `BACKUP_CONNECT_TIMEOUT_SECONDS`. Files that vanish while they are read (restic exit code 3, e.g. journals
+answer within `BACKUP_CONNECT_TIMEOUT_SECONDS`. Every run that fails, also one that fails on its settings, sets
+`backup_last_run_success` to 0; a run skipped because another backup or restore is running records nothing. Files that vanish while they are read (restic exit code 3, e.g. journals
 of running services) are skipped with a warning; the run still succeeds.
 
 ## Metrics and alerts

@@ -142,19 +142,34 @@ expect_refused "no repository" env -u BACKUP_REPOSITORY
 expect_refused "no password" env -u BACKUP_PASSWORD
 expect_refused "no database" env -u DATABASE_URL
 expect_refused "bad max age" env BACKUP_MAX_AGE_HOURS=soon
+expect_refused "mysql database" env DATABASE_URL="mysql://user:url-secret@db/attraccess"
+grep -q 'DATABASE_URL must be a postgres' <<OUT || die "the refused database URL must be named, got: $out"
+$out
+OUT
+# BACKUP_DATABASE_URL wins over a valid DATABASE_URL, so it is the one that is checked.
+expect_refused "bad database override" env BACKUP_DATABASE_URL="postgres:/user:url-secret@db/attraccess"
+grep -q 'BACKUP_DATABASE_URL must be a postgres' <<OUT || die "the refused override must be named, got: $out"
+$out
+OUT
+if printf '%s\n' "$out" | grep -q 'url-secret'; then die "a refused database URL must not be logged"; fi
+for bad in soon 0 00 -5 1.5; do
+  expect_refused "connect timeout $bad" env BACKUP_CONNECT_TIMEOUT_SECONDS="$bad"
+  printf '%s\n' "$out" | grep -q 'BACKUP_CONNECT_TIMEOUT_SECONDS must be' || die "connect timeout '$bad' must be named, got: $out"
+done
 if env -u BACKUP_REPOSITORY sh "$lib/backup.sh" >/dev/null 2>&1; then die "backup without a repository must fail"; fi
 if env -u BACKUP_REPOSITORY "$lib/entrypoint.sh" snapshots >/dev/null 2>&1; then die "snapshots without a repository must fail"; fi
 pass "not configured: run exits with an error and removes the status, backup refuses"
 
-# 8b. Only the settings are checked at start, not the repository: a target that cannot be opened (wrong password,
-#     internet down) still starts the scheduler, so Attraccess starts. The runs report the error.
-BACKUP_REPOSITORY="rest:http://127.0.0.1:1/" "$lib/entrypoint.sh" run >"$work/unreachable.log" 2>&1 &
+# 8b. Only the settings are checked at start, not the repository or the database: a target that cannot be opened
+#     (wrong password, internet down) still starts the scheduler, so Attraccess starts. The runs report the error.
+BACKUP_REPOSITORY="rest:http://127.0.0.1:1/" BACKUP_DATABASE_URL="postgresql://user:secret@127.0.0.1:1/none" \
+  BACKUP_CONNECT_TIMEOUT_SECONDS=5 "$lib/entrypoint.sh" run >"$work/unreachable.log" 2>&1 &
 unreachable_pid=$!
 for _ in $(seq 1 20); do [ -s "$work/status/status" ] && break; sleep 0.5; done
 [ "$(cat "$work/status/status" 2>/dev/null)" = "enabled" ] || { cat "$work/unreachable.log"; die "the start must not depend on the repository"; }
 if grep -q 'checking the restic repository' "$work/unreachable.log"; then die "the start must not open the repository"; fi
 kill -TERM "$unreachable_pid"; wait "$unreachable_pid" || true
-pass "the start checks only the settings, not the repository"
+pass "the start checks only the settings, not the repository or the database"
 
 # 8c. BACKUP_DISABLED=true: one warning, status `disabled`, keeps running; removed again on SIGTERM.
 BACKUP_DISABLED=true "$lib/entrypoint.sh" run >"$work/disabled.log" 2>&1 &
@@ -219,6 +234,42 @@ PATH="$work/bin3:$PATH" sh "$lib/backup.sh" >"$work/exit3.log" 2>&1 || { cat "$w
 grep -q 'some files could not be read' "$work/exit3.log" || die "exit code 3 must be logged as a warning"
 grep -q '^backup_last_run_success 1$' "$work/status/backup.prom" || die "exit code 3 must count as a success"
 pass "restic exit code 3 (unreadable files) counts as a success with a warning"
+
+# 9d. A run skipped because another backup or restore holds the lock is not a failed run, even with settings that would
+#     fail it, and leaves the dump of the running one alone.
+cp "$work/status/backup.prom" "$work/before-busy.prom"
+mkdir -p "$work/state/dump" && echo running >"$work/state/dump/attraccess.dump"
+exec 8>"$work/state/backup.lock"
+flock -n 8 || die "the test could not take the run lock"
+for url in "$DATABASE_URL" "mysql://db/attraccess"; do
+  if BACKUP_DATABASE_URL="$url" sh "$lib/backup.sh" >"$work/busy.log" 2>&1; then die "a run must not start while the lock is busy"; fi
+  grep -q 'another backup or restore is already running' "$work/busy.log" || { cat "$work/busy.log"; die "missing the busy message"; }
+  cmp -s "$work/before-busy.prom" "$work/status/backup.prom" || die "a skipped run must not change the metrics"
+  [ "$(cat "$work/state/last_run_success")" = 1 ] || die "a skipped run must not count as a failed run"
+done
+[ -s "$work/state/dump/attraccess.dump" ] || die "a skipped run removed the dump of the running one"
+exec 8>&-
+rm -f "$work/state/dump/attraccess.dump"
+pass "a run skipped because the lock is busy records nothing"
+
+# 9e. A run that fails before the dump (restic settings, database URL) is recorded as a failed run too, so BackupFailed
+#     fires right away.
+expect_failed_run() {
+  name="$1"
+  message="$2"
+  shift 2
+  sh "$lib/backup.sh" >/dev/null 2>&1 || die "$name: the backup before it failed"
+  grep -q '^backup_last_run_success 1$' "$work/status/backup.prom" || die "$name: expected a successful run before it"
+  if "$@" sh "$lib/backup.sh" >"$work/failed-run.log" 2>&1; then die "$name: the backup must fail"; fi
+  grep -q "$message" "$work/failed-run.log" || { cat "$work/failed-run.log"; die "$name: missing '$message'"; }
+  grep -q 'BACKUP FAILED' "$work/failed-run.log" || die "$name: missing the failure line"
+  grep -q '^backup_last_run_success 0$' "$work/status/backup.prom" || die "$name: the run must be recorded as failed"
+}
+expect_failed_run "mysql database" 'BACKUP_DATABASE_URL must be a postgres' env BACKUP_DATABASE_URL="mysql://db/attraccess"
+expect_failed_run "no database" 'DATABASE_URL (or BACKUP_DATABASE_URL) is not set' env -u DATABASE_URL
+expect_failed_run "no password" 'BACKUP_PASSWORD is required' env -u BACKUP_PASSWORD
+expect_failed_run "no repository" 'BACKUP_REPOSITORY is not set' env -u BACKUP_REPOSITORY
+pass "a run that fails on its settings is recorded as a failed run"
 
 # 10. An invalid BACKUP_SCHEDULE refuses the start (crond would skip such a line silently).
 for bad in 'bad' '* * * *' '61 25 * * *' '0 24 * * *' '0 3 32 * *' '0 3 * 13 *' '0 3 * * 8'; do

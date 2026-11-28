@@ -60,8 +60,11 @@ case "${1:-run}" in
     schedule="${BACKUP_SCHEDULE:-0 3 * * *}"
     schedule_valid "$schedule" ||
       not_configured "BACKUP_SCHEDULE must be a 5-field cron expression (minute hour day month weekday) with values in range, got: $schedule"
-    [ -n "${BACKUP_DATABASE_URL:-${DATABASE_URL:-}}" ] || not_configured "DATABASE_URL (or BACKUP_DATABASE_URL) is not set"
+    database_problem="$(database_url_problem)"
+    [ -z "$database_problem" ] || not_configured "$database_problem"
     max_age_valid || not_configured "BACKUP_MAX_AGE_HOURS must be a whole number of hours above 0, got: ${BACKUP_MAX_AGE_HOURS:-}"
+    connect_timeout_valid ||
+      not_configured "BACKUP_CONNECT_TIMEOUT_SECONDS must be a whole number of seconds above 0, got: ${BACKUP_CONNECT_TIMEOUT_SECONDS:-}"
     set_state mode configured
     set_state started "$(date +%s)"
     # Earlier versions kept only the last success, in a metric file in STATE_DIR: carry it over once.

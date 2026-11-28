@@ -5,9 +5,8 @@ set -eu
 # shellcheck source=lib.sh
 . "$(dirname "$0")/lib.sh"
 
-configure_restic || fail "BACKUP_REPOSITORY is not set"
-connect_database
-
+# The lock comes first: a run skipped because another backup or restore holds it is not a failed run, and it must not
+# touch the dump of that run. From here on every way out but success is recorded as a failed run.
 mkdir -p "$STATE_DIR"
 exec 9>"$STATE_DIR/backup.lock"
 flock -n 9 || fail "another backup or restore is already running"
@@ -17,6 +16,8 @@ log "backup started"
 remove_dump() { rm -f "$DUMP_FILE" "$DUMP_FILE.partial"; }
 trap 'remove_dump; record_run 0; log "BACKUP FAILED (see the messages above)" >&2' EXIT
 
+configure_restic || fail "BACKUP_REPOSITORY is not set"
+connect_database
 wait_for_postgres
 log "dumping the database"
 remove_dump

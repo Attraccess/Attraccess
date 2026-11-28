@@ -169,18 +169,36 @@ percent_decode() {
     }'
 }
 
+# The longest time restic gets to open the repository (see open_repository): unset, or a whole number of seconds above 0.
+connect_timeout_valid() {
+  case "${BACKUP_CONNECT_TIMEOUT_SECONDS:-120}" in
+    *[!0-9]*) return 1 ;;
+    *[1-9]*) return 0 ;;
+    *) return 1 ;; # only zeros: `timeout 0` would wait forever
+  esac
+}
+
+# Prints why the database URL (BACKUP_DATABASE_URL, else DATABASE_URL) cannot be used, and nothing when it can. Only
+# looks at the setting, never at the database. The message must not contain the URL (it holds the password).
+database_url_problem() {
+  setting=DATABASE_URL
+  [ -z "${BACKUP_DATABASE_URL:-}" ] || setting=BACKUP_DATABASE_URL
+  case "${BACKUP_DATABASE_URL:-${DATABASE_URL:-}}" in
+    postgres://* | postgresql://*) ;;
+    '') echo "DATABASE_URL (or BACKUP_DATABASE_URL) is not set" ;;
+    *) echo "$setting must be a postgres:// or postgresql:// URL" ;;
+  esac
+}
+
 # Reads DATABASE_URL (or BACKUP_DATABASE_URL) and sets PG_URL to the same URL WITHOUT the password, and exports the
 # (percent-decoded) password as PGPASSWORD. The PostgreSQL tools get PG_URL on their command line, which every process
 # on the host can read (ps); libpq takes the password from the environment. The password may be in the user info
 # (user:password@host) or in a `password=` query parameter; both are removed from PG_URL (the query parameter wins,
 # like in libpq). Call it in the main shell, not in $(...).
 connect_database() {
+  problem="$(database_url_problem)"
+  [ -z "$problem" ] || fail "$problem"
   url="${BACKUP_DATABASE_URL:-${DATABASE_URL:-}}"
-  [ -n "$url" ] || fail "DATABASE_URL (or BACKUP_DATABASE_URL) is required"
-  case "$url" in
-    postgres://* | postgresql://*) ;;
-    *) fail "DATABASE_URL must be a postgres:// or postgresql:// URL" ;;
-  esac
   scheme="${url%%://*}"
   rest="${url#*://}"
   # The authority (user:password@host:port) ends at the first / or ?, like libpq reads it.
