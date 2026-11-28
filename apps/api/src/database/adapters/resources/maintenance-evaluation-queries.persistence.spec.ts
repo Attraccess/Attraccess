@@ -119,6 +119,28 @@ describe('buildScheduleEvaluationQuery (real PostgreSQL)', () => {
     expect(Number(bySchedule.get(scheduleRecent)?.totalCount)).toBe(2);
   });
 
+  it('counts a session whose project was switched twice as one use, like an unswitched one', async () => {
+    const repository = dataSource.getRepository(ResourceUsage);
+    let previousUsageId: number | null = null;
+    const at = (hour: number) => new Date(Date.UTC(2026, 7, 1, hour));
+    for (const hour of [9, 10, 11]) {
+      const part: ResourceUsage = await repository.save({
+        resourceId: RESOURCE,
+        usageAction: ResourceUsageAction.Usage,
+        isFinalized: true,
+        startTime: at(hour - 1),
+        endTime: at(hour),
+        previousUsageId,
+      } as ResourceUsage);
+      previousUsageId = part.id;
+    }
+
+    const [row] = await runAggregate([[RESOURCE, scheduleRecent, recentBaseline]]);
+
+    // The two unswitched sessions after the baseline, and the switched one once.
+    expect(Number(row.totalCount)).toBe(3);
+  });
+
   it('uses the latest completed maintenance as the schedule baseline', async () => {
     await dataSource.getRepository(ResourceMaintenance).save({
       resourceId: RESOURCE,
