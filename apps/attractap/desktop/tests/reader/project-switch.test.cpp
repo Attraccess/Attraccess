@@ -4,6 +4,9 @@
 // project picker, usage form flow and result screens run against hand-written server payloads.
 void ReaderWorkflow::testProjectSwitch()
 {
+    // The handshake (api/handlers/auth.cpp) announces that this touch build offers the switch; without it the
+    // server refuses SWITCH_SESSION_PROJECT.
+    assert(server.last("READER_FIRMWARE_INFO")["data"]["payload"]["capabilities"]["projectSwitch"] == true);
     click("Abmelden");
     struct Running {
         bool offered = true;
@@ -349,7 +352,9 @@ void ReaderWorkflow::testProjectSwitch()
         runningList(ended);
         assert(lv_screen_active() == Display::statusScreen.getScreen());
         assert(label(lv_screen_active(), "Projekt nicht gewechselt"));
-        assert(label(lv_screen_active(), "Sie haben hier keine eigene Sitzung. Es wurde nichts beendet."));
+        assert(label(lv_screen_active(), "Ihre Sitzung läuft nicht mehr."));
+        // Not the text of a stop without an own session: nothing was to be ended here.
+        assert(!label(lv_screen_active(), "Sie haben hier keine eigene Sitzung. Es wurde nichts beendet."));
         assert(!label(lv_screen_active(), "Code: NoOwnActiveSessionError"));
         display.capture(output, "project-switch-08-session-ended");
         clearStatus();
@@ -368,6 +373,22 @@ void ReaderWorkflow::testProjectSwitch()
         assert(label(lv_screen_active(), "Code: METER_SWITCH_FAILED"));
         click("Zurück");
         assert(onDetails());
+    }
+    // Refusals the reader has no text of its own for show the general failure on the button, and the session keeps
+    // running: a switch made elsewhere continued the named record (the row now names the continuation), or a
+    // project-switch flow failed.
+    for (const auto &[code, rowAfter] : {std::pair{"PROJECT_SWITCH_SESSION_CHANGED", Running{true, 43, "Zweitprojekt", 30}},
+                                         std::pair{"FLOW_EXECUTION_ERROR", Running{}}}) {
+        runningList({});
+        openPicker();
+        click("Zweitprojekt");
+        reply((std::string(R"("error":")") + code + R"(")").c_str());
+        runningList(rowAfter);
+        assert(onDetails());
+        assert(label(lv_screen_active(), warned("Fehlgeschlagen – erneut tippen").c_str()));
+        assert(label(lv_screen_active(), (std::string("Projekt: ") + rowAfter.projectName).c_str()));
+        pump(4500);
+        assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Projekt wechseln")));
     }
     // Once the refreshed row kept the button, the reason was readable there: a later end just takes both away.
     runningList({});

@@ -301,7 +301,7 @@ enum class Message {
     SecureConversionTitle, SecureConversionTransfer, SecureConversionVerify, SecureConversionBurn,
     SecureConversionBootloader, SecureConversionDontUnplug, SecureConversionRestartHint,
     ChangeProject, NoProject, CurrentProjectLine, SwitchingProject, ProjectChanged, PleaseCompleteBeforeSwitchingProject,
-    ErrorMeterSwitchFailed, ProjectNotChanged,
+    ErrorMeterSwitchFailed, ProjectNotChanged, ErrorSwitchSessionGone,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };

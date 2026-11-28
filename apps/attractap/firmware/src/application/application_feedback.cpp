@@ -83,7 +83,8 @@ void Application::reportActionFailure(const API::ActionResult &result, uint32_t 
     // after this answer. There is nothing to retry, so the reason gets a screen of its own in both orders.
     this->logger.errorf("Action failed: %s", result.error.c_str());
     this->beeper.errorBeep();
-    this->showStatus(StatusScreen::warning(FirmwareI18n::Message::ProjectNotChanged, FirmwareI18n::readerError(result.error)), returnToList);
+    this->showStatus(StatusScreen::warning(FirmwareI18n::Message::ProjectNotChanged, FirmwareI18n::Message::ErrorSwitchSessionGone),
+                     returnToList);
   } else if (result.error == "START_BLOCKED" && !result.blockTitle.empty()) {
     // A plugin refused the start: its own words, and only those, as a full-screen warning.
     this->beeper.errorBeep();

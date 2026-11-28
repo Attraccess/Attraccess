@@ -15,6 +15,8 @@ inline constexpr Entry projectSwitchCatalog[] = {
     {Message::PleaseCompleteBeforeSwitchingProject, "Bitte vor dem Wechsel ausfüllen", "Please complete before switching"},
     {Message::ErrorMeterSwitchFailed, "Zähler nicht lesbar. Projekt unverändert.", "Meter not readable. Project unchanged."},
     {Message::ProjectNotChanged, "Projekt nicht gewechselt", "Project not changed"},
+    // A switch refused because the card holder's session ended meanwhile.
+    {Message::ErrorSwitchSessionGone, "Ihre Sitzung läuft nicht mehr.", "Your session is no longer running."},
 };
 static_assert(sizeof(catalog) / sizeof(Entry) + sizeof(cardRelayCatalog) / sizeof(Entry) +
                       sizeof(networkStatusCatalog) / sizeof(Entry) + sizeof(sessionUsersCatalog) / sizeof(Entry) +

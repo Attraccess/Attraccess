@@ -57,7 +57,7 @@ Wird der Wechsel abgelehnt, behält die Sitzung ihr Projekt:
 
 - Ein Zähler ist nicht lesbar: Die Schaltfläche zeigt **⚠ Zähler nicht lesbar. Projekt unverändert.**
 - Das Guthaben reicht nicht für eine neue Sitzung, wenn die Ressource [den Wechsel wie eine solche abrechnet](billing/configuration.md#abrechnung-beim-projektwechsel): Der Leser meldet [zu geringes Guthaben](#ergebnisse-meldungen-und-niedriges-guthaben)
-- Ihre Sitzung wurde genau während Ihrer Auswahl beendet: Ein Warnbildschirm mit der Überschrift **Projekt nicht gewechselt** meldet **Sie haben hier keine eigene Sitzung. Es wurde nichts beendet.** Tippen Sie auf **OK** oder warten Sie.
+- Ihre Sitzung wurde genau während Ihrer Auswahl beendet: Ein Warnbildschirm mit der Überschrift **Projekt nicht gewechselt** meldet **Ihre Sitzung läuft nicht mehr.** Tippen Sie auf **OK** oder warten Sie.
 - Andere Ablehnungen, etwa ein fehlgeschlagener Ablauf, nennen keinen genauen Grund: Die Schaltfläche zeigt **⚠ Fehlgeschlagen – erneut tippen**
 
 Ist **Projekt wechseln** schon verschwunden, wenn der neu geladene Status erscheint, etwa weil die Sitzung inzwischen beendet wurde, wechselt jeder andere Grund, den eine Schaltfläche zeigen würde, auf den [Bildschirm **Etwas ist schiefgelaufen**](#ergebnisse-meldungen-und-niedriges-guthaben).
