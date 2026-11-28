@@ -4,9 +4,13 @@ import type {
   PluginAccessPrincipal,
   PluginActiveSession,
   PluginCanStartResult,
+  PluginHostDataContext,
   PluginMaintenanceWindow,
   PluginResourceAccessContext,
+  PluginResourceVisibilityHost,
 } from '@attraccess/plugins-backend-sdk';
+import type { ResourceGroupsService } from '../../resources/groups/resourceGroups.service';
+import type { ResourceListVisibilityService } from '../../resources/visibility/resource-list-visibility.service';
 import type { ResourceActivityVisibilityService } from '../../resources/usage/authorization/resource-activity-visibility.service';
 import type { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import type { ResourceUsageService } from '../../resources/usage/sessions/resource-usage.service';
@@ -14,6 +18,10 @@ import type { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import type { PluginCoreLookupPort, PluginCoreUser } from '../persistence/plugin-host-data.port';
 
 const LOOKUP_CONCURRENCY = 20;
+/** The largest id the database column holds; larger values name no resource and must not reach a query. */
+const MAX_ID = 2_147_483_647;
+/** A malformed principal names no user; it must never reach a lookup that could ignore an undefined condition. */
+const isUserId = (id: unknown): id is number => Number.isSafeInteger(id) && (id as number) > 0;
 const NO_START: PluginCanStartResult = { allowed: false, requiresSupervision: false, supervisionAllowed: false };
 
 /** Core services and lookups the plugin-facing access queries delegate to. */
@@ -25,6 +33,11 @@ export interface ResourceAccessDeps {
   >;
   rbac: Pick<RbacService, 'getEffectivePermissions'>;
   visibility: Pick<ResourceActivityVisibilityService, 'resolve'>;
+  /** Core's machine list rule (ATT-843). */
+  listVisibility: Pick<ResourceListVisibilityService, 'filterVisible' | 'scopeOf' | 'groupContext'>;
+  groups: Pick<ResourceGroupsService, 'getMany'>;
+  /** The existing resources among the ids that the hidden-resource-group rule (ATT-515) leaves visible. */
+  filterOutHiddenGroupResources: PluginHostDataContext['resources']['filterVisible'];
   findUser: PluginCoreLookupPort['findUser'];
   findResource: PluginCoreLookupPort['findResourceSupervision'];
   listResourceIds: PluginCoreLookupPort['listResourceIds'];
@@ -50,13 +63,67 @@ export function createResourceAccessContext(getDeps: () => ResourceAccessDeps): 
 
   /** Loads the user and attaches the request scope, mirroring what core's auth strategy hands its services. */
   const resolveUser = async (principal: PluginAccessPrincipal): Promise<PluginCoreUser | AuthenticatedUser | null> => {
-    const user = await getDeps().findUser(principalId(principal));
+    const id = principalId(principal);
+    if (!isUserId(id)) return null;
+    const user = await getDeps().findUser(id);
     if (!user) return null;
     const effectivePermissions = await scopedPermissions(principal);
     return effectivePermissions ? ({ ...user, effectivePermissions } as AuthenticatedUser) : user;
   };
 
+  /** The user as core's visibility rules read them: `effectivePermissions` is always set. */
+  const resolveViewer = async (principal: PluginAccessPrincipal): Promise<AuthenticatedUser | null> => {
+    const user = await resolveUser(principal);
+    if (!user) return null;
+    if ('effectivePermissions' in user) return user as AuthenticatedUser;
+    const effectivePermissions = await getDeps().rbac.getEffectivePermissions(user.id);
+    return { ...user, effectivePermissions } as AuthenticatedUser;
+  };
+
+  /** Core's machine list rule AND the hidden-group rule, so a plugin never shows more than core would. */
+  const visibleAmong = async (viewer: AuthenticatedUser, resourceIds: number[]): Promise<number[]> => {
+    const deps = getDeps();
+    const ids = [...new Set(resourceIds)].filter((id) => Number.isInteger(id) && id > 0 && id <= MAX_ID);
+    if (ids.length === 0) return [];
+    // This lookup also drops unknown and deleted ids, which core's rule passes through for viewers who see all.
+    const shown = await deps.filterOutHiddenGroupResources(viewer.id, ids, {
+      seeAll: viewer.effectivePermissions.has('resources.update'),
+    });
+    const visible = new Set(await deps.listVisibility.filterVisible(viewer, shown));
+    return ids.filter((id) => visible.has(id));
+  };
+
+  const filterVisible = async (principal: PluginAccessPrincipal, resourceIds: number[]): Promise<number[]> => {
+    const viewer = await resolveViewer(principal);
+    return viewer ? visibleAmong(viewer, resourceIds) : [];
+  };
+
   return {
+    filterVisible,
+
+    async canSee(principal, resourceId) {
+      return (await filterVisible(principal, [resourceId])).length > 0;
+    },
+
+    async listVisibleResourceIds(principal) {
+      const viewer = await resolveViewer(principal);
+      return viewer ? visibleAmong(viewer, await getDeps().listResourceIds()) : [];
+    },
+
+    async getResourceListScope(principal) {
+      const viewer = await resolveViewer(principal);
+      return viewer ? getDeps().listVisibility.scopeOf(viewer) : 'permitted';
+    },
+
+    async filterVisibleGroups(principal, groupIds) {
+      const deps = getDeps();
+      const viewer = groupIds.length > 0 ? await resolveViewer(principal) : null;
+      if (!viewer) return [];
+      const groups = await deps.groups.getMany(await deps.listVisibility.groupContext(viewer));
+      const visible = new Set(groups.map((group) => group.id));
+      return [...new Set(groupIds)].filter((id) => visible.has(id));
+    },
+
     async canStart(principal, resourceId): Promise<PluginCanStartResult> {
       const deps = getDeps();
       const resource = await deps.findResource(resourceId);
@@ -96,6 +163,7 @@ export function createResourceAccessContext(getDeps: () => ResourceAccessDeps): 
     },
 
     async hasPermission(principal, permission) {
+      if (!isUserId(principalId(principal))) return false;
       const permissions =
         (await scopedPermissions(principal)) ?? (await getDeps().rbac.getEffectivePermissions(principalId(principal)));
       return permissions.has(permission);
@@ -144,4 +212,14 @@ export function createResourceAccessContext(getDeps: () => ResourceAccessDeps): 
       }));
     },
   };
+}
+
+/**
+ * The host side of the SDK's `@ResourceVisible()` decorator: only `canSee`. Its token is global, so every plugin module
+ * can inject it whatever the plugin's permissions; the full `resourceAccess` stays behind `ACCESS_RESOURCES`.
+ */
+export function createResourceVisibilityHost(access: PluginResourceAccessContext): PluginResourceVisibilityHost {
+  return Object.freeze({
+    canSee: (principal: PluginAccessPrincipal, resourceId: number) => access.canSee(principal, resourceId),
+  });
 }

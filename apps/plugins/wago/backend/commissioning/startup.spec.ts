@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { PluginContext, PluginLiveTopic } from '@attraccess/plugins-backend-sdk';
 import plugin from '../plugin';
+import { HostModule } from '../host-module.test-fixture';
 import { WagoRuntimeArtifactsService } from '../runtime/artifacts/service';
 import { WagoCommissioningService } from './service';
 
@@ -35,7 +36,7 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
       'plugin.wago.read-state',
       'plugin.wago.wait-for-state',
     ]);
-    module = await Test.createTestingModule({ imports: [plugin.register(context)] }).compile();
+    module = await Test.createTestingModule({ imports: [HostModule, plugin.register(context)] }).compile();
     await module.init();
     expect(registerLiveTopic.mock.calls.map(([topic]) => topic.topic)).toEqual([
       'controllers',

@@ -339,6 +339,7 @@
       "resources": "Specific resources",
       "searchResources": "Search resources",
       "selectedCount": "{{count}} selected",
+      "unavailableResource": "The selection contains a resource you cannot see. It is hidden from you or no longer exists. Clear the resource selection, choose the resources again, then save.",
       "needSelection": "Choose at least one source for this feed.",
       "create": "Create feed"
     },

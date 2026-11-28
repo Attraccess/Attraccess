@@ -57,12 +57,19 @@ Eine für jemanden verborgene Maschine antwortet mit `404` (Ressource nicht gefu
 
 Die Sichtbarkeit der Nutzung (unten) gilt zusätzlich: Eine Maschine, die man nicht sehen darf, erscheint nie in der Liste der Maschinen in Benutzung oder in Live-Aktualisierungen, egal wie die Einstellung zur Nutzung lautet.
 
+Auch die offiziellen Plugins befolgen die Einstellung. Eine Maschine, die nur in verborgenen Ressourcengruppen liegt, bleibt in Plugins wie bisher zusätzlich verborgen.
+
+- **Reservierungen:** Verfügbarkeit, neue Buchungen, die Reservierungseinstellungen einer Maschine, die Verwaltungsseiten und Kalender-Feeds lassen eine verborgene Maschine aus oder antworten mit „nicht gefunden“. Wer die Reservierungen einer Maschine verwalten darf, sieht sie allein dadurch noch nicht. **Eigene Buchungen** auf einer Maschine, die verborgen wurde, bleiben erhalten: Sie stehen weiter unter **Meine Reservierungen** mit dem Maschinennamen, lassen sich öffnen, stornieren, behalten oder vorzeitig beenden, und Ihre Kalender-Feeds enthalten sie weiter, solange deren Auswahl die Maschine noch umfasst.
+- **Statuswände:** Wer eine Wand einrichtet, kann nur Maschinen und Ressourcengruppen wählen, die er sehen darf, und **alle Ressourcen** braucht eine Person, deren Maschinenliste nicht eingeschränkt ist. Eine gewählte Gruppe zeigt alle ihre Maschinen, auch solche, die diese Person nicht sehen darf, und **alle Ressourcen** zeigt auch Maschinen, die nur in verborgenen Ressourcengruppen liegen.
+
 > [!WARNING]
-> Seiten und Feeds von Plugins, zum Beispiel des Reservierungs-Plugins, sind noch nicht abgedeckt und können Maschinen weiterhin namentlich auflisten. Prüfen Sie die eingesetzten Plugins, bevor Sie sich darauf verlassen, dass diese Einstellung Ihre Geräteliste verbirgt.
+> Plugins aus anderen Quellen befolgen die Einstellung nur, wenn sie die [Sichtbarkeitsmethoden des Plugin-SDK](plugins/developing-plugins.md#sichtbarkeit-von-maschinen) verwenden. Prüfen Sie sie, bevor Sie sich darauf verlassen, dass diese Einstellung Ihre Geräteliste verbirgt.
 
 > [!NOTE]
-> Zwei Stellen zeigen Maschinen bewusst unabhängig von dieser Einstellung:
+> Diese Stellen zeigen Maschinen bewusst unabhängig von dieser Einstellung:
 >
+> - **Links zu Statuswänden:** Der öffentliche Link einer Statuswand zeigt allen, die ihn haben, was für die Wand eingerichtet wurde.
+> - **Plugin-Nachrichten und Reader-Anzeigen:** Was Plugins, auch die offiziellen, auf Attractap-Readern anzeigen oder in Benachrichtigungen und E-Mails senden, schränkt diese Einstellung nicht ein.
 > - **Projekte:** Nutzungsverlauf und Statistiken eines Projekts zeigen dessen Mitgliedern die im Projekt genutzten Maschinen. Das sind Projektdaten, die mit den Mitgliedern des Projekts geteilt werden.
 > - **Berichte:** Der Berichtsexport (`resources.reports.export`, Berichte zu Sitzungen und Betriebsdauer exportieren) umfasst alle Maschinen.
 

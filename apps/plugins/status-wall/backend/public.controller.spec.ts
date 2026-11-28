@@ -20,7 +20,7 @@ async function setup() {
     { id: 1, name: 'Laser', imageUrl: null },
     { id: 2, name: 'Lathe', imageUrl: null },
   ];
-  const wall = await walls.create({ name: 'Hall', selection: { all: false, resourceIds: [1], groupIds: [] } });
+  const wall = await walls.create(1, { name: 'Hall', selection: { all: false, resourceIds: [1], groupIds: [] } });
   const response = {
     headers: {} as Record<string, string>,
     setHeader(name: string, value: string) {

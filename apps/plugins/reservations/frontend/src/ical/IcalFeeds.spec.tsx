@@ -161,4 +161,25 @@ describe('IcalFeeds', () => {
     const body = calls.find((call) => call.method === 'POST')?.body as { selection: { resourceIds: number[] } };
     expect([...body.selection.resourceIds].sort()).toEqual([1, 2]);
   });
+
+  it('says how to get rid of a hidden resource when saving a feed is refused', async () => {
+    const user = userEvent.setup();
+    mockFetch({
+      ...zone,
+      // Resource 9 is stored in the feed but has no row in the picker.
+      'GET /ical/feeds': [{ ...feed(1, 'Phone'), selection: { ...selection, introduced: false, resourceIds: [9] } }],
+      'GET /api/resource-groups': [],
+      'PATCH /ical/feeds/1': () => ({
+        status: 404,
+        body: { code: 'RESOURCE_NOT_FOUND', message: 'Resource not found' },
+      }),
+    });
+    renderWithProviders(<IcalFeeds />);
+    await user.click(await screen.findByRole('button', { name: 'Edit' }));
+    const form = await screen.findByRole('dialog');
+    await user.click(within(form).getByRole('button', { name: 'Save' }));
+    expect(
+      await screen.findByText(/contains a resource you cannot see.*Clear the resource selection/),
+    ).toBeInTheDocument();
+  });
 });

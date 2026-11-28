@@ -152,10 +152,10 @@ export class ReservationService implements OnModuleDestroy {
    * `ReservationError` (409 with `{ code, message }`) for every violated rule.
    */
   async create(actor: ReservationActor, input: CreateReservationInput): Promise<ReservationRow> {
-    const resource = await this.directory.getResource(input.resourceId);
-    // A resource hidden from the actor (hidden groups) is answered like an unknown one.
-    const visible = resource ? await this.visibility.filterVisible(actor, [input.resourceId]) : [];
-    if (!visible.includes(input.resourceId)) throw new ReservationError('RESOURCE_NOT_FOUND', 'Resource not found');
+    // A resource hidden from the actor is answered like an unknown one.
+    if (!(await this.visibility.canSee(actor, input.resourceId))) {
+      throw new ReservationError('RESOURCE_NOT_FOUND', 'Resource not found');
+    }
     const created = await this.mutex.run(input.resourceId, async () => {
       const settings = await this.settings.get(input.resourceId);
       const canBook = await this.access.canBook(actor, input.resourceId, settings);
@@ -249,14 +249,26 @@ export class ReservationService implements OnModuleDestroy {
     return reservation;
   }
 
-  /** Loads a reservation for an actor: non-holders that do not manage the resource get a 404. */
+  /**
+   * Whether the actor manages the resource and may see it: manager roles do not make a hidden machine visible.
+   * `resources.update` holders see every machine.
+   */
+  private async managesVisible(actor: ReservationActor, resourceId: number): Promise<boolean> {
+    if (!(await this.access.isManager(actor, resourceId))) return false;
+    return (await this.access.hasUpdatePermission(actor)) || this.visibility.canSee(actor, resourceId);
+  }
+
+  /**
+   * Loads a reservation for an actor: non-holders that do not manage the resource, or may not see it, get a 404. The
+   * holder keeps their own booking, and its actions, on a machine that became hidden from them.
+   */
   async getForActor(
     actor: ReservationActor,
     id: number,
   ): Promise<{ reservation: ReservationRow; isHolder: boolean; isManager: boolean }> {
     const reservation = await this.load(id);
     const isHolder = reservation.userId === actor.userId;
-    const isManager = await this.access.isManager(actor, reservation.resourceId);
+    const isManager = await this.managesVisible(actor, reservation.resourceId);
     if (!isHolder && !isManager) throw new ReservationError('RESERVATION_NOT_FOUND', 'Reservation not found');
     return { reservation, isHolder, isManager };
   }
@@ -359,7 +371,7 @@ export class ReservationService implements OnModuleDestroy {
     reason?: string | null,
   ): Promise<ReservationRow> {
     const reservation = await this.load(id);
-    if (!(await this.access.isManager(actor, reservation.resourceId))) {
+    if (!(await this.managesVisible(actor, reservation.resourceId))) {
       // Like everywhere else, a booking the caller may not see does not exist for them. Only the holder,
       // who knows their own request, learns that deciding is not theirs to do.
       if (reservation.userId !== actor.userId) {

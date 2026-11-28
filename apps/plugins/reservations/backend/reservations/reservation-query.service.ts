@@ -37,8 +37,8 @@ export class ReservationQueryService {
   ) {}
 
   /**
-   * Maps entities to DTOs with names and manager flags resolved in bulk: one managed-resources lookup (only
-   * when `knownManaged` does not cover every resource) and 2 name queries.
+   * Maps entities to DTOs with names and manager flags resolved in bulk: one managed-resources lookup and one
+   * visibility filter (only when `knownManaged` does not cover every resource) and 2 name queries.
    */
   async present(
     actor: ReservationActor,
@@ -46,7 +46,10 @@ export class ReservationQueryService {
     knownManaged?: Map<number, boolean>,
   ): Promise<ReservationDto[]> {
     const known = knownManaged ?? new Map<number, boolean>();
-    const managed = rows.every((row) => known.has(row.resourceId)) ? [] : await this.access.managedResourceIds(actor);
+    // Managing a machine that is hidden from the actor does not count, as for `get` and the decisions.
+    const managed = rows.every((row) => known.has(row.resourceId))
+      ? []
+      : await this.visibleManagedIds(actor, await this.access.managedResourceIds(actor));
     const managedIds = new Set(managed ?? []);
     const isManager = (resourceId: number) => known.get(resourceId) ?? (managed === null || managedIds.has(resourceId));
     // Only the resources of other people's bookings need core's attribution answer.
@@ -94,7 +97,15 @@ export class ReservationQueryService {
     actor: ReservationActor,
     filter: { resourceId?: number; status?: ReservationStatus; from?: Date; to?: Date; page: number },
   ): Promise<ManagedReservationListDto> {
-    const managedIds = await this.access.managedResourceIds(actor);
+    // A machine hidden from the caller answers like an unknown one, whatever they manage. `resources.update`
+    // holders (`null`) see every machine.
+    const roleIds = await this.access.managedResourceIds(actor);
+    if (filter.resourceId !== undefined && roleIds !== null) {
+      if (!(await this.visibility.canSee(actor, filter.resourceId))) {
+        throw new ReservationError('RESOURCE_NOT_FOUND', 'Resource not found');
+      }
+    }
+    const managedIds = await this.visibleManagedIds(actor, roleIds);
     // The manager pages and the frontend's "do I manage anything" probe rely on this being a 403, not an empty list.
     if (managedIds !== null && managedIds.length === 0) {
       throw new ReservationError('FORBIDDEN', 'You do not manage any resource');
@@ -121,8 +132,13 @@ export class ReservationQueryService {
 
   /** Whether the caller manages at least one resource (drives the manager pages' visibility). */
   async managerAccess(actor: ReservationActor): Promise<{ isManager: boolean }> {
-    const managedIds = await this.access.managedResourceIds(actor);
+    const managedIds = await this.visibleManagedIds(actor, await this.access.managedResourceIds(actor));
     return { isManager: managedIds === null || managedIds.length > 0 };
+  }
+
+  /** Being a manager of a machine does not make it visible: only the visible ones of `managed` count. */
+  private async visibleManagedIds(actor: ReservationActor, managed: number[] | null): Promise<number[] | null> {
+    return managed === null ? null : this.visibility.filterVisible(actor, managed);
   }
 
   /**
@@ -138,8 +154,8 @@ export class ReservationQueryService {
     if (to.getTime() - from.getTime() > MAX_AVAILABILITY_RANGE_DAYS * DAY_MS) {
       throw new ReservationError('RANGE_TOO_LARGE', `The range may span at most ${MAX_AVAILABILITY_RANGE_DAYS} days`);
     }
-    // Existence and visibility in one query (filterVisible only returns existing resources).
-    if ((await this.visibility.filterVisible(actor, [resourceId])).length === 0) {
+    // Existence and visibility in one answer.
+    if (!(await this.visibility.canSee(actor, resourceId))) {
       throw new ReservationError('RESOURCE_NOT_FOUND', 'Resource not found');
     }
     await this.settings.whenReady();

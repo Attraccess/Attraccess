@@ -1,6 +1,11 @@
-import { READER_UI_CAPABILITIES_NONE, type ReaderUiProvider } from '@attraccess/plugins-backend-sdk';
+import {
+  PLUGIN_RESOURCE_VISIBILITY_HOST,
+  READER_UI_CAPABILITIES_NONE,
+  type ReaderUiProvider,
+} from '@attraccess/plugins-backend-sdk';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { Global, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { ReservationEventHandlers } from './events/event-handlers.service';
 import { resolveHookServices } from './hooks/runtime';
@@ -10,11 +15,19 @@ import { ReservationNotifications } from './notifications/notifier.service';
 import plugin from './plugin';
 import { createHarness } from './testing/harness.test-utils';
 
+/** What the host's global plugin module provides to every plugin module (the routes' `@ResourceVisible()`). */
+@Global()
+@Module({
+  providers: [{ provide: PLUGIN_RESOURCE_VISIBILITY_HOST, useValue: { canSee: async () => true } }],
+  exports: [PLUGIN_RESOURCE_VISIBILITY_HOST],
+})
+class HostModule {}
+
 describe('plugin module wiring', () => {
   it('resolves the whole provider graph, publishes the hooks and shuts down cleanly', async () => {
     const h = await createHarness();
     await h.enable(1);
-    const moduleRef = await Test.createTestingModule({ imports: [plugin.register(h.context)] }).compile();
+    const moduleRef = await Test.createTestingModule({ imports: [HostModule, plugin.register(h.context)] }).compile();
     const app = moduleRef.createNestApplication();
     await app.init();
     try {

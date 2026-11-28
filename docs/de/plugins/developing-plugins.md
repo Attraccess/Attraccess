@@ -1132,6 +1132,55 @@ Scheduler. Unbekannte Personen und Ressourcen ergeben negative Antworten (`false
 | `getMaintenanceWindows(resourceId, from, to)`   | Fenster, die `[from, to)` überschneiden, als `{ maintenanceId, resourceId, startTime, endTime \| null, reason \| null }`. Offene Wartung zählt bis zu ihrem Abschluss.                                                                                                                                                                                                                                                                                                                                                                                           |
 | `getActiveSessions(resourceId)`                 | Laufende Sitzungen `{ usageId, userId, startTime }`, die früheste zuerst.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
+#### Sichtbarkeit von Maschinen
+
+Alles, was einer Person verrät, dass es eine Maschine gibt (eine Liste, eine Seite, ein Feed, ein Export), muss die
+Instanz-Einstellung **Wer die Maschinenliste sehen darf** und die verborgenen Ressourcengruppen befolgen. Bauen Sie
+keine der Regeln nach: Fragen Sie den Host nach den Ressourcen, die die Person sehen darf. Diese Methoden gehören zu
+`context.resourceAccess` (Berechtigung `ACCESS_RESOURCES`); was ein Prinzipal ist, steht oben.
+
+| Methode                                    | Liefert                                                                                                                                                   |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listVisibleResourceIds(principal)`        | Die IDs aller Ressourcen, die der Prinzipal sehen darf.                                                                                                   |
+| `filterVisible(principal, resourceIds)`    | Die vorhandenen, sichtbaren IDs aus `resourceIds` in der übergebenen Reihenfolge. Rufen Sie es einmal für eine ganze Liste auf statt `canSee` je Eintrag. |
+| `canSee(principal, resourceId)`            | Ob es die Ressource gibt und der Prinzipal sie sehen darf.                                                                                                |
+| `getResourceListScope(principal)`          | `all` oder `permitted`: ob die Einstellung die Maschinenliste des Prinzipals einschränkt. Damit erlauben Sie eine Auswahl, die „alle Ressourcen“ meint.   |
+| `filterVisibleGroups(principal, groupIds)` | Die Ressourcengruppen aus `groupIds`, die der Kern dem Prinzipal auflisten würde, in der übergebenen Reihenfolge.                                         |
+
+Die ersten drei verbinden die Maschinenlisten-Regel des Kerns (mit `resources.update` oder `resources.access.manage`
+erfüllt man sie für jede Maschine; im Modus `authenticated` auch mit `resources.read`; alle anderen erfüllen sie für
+das, worin sie eingewiesen sind, was sie einweisen oder warten, was sie gerade nutzen und für Maschinen, die Aufsicht
+erlauben oder verlangen) mit der Regel für verborgene Gruppen, beide müssen also zutreffen. Nach der Regel für
+verborgene Gruppen braucht man für eine Maschine, die nur in verborgenen Gruppen liegt, zusätzlich `resources.update`,
+oder man muss für eine dieser Gruppen Einweiser oder in sie eingewiesen sein. `getResourceListScope` betrachtet nur die
+Einstellung: `all` bedeutet nicht, dass der Prinzipal jede Maschine sehen darf. Übergeben Sie bei Anfragen `request.user` und bei Hintergrundarbeit für eine Person, etwa dem Rendern
+ihres Kalender-Feeds, eine Benutzer-ID. Unbekannte Personen sehen nichts.
+
+Routen mit der Maschinen-ID im Pfad erhalten den Decorator `@ResourceVisible()`. Bei angemeldeten Anfragen beantwortet
+er eine Ressource, die die aufrufende Person nicht sehen darf, mit demselben 404 wie der Kern
+(`ResourceNotFoundException`), bevor Ihr Handler läuft. Er braucht keine Plugin-Berechtigung. Er liest `:resourceId`;
+für einen anderen Parameter übergeben Sie dessen Namen. Er prüft nur IDs aus reinen Ziffern und lässt alles andere
+durch. Die Route muss den Parameter deshalb mit `ParseIntPipe` lesen, das nicht ganzzahlige Werte mit `400` ablehnt:
+
+```ts
+@Auth()
+@Controller('widgets')
+class WidgetsController {
+  @Get('resources/:resourceId/widgets')
+  @ResourceVisible()
+  list(@Param('resourceId', ParseIntPipe) resourceId: number) {}
+
+  @Get('resources/:id/diagnostics')
+  @ResourceVisible('id')
+  diagnostics(@Param('id', ParseIntPipe) id: number) {}
+}
+```
+
+Für eine Maschine in Body oder Query prüfen Sie selbst mit `canSee` und werfen `ResourceNotFoundException`. Ein Test,
+der Ihr Nest-Modul aufbaut, muss `PLUGIN_RESOURCE_VISIBILITY_HOST` (einen `PluginResourceVisibilityHost`) wie der Host
+aus einem `@Global()`-Modul bereitstellen. Diese APIs brauchen Attraccess `2.0.0-beta.2` oder neuer: Geben Sie das als
+`attraccessVersion.min` und in `attraccess.host` an.
+
 ### Persistenz
 
 Ein Plugin hat keinen Datenbankzugriff. Eigene Daten liegen in Tabellen, die das Plugin deklariert und über
@@ -1177,6 +1226,10 @@ Entitäten oder Abfrage-Handles. Jede Gruppe prüft beim Aufruf einer Methode ih
 | `hostData.users`     | `READ_USERS`       | `getUsernames(ids)` (aus Kompatibilitätsgründen beibehalten), `getDisplayNames(ids)` (Map von Benutzer-ID auf Anzeigenamen: „Vorname Nachname“, ersatzweise der Benutzername), `getLocales(ids)`, `isActive(id)` (existiert, nicht gelöscht, nicht deaktiviert), `listIdsWithAnyPermission(keys)`.                   |
 | `hostData.settings`  | `READ_SETTINGS`    | `getApp(key)`: der getrimmte Wert einer Anwendungseinstellung oder `null`.                                                                                                                                                                                                                                           |
 | `hostData.flows`     | `TRIGGER_FLOWS`    | `findNodes(query)`: Flow-Knoten nach `type`, `typePrefix`, `dataEquals`, `dataIn`, `resourceId`, `excludeResourceId`, `excludeFlowId`, `orderById` und `limit`, als `{ id, type, resourceId, resourceName, flowId, flowName, data }`.                                                                                |
+
+`hostData.resources.filterVisible` ist **veraltet**: Es wendet nur die Regel für verborgene Gruppen an, nicht die
+Maschinenlisten-Einstellung. Für bestehende Plugins verhält es sich unverändert; verwenden Sie stattdessen
+[Sichtbarkeit von Maschinen](#sichtbarkeit-von-maschinen).
 
 `PluginUserModel` (`id`, `username`, `firstName`, `lastName`, `displayName`, `locale`, `isDisabled`; `displayName` ist der berechnete Name „Vorname Nachname“ bzw. der Benutzername, zeigen Sie ihn Menschen an) und `PluginResourceModel` (`id`, `name`, `type`,
 `description`, `allowTakeOver`, `maxParallelSessions`, `supervisionMode`) stammen aus `@attraccess/application-models`

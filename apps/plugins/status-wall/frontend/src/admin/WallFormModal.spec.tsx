@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { PluginApiError } from '@attraccess/plugins-frontend-sdk';
 import '@testing-library/jest-dom/vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
@@ -96,7 +97,7 @@ describe('WallFormModal', () => {
 
   it('says so when there are no groups', async () => {
     api.listResourceGroups.mockResolvedValue([]);
-    mount(wall);
+    mount({ ...wall, selection: { all: false, resourceIds: [4], groupIds: [] } });
     expect(await screen.findByText('There are no resource groups.')).toBeInTheDocument();
   });
 
@@ -111,6 +112,42 @@ describe('WallFormModal', () => {
     expect(await screen.findByText('name taken')).toBeInTheDocument();
     expect(onSaved).not.toHaveBeenCalled();
     expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['ResourceNotFoundException', 404, /contains a resource you cannot see.*Clear the resource selection/],
+    ['ResourceGroupNotFound', 404, /contains a group you cannot see.*Remove it from the selection/],
+    ['ResourceListNarrowed', 403, /Switch off "Show all resources"/],
+    ['Not Found', 404, /^Not Found$/],
+  ])('explains the refusal "%s" in words a manager can act on', async (message, status, shown) => {
+    const user = userEvent.setup();
+    api.createWall.mockRejectedValue(new PluginApiError(message, status));
+    mount();
+
+    await user.type(screen.getByRole('textbox', { name: /Name/ }), 'Hall');
+    await user.click(saveButton() as HTMLButtonElement);
+
+    expect(await screen.findByText(shown)).toBeInTheDocument();
+  });
+
+  it('lets a manager drop a stored group the list does not offer', async () => {
+    const user = userEvent.setup();
+    api.listResourceGroups.mockResolvedValue([{ id: 3, name: 'Wood' }]);
+    api.updateWall.mockResolvedValue(wall);
+    mount({ ...wall, selection: { all: false, resourceIds: [], groupIds: [2, 3] } });
+
+    expect(await screen.findByText(/not in this list: 1\./)).toBeInTheDocument();
+    expect(screen.queryByText('There are no resource groups.')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Remove them from the selection' }));
+    expect(screen.queryByText(/not in this list/)).not.toBeInTheDocument();
+    await user.click(saveButton() as HTMLButtonElement);
+
+    await waitFor(() =>
+      expect(api.updateWall).toHaveBeenCalledWith(7, {
+        name: 'Metal shop',
+        selection: { all: false, resourceIds: [], groupIds: [3] },
+      }),
+    );
   });
 
   it('closes on cancel', async () => {

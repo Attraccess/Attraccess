@@ -339,6 +339,7 @@
       "resources": "Bestimmte Ressourcen",
       "searchResources": "Ressourcen suchen",
       "selectedCount": "{{count}} ausgewählt",
+      "unavailableResource": "Die Auswahl enthält eine Ressource, die du nicht sehen kannst. Sie ist für dich verborgen oder existiert nicht mehr. Leere die Ressourcenauswahl, wähle die Ressourcen neu und speichere dann.",
       "needSelection": "Wähle mindestens eine Quelle für diesen Feed.",
       "create": "Feed erstellen"
     },

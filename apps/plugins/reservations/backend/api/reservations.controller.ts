@@ -1,4 +1,4 @@
-import { Auth, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, type AuthenticatedRequest, ResourceVisible } from '@attraccess/plugins-backend-sdk';
 import { Body, Controller, Get, HttpCode, Inject, Param, ParseIntPipe, Post, Query, Req, Res } from '@nestjs/common';
 import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { PendingDecisionService } from '../hooks/pending-decision.service';
@@ -28,6 +28,7 @@ export class ReservationsController {
   ) {}
 
   @Get('resources/:resourceId/pending-decision')
+  @ResourceVisible()
   @ApiOperation({
     summary: 'The caller’s running booking that still awaits a "keep or free the rest?" answer on this resource',
     description:
@@ -35,6 +36,7 @@ export class ReservationsController {
   })
   @ApiParam({ name: 'resourceId', type: Number })
   @ApiOkResponse({ type: ReservationDto, description: 'The booking, or null' })
+  @ApiReservationErrors({ notFound: true })
   async pendingDecision(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() request: AuthenticatedRequest,
@@ -44,6 +46,7 @@ export class ReservationsController {
   }
 
   @Get('resources/:resourceId/availability')
+  @ResourceVisible()
   @ApiOperation({
     summary: 'Bookings, booking rules and the caller’s booking permission of a resource for a time range',
     description:
@@ -111,7 +114,7 @@ export class ReservationsController {
   @ApiQuery({ name: 'to', required: false, type: String })
   @ApiQuery({ name: 'page', required: false, type: Number, description: '1-based, default 1' })
   @ApiOkResponse({ type: ManagedReservationListDto })
-  @ApiReservationErrors({ badRequest: true, forbidden: true })
+  @ApiReservationErrors({ badRequest: true, forbidden: true, notFound: true })
   listManaged(
     @Req() request: AuthenticatedRequest,
     @Query('resourceId') resourceId?: string,

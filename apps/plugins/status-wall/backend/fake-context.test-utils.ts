@@ -20,6 +20,11 @@ export function createFakeContext() {
     groups: new Map<number, number[]>(),
     sessions: new Map<number, PluginActiveSession[]>(),
     maintenance: new Map<number, PluginMaintenanceWindow[]>(),
+    /** What the host answers the manager: every id is visible unless listed here. */
+    listScope: 'all' as 'all' | 'permitted',
+    hiddenResources: new Set<number>(),
+    deletedResources: new Set<number>(),
+    hiddenGroups: new Set<number>(),
   };
   const handlers = new Map<SystemEvent, Set<Handler>>();
 
@@ -31,10 +36,22 @@ export function createFakeContext() {
         listDisplay: jest.fn(async (ids?: number[]) =>
           state.resources.filter((resource) => ids === undefined || ids.includes(resource.id)),
         ),
+        getNames: jest.fn(
+          async (ids: number[]) =>
+            new Map(ids.filter((id) => !state.deletedResources.has(id)).map((id) => [id, `Resource ${id}`])),
+        ),
         listIdsInGroups: jest.fn(async (groupIds: number[]) => groupIds.flatMap((id) => state.groups.get(id) ?? [])),
       },
     },
     resourceAccess: {
+      getResourceListScope: jest.fn(async () => state.listScope),
+      filterVisible: jest.fn(async (_viewer: unknown, ids: number[]) =>
+        ids.filter((id) => !state.hiddenResources.has(id) && !state.deletedResources.has(id)),
+      ),
+      // Like the host: a group that does not exist is not visible either.
+      filterVisibleGroups: jest.fn(async (_viewer: unknown, ids: number[]) =>
+        ids.filter((id) => state.groups.has(id) && !state.hiddenGroups.has(id)),
+      ),
       getActiveSessions: jest.fn(async (id: number) => state.sessions.get(id) ?? []),
       getMaintenanceWindows: jest.fn(async (id: number) => state.maintenance.get(id) ?? []),
     },

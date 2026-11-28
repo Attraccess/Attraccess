@@ -168,7 +168,7 @@ export class PreStartService {
    * viewer may not override it. Managers see nothing (they start through the override confirmation), and
    * a booking that merely starts soon is not a block (it is only a confirmation at start). The host
    * checks again at start, so this is informational and uses the same answer as the gate, including who is named.
-   * Like the plugin's own endpoints it says nothing about resources the viewer may not see (hidden groups).
+   * Like the plugin's own endpoints it says nothing about resources the viewer may not see.
    */
   async evaluateStartBlocked(ctx: StartBlockedContext, deadline = hookDeadline()): Promise<StartBlockedState | null> {
     if (!this.settings.isWarm) {
@@ -196,7 +196,7 @@ export class PreStartService {
     // The viewer's request scope (an API token's) applies to every check, as in core's own answers.
     const viewer = subjectOfPrincipal(ctx.principal);
     if (await this.access.isManager(viewer, ctx.resourceId)) return null;
-    if ((await this.visibility.filterVisible(viewer, [ctx.resourceId])).length === 0) return null;
+    if (!(await this.visibility.canSee(viewer, ctx.resourceId))) return null;
     const timeZone = await this.globalSettings.getTimezone();
     const holder = await this.holderNameFor(viewer, active);
     const until = formatTime(active.endTime, { lang: ctx.language, timeZone });

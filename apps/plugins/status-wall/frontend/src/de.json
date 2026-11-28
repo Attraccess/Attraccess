@@ -43,6 +43,13 @@
     "resources": "Ressourcen",
     "selectedCount": "{{count}} ausgewählt",
     "needSelection": "Wähle mindestens eine Gruppe oder Ressource.",
+    "unlistedGroups": "Ausgewählte Gruppen, die nicht in dieser Liste stehen: {{count}}. Sie sind für dich verborgen oder existieren nicht mehr.",
+    "removeUnlistedGroups": "Aus der Auswahl entfernen",
+    "errors": {
+      "resourceUnavailable": "Die Auswahl enthält eine Ressource, die du nicht sehen kannst. Sie ist für dich verborgen oder existiert nicht mehr. Leere die Ressourcenauswahl, wähle die Ressourcen neu und speichere dann.",
+      "groupUnavailable": "Die Auswahl enthält eine Gruppe, die du nicht sehen kannst. Sie ist für dich verborgen oder existiert nicht mehr. Entferne sie aus der Auswahl und speichere dann.",
+      "allNeedsWholeList": "Alle Ressourcen kannst du nur zeigen, wenn du die gesamte Maschinenliste siehst. Schalte „Alle Ressourcen zeigen“ aus und wähle Gruppen oder Ressourcen."
+    },
     "create": "Erstellen"
   },
   "link": {
