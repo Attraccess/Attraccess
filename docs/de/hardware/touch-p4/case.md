@@ -23,7 +23,7 @@ passt in beide. Noch nichts wurde gedruckt oder anprobiert: siehe [Noch nicht ge
     7 mm großes quadratisches Loch über jedem der vier Masse-Pads der Platine, damit die leitfähigen Dichtungen
     die Metallrückseite erreichen; Aussparungen über den Pins der Ethernet-Buchse und den Schirmlaschen der
     USB-C-Buchse, jeweils 1 mm größer als die Pads.
-  - **Tasche.** Wände um das LCD-Modul, 0,25 mm pro Seite, richten es beim Einkleben aus. Die Tasche ist unten
+  - **Tasche.** Wände um das LCD-Modul, 0,4 mm pro Seite (wie beim alten Rahmen, der passte), richten es beim Einkleben aus. Die Tasche ist unten
     offen, wo sich das Flexkabel um die Kante faltet.
   - **Rand.** Er sitzt mit 0,1 mm pro Seite im Bildschirmfenster der Kappe und richtet den Rahmen seitlich aus.
     Er trägt kein Klebeband und bleibt 1,1 mm unter dem Glas (`rim_gap`); seine Öffnung von 77,3 mm lässt die
@@ -234,7 +234,7 @@ schreiben Step-Dateien dafür und nutzen `rsvg-convert` für Beschriftungen.
     die weitere Öffnung im Rand und der in der Tiefe geklemmte Rahmen.
   - Der neue Rahmen ist nur im CAD geprüft: keine Überschneidung mit Kappe, Display, Kachel oder Platine,
     die Oberseite des Bodens 0,2 mm unter der Metallrückseite. Wie gut das Klebeband hält und ob die
-    0,25 mm der Tasche zu einem echten Druck passen, ist offen.
+    0,4 mm der Tasche zu einem echten Druck passen, ist offen.
 - **Abstand des Displays zur Platine.** Das Gehäuse hält das Display 1,7 mm von der Platine entfernt
   (`disp_gap`): der 1,5 mm dicke Boden des Displayrahmens und 0,2 mm Klebeband. Einzelheiten in den [Designnotizen](hardware/touch-p4/design-notes.md#displaymontage-und-flexkabel).
   - Das Flexkabel des Displays faltet sich flach auf die Metallrückseite des LCD und geht durch einen Schlitz

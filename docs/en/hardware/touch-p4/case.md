@@ -21,7 +21,7 @@ both. Nothing has been printed or test-fitted yet: see [Not yet verified](#not-y
     so the fold slides in (the flex area plus 1 mm, slot included); a 7 mm square hole over each of the
     board's four ground pads, so the conductive gaskets reach the metal back; reliefs over the Ethernet
     jack's pins and the USB-C socket's shell tabs, each 1 mm larger than the pads.
-  - **Pocket.** Walls round the LCD module, 0.25 mm per side, locate it while it is taped. The pocket is
+  - **Pocket.** Walls round the LCD module, 0.4 mm per side (as on the old frame, which fitted), locate it while it is taped. The pocket is
     open at the bottom, where the flex folds round.
   - **Rim.** It fits the cap's screen window with 0.1 mm per side and locates the frame sideways. It
     carries no tape and stays 1.1 mm under the glass (`rim_gap`); its 77.3 mm opening clears the touch
@@ -227,7 +227,7 @@ files for it, and use `rsvg-convert` for labels.
     rim opening and the frame clamped in depth.
   - The new frame is checked in CAD only: no interference with the cap, the display, the tile or the
     board, the floor's top 0.2 mm under the metal back. How well the tape holds and whether the pocket's
-    0.25 mm suits a real print is open.
+    0.4 mm suits a real print is open.
 - **Display distance to the board.** The case holds the display 1.7 mm off the board (`disp_gap`): the
   display frame's 1.5 mm floor and 0.2 mm of tape.
   Details in the [design notes](hardware/touch-p4/design-notes.md#display-mounting-and-flex).
