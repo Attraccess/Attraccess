@@ -252,6 +252,7 @@ void Application::updateSelectedResourceDetails() {
       personalized && resource.canEndOtherSessions,
       personalized,
       this->cardAuthenticationData.displayName});
+    if (!this->waitingForResourceRefresh) Display::resourceDetailsScreen.keepActionErrorOnItsButton();
     return;
   }
   // The selected resource was removed while the user was looking at it.

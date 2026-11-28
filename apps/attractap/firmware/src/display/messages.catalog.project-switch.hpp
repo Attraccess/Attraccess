@@ -14,6 +14,7 @@ inline constexpr Entry projectSwitchCatalog[] = {
     {Message::ProjectChanged, "Projekt gewechselt", "Project changed"},
     {Message::PleaseCompleteBeforeSwitchingProject, "Bitte vor dem Wechsel ausfüllen", "Please complete before switching"},
     {Message::ErrorMeterSwitchFailed, "Zähler nicht lesbar. Projekt unverändert.", "Meter not readable. Project unchanged."},
+    {Message::ProjectNotChanged, "Projekt nicht gewechselt", "Project not changed"},
 };
 static_assert(sizeof(catalog) / sizeof(Entry) + sizeof(cardRelayCatalog) / sizeof(Entry) +
                       sizeof(networkStatusCatalog) / sizeof(Entry) + sizeof(sessionUsersCatalog) / sizeof(Entry) +

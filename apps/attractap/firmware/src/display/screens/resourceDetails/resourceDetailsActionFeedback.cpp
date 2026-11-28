@@ -72,7 +72,7 @@ std::string ResourceDetailsScreen::roleOf(button_click_type_t type) const
           std::to_string(this->resourceCache.activeUsageId);
 }
 
-bool ResourceDetailsScreen::showActionError(const FirmwareI18n::Text &text)
+bool ResourceDetailsScreen::showActionError(const FirmwareI18n::Text &text, std::function<void()> onSwitchButtonGone)
 {
    if (!this->screen || !this->buttonFor(this->lastActionType, this->lastActionFlowId))
    {
@@ -81,6 +81,8 @@ bool ResourceDetailsScreen::showActionError(const FirmwareI18n::Text &text)
    this->actionErrorPending = true;
    this->actionErrorText = text;
    this->actionErrorDeadline = 0;
+   this->switchButtonGoneCallback =
+      this->lastActionType == BUTTON_CLICK_TYPE_SWITCH_PROJECT ? std::move(onSwitchButtonGone) : nullptr;
    this->applyActionError();
    return true;
 }
@@ -94,7 +96,9 @@ void ResourceDetailsScreen::applyActionError()
    lv_obj_t *button = this->buttonFor(this->lastActionType, this->lastActionFlowId);
    if (!button || this->roleOf(this->lastActionType) != this->lastActionRole)
    {
+      const std::function<void()> buttonGone = button ? nullptr : std::move(this->switchButtonGoneCallback);
       this->dropActionError();
+      if (buttonGone) buttonGone(); // last: it may leave this screen
       return;
    }
    const uint32_t now = millis();
@@ -122,5 +126,6 @@ void ResourceDetailsScreen::dropActionError()
 {
    this->actionErrorPending = false;
    this->actionErrorDeadline = 0;
+   this->switchButtonGoneCallback = nullptr;
    this->actionError.clear();
 }

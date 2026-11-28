@@ -11,6 +11,7 @@ void ReaderWorkflow::testProjectSwitch()
         const char *projectName = "Werkstattprojekt";
         uint32_t usageId = 9;
         bool timed = false; // an automatic end adds "Extend" above the project
+        bool running = true; // false: the session has ended
     };
     const auto runningList = [&](const Running &running) {
         JsonDocument doc;
@@ -26,7 +27,12 @@ void ReaderWorkflow::testProjectSwitch()
         auto r = resources.add<JsonObject>();
         r["id"] = 1; r["name"] = "Laser"; r["description"] = ""; r["type"] = "machine";
         r["isHealthy"] = true; r["hasIntroduction"] = true; r["maxParallelSessions"] = 1;
-        r["canStart"] = false; r["activeSessionCount"] = 1;
+        r["canStart"] = !running.running; r["activeSessionCount"] = running.running ? 1 : 0;
+        const auto push = [&] {
+            std::string payload; serializeJson(doc, payload); server.push("RESOURCE_LIST", payload);
+            pump();
+        };
+        if (!running.running) return push();
         auto own = r["ownUsageSession"].to<JsonObject>();
         own["id"] = running.usageId; own["user"]["username"] = username.c_str(); own["startTime"] = "2026-01-01T10:00:00Z";
         if (running.timed) {
@@ -41,9 +47,9 @@ void ReaderWorkflow::testProjectSwitch()
             if (running.projectName) r["ownProjectName"] = running.projectName;
             else r["ownProjectName"] = nullptr;
         }
-        std::string payload; serializeJson(doc, payload); server.push("RESOURCE_LIST", payload);
-        pump();
+        push();
     };
+    const auto ended = [] { Running row; row.running = false; return row; }();
     const auto projects = [&] {
         const auto request = server.last("PROJECTS_OF_USER");
         server.push("PROJECTS_OF_USER",
@@ -192,6 +198,22 @@ void ReaderWorkflow::testProjectSwitch()
                         ",\"projects\":[" + items + "]}");
         pump();
     };
+    // Types into the picker's search field (it shows its placeholder or the active query) and confirms.
+    const auto searchFor = [&](const char *fieldCaption, const char *query) {
+        click(fieldCaption);
+        std::function<lv_obj_t *(lv_obj_t *)> keyboardIn = [&](lv_obj_t *root) -> lv_obj_t * {
+            if (lv_obj_has_flag(root, LV_OBJ_FLAG_HIDDEN)) return nullptr;
+            if (lv_obj_check_type(root, &lv_keyboard_class)) return root;
+            for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
+                if (auto *found = keyboardIn(lv_obj_get_child(root, i))) return found;
+            return nullptr;
+        };
+        lv_obj_t *keyboard = keyboardIn(lv_screen_active());
+        assert(keyboard);
+        lv_textarea_set_text(lv_keyboard_get_textarea(keyboard), query);
+        lv_obj_send_event(keyboard, LV_EVENT_READY, nullptr);
+        pump();
+    };
     const auto fullyVisible = [](const char *caption) {
         lv_obj_t *button = buttonOf(lv_screen_active(), caption);
         if (!button || !lv_obj_is_visible(button)) return false;
@@ -234,21 +256,7 @@ void ReaderWorkflow::testProjectSwitch()
     reopen();
     assert(label(lv_screen_active(), "Seite 1 von 2") && fullyVisible("Alpha"));
     // The same for a search.
-    click("Projekte suchen");
-    {
-        std::function<lv_obj_t *(lv_obj_t *)> keyboardIn = [&](lv_obj_t *root) -> lv_obj_t * {
-            if (lv_obj_has_flag(root, LV_OBJ_FLAG_HIDDEN)) return nullptr;
-            if (lv_obj_check_type(root, &lv_keyboard_class)) return root;
-            for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
-                if (auto *found = keyboardIn(lv_obj_get_child(root, i))) return found;
-            return nullptr;
-        };
-        lv_obj_t *keyboard = keyboardIn(lv_screen_active());
-        assert(keyboard);
-        lv_textarea_set_text(lv_keyboard_get_textarea(keyboard), "eps");
-        lv_obj_send_event(keyboard, LV_EVENT_READY, nullptr);
-        pump();
-    }
+    searchFor("Projekte suchen", "eps");
     pageReply(1, "eps", 1, {"Epsilon"});
     assert(fullyVisible("Kein Projekt") && fullyVisible("Epsilon"));
     reopen();
@@ -330,6 +338,75 @@ void ReaderWorkflow::testProjectSwitch()
     clearStatus();
     assert(label(lv_screen_active(), "Projekt: Werkstattprojekt"));
 
-    // The choice before a start is unchanged: no "no project" entry of the switch.
+    // The session ended just as the choice was made: the refusal has no button left to appear on and says why on a
+    // screen of its own, whether the refreshed row arrives after the answer or before it.
+    for (const bool rowFirst : {false, true}) {
+        runningList({});
+        openPicker();
+        click("Zweitprojekt");
+        if (rowFirst) runningList(ended);
+        reply(R"("error":"NoOwnActiveSessionError")");
+        runningList(ended);
+        assert(lv_screen_active() == Display::statusScreen.getScreen());
+        assert(label(lv_screen_active(), "Projekt nicht gewechselt"));
+        assert(label(lv_screen_active(), "Sie haben hier keine eigene Sitzung. Es wurde nichts beendet."));
+        assert(!label(lv_screen_active(), "Code: NoOwnActiveSessionError"));
+        display.capture(output, "project-switch-08-session-ended");
+        clearStatus();
+        assert(onDetails() && !lv_obj_is_visible(requireLabel(lv_screen_active(), "Projekt wechseln")));
+    }
+    // Another refusal whose button goes before it could be read moves to the full-screen error, in both orders.
+    for (const bool rowFirst : {false, true}) {
+        runningList({});
+        openPicker();
+        click("Zweitprojekt");
+        if (rowFirst) runningList(ended);
+        reply(R"("error":"METER_SWITCH_FAILED")");
+        runningList(ended);
+        assert(lv_screen_active() == Display::statusScreen.getScreen());
+        assert(label(lv_screen_active(), "Zähler nicht lesbar. Projekt unverändert."));
+        assert(label(lv_screen_active(), "Code: METER_SWITCH_FAILED"));
+        click("Zurück");
+        assert(onDetails());
+    }
+    // Once the refreshed row kept the button, the reason was readable there: a later end just takes both away.
+    runningList({});
+    openPicker();
+    click("Zweitprojekt");
+    reply(R"("error":"METER_SWITCH_FAILED")");
+    runningList({});
+    assert(label(lv_screen_active(), warned("Zähler nicht lesbar. Projekt unverändert.").c_str()));
+    runningList(ended);
+    assert(onDetails() && !label(lv_screen_active(), warned("Zähler nicht lesbar. Projekt unverändert.").c_str()));
+
+    // The choice before a start does not take over what the switch picker was searching for.
+    runningList({});
+    openPicker();
+    searchFor("Projekte suchen", "eps");
+    pageReply(1, "eps", 1, {"Epsilon"});
+    runningList(ended);
+    assert(onDetails());
+    {
+        const auto requests = server.count("PROJECTS_OF_USER");
+        click("Projekt wählen");
+        assert(server.count("PROJECTS_OF_USER") == requests + 1);
+        const auto request = server.last("PROJECTS_OF_USER");
+        assert(request["data"]["payload"]["page"].as<int>() == 1 && request["data"]["payload"]["search"].isNull());
+        assert(label(lv_screen_active(), "Projekte suchen") && !label(lv_screen_active(), "Epsilon"));
+        // The choice before a start is unchanged: no "no project" entry of the switch.
+        assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Kein Projekt")));
+    }
+    // Its own search it keeps, as before.
+    pageReply(1, "", 5, fullPage);
+    searchFor("Projekte suchen", "alp");
+    pageReply(1, "alp", 1, {"Alpha"});
+    click("Abbrechen");
+    {
+        const auto requests = server.count("PROJECTS_OF_USER");
+        click("Projekt wählen");
+        assert(server.count("PROJECTS_OF_USER") == requests);
+        assert(label(lv_screen_active(), "alp") && label(lv_screen_active(), "Alpha"));
+    }
+    click("Abbrechen");
     click(LV_SYMBOL_LEFT);
 }

@@ -6,6 +6,8 @@
 
 void ProjectSelectScreen::setSwitchTarget(bool value, uint32_t current)
 {
+   // What a switch searched and paged through is not carried over to the choice before a start.
+   if (this->switching && !value) this->resetProjectsSearch();
    this->switching = value;
    this->currentProjectId = value ? current : 0;
    this->updateSwitchChrome();

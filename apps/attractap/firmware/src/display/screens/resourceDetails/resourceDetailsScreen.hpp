@@ -59,7 +59,11 @@ public:
     // its 4 s start once it is visible. It survives the refresh rebuilding the flow
     // buttons, and is dropped when the button now means something else (start became
     // "Take over", a stop now ends another user's session) or the screen is left.
-    bool showActionError(const FirmwareI18n::Text &text);
+    // `onSwitchButtonGone` is for a refused project switch: it runs when "Change project"
+    // disappears before the refreshed row has kept it, so the reason was never readable.
+    bool showActionError(const FirmwareI18n::Text &text, std::function<void()> onSwitchButtonGone = nullptr);
+    // The refreshed row is on screen: an error still on its button has been shown there.
+    void keepActionErrorOnItsButton() { this->switchButtonGoneCallback = nullptr; }
 
     void setProjects(const API::ProjectsOfUserResponse &projects);
     // Rebuilds the plugin slot containers (header, body, session) from the slot cache. Needs lv_lock().
@@ -179,6 +183,7 @@ private:
     bool actionErrorPending = false;
     FirmwareI18n::Text actionErrorText;
     uint32_t actionErrorDeadline = 0; // 0 until the error is visible
+    std::function<void()> switchButtonGoneCallback;
     lv_obj_t *lockDoorButton = nullptr;
     lv_obj_t *unlockDoorButton = nullptr;
     lv_obj_t *unlatchDoorButton = nullptr;

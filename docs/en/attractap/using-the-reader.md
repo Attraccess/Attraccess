@@ -57,8 +57,10 @@ If the switch is refused, the session keeps its project:
 
 - A meter cannot be read: the button shows **⚠ Zähler nicht lesbar. Projekt unverändert.** (Meter not readable. Project unchanged.)
 - The balance does not cover a new session where the resource [charges the switch like one](billing/configuration.md#charging-on-project-switch): the reader reports [insufficient balance](#results-messages-and-low-balance)
-- Your session ended just as you made your choice: the reader says **Sie haben hier keine eigene Sitzung. Es wurde nichts beendet.** (You have no session of your own here. Nothing was ended.)
+- Your session ended just as you made your choice: a warning screen titled **Projekt nicht gewechselt** (Project not changed) says **Sie haben hier keine eigene Sitzung. Es wurde nichts beendet.** (You have no session of your own here. Nothing was ended.) Tap **OK** or wait.
 - Other refusals, such as a failed flow, show no specific reason: the button shows **⚠ Fehlgeschlagen – erneut tippen** (⚠ Failed – tap to retry)
+
+If **Projekt wechseln** is already gone when the reloaded status appears, for example because the session ended meanwhile, any other reason a button would show moves to the [**Etwas ist schiefgelaufen** (Something went wrong) screen](#results-messages-and-low-balance).
 
 Older firmware, Attractap Lite, the BLE Bridge and plugin readers do not offer this. See [Switching the project of a running session](resources/usage-tracking.md#switching-the-project-of-a-running-session).
 
