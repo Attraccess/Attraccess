@@ -14,6 +14,7 @@ describe('AttractapProjectSwitchHandler', () => {
     const services = {
       resourceUsageService: {
         assertSessionProjectSwitchable: jest.fn().mockResolvedValue(undefined),
+        getActiveSessionsForResource: jest.fn().mockResolvedValue([{ id: 40, userId: 99 }]),
         switchSessionProject: jest.fn().mockResolvedValue({ id: 12, project: { name: 'Rocket' } }),
       },
       usersService: { findOne: jest.fn().mockResolvedValue(user) },
@@ -157,6 +158,18 @@ describe('AttractapProjectSwitchHandler', () => {
     expect(replies()[0]).toMatchObject({ error: expected });
     expect(services.resourceListService.sendResourceListToSocket).toHaveBeenCalled();
     expect(services.formsHandler.clearFormDraft).not.toHaveBeenCalled();
+  });
+
+  it('does not claim there is no own session when the named one runs on as another record', async () => {
+    const { services, request, replies } = setUp();
+    services.resourceUsageService.assertSessionProjectSwitchable.mockRejectedValue(new NoSessionToSwitchError());
+    services.resourceUsageService.getActiveSessionsForResource.mockResolvedValue([{ id: 12, userId: user.id }]);
+
+    await request();
+
+    // The reader has no text of its own for this code: it shows its general "try again" on the refreshed row.
+    expect(replies()).toEqual([expect.objectContaining({ error: 'PROJECT_SWITCH_SESSION_CHANGED' })]);
+    expect(services.resourceListService.sendResourceListToSocket).toHaveBeenCalled();
   });
 
   it('tells the reader about an insufficient balance, with whether it can top up', async () => {

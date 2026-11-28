@@ -85,7 +85,7 @@ export class AttractapProjectSwitchHandler {
 
     const target = { projectId, ...(Number.isInteger(usageId) ? { usageId } : {}) };
     const refuse = async (error: unknown) => {
-      await this.replyRefusal(resourceId, reply, error);
+      await this.replyRefusal(resourceId, user.id, reply, error);
       // The refreshed row shows what still runs, and under which project.
       await this.resourceListService.sendResourceListToSocket(socket, { resourceIds: new Set([resourceId]) });
     };
@@ -124,8 +124,21 @@ export class AttractapProjectSwitchHandler {
     }
   }
 
+  /**
+   * A named session that is gone may still run, as the record a switch made elsewhere continued it with. Then the
+   * reader must not say that nothing of theirs runs here: it has no text for this code and shows its general failure.
+   */
+  private async goneSessionCode(resourceId: number, userId: number): Promise<string> {
+    const active = await this.resourceUsageService.getActiveSessionsForResource(resourceId);
+    return active.some((session) => session.userId === userId)
+      ? 'PROJECT_SWITCH_SESSION_CHANGED'
+      : // The code of a stop without an own session: the reader says that none of theirs runs here.
+        'NoOwnActiveSessionError';
+  }
+
   private async replyRefusal(
     resourceId: number,
+    userId: number,
     reply: (payload: Record<string, unknown>) => Promise<unknown>,
     error: unknown,
   ): Promise<void> {
@@ -135,8 +148,7 @@ export class AttractapProjectSwitchHandler {
     }
     const message = error instanceof Error ? error.message : String(error);
     this.logger.warn(`Switching the project of a session on resource ${resourceId} failed: ${message}`);
-    // The code of a stop without an own session: the reader says that none of theirs runs here.
-    if (error instanceof NoSessionToSwitchError) await reply({ error: 'NoOwnActiveSessionError' });
+    if (error instanceof NoSessionToSwitchError) await reply({ error: await this.goneSessionCode(resourceId, userId) });
     else await reply({ error: CODED_REFUSAL.exec(message)?.[1] ?? message });
   }
 }
