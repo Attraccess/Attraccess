@@ -19,7 +19,7 @@ import { ProjectsSelect } from '../../../../../components/projectsSelect/index';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLiveUpdates } from '../../../../../utils/live-updates';
 import { PROJECT_SWITCHED_EVENT } from '../../sessionEvents';
-import { invalidateSwitchedRecords } from '../ActiveSessionDisplay/invalidateSwitchedSession';
+import { invalidateSwitchedRecords } from '../../invalidateSwitchedSession';
 
 export interface HistoryTableProps {
   resourceId: number;

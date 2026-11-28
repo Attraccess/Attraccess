@@ -16,7 +16,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     return { mutate: vi.fn(), isPending: false };
   },
 }));
-vi.mock('./invalidateSwitchedSession', () => ({ invalidateSwitchedSession: vi.fn() }));
+vi.mock('../../invalidateSwitchedSession', () => ({ invalidateSwitchedSession: vi.fn() }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
 vi.mock('../../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ apiError: state.apiError, success: vi.fn() }),

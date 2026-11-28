@@ -7,7 +7,7 @@ import { useToastMessage } from '../../../../../components/toastProvider';
 import { useRefreshNetworkRestrictionOnError } from '../../../../../hooks/useRefreshNetworkRestrictionOnError';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
-import { invalidateSwitchedSession } from './invalidateSwitchedSession';
+import { invalidateSwitchedSession } from '../../invalidateSwitchedSession';
 import { switchErrorFallbackKey } from './switchErrorFallbackKey';
 import en from './switchProject/en.json';
 import de from './switchProject/de.json';

@@ -23,7 +23,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useLiveUpdates } from '../../../../../utils/live-updates';
 import { PROJECT_SWITCHED_EVENT, SESSION_EVENTS, SESSION_EXTENDED_EVENT } from '../../sessionEvents';
-import { invalidateSwitchedRecords } from '../ActiveSessionDisplay/invalidateSwitchedSession';
+import { invalidateSwitchedRecords } from '../../invalidateSwitchedSession';
 import { mySessionsQueryKey } from '../../../../resourceOverview/activeUsageSessionsBanner/mySessionsQuery';
 import en from './translations/en.json';
 import de from './translations/de.json';
