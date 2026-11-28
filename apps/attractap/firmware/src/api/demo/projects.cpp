@@ -60,14 +60,21 @@ void DemoWebsocket::handleSwitchProject(JsonObjectConst payload)
     const uint32_t usageId = payload["usageId"] | 0u;
     const uint32_t projectId = payload["projectId"] | 0u;
     DemoSession *own = nullptr;
+    bool ownRuns = false;
     if (idx >= 0)
         for (DemoSession &session : _sessions[idx])
-            if (isOwnSession(session) && (usageId == 0 || session.id == usageId))
-                own = &session;
-    const char *refusal = !own ? "No active session found"
-                          : own->projectId == projectId ? "The session is already booked to this project"
-                          : projectId > DEMO_PROJECT_COUNT ? "Project not found"
-                                                           : nullptr;
+            if (isOwnSession(session))
+            {
+                ownRuns = true;
+                if (usageId == 0 || session.id == usageId)
+                    own = &session;
+            }
+    // The server's replies (project-switch.handler.ts): a named record that a switch replaced while the card holder's
+    // session runs on is a changed session, not a missing one.
+    const char *refusal = projectId > DEMO_PROJECT_COUNT ? "Project not found"
+                          : !own ? (ownRuns ? "PROJECT_SWITCH_SESSION_CHANGED" : "NoOwnActiveSessionError")
+                          : own->projectId == projectId ? "The session already belongs to this project"
+                                                        : nullptr;
     if (refusal)
     {
         respondActionError("SWITCH_SESSION_PROJECT", refusal);

@@ -197,10 +197,11 @@ int main(int argc, char **argv)
     assert(printer()["ownProjectId"] == 1 && printer()["ownProjectName"] == switchReply["data"]["payload"]["projectName"]);
     assert(printer()["ownUsageSession"]["id"].as<uint32_t>() != unbookedId);
     assert(printer()["ownUsageSession"]["startTime"].as<std::string>() == startedAt);
-    switchProject(unbookedId, "2"); // the replaced record is no longer running
-    assert(switchReply["data"]["payload"]["error"] == "No active session found");
+    switchProject(unbookedId, "2"); // the replaced record is no longer running, but the session runs on
+    assert(switchReply["data"]["payload"]["error"] == "PROJECT_SWITCH_SESSION_CHANGED");
     switchProject(printer()["ownUsageSession"]["id"].as<uint32_t>(), "1"); // already booked there
-    assert(!switchReply["data"]["payload"]["error"].isNull() && printer()["ownProjectId"] == 1);
+    assert(switchReply["data"]["payload"]["error"] == "The session already belongs to this project");
+    assert(printer()["ownProjectId"] == 1);
     switchProject(printer()["ownUsageSession"]["id"].as<uint32_t>(), "null");
     assert(switchReply["data"]["payload"]["success"] == true && switchReply["data"]["payload"]["projectName"].isNull());
     assert(printer()["ownProjectId"] == 0 && printer()["activeSessionCount"] == 1);
@@ -209,6 +210,8 @@ int main(int argc, char **argv)
     assert(printer()["activeSessionCount"] == 2 && printer()["canStart"] == false);
     assert(printer()["activeUsageSession"]["user"]["username"] == "Ben");
     tap("C3C3C3C3"); assert(printer()["canStart"] == true && printer()["ownUsageSession"].isNull());
+    switchProject(annId, "1"); // nothing of this card holder runs here
+    assert(switchReply["data"]["payload"]["error"] == "NoOwnActiveSessionError");
     startPrinter();
     assert(printer()["activeUsageSessions"].size() == 3);
     tap("D4D4D4D4");
