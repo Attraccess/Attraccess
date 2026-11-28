@@ -152,7 +152,10 @@ write_metrics() {
         ;;
     esac
     metric backup_last_run_timestamp_seconds "Unix time the last backup run ended." "$(get_state last_run)"
-    metric backup_last_run_success "1 when the last backup run succeeded, 0 when it failed." "$(get_state last_run_success)"
+    # Not while disabled: no run is scheduled, so an earlier failure would keep BackupFailed firing for good. The value
+    # is kept in STATE_DIR and reported again once backups are back on.
+    [ "$mode" = disabled ] ||
+      metric backup_last_run_success "1 when the last backup run succeeded, 0 when it failed." "$(get_state last_run_success)"
     metric backup_last_success_timestamp_seconds "Unix time of the last successful backup." "$(get_state last_success)"
   } >"$METRICS_FILE.tmp"
   # No secret in it, and node-exporter (runs as nobody) must be able to read it.

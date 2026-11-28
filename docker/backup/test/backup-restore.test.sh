@@ -175,7 +175,9 @@ if grep -q 'checking the restic repository' "$work/unreachable.log"; then die "t
 kill -TERM "$unreachable_pid"; wait "$unreachable_pid" || true
 pass "the start checks only the settings, not the repository or the database"
 
-# 8c. BACKUP_DISABLED=true: one warning, status `disabled`, keeps running; removed again on SIGTERM.
+# 8c. BACKUP_DISABLED=true: one warning, status `disabled`, keeps running; removed again on SIGTERM. A failed last run
+#     from before is not reported: no run is scheduled that could clear BackupFailed again.
+echo 0 >"$work/state/last_run_success"
 BACKUP_DISABLED=true "$lib/entrypoint.sh" run >"$work/disabled.log" 2>&1 &
 disabled_pid=$!
 for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$work/status/status" ] && break; sleep 0.5; done
@@ -183,6 +185,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$work/status/status" ] && break; sleep 0
 kill -0 "$disabled_pid" || die "BACKUP_DISABLED=true must keep running"
 grep -q '^backup_disabled 1$' "$work/status/backup.prom" || die "BACKUP_DISABLED=true must report backup_disabled 1"
 if grep -q '^backup_configured' "$work/status/backup.prom"; then die "disabled backups must not report backup_configured"; fi
+if grep -q '^backup_last_run_success' "$work/status/backup.prom"; then die "disabled backups must not report an earlier failed run"; fi
 [ "$(grep -c 'DISABLED on purpose' "$work/disabled.log")" = "1" ] || die "expected exactly one disabled warning"
 kill -TERM "$disabled_pid"; wait "$disabled_pid" || true
 [ ! -e "$work/status/status" ] || die "stopping must remove the status"

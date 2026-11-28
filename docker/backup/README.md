@@ -36,7 +36,7 @@ live in `BACKUP_STATE_DIR`, so they survive restarts.
 | `backup_max_age_seconds`                   | `BACKUP_MAX_AGE_HOURS` in seconds                                            |
 | `backup_scheduler_start_timestamp_seconds` | start of the scheduler (the reference for `BackupTooOld` before any success) |
 | `backup_last_run_timestamp_seconds`        | end of the last run                                                          |
-| `backup_last_run_success`                  | 1 the last run succeeded, 0 it failed                                        |
+| `backup_last_run_success`                  | 1 the last run succeeded, 0 it failed (absent while disabled)                |
 | `backup_last_success_timestamp_seconds`    | end of the last successful run                                               |
 
 The Grafana rules `BackupNotConfigured`, `BackupFailed`, `BackupTooOld` and `BackupsDisabled`
