@@ -42,6 +42,7 @@ export function ProjectsSelect(props: Props) {
     <Select
       {...selectProps}
       items={items}
+      isDisabled={isDisabled}
       placeholder={projects?.data?.find((r) => r.id === resolvedValue)?.name ?? props.placeholder}
       value={selectedKey}
       onChange={(key) => {
@@ -53,8 +54,8 @@ export function ProjectsSelect(props: Props) {
         handleChange(Number.isNaN(parsed) ? undefined : parsed);
       }}
       data-cy="projects-select"
-
-      aria-label={props.ariaLabel ?? 'Projects Select'}
+      // A visible label names the field; a second name would be read out in addition.
+      aria-label={props.ariaLabel ?? (props.label ? undefined : 'Projects Select')}
     />
   );
 }

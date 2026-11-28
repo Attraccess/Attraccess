@@ -41,7 +41,7 @@
   },
   "METER_SWITCH_FAILED": {
     "title": "Meter could not be read",
-    "description": "The project was not changed because a billed meter could not be read: {{error}}"
+    "description": "The project was not changed because a billed meter could not be read. Technical details: {{error}}"
   },
   "METER_INITIALIZATION_FAILED": {
     "title": "Meter did not start",

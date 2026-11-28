@@ -30,9 +30,13 @@
     "description": "Die Sitzung wurde beendet, während du ein Projekt ausgewählt hast. Hier wurde das Projekt nicht gewechselt."
   },
   "errors": {
+    "INSUFFICIENT_BALANCE": {
+      "title": "Nicht genügend Guthaben",
+      "description": "Das Projekt wurde nicht gewechselt, weil das Guthaben nicht für eine neue Sitzung reicht."
+    },
     "PROJECT_SWITCH_FAILED": {
       "title": "Projekt nicht gewechselt",
-      "description": "Das Projekt wurde nicht gewechselt: {{error}}"
+      "description": "Das Projekt wurde nicht gewechselt. Technische Details: {{error}}"
     },
     "PROJECT_SWITCH_DEVICE_FAILED": {
       "title": "Projekt nicht gewechselt",

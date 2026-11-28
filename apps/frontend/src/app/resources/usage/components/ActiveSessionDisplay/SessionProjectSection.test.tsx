@@ -15,7 +15,7 @@ const state = vi.hoisted(() => ({
   listState: 'ready' as 'ready' | 'loading' | 'error',
   refetch: vi.fn(),
   warning: vi.fn(),
-  selectProps: {} as { value?: number | null; ariaLabel?: string },
+  selectProps: {} as { value?: number | null; label?: string; ariaLabel?: string },
 }));
 
 vi.mock('../../../../../hooks/useNetworkRestriction', () => ({
@@ -47,6 +47,7 @@ vi.mock('../../../../../components/projectsSelect', () => ({
   }: {
     onChange: (id: number | undefined) => void;
     value?: number | null;
+    label?: string;
     ariaLabel?: string;
   }) => {
     state.selectProps = props;
@@ -167,7 +168,9 @@ describe('switching the project of the running session', () => {
     mount(current);
     await user.click(screen.getByRole('button', { name: 'change' }));
 
-    expect(state.selectProps.ariaLabel).toBe('dialog.select');
+    // The visible label alone names it: a second, equal name would be announced in addition.
+    expect(state.selectProps.label).toBe('dialog.select');
+    expect(state.selectProps.ariaLabel).toBeUndefined();
     expect(state.selectProps.value).toBeUndefined();
     await user.click(screen.getByRole('button', { name: 'pick none' }));
     expect(state.selectProps.value).toBeNull();

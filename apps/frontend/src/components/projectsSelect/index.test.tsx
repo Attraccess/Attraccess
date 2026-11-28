@@ -61,3 +61,11 @@ it('shows a chosen "unassigned" as the selected option, unlike nothing chosen ye
   );
   expect(screen.getByRole('button', { name: /No project/ })).toBeTruthy();
 });
+it('locks the select while disabled', () => {
+  render(<ProjectsSelect value={7} isDisabled label="Project" />);
+  expect(screen.getByRole('button', { name: /Workshop/ }).hasAttribute('disabled')).toBe(true);
+});
+it('is named by its visible label alone, once', () => {
+  render(<ProjectsSelect value={7} label="New project" />);
+  expect(screen.getByRole('button', { name: /^Workshop New project$|^New project Workshop$/ })).toBeTruthy();
+});

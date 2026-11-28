@@ -62,6 +62,7 @@ const cases = [
   ['a cancelled continuation', nest(409, 'The tentative usage session was cancelled')],
   ['an invalid value', nest(400, ['projectId must be a positive number'])],
   ['an unexpected server error', nest(500, 'Internal server error')],
+  ['a balance that does not cover a new session', nest(400, 'INSUFFICIENT_BALANCE')],
 ] as const;
 
 describe.each(['en', 'de'] as const)('project switch errors in %s', (language) => {
@@ -98,6 +99,35 @@ describe.each(['en', 'de'] as const)('project switch errors in %s', (language) =
     result.current.reportError(new TypeError('Failed to fetch'));
 
     expect(lastToast().description).toMatch(NOT_CHANGED[language]);
+  });
+});
+
+describe.each([
+  ['en', /Technical details: /],
+  ['de', /Technische Details: /],
+] as const)('untranslated server text in %s', (language, label) => {
+  beforeEach(() => {
+    state.apiError.mockReset();
+    useTranslationState.setState({ language });
+  });
+
+  it.each([
+    ['a meter that cannot be read', nest(400, 'METER_SWITCH_FAILED: "Energy": The cumulative counter decreased')],
+    ['an unmapped refusal', nest(400, ['projectId must be a positive number'])],
+  ])('is labelled as technical detail after %s', async (_name, error) => {
+    renderHook(() => useSwitchSessionProject(7, vi.fn()));
+
+    await state.onError?.(error);
+
+    expect(lastToast().description).toMatch(label);
+  });
+
+  it('is labelled as technical detail when the forms could not be loaded', () => {
+    const { result } = renderHook(() => useSwitchSessionProject(7, vi.fn()));
+
+    result.current.reportError(new TypeError('Failed to fetch'));
+
+    expect(lastToast().description).toMatch(label);
   });
 });
 

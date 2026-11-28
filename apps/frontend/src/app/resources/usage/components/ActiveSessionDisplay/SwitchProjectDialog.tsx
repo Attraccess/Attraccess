@@ -82,7 +82,6 @@ export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<Swi
                 value={selected}
                 onChange={(projectId) => setSelected(projectId ?? null)}
                 label={t('dialog.select')}
-                ariaLabel={t('dialog.select')}
                 placeholder={t('dialog.placeholder')}
                 includeUnassignedOption
                 unassignedLabel={t('noProject')}

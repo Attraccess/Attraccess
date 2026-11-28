@@ -30,9 +30,13 @@
     "description": "The session ended while you were choosing a project. The project was not changed here."
   },
   "errors": {
+    "INSUFFICIENT_BALANCE": {
+      "title": "Insufficient balance",
+      "description": "The project was not changed because the balance does not cover a new session."
+    },
     "PROJECT_SWITCH_FAILED": {
       "title": "Project not changed",
-      "description": "The project was not changed: {{error}}"
+      "description": "The project was not changed. Technical details: {{error}}"
     },
     "PROJECT_SWITCH_DEVICE_FAILED": {
       "title": "Project not changed",

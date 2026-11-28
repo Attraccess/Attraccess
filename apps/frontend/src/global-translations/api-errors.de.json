@@ -41,7 +41,7 @@
   },
   "METER_SWITCH_FAILED": {
     "title": "Zähler nicht lesbar",
-    "description": "Das Projekt wurde nicht gewechselt, weil ein abgerechneter Zähler nicht gelesen werden konnte: {{error}}"
+    "description": "Das Projekt wurde nicht gewechselt, weil ein abgerechneter Zähler nicht gelesen werden konnte. Technische Details: {{error}}"
   },
   "METER_INITIALIZATION_FAILED": {
     "title": "Zähler nicht gestartet",
