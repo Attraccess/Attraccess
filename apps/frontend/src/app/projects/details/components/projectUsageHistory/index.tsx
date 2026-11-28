@@ -86,7 +86,7 @@ export function ProjectUsageHistory({ projectId }: ProjectUsageHistoryProps) {
                       </TableCell>
                       <TableCell>
                         <DateTimeDisplay date={session.startTime} />
-                        <ContinuationLabel previousUsageId={session.previousUsageId} />
+                        <ContinuationLabel previousUsageId={session.previousUsageId} className="w-0 min-w-full" />
                       </TableCell>
                       <TableCell>
                         {session.endTime ? <DateTimeDisplay date={session.endTime} /> : t('history.inProgress')}

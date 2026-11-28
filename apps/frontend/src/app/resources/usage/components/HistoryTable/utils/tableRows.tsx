@@ -36,7 +36,8 @@ export function generateRowCells(
     cells.push(
       <TableCell key={`start-${session.id}`} className="whitespace-nowrap">
         <DateTimeDisplay date={session.startTime} />
-        <ContinuationLabel previousUsageId={session.previousUsageId} />
+        {/* Wraps below the date and adds nothing to the column's width, which would squeeze the others. */}
+        <ContinuationLabel previousUsageId={session.previousUsageId} className="w-0 min-w-full whitespace-normal" />
       </TableCell>,
       <TableCell key={`end-${session.id}`} className="hidden lg:table-cell whitespace-nowrap">
         <DateTimeDisplay date={session.endTime} />
