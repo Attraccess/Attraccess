@@ -37,8 +37,8 @@ export class ReservationQueryService {
   ) {}
 
   /**
-   * Maps entities to DTOs with names and manager flags resolved in bulk: one managed-resources lookup (only
-   * when `knownManaged` does not cover every resource) and 2 name queries.
+   * Maps entities to DTOs with names and manager flags resolved in bulk: one managed-resources lookup and one
+   * visibility filter (only when `knownManaged` does not cover every resource) and 2 name queries.
    */
   async present(
     actor: ReservationActor,
@@ -46,7 +46,10 @@ export class ReservationQueryService {
     knownManaged?: Map<number, boolean>,
   ): Promise<ReservationDto[]> {
     const known = knownManaged ?? new Map<number, boolean>();
-    const managed = rows.every((row) => known.has(row.resourceId)) ? [] : await this.access.managedResourceIds(actor);
+    // Managing a machine that is hidden from the actor does not count, as for `get` and the decisions.
+    const managed = rows.every((row) => known.has(row.resourceId))
+      ? []
+      : await this.visibleManagedIds(actor, await this.access.managedResourceIds(actor));
     const managedIds = new Set(managed ?? []);
     const isManager = (resourceId: number) => known.get(resourceId) ?? (managed === null || managedIds.has(resourceId));
     // Only the resources of other people's bookings need core's attribution answer.

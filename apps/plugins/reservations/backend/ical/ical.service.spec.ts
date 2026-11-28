@@ -59,7 +59,9 @@ describe('IcalService', () => {
     for (const id of [1, 2, 3]) await h.enable(id);
     await h.settings.warmUp();
     const visibility = {
-      filterVisible: async (_subject: unknown, ids: number[]) => ids.filter((id) => !hidden.has(id)),
+      // Machines are hidden from the feed owner (user 10) only, so a render that asked for anyone else would show them.
+      filterVisible: async (subject: number | { userId: number }, ids: number[]) =>
+        (typeof subject === 'number' ? subject : subject.userId) === 10 ? ids.filter((id) => !hidden.has(id)) : ids,
       resourceIdsOfGroups: async (groupIds: number[]) => groupIds.flatMap((id) => groups.get(id) ?? []),
       isActiveAccount: async (userId: number) => !inactive.has(userId),
       resourceIdsRequiringSupervision: async (ids: number[]) => ids.filter((id) => supervisionRequired.has(id)),

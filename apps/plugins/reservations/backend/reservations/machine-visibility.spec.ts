@@ -1,5 +1,4 @@
 import { Harness, createHarness, principal } from '../testing/harness.test-utils';
-import { ReservationError } from './errors';
 
 /**
  * Machine list visibility (ATT-1407): a machine the host hides from a user is not told to them by any reservation
@@ -54,8 +53,7 @@ describe('reservations on a machine hidden from the user', () => {
     await expect(h.queries.availability(principal(HOLDER), 1, ...range)).rejects.toEqual(
       notFound('RESOURCE_NOT_FOUND'),
     );
-    await expect(book(HOLDER, 1, '04')).rejects.toBeInstanceOf(ReservationError);
-    expect((await h.queries.listMine(principal(HOLDER), 'upcoming')).map((row) => row.userId)).toEqual([HOLDER]);
+    await expect(book(HOLDER, 1, '04')).rejects.toEqual(notFound('RESOURCE_NOT_FOUND'));
   });
 
   it('does not let a manager role show another person’s booking or decide on it', async () => {
@@ -79,6 +77,10 @@ describe('reservations on a machine hidden from the user', () => {
     const booking = await book(ROLE_MANAGER, 1, '02');
     h.hideFrom(ROLE_MANAGER, 1);
     await expect(h.reservations.approve(principal(ROLE_MANAGER), booking.id)).rejects.toMatchObject({ status: 403 });
+    // The lists must not offer the decision either.
+    expect(await h.queries.listMine(principal(ROLE_MANAGER), 'upcoming')).toEqual([
+      expect.objectContaining({ id: booking.id, canDecide: false }),
+    ]);
   });
 
   it('leaves hidden machines out of the manager list and its total', async () => {

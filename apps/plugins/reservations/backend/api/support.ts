@@ -73,7 +73,11 @@ export function ApiReservationErrors(options: {
     decorators.push(ApiForbiddenResponse({ type: ReservationErrorDto, description: 'Not allowed (FORBIDDEN)' }));
   if (options.notFound) {
     decorators.push(
-      ApiNotFoundResponse({ type: ReservationErrorDto, description: 'RESERVATION_NOT_FOUND or RESOURCE_NOT_FOUND' }),
+      ApiNotFoundResponse({
+        type: ReservationErrorDto,
+        description:
+          'RESERVATION_NOT_FOUND or RESOURCE_NOT_FOUND. On routes under resources/:resourceId, a machine that does not exist or that the caller may not see is answered before the handler with core’s body instead: message ResourceNotFoundException, no code.',
+      }),
     );
   }
   if (options.conflict) {

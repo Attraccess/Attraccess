@@ -36,6 +36,7 @@ export class ReservationsController {
   })
   @ApiParam({ name: 'resourceId', type: Number })
   @ApiOkResponse({ type: ReservationDto, description: 'The booking, or null' })
+  @ApiReservationErrors({ notFound: true })
   async pendingDecision(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Req() request: AuthenticatedRequest,
@@ -113,7 +114,7 @@ export class ReservationsController {
   @ApiQuery({ name: 'to', required: false, type: String })
   @ApiQuery({ name: 'page', required: false, type: Number, description: '1-based, default 1' })
   @ApiOkResponse({ type: ManagedReservationListDto })
-  @ApiReservationErrors({ badRequest: true, forbidden: true })
+  @ApiReservationErrors({ badRequest: true, forbidden: true, notFound: true })
   listManaged(
     @Req() request: AuthenticatedRequest,
     @Query('resourceId') resourceId?: string,
