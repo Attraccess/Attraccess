@@ -1,4 +1,4 @@
-import { ResourceType, ResourceUsageAction } from '@attraccess/application-models';
+import { ResourceType, ResourceUsageAction, sessionStartOf } from '@attraccess/application-models';
 import type {
   SupervisionMode,
   UsageBillingItemDraft,
@@ -439,7 +439,7 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
       projectId: draft.projectId,
       previousUsageId: previous.id,
       projectSwitchCharging: draft.projectSwitchCharging,
-      sessionStartTime: previous.sessionStartTime ?? previous.startTime,
+      sessionStartTime: sessionStartOf(previous),
       formSubmissions: undefined,
       billingTransaction: null,
     });

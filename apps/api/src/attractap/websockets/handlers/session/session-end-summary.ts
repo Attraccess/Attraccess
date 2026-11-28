@@ -1,5 +1,5 @@
 import type { Logger } from '@nestjs/common';
-import type { UsageSession } from '@attraccess/application-models';
+import { sessionStartOf, type UsageSession } from '@attraccess/application-models';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import type { BillingService } from '../../../../billing/charges/billing.service';
 import type { StopResourceUsageSessionPayload } from '../../websocket.types';
@@ -16,7 +16,7 @@ export async function sessionEndSummary(
   usage: UsageSession | undefined,
   userId: number,
 ): Promise<SessionEndSummary> {
-  const startedAt = usage?.sessionStartTime ?? usage?.startTime;
+  const startedAt = usage ? sessionStartOf(usage) : undefined;
   const start = startedAt ? new Date(startedAt).getTime() : NaN;
   const end = usage?.endTime ? new Date(usage.endTime).getTime() : NaN;
   const summary: SessionEndSummary =

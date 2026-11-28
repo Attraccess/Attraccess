@@ -1,4 +1,4 @@
-import { ResourceType } from '@attraccess/application-models';
+import { ResourceType, sessionStartOf } from '@attraccess/application-models';
 import {
   SessionDurationEstimateExceedsMaximumException,
   SessionDurationEstimateRequiredException,
@@ -104,9 +104,7 @@ export function extensionCap(session: {
   maxAutoEndAt: Date | null;
 }): Date {
   // A project switch does not move the limit: it counts from the start of the session that was switched.
-  return (
-    session.maxAutoEndAt ?? addMinutes(session.sessionStartTime ?? session.startTime, MAX_SESSION_DURATION_MINUTES)
-  );
+  return session.maxAutoEndAt ?? addMinutes(sessionStartOf(session), MAX_SESSION_DURATION_MINUTES);
 }
 
 /** The new deadline of an extension, or a refusal. Nothing is clipped; `toMax` is the explicit way to the cap. */

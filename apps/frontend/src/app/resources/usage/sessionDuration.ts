@@ -1,3 +1,5 @@
+import { sessionStartOf } from '@attraccess/application-models';
+
 /** Extension steps the API accepts, in minutes. */
 export const EXTEND_STEPS_MINUTES = [60, 120, 240, 360, 720, 1440] as const;
 
@@ -16,13 +18,8 @@ export interface SessionDeadline {
   maxAutoEndAt?: string | null;
 }
 
-/**
- * Since when the person has been using the machine. After a project switch the running record is a continuation:
- * its `startTime` is the switch, `sessionStartTime` the start of the session.
- */
-export function sessionStartOf(usage: { startTime: string; sessionStartTime?: string | null }): string {
-  return usage.sessionStartTime ?? usage.startTime;
-}
+/** Since when the person has been using the machine, also after a project switch (shared with the API). */
+export { sessionStartOf };
 
 /** The latest the automatic end can be moved to: the session's maximum, or the 30 day limit. */
 export function extensionCap(session: SessionDeadline): Date {

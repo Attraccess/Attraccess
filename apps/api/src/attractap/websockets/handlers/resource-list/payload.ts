@@ -4,6 +4,7 @@ import {
   ResourceIntroducerType,
   ResourceType,
   SupervisionMode,
+  sessionStartOf,
 } from '@attraccess/application-models';
 import { formatUserDisplayName } from '@attraccess/shared';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
@@ -67,7 +68,7 @@ function readerAutoEnd(session: ReaderSessionSource, offsetMinutes: (at: Date) =
 
 function toReaderSession(session: ReaderSessionSource, offsetMinutes: (at: Date) => number, now = new Date()) {
   // After a project switch the reader keeps showing since when the machine has been in use.
-  const startedAt = session.sessionStartTime ?? session.startTime;
+  const startedAt = sessionStartOf(session);
   return {
     id: session.id,
     user: {

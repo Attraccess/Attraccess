@@ -1,5 +1,5 @@
 import { ResourceUsage } from '@attraccess/database-entities';
-import { ResourceUsageAction, type UsageSessionWithParties } from '@attraccess/application-models';
+import { ResourceUsageAction, sessionStartOf, type UsageSessionWithParties } from '@attraccess/application-models';
 import { EntityManager, IsNull } from 'typeorm';
 import type { ContinuationDraft } from '../../../resources/usage/usage-session-store.port';
 import { toUsageSession } from './usage-session-mapping';
@@ -30,7 +30,7 @@ export async function createContinuation(
       projectId: draft.projectId,
       previousUsageId: previous.id,
       projectSwitchCharging: draft.projectSwitchCharging,
-      sessionStartTime: previous.sessionStartTime ?? previous.startTime,
+      sessionStartTime: sessionStartOf(previous),
       // Frozen when the session started, and kept for as long as it is continued.
       sessionDurationCreditsPerMinute: previous.sessionDurationCreditsPerMinute,
       operatingDurationCreditsPerMinute: previous.operatingDurationCreditsPerMinute,
