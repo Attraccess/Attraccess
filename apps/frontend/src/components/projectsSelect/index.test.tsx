@@ -41,8 +41,23 @@ it('supports clearing assignment through the legacy change callback', async () =
 });
 it('renders the placeholder before projects arrive and supports an optional change handler', async () => {
   state.projects = undefined;
-  render(<ProjectsSelect value={null} placeholder="Choose project" includeUnassignedOption />);
+  render(<ProjectsSelect value={undefined} placeholder="Choose project" includeUnassignedOption />);
   fireEvent.click(screen.getByRole('button', { name: /Choose project/ }));
   fireEvent.click(await screen.findByRole('option', { name: 'Unassigned' }));
   expect(state.query).toHaveBeenCalledWith({ query: { includeArchived: undefined } });
+});
+it('shows a chosen "unassigned" as the selected option, unlike nothing chosen yet', () => {
+  const view = render(
+    <ProjectsSelect
+      value={undefined}
+      placeholder="Choose project"
+      includeUnassignedOption
+      unassignedLabel="No project"
+    />,
+  );
+  expect(screen.getByRole('button', { name: /Choose project/ })).toBeTruthy();
+  view.rerender(
+    <ProjectsSelect value={null} placeholder="Choose project" includeUnassignedOption unassignedLabel="No project" />,
+  );
+  expect(screen.getByRole('button', { name: /No project/ })).toBeTruthy();
 });

@@ -9,11 +9,78 @@
     "placeholder": "Choose a project",
     "unchanged": "The session already belongs to this project.",
     "cancel": "Cancel",
-    "confirm": "Switch project"
+    "confirm": "Switch project",
+    "replaced": {
+      "title": "This session has changed",
+      "description": "It ended or its project was changed elsewhere while this dialog was open. Close the dialog and check your session."
+    }
   },
   "success": {
     "title": "Project changed",
     "project": "Usage is now booked to {{name}}.",
     "noProject": "Usage is no longer booked to a project."
+  },
+  "projects": {
+    "loading": "Loading projects…",
+    "loadError": "The projects could not be loaded.",
+    "retry": "Try again"
+  },
+  "ended": {
+    "title": "Session no longer running",
+    "description": "The session ended while you were choosing a project. The project was not changed here."
+  },
+  "errors": {
+    "PROJECT_SWITCH_FAILED": {
+      "title": "Project not changed",
+      "description": "The project was not changed: {{error}}"
+    },
+    "PROJECT_SWITCH_DEVICE_FAILED": {
+      "title": "Project not changed",
+      "description": "The project was not changed because a connected device did not accept the change. Your session continues under the previous project. Technical details: {{error}}"
+    },
+    "PROJECT_SWITCH_UNCONFIRMED": {
+      "title": "Project change not confirmed",
+      "description": "The server did not answer, so it is unknown whether the project was changed. Check the project shown for your session before trying again. Technical details: {{error}}"
+    },
+    "FLOW_EXECUTION_ERROR": {
+      "title": "Project not changed",
+      "description": "The project was not changed: {{error}}"
+    },
+    "The session already belongs to this project": {
+      "title": "Project not changed",
+      "description": "The project was not changed: the session already belongs to this project."
+    },
+    "Only the owner of a running session can switch its project": {
+      "title": "Project not changed",
+      "description": "The project was not changed. Only the person who started a running session can switch its project."
+    },
+    "No active usage session found": {
+      "title": "Project not changed",
+      "description": "The project was not changed because this session is no longer running."
+    },
+    "Project not found": {
+      "title": "Project not changed",
+      "description": "The project was not changed. The selected project no longer exists or you are no longer a member of it."
+    },
+    "A usage lifecycle operation is already in progress for this resource": {
+      "title": "Project not changed",
+      "description": "The project was not changed because another change to this machine's sessions is in progress. Try again in a moment."
+    },
+    "MachineBusyError": {
+      "title": "Project not changed",
+      "description": "The project was not changed because another change to this machine's sessions is in progress. Try again in a moment."
+    },
+    "SessionChangeInterruptedError": {
+      "title": "Project not changed",
+      "description": "The project was not changed because the server was restarted during the switch. Check the machine and try again."
+    },
+    "Usage session changed during the project switch": {
+      "title": "Project not changed",
+      "description": "The project was not changed because the session changed meanwhile. Check your session and try again."
+    },
+    "The tentative usage session was cancelled": {
+      "title": "Project not changed",
+      "description": "The project was not changed because the session changed meanwhile. Check your session and try again."
+    }
   }
 }

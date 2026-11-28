@@ -31,6 +31,8 @@ export function ProjectsSelect(props: Props) {
 
   const { data: projects } = useFindManyProjects({ query: { includeArchived } });
   const resolvedValue = value ?? undefined;
+  // `null` is a chosen "unassigned", `undefined` is nothing chosen yet.
+  const selectedKey = value === null && includeUnassignedOption ? UNASSIGNED_KEY : (resolvedValue?.toString() ?? '');
   const projectItems = (projects?.data ?? []).map((project) => ({ key: project.id.toString(), label: project.name }));
   const items = includeUnassignedOption
     ? [{ key: UNASSIGNED_KEY, label: unassignedLabel ?? 'Unassigned' }, ...projectItems]
@@ -41,7 +43,7 @@ export function ProjectsSelect(props: Props) {
       {...selectProps}
       items={items}
       placeholder={projects?.data?.find((r) => r.id === resolvedValue)?.name ?? props.placeholder}
-      value={resolvedValue ? resolvedValue.toString() : ''}
+      value={selectedKey}
       onChange={(key) => {
         if (key === UNASSIGNED_KEY || key === '') {
           handleChange(undefined);

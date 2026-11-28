@@ -219,7 +219,8 @@ export const UsageNotesDrawer = memo(
                   {canEditProject && resolveProjectId && onProjectChange ? (
                     <ProjectsSelect
                       label={t('projectSelectLabel')}
-                      value={resolveProjectId(session)}
+                      // The drawer shows an unassigned session through the placeholder.
+                      value={resolveProjectId(session) ?? undefined}
                       onChange={(projectId) => onProjectChange(session, projectId)}
                       placeholder={projectPlaceholder}
                       includeUnassignedOption

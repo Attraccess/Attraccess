@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
-import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModal, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { FormSubmissionRequestDto, ResourceUsage } from '@attraccess/react-query-client';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
 import { useSwitchSessionProject } from './useSwitchSessionProject';
+import { useSessionEndedNotice } from './useSessionEndedNotice';
+import { ProjectListStatus } from './ProjectListStatus';
 import en from './switchProject/en.json';
 import de from './switchProject/de.json';
 
@@ -17,7 +19,9 @@ interface SwitchProjectDialogProps {
 /** Picks the project the running session continues under; "No project" is a choice of its own. */
 export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<SwitchProjectDialogProps>) {
   const { t } = useTranslations({ en, de });
-  const currentProjectId = usage.project?.id ?? null;
+  // The session the dialog was opened for; `usage` follows whichever record runs now.
+  const [openedFor] = useState(usage);
+  const currentProjectId = openedFor.project?.id ?? null;
   // Undefined until something is picked.
   const [selected, setSelected] = useState<number | null | undefined>(undefined);
   const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);
@@ -26,6 +30,11 @@ export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<Swi
     clearFormsDraft();
     onClose();
   });
+  useSessionEndedNotice(resourceId, openedFor.userId);
+  // A switch cannot be taken back, so the dialog stays until its outcome is known.
+  const isBusy = switchProject.isPending || isCollectingForms;
+  // Not while busy: the live update of this dialog's own switch can arrive before its answer.
+  const isReplaced = !isBusy && usage.id !== openedFor.id;
 
   const unchanged = selected === undefined || selected === currentProjectId;
 
@@ -45,7 +54,7 @@ export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<Swi
     switchProject.mutate({
       path: { resourceId },
       // Naming the session keeps a switch from moving one that replaced it meanwhile.
-      body: { usageId: usage.id, projectId: selected, formSubmissions },
+      body: { usageId: openedFor.id, projectId: selected, formSubmissions },
     });
   };
 
@@ -54,7 +63,7 @@ export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<Swi
       <StandardModal
         isOpen
         onOpenChange={(open) => {
-          if (!open && !isCollectingForms) onClose();
+          if (!open && !isBusy) onClose();
         }}
         size="md"
       >
@@ -63,24 +72,35 @@ export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<Swi
         </ModalHeader>
         <ModalBody className="flex flex-col gap-4">
           <p className="text-sm text-muted">{t('dialog.description')}</p>
-          <ProjectsSelect
-            value={selected ?? undefined}
-            onChange={(projectId) => setSelected(projectId ?? null)}
-            label={t('dialog.select')}
-            placeholder={selected === null ? t('noProject') : t('dialog.placeholder')}
-            includeUnassignedOption
-            unassignedLabel={t('noProject')}
-          />
-          {selected !== undefined && unchanged && <p className="text-sm text-muted">{t('dialog.unchanged')}</p>}
+          {isReplaced ? (
+            <StatusAlert status="warning" title={t('dialog.replaced.title')}>
+              {t('dialog.replaced.description')}
+            </StatusAlert>
+          ) : (
+            <>
+              <ProjectsSelect
+                value={selected}
+                onChange={(projectId) => setSelected(projectId ?? null)}
+                label={t('dialog.select')}
+                ariaLabel={t('dialog.select')}
+                placeholder={t('dialog.placeholder')}
+                includeUnassignedOption
+                unassignedLabel={t('noProject')}
+                isDisabled={isBusy}
+              />
+              <ProjectListStatus />
+              {selected !== undefined && unchanged && <p className="text-sm text-muted">{t('dialog.unchanged')}</p>}
+            </>
+          )}
         </ModalBody>
         <ModalFooter>
-          <Button variant="tertiary" onPress={onClose}>
+          <Button variant="tertiary" isDisabled={isBusy} onPress={onClose}>
             {t('dialog.cancel')}
           </Button>
           <Button
             variant="primary"
-            isDisabled={unchanged}
-            isPending={switchProject.isPending || isCollectingForms}
+            isDisabled={unchanged || isReplaced}
+            isPending={isBusy}
             onPress={() => void confirm()}
             data-cy="switch-project-confirm"
           >

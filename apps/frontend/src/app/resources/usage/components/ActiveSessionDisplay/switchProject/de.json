@@ -9,11 +9,78 @@
     "placeholder": "Projekt wählen",
     "unchanged": "Die Sitzung gehört bereits zu diesem Projekt.",
     "cancel": "Abbrechen",
-    "confirm": "Projekt wechseln"
+    "confirm": "Projekt wechseln",
+    "replaced": {
+      "title": "Diese Sitzung hat sich geändert",
+      "description": "Sie wurde beendet oder ihr Projekt wurde anderswo gewechselt, während dieser Dialog offen war. Schließe den Dialog und prüfe deine Sitzung."
+    }
   },
   "success": {
     "title": "Projekt gewechselt",
     "project": "Die Nutzung wird jetzt {{name}} zugeordnet.",
     "noProject": "Die Nutzung wird keinem Projekt mehr zugeordnet."
+  },
+  "projects": {
+    "loading": "Projekte werden geladen…",
+    "loadError": "Die Projekte konnten nicht geladen werden.",
+    "retry": "Erneut versuchen"
+  },
+  "ended": {
+    "title": "Sitzung läuft nicht mehr",
+    "description": "Die Sitzung wurde beendet, während du ein Projekt ausgewählt hast. Hier wurde das Projekt nicht gewechselt."
+  },
+  "errors": {
+    "PROJECT_SWITCH_FAILED": {
+      "title": "Projekt nicht gewechselt",
+      "description": "Das Projekt wurde nicht gewechselt: {{error}}"
+    },
+    "PROJECT_SWITCH_DEVICE_FAILED": {
+      "title": "Projekt nicht gewechselt",
+      "description": "Das Projekt wurde nicht gewechselt, weil ein verbundenes Gerät die Änderung nicht angenommen hat. Deine Sitzung läuft unter dem bisherigen Projekt weiter. Technische Details: {{error}}"
+    },
+    "PROJECT_SWITCH_UNCONFIRMED": {
+      "title": "Projektwechsel nicht bestätigt",
+      "description": "Der Server hat nicht geantwortet, daher ist unklar, ob das Projekt gewechselt wurde. Prüfe das bei deiner Sitzung angezeigte Projekt, bevor du es erneut versuchst. Technische Details: {{error}}"
+    },
+    "FLOW_EXECUTION_ERROR": {
+      "title": "Projekt nicht gewechselt",
+      "description": "Das Projekt wurde nicht gewechselt: {{error}}"
+    },
+    "The session already belongs to this project": {
+      "title": "Projekt nicht gewechselt",
+      "description": "Das Projekt wurde nicht gewechselt: Die Sitzung gehört bereits zu diesem Projekt."
+    },
+    "Only the owner of a running session can switch its project": {
+      "title": "Projekt nicht gewechselt",
+      "description": "Das Projekt wurde nicht gewechselt. Nur wer eine laufende Sitzung gestartet hat, kann ihr Projekt wechseln."
+    },
+    "No active usage session found": {
+      "title": "Projekt nicht gewechselt",
+      "description": "Das Projekt wurde nicht gewechselt, weil diese Sitzung nicht mehr läuft."
+    },
+    "Project not found": {
+      "title": "Projekt nicht gewechselt",
+      "description": "Das Projekt wurde nicht gewechselt. Das ausgewählte Projekt existiert nicht mehr oder du bist kein Mitglied mehr."
+    },
+    "A usage lifecycle operation is already in progress for this resource": {
+      "title": "Projekt nicht gewechselt",
+      "description": "Das Projekt wurde nicht gewechselt, weil gerade eine andere Sitzungsänderung an dieser Maschine läuft. Versuche es gleich noch einmal."
+    },
+    "MachineBusyError": {
+      "title": "Projekt nicht gewechselt",
+      "description": "Das Projekt wurde nicht gewechselt, weil gerade eine andere Sitzungsänderung an dieser Maschine läuft. Versuche es gleich noch einmal."
+    },
+    "SessionChangeInterruptedError": {
+      "title": "Projekt nicht gewechselt",
+      "description": "Das Projekt wurde nicht gewechselt, weil der Server während des Wechsels neu gestartet wurde. Prüfe die Maschine und versuche es erneut."
+    },
+    "Usage session changed during the project switch": {
+      "title": "Projekt nicht gewechselt",
+      "description": "Das Projekt wurde nicht gewechselt, weil sich die Sitzung inzwischen geändert hat. Prüfe deine Sitzung und versuche es erneut."
+    },
+    "The tentative usage session was cancelled": {
+      "title": "Projekt nicht gewechselt",
+      "description": "Das Projekt wurde nicht gewechselt, weil sich die Sitzung inzwischen geändert hat. Prüfe deine Sitzung und versuche es erneut."
+    }
   }
 }
