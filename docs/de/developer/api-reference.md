@@ -131,8 +131,8 @@ Ein Leser meldet in `READER_FIRMWARE_INFO` `capabilities.sessionDuration: true`,
 
 | Status | Bedeutung |
 |--------|-----------|
-| `400` | Die Sitzung gehört bereits zu diesem Projekt, sie ist keine laufende Maschinensitzung, ein erforderliches Formular fehlt, das Guthaben reicht nicht für eine neue Sitzung (wenn die Ressource einen Wechsel wie eine solche abrechnet), ein abgerechneter Zähler war nicht lesbar (`METER_SWITCH_FAILED`) oder ein Projektwechsel-Flow ist fehlgeschlagen (`FLOW_EXECUTION_ERROR`). |
-| `403` | Die Sitzung gehört jemand anderem (nur die Person, der sie gehört, kann sie wechseln), oder die Netzwerkbeschränkung für den Sitzungsstart greift. |
+| `400` | `projectId` fehlt oder ist keine positive ganze Zahl, die Sitzung gehört bereits zu diesem Projekt, sie ist keine laufende Maschinensitzung, ein erforderliches Formular fehlt, das Guthaben reicht nicht für eine neue Sitzung (wenn die Ressource einen Wechsel wie eine solche abrechnet), ein abgerechneter Zähler war nicht lesbar (`METER_SWITCH_FAILED`) oder ein Projektwechsel-Flow ist fehlgeschlagen (`FLOW_EXECUTION_ERROR`). |
+| `403` | Die mit `usageId` benannte Sitzung gehört jemand anderem (nur die Person, der sie gehört, kann sie wechseln), oder die Netzwerkbeschränkung für den Sitzungsstart greift. |
 | `404` | Keine laufende Sitzung von Ihnen an der Ressource, oder das Projekt existiert nicht bzw. Sie sind kein Mitglied. |
 | `409` | Eine andere Änderung an den Sitzungen der Maschine läuft gerade, oder die Sitzung hat sich während des Wechsels geändert. Versuchen Sie es erneut. |
 

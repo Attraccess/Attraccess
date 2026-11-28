@@ -133,8 +133,8 @@ A reader announces `capabilities.sessionDuration: true` in `READER_FIRMWARE_INFO
 
 | Status | Meaning |
 |--------|---------|
-| `400` | The session already belongs to this project, it is not a running machine session, a required form is missing, the balance does not cover a new session (when the resource charges a switch as one), a billed meter could not be read (`METER_SWITCH_FAILED`), or a project switch flow failed (`FLOW_EXECUTION_ERROR`). |
-| `403` | The session belongs to somebody else (only its owner can switch it), or the network restriction for starting a session applies. |
+| `400` | `projectId` is missing or not a positive whole number, the session already belongs to this project, it is not a running machine session, a required form is missing, the balance does not cover a new session (when the resource charges a switch as one), a billed meter could not be read (`METER_SWITCH_FAILED`), or a project switch flow failed (`FLOW_EXECUTION_ERROR`). |
+| `403` | The session named by `usageId` belongs to somebody else (only its owner can switch it), or the network restriction for starting a session applies. |
 | `404` | No running session of yours on the resource, or the project does not exist or you are not a member of it. |
 | `409` | Another change of the machine's sessions is in progress, or the session changed during the switch. Try again. |
 
