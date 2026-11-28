@@ -41,12 +41,7 @@ int failures = 0;
         }                                                                                  \
     } while (0)
 
-// Sets the heap budget for a scope and restores an unlimited one after it, also when a check in between fails.
-struct TestBudget
-{
-    explicit TestBudget(size_t bytes) { heap_guard::setTestBudget(bytes); }
-    ~TestBudget() { heap_guard::setTestBudget(SIZE_MAX); }
-};
+using heap_guard::TestBudget;
 
 Bytes bytes(const char *base64)
 {
@@ -659,28 +654,41 @@ void testSessionTls()
         size_t delivered = 0;
         auto onFrame = [&](SessionFraming::FrameType, const uint8_t *, size_t length) { delivered += length; };
 
-        // The first piece leaves about 1.6 KiB of capacity, the second needs 2.4 KiB. Room for that, not for double
-        // the capacity: taken, and the frame arrives.
+        // The first piece leaves about 1.6 KiB of capacity, the second needs 2.4 KiB. Exactly that much heap: taken,
+        // and the frame arrives.
         Bytes first, second;
         splitRecord(1600, first, second);
         CHECK(client.feed(first.data(), first.size(), onFrame) == SessionTls::Status::Open && delivered == 0);
+        size_t kept = client.inboundCapacity();
+        CHECK(second.size() > kept); // the second piece has to grow the buffer
         {
             TestBudget budget(heap_guard::CRITICAL_RESERVE_BYTES + second.size());
             CHECK(client.feed(second.data(), second.size(), onFrame) == SessionTls::Status::Open);
         }
         CHECK(delivered == PAYLOAD);
-        // Grown to exactly what was checked. A plain `insert` would have doubled to about 3.2 KiB, past the budget.
+        // Grown to exactly what was checked. On macOS (libc++) a plain `insert` doubles the kept capacity, past the
+        // budget; on the reader (libstdc++) it doubles the size, which is 0 here.
         CHECK(client.inboundCapacity() == second.size());
 
-        // The second piece (3.4 KiB) needs more than the buffer kept (2.4 KiB), and the heap has no room for it: the
+        // With heap to spare, inbound still takes only what the record needs: it is empty when the feed starts, so
+        // doubling would only cost headroom for the work after it (decoding the frame).
+        splitRecord(1100, first, second);
+        kept = client.inboundCapacity();
+        CHECK(first.size() <= kept && second.size() > kept && second.size() < 2 * kept);
+        CHECK(client.feed(first.data(), first.size(), onFrame) == SessionTls::Status::Open);
+        CHECK(client.feed(second.data(), second.size(), onFrame) == SessionTls::Status::Open);
+        CHECK(delivered == 2 * PAYLOAD && client.inboundCapacity() == second.size());
+
+        // The second piece (3.4 KiB) needs more than the buffer kept (2.9 KiB), and the heap has no room for it: the
         // session fails cleanly instead of the reader aborting.
         splitRecord(600, first, second);
+        CHECK(second.size() > client.inboundCapacity());
         CHECK(client.feed(first.data(), first.size(), onFrame) == SessionTls::Status::Open);
         {
             TestBudget budget(heap_guard::CRITICAL_RESERVE_BYTES + second.size() - 1);
             CHECK(client.feed(second.data(), second.size(), onFrame) == SessionTls::Status::Failed);
         }
-        CHECK(client.lastError() == MBEDTLS_ERR_SSL_ALLOC_FAILED && delivered == PAYLOAD);
+        CHECK(client.lastError() == MBEDTLS_ERR_SSL_ALLOC_FAILED && delivered == 2 * PAYLOAD);
     }
 
     // Bootstrap: no installation known yet, learned from the verified certificate.

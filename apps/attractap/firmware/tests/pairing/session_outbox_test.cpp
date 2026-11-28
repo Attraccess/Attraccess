@@ -22,13 +22,7 @@ namespace
 
     using Result = SessionOutbox::Result;
 
-    // Restores an unlimited budget when a test ends, also for the tests that run after it.
-    struct Budget
-    {
-        explicit Budget(size_t bytes) { heap_guard::setTestBudget(bytes); }
-        ~Budget() { heap_guard::setTestBudget(SIZE_MAX); }
-        void set(size_t bytes) { heap_guard::setTestBudget(bytes); }
-    };
+    using Budget = heap_guard::TestBudget;
 
     std::vector<uint8_t> bytes(const std::string &text) { return std::vector<uint8_t>(text.begin(), text.end()); }
 
@@ -144,11 +138,11 @@ namespace
 
         // With heap to spare the outbox doubles as before, but never past MAX_BYTES: it can never hold more.
         SessionOutbox roomy;
-        roomy.append(waiting.data(), waiting.size());
+        expect(roomy.append(waiting.data(), waiting.size()), "setup: 6 KiB taken");
         expect(roomy.append(record.data(), record.size()) && roomy.capacity() == 2 * WAITING, "doubled");
         SessionOutbox capped;
         const std::vector<uint8_t> large(10 * 1024, 'c');
-        capped.append(large.data(), large.size());
+        expect(capped.append(large.data(), large.size()), "setup: 10 KiB taken");
         expect(capped.append(record.data(), record.size()) && capped.capacity() == SessionOutbox::MAX_BYTES,
                "the doubling stops at MAX_BYTES");
     }

@@ -19,13 +19,7 @@ namespace
         failures++;
     }
 
-    // Restores an unlimited budget when a test ends, also for the tests that run after it.
-    struct Budget
-    {
-        explicit Budget(size_t bytes) { heap_guard::setTestBudget(bytes); }
-        ~Budget() { heap_guard::setTestBudget(SIZE_MAX); }
-        void set(size_t bytes) { heap_guard::setTestBudget(bytes); }
-    };
+    using Budget = heap_guard::TestBudget;
 
     constexpr size_t RESERVE = heap_guard::CRITICAL_RESERVE_BYTES;
     constexpr size_t CAPACITY = 1000;
@@ -52,7 +46,7 @@ namespace
     void roomForNeededButNotDoubleReservesExactlyNeeded()
     {
         auto v = filled();
-        Budget budget(RESERVE + NEEDED); // 2 * CAPACITY does not fit
+        Budget budget(RESERVE + NEEDED); // 2 * SIZE does not fit
         expect(heap_guard::reserveFor(v, NEEDED, RESERVE), "needed fits: true");
         expect(v.capacity() == NEEDED, "exactly needed is reserved, not the doubling");
         expect(intact(v), "the contents stay");
@@ -61,9 +55,9 @@ namespace
     void roomForDoubleDoubles()
     {
         auto v = filled();
-        Budget budget(RESERVE + 2 * CAPACITY);
+        Budget budget(RESERVE + 2 * SIZE);
         expect(heap_guard::reserveFor(v, NEEDED, RESERVE), "double fits: true");
-        expect(v.capacity() >= 2 * CAPACITY, "the usual doubling, so later appends do not reallocate");
+        expect(v.capacity() == 2 * SIZE, "doubles the size, as insert would, so later appends do not reallocate");
         expect(intact(v), "the contents stay");
 
         auto capped = filled();
@@ -74,6 +68,17 @@ namespace
         auto below = filled();
         expect(heap_guard::reserveFor(below, NEEDED, RESERVE, SIZE), "a limit below needed: true");
         expect(below.capacity() == NEEDED, "needed wins over the limit");
+    }
+
+    // SessionTls: inbound is empty when a feed starts and keeps only its buffer. `insert` would take exactly
+    // `needed` (libstdc++ doubles the size, which is 0), so reserveFor takes no more, even with heap to spare.
+    void anEmptyVectorTakesExactlyNeeded()
+    {
+        std::vector<uint8_t> v;
+        v.reserve(CAPACITY);
+        Budget budget(SIZE_MAX);
+        expect(heap_guard::reserveFor(v, CAPACITY + 1, RESERVE), "empty, kept buffer: true");
+        expect(v.capacity() == CAPACITY + 1, "exactly needed, not double the kept capacity");
     }
 
     void noRoomLeavesTheVectorAlone()
@@ -119,6 +124,7 @@ int main()
 {
     roomForNeededButNotDoubleReservesExactlyNeeded();
     roomForDoubleDoubles();
+    anEmptyVectorTakesExactlyNeeded();
     noRoomLeavesTheVectorAlone();
     spareCapacityNeedsNoHeap();
     elementSizeCountsAndOverflowIsRefused();

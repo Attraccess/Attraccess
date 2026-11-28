@@ -32,6 +32,16 @@ namespace heap_guard
     }
     // Host tests: the largest block an allocation may take. SIZE_MAX (the default) means unlimited.
     inline void setTestBudget(size_t bytes) { testBudget() = bytes; }
+
+    // Host tests: the budget for a scope, unlimited again after it (also when a check in between fails).
+    struct TestBudget
+    {
+        explicit TestBudget(size_t bytes) { setTestBudget(bytes); }
+        ~TestBudget() { setTestBudget(SIZE_MAX); }
+        TestBudget(const TestBudget &) = delete;
+        TestBudget &operator=(const TestBudget &) = delete;
+        void set(size_t bytes) { setTestBudget(bytes); }
+    };
 #endif
 
     // The largest single allocation that can succeed right now (8-bit capable heap: internal RAM, plus PSRAM
@@ -70,20 +80,22 @@ namespace heap_guard
         return largest >= reserve && largest - reserve >= bytes;
     }
 
-    // Grows `v` so it takes `needed` elements without reallocating again (ATT-1394). A plain `insert` would grow to
-    // about double the current size, not to `needed`, so a check of `needed` bytes alone passes and the allocation
-    // still fails; with exceptions off that aborts the reader. Tries the usual doubling (capped at `limit`) first,
-    // then exactly `needed`. False, with `v` unchanged, when neither fits with `reserve` left over. The old buffer is
-    // still allocated while `fits` measures: during the copy both exist.
+    // Grows `v` so it takes `needed` elements without reallocating again (ATT-1394). A plain `insert` grows to about
+    // double the current size (libstdc++: size + max(size, n)), not to `needed`, so a check of `needed` bytes alone
+    // passes and the allocation still fails; with exceptions off that aborts the reader. Tries that doubling (capped
+    // at `limit`) first, then exactly `needed`. It doubles the size, not the capacity, so an empty vector that kept
+    // its buffer takes exactly `needed`, as `insert` would. False, with `v` unchanged, when neither fits with
+    // `reserve` left over. The old buffer is still allocated while `fits` measures: during the copy both exist.
     template <typename V>
     bool reserveFor(V &v, size_t needed, size_t reserve = BULK_RESERVE_BYTES, size_t limit = SIZE_MAX)
     {
-        const size_t capacity = v.capacity();
-        if (needed <= capacity) return true;
+        if (needed <= v.capacity()) return true;
         if (needed > v.max_size()) return false;
         constexpr size_t elem = sizeof(typename V::value_type);
+        // Unreachable past the max_size() check today; kept so the arithmetic stays safe on its own.
         const auto bytesOf = [](size_t count) { return count > SIZE_MAX / elem ? SIZE_MAX : count * elem; };
-        const size_t doubled = capacity > SIZE_MAX / 2 ? SIZE_MAX : capacity * 2;
+        const size_t size = v.size();
+        const size_t doubled = size > SIZE_MAX / 2 ? SIZE_MAX : size * 2;
         const size_t grown = std::min(std::max(needed, std::min(doubled, limit)), v.max_size());
         if (grown > needed && fits(bytesOf(grown), reserve))
         {
