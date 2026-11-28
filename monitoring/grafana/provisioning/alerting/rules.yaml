@@ -20,8 +20,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Attraccess service is down"
-          description: "The Attraccess API has been unreachable for more than 2 minutes."
+          summary: 'Attraccess service is down'
+          description: 'The Attraccess API has been unreachable for more than 2 minutes.'
         data:
           - refId: A
             relativeTimeRange:
@@ -70,8 +70,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High HTTP 5xx error rate"
-          description: "More than 5% of HTTP requests are returning 5xx errors over the last 5 minutes."
+          summary: 'High HTTP 5xx error rate'
+          description: 'More than 5% of HTTP requests are returning 5xx errors over the last 5 minutes.'
         data:
           - refId: A
             relativeTimeRange:
@@ -120,8 +120,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High request latency (p95 > 2s)"
-          description: "The 95th percentile request latency exceeds 2 seconds in 5-minute evaluation windows and has remained above this threshold for at least 10 minutes, with at least 0.1 req/s traffic (suppressed during idle periods to avoid low-sample-count noise)."
+          summary: 'High request latency (p95 > 2s)'
+          description: 'The 95th percentile request latency exceeds 2 seconds in 5-minute evaluation windows and has remained above this threshold for at least 10 minutes, with at least 0.1 req/s traffic (suppressed during idle periods to avoid low-sample-count noise).'
         data:
           - refId: A
             relativeTimeRange:
@@ -170,8 +170,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Prometheus scrape failures"
-          description: "Prometheus has been unable to scrape the Attraccess metrics endpoint for 5 minutes."
+          summary: 'Prometheus scrape failures'
+          description: 'Prometheus has been unable to scrape the Attraccess metrics endpoint for 5 minutes.'
         data:
           - refId: A
             relativeTimeRange:
@@ -220,8 +220,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High number of failed login attempts"
-          description: "More than 10 failed login attempts in the last 5 minutes — possible brute-force or credential-stuffing attack."
+          summary: 'High number of failed login attempts'
+          description: 'More than 10 failed login attempts in the last 5 minutes — possible brute-force or credential-stuffing attack.'
         data:
           - refId: A
             relativeTimeRange:
@@ -270,8 +270,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High number of failed SSO login attempts"
-          description: "More than 10 failed SSO login attempts in the last 5 minutes — possible SSO brute-force attack or provider misconfiguration."
+          summary: 'High number of failed SSO login attempts'
+          description: 'More than 10 failed SSO login attempts in the last 5 minutes — possible SSO brute-force attack or provider misconfiguration.'
         data:
           - refId: A
             relativeTimeRange:
@@ -320,8 +320,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Resources with overdue maintenance"
-          description: "{{ $values.A.Value }} resources have overdue maintenance."
+          summary: 'Resources with overdue maintenance'
+          description: '{{ $values.A.Value }} resources have overdue maintenance.'
         data:
           - refId: A
             relativeTimeRange:
@@ -370,8 +370,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "All Attractap readers offline"
-          description: "No Attractap readers have been connected for 5 minutes, but at least one was connected within the last hour. Check reader power/network."
+          summary: 'All Attractap readers offline'
+          description: 'No Attractap readers have been connected for 5 minutes, but at least one was connected within the last hour. Check reader power/network.'
         data:
           - refId: A
             relativeTimeRange:
@@ -428,8 +428,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Attractap readers crashing"
-          description: "{{ $values.A }} crash or watchdog reset reports (PANIC, INT_WDT, TASK_WDT, WDT) in the last hour. This warning fires at four or more reports held for 5 minutes.{{ if $values.B }} Readers and reset reasons: {{ $values.B.Labels.readers }}.{{ end }}"
+          summary: 'Attractap readers crashing'
+          description: '{{ $values.A }} crash or watchdog reset reports (PANIC, INT_WDT, TASK_WDT, WDT) in the last hour. This warning fires at four or more reports held for 5 minutes.{{ if $values.B }} Readers and reset reasons: {{ $values.B.Labels.readers }}.{{ end }}'
         data:
           - refId: A
             relativeTimeRange:
@@ -491,8 +491,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Attractap readers restarting (power-on resets)"
-          description: "{{ $values.A }} power-on reset reports in the last hour. This warning fires at four or more reports held for 5 minutes. A power-on reset alone does not confirm a reader fault: power was cut and restored, for example by an outage, a loose cable or someone power-cycling a frozen reader.{{ if $values.B }} Readers and reset reasons: {{ $values.B.Labels.readers }}.{{ end }}"
+          summary: 'Attractap readers restarting (power-on resets)'
+          description: '{{ $values.A }} power-on reset reports in the last hour. This warning fires at four or more reports held for 5 minutes. A power-on reset alone does not confirm a reader fault: power was cut and restored, for example by an outage, a loose cable or someone power-cycling a frozen reader.{{ if $values.B }} Readers and reset reasons: {{ $values.B.Labels.readers }}.{{ end }}'
         data:
           - refId: A
             relativeTimeRange:
@@ -554,7 +554,7 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Reader display alerts open"
+          summary: 'Reader display alerts open'
           description: "{{ $values.A }} reader display alerts are open. Open plugin circuit breaker: starts follow the plugin's hook failure policy (fail closed by default); after 60 s the next start probes the hook and the breaker closes by itself when it answers. ACCESS_HOOKS plugin that failed to load: its start hooks are not enforced until it loads again. Reader crash-loop suspension: plugin widgets are suspended on that reader and return after 30 min without another panic. Reader time zone conflict: plugins return different time zones for one reader, which shows the first valid zone in host order; it stays open until an admin clears it. Admins can clear an alert early in the plugin settings or the reader editor."
         data:
           - refId: A
@@ -604,8 +604,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Cron job failing"
-          description: "Cron job {{ $labels.job_name }} has recorded failures in the last 15 minutes."
+          summary: 'Cron job failing'
+          description: 'Cron job {{ $labels.job_name }} has recorded failures in the last 15 minutes.'
         data:
           - refId: A
             relativeTimeRange:
@@ -654,8 +654,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Cron job has not succeeded recently"
-          description: "Cron job {{ $labels.job_name }} has not completed successfully in over 25 hours."
+          summary: 'Cron job has not succeeded recently'
+          description: 'Cron job {{ $labels.job_name }} has not completed successfully in over 25 hours.'
         data:
           - refId: A
             relativeTimeRange:
@@ -704,8 +704,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Resource flow executions failing"
-          description: "Flow trigger {{ $labels.trigger_type }} is failing at more than 0.1/s over the last 15 minutes."
+          summary: 'Resource flow executions failing'
+          description: 'Flow trigger {{ $labels.trigger_type }} is failing at more than 0.1/s over the last 15 minutes.'
         data:
           - refId: A
             relativeTimeRange:
@@ -754,8 +754,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "External service call errors"
-          description: "Outbound calls to {{ $labels.target }} are erroring at more than 0.2/s over the last 5 minutes."
+          summary: 'External service call errors'
+          description: 'Outbound calls to {{ $labels.target }} are erroring at more than 0.2/s over the last 5 minutes.'
         data:
           - refId: A
             relativeTimeRange:
@@ -804,8 +804,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "MQTT servers unhealthy"
-          description: "One or more configured MQTT servers are not healthy."
+          summary: 'MQTT servers unhealthy'
+          description: 'One or more configured MQTT servers are not healthy.'
         data:
           - refId: A
             relativeTimeRange:
@@ -854,8 +854,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "Email delivery failing"
-          description: "Email sending is failing at more than 0.1/s over the last 15 minutes."
+          summary: 'Email delivery failing'
+          description: 'Email sending is failing at more than 0.1/s over the last 15 minutes.'
         data:
           - refId: A
             relativeTimeRange:
@@ -904,7 +904,7 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Audit records dropped"
+          summary: 'Audit records dropped'
           description: "About {{ humanize $values.A.Value }} audit records could not be stored in the last 5 minutes; the changes they describe were applied. Check the API log for 'Audit record dropped' lines (domain, action, reason, code). storage_error: the insert failed, the PostgreSQL code says why (55P03 or 57014: the insert waited longer than the 10-second lock timeout). queue_full: more than 1,000 audit writes were waiting. storage_unavailable: audit storage is not available (startup failed). shutting_down: expected while the API restarts. settings_unavailable: the audit settings could not be read. invalid_event: an event was rejected, which points to a bug. The alert clears about 5 minutes after the last drop."
         data:
           - refId: A
@@ -954,8 +954,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High Node.js event loop lag"
-          description: "The Node.js event loop lag has exceeded 0.5s for 5 minutes — the API may be CPU-saturated."
+          summary: 'High Node.js event loop lag'
+          description: 'The Node.js event loop lag has exceeded 0.5s for 5 minutes — the API may be CPU-saturated.'
         data:
           - refId: A
             relativeTimeRange:
@@ -1004,8 +1004,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High host memory usage"
-          description: "Host RAM usage has been above 90% for 10 minutes."
+          summary: 'High host memory usage'
+          description: 'Host RAM usage has been above 90% for 10 minutes.'
         data:
           - refId: A
             relativeTimeRange:
@@ -1054,8 +1054,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High host disk usage"
-          description: "A persistent host filesystem has been above 85% usage for 15 minutes."
+          summary: 'High host disk usage'
+          description: 'A persistent host filesystem has been above 85% usage for 15 minutes.'
         data:
           - refId: A
             relativeTimeRange:
@@ -1104,8 +1104,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "High Attraccess container memory usage"
-          description: "The Attraccess container memory working set has been above 90% of its container limit for 10 minutes."
+          summary: 'High Attraccess container memory usage'
+          description: 'The Attraccess container memory working set has been above 90% of its container limit for 10 minutes.'
         data:
           - refId: A
             relativeTimeRange:
@@ -1137,6 +1137,206 @@ groups:
                   evaluator:
                     type: gt
                     params: [0.9]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: backup-not-configured
+        title: BackupNotConfigured
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Backups are not set up'
+          description: 'The backup service refuses to start because its settings are missing or invalid, so nothing is backed up and Attraccess does not start. The log of the backup service names the setting. Set BACKUP_REPOSITORY, BACKUP_PASSWORD and the credentials of the target, or BACKUP_DISABLED=true to run without backups on purpose.'
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'max(backup_configured)'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: lt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: backup-failed
+        title: BackupFailed
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: 'The last backup failed'
+          description: 'The last backup run failed. The log of the backup service shows the cause in the lines before BACKUP FAILED (for example the backup target cannot be reached, wrong credentials or a wrong BACKUP_PASSWORD). The alert clears after the next successful run; on balena, run one by hand with: balena-engine exec -it <backup container> attraccess-backup backup.'
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'max(backup_last_run_success)'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: lt
+                    params: [1]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: backup-too-old
+        title: BackupTooOld
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: 'No recent successful backup'
+          description: 'There has been no successful backup for more than BACKUP_MAX_AGE_HOURS (default 30 hours), {{ humanizeDuration $values.A.Value }} longer than allowed. Check that the backup service is running and that its scheduled runs succeed (log lines backup SUCCEEDED or BACKUP FAILED).'
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'max(time() - (backup_last_success_timestamp_seconds or backup_scheduler_start_timestamp_seconds) - backup_max_age_seconds)'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: backups-disabled
+        title: BackupsDisabled
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Backups are disabled'
+          description: 'BACKUP_DISABLED=true is set: nothing is backed up. Remove it and configure the backup service once this installation should be backed up again.'
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'max(backup_disabled)'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0]
                   operator:
                     type: and
                   query:

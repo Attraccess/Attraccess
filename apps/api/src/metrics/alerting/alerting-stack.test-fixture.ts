@@ -26,6 +26,10 @@ function composeImage(name: string): string {
   return image;
 }
 
+// Address of the host as seen from the containers. Rootless Docker cannot reach the host through `host-gateway`;
+// there, set ALERTING_HOST_GATEWAY to the host's LAN address.
+const HOST_GATEWAY = process.env['ALERTING_HOST_GATEWAY'] || 'host-gateway';
+
 export const PROMETHEUS_IMAGE = composeImage('prom/prometheus');
 export const GRAFANA_IMAGE = process.env['ALERTING_GRAFANA_VERSION']
   ? `grafana/grafana:${process.env['ALERTING_GRAFANA_VERSION']}`
@@ -43,6 +47,18 @@ export function scaledRules(rules: string, pending: string, interval: string): s
     .replace(/^ {8}for: 5m$/gm, `        for: ${pending}`);
 }
 
+/** Reads until `done` accepts the value, every 2 seconds for up to `seconds`; returns the accepted value. */
+export async function eventually<T>(read: () => Promise<T>, done: (value: T) => boolean, seconds: number): Promise<T> {
+  const deadline = Date.now() + seconds * 1000;
+  let value = await read();
+  while (!done(value)) {
+    if (Date.now() > deadline) throw new Error(`Timed out waiting; last value: ${JSON.stringify(value)}`);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    value = await read();
+  }
+  return value;
+}
+
 export interface Notification {
   status: string;
   title: string;
@@ -52,6 +68,8 @@ export interface Notification {
 
 interface Rule {
   name: string;
+  /** "0001-01-01T00:00:00Z" until Grafana has evaluated the rule once. */
+  lastEvaluation?: string;
   alerts?: Array<{ state: string; activeAt: string; annotations: { description: string } }>;
 }
 type Rules = { data?: { groups: Array<{ rules: Rule[] }> } };
@@ -117,6 +135,9 @@ export class AlertingStack {
   private db!: PostgresFixtureDatabase;
   private servers: MetricsServer[] = [];
   private webhook!: Server;
+  /** Stands in for node-exporter's textfile collector: serves the backup sidecar's backup.prom as it is set. */
+  private textfile!: Server;
+  private textfileBody = '';
   private network!: StartedNetwork;
   private prometheus!: StartedTestContainer;
   private grafana!: StartedTestContainer;
@@ -143,6 +164,7 @@ export class AlertingStack {
     this.servers.push(await MetricsServer.start(file));
     this.servers.push(await MetricsServer.start(file));
     const webhookPort = await this.startWebhook();
+    await this.startTextfile();
     this.network = await new Network().start();
     this.prometheus = await this.startPrometheus();
     this.grafana = await this.startGrafana(rules, webhookPort);
@@ -172,8 +194,16 @@ export class AlertingStack {
     return (this.webhook.address() as { port: number }).port;
   }
 
+  private async startTextfile(): Promise<void> {
+    this.textfile = createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' }).end(this.textfileBody);
+    });
+    await new Promise<void>((resolve) => this.textfile.listen(0, '0.0.0.0', resolve));
+  }
+
   private async startPrometheus(): Promise<StartedTestContainer> {
     const targets = this.servers.map((s) => `'host.docker.internal:${s.port}'`).join(', ');
+    const textfilePort = (this.textfile.address() as { port: number }).port;
     const config = `global:
   scrape_interval: 5s
 scrape_configs:
@@ -181,11 +211,14 @@ scrape_configs:
     metrics_path: /api/metrics
     static_configs:
       - targets: [${targets}]
+  - job_name: node-exporter
+    static_configs:
+      - targets: ['host.docker.internal:${textfilePort}']
 `;
     return new GenericContainer(PROMETHEUS_IMAGE)
       .withNetwork(this.network)
       .withNetworkAliases('prometheus')
-      .withExtraHosts([{ host: 'host.docker.internal', ipAddress: 'host-gateway' }])
+      .withExtraHosts([{ host: 'host.docker.internal', ipAddress: HOST_GATEWAY }])
       .withCopyContentToContainer([{ content: config, target: '/etc/prometheus/prometheus.yml' }])
       .withExposedPorts(9090)
       .withWaitStrategy(Wait.forHttp('/-/ready', 9090).withStartupTimeout(STARTUP_TIMEOUT_MS))
@@ -222,7 +255,7 @@ policies:
     return new GenericContainer(GRAFANA_IMAGE)
       .withNetwork(this.network)
       .withTmpFs({ '/var/lib/grafana': 'rw,exec,mode=1777' })
-      .withExtraHosts([{ host: 'host.docker.internal', ipAddress: 'host-gateway' }])
+      .withExtraHosts([{ host: 'host.docker.internal', ipAddress: HOST_GATEWAY }])
       .withEnvironment({
         GF_AUTH_ANONYMOUS_ENABLED: 'true',
         GF_AUTH_ANONYMOUS_ORG_ROLE: 'Viewer',
@@ -256,6 +289,13 @@ policies:
   /** Counts dropped audit records on the first metrics server, as the API does when a write is lost. */
   dropAuditRecords(domain: string, reason: string, count = 1): void {
     this.servers[0].audit.recordsDropped.inc({ domain, reason }, count);
+  }
+
+  /** Replaces the backup metrics node-exporter publishes (the content of the sidecar's backup.prom). */
+  setBackupMetrics(metrics: Record<string, number>): void {
+    this.textfileBody = Object.entries(metrics)
+      .map(([name, value]) => `# TYPE ${name} gauge\n${name} ${value}\n`)
+      .join('');
   }
 
   /** Makes every count query fail, as a broken database would; both metrics servers then answer 500. */
@@ -294,6 +334,12 @@ policies:
     throw new Error(`Grafana did not return the alert rule ${alertname}`);
   }
 
+  /** True once Grafana has evaluated the rule after the given time (milliseconds since the epoch). */
+  async evaluatedSince(alertname: string, since: number): Promise<boolean> {
+    const rule = await this.rule(alertname);
+    return Date.parse(rule.lastEvaluation ?? '') > since;
+  }
+
   async instances(alertname: string): Promise<AlertInstance[]> {
     const rule = await this.rule(alertname);
     return (rule.alerts ?? []).map((a) => ({
@@ -310,6 +356,7 @@ policies:
       this.network?.stop(),
       ...this.servers.map((s) => s.stop()),
       this.webhook && new Promise((resolve) => this.webhook.close(resolve)),
+      this.textfile && new Promise((resolve) => this.textfile.close(resolve)),
       this.db?.close(),
     ]);
     await this.database?.remove();

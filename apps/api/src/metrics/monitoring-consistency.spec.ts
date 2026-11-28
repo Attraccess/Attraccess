@@ -262,6 +262,11 @@ describe('Monitoring configuration consistency', () => {
       'HighAttraccessContainerMemoryUsage',
       // ATT-1212 audit persistence
       'AuditRecordsDropped',
+      // balena backup sidecar (docker/backup), metrics through the node-exporter textfile collector
+      'BackupNotConfigured',
+      'BackupFailed',
+      'BackupTooOld',
+      'BackupsDisabled',
     ];
 
     it('Grafana provisioned rules define all required alerts', () => {
@@ -316,6 +321,17 @@ describe('Monitoring configuration consistency', () => {
       const known = collectMetricNames();
       for (const name of extractMetricRefs(grafanaRules)) {
         expect(known.has(name) || known.has(stripHistogramSuffix(name))).toBe(true);
+      }
+    });
+
+    it('backup alert rules only reference metrics the backup sidecar writes', () => {
+      // A misspelt name gives the rule no data, and noDataState OK would keep it quiet for good.
+      const sidecar = readFileSync(join(MONITORING_ROOT, '..', 'docker', 'backup', 'lib.sh'), 'utf-8');
+      const written = new Set([...sidecar.matchAll(/\bmetric (backup_[a-z_]+)/g)].map((m) => m[1]));
+      const referenced = new Set(grafanaRules.match(/\bbackup_[a-z_]+\b/g));
+      expect(referenced.size).toBeGreaterThan(0);
+      for (const name of referenced) {
+        expect({ name, written: written.has(name) }).toEqual({ name, written: true });
       }
     });
 

@@ -34,6 +34,7 @@ fi
 # The scratch directory holds the plaintext dump: removed whatever happens.
 scratch="$STATE_DIR/restore"
 trap 'rm -rf "$scratch"' EXIT
+exit_on_signals
 rm -rf "$scratch"
 mkdir -p "$scratch"
 log "restoring snapshot $snapshot"

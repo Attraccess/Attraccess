@@ -1,4 +1,5 @@
 # Prometheus & Grafana Setup
+
 <!-- llms-description: Set up Prometheus and Grafana with Attraccess's bundled dashboards on Coolify or manual Docker Compose, including bearer token and provisioning. -->
 
 This guide covers how to set up Prometheus and Grafana to collect and visualize Attraccess metrics. Attraccess ships with pre-configured dashboards, datasource provisioning, and a Prometheus scrape config bundled inside the `attraccess` image at `/app/share/monitoring/` — so no repo checkout is required to deploy the stack.
@@ -109,11 +110,11 @@ volumes:
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GRAFANA_ADMIN_USER` | `admin` | Grafana admin username (only applied on first init — see Troubleshooting) |
-| `GRAFANA_ADMIN_PASSWORD` | `attraccess` | Grafana admin password (only applied on first init — see Troubleshooting) |
-| `PROMETHEUS_METRICS_API_KEY` | _(unset)_ | Bearer token Prometheus uses to scrape Attraccess. When set, `monitoring-init` injects it into `prometheus.yml`. Leave unset on first deploy, then mint a key in Attraccess and add it. |
+| Variable                     | Default      | Description                                                                                                                                                                             |
+| ---------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GRAFANA_ADMIN_USER`         | `admin`      | Grafana admin username (only applied on first init — see Troubleshooting)                                                                                                               |
+| `GRAFANA_ADMIN_PASSWORD`     | `attraccess` | Grafana admin password (only applied on first init — see Troubleshooting)                                                                                                               |
+| `PROMETHEUS_METRICS_API_KEY` | _(unset)_    | Bearer token Prometheus uses to scrape Attraccess. When set, `monitoring-init` injects it into `prometheus.yml`. Leave unset on first deploy, then mint a key in Attraccess and add it. |
 
 > [!WARNING]
 > Change the default Grafana password before deploying to production.
@@ -157,11 +158,11 @@ scrape_configs:
 > [!NOTE]
 > Alerting is managed entirely by Grafana (see `grafana/provisioning/alerting`), so Prometheus does not load any `rule_files`.
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `scrape_interval` (job) | `10s` | Per-job scrape interval for the Attraccess job |
-| `scrape_interval` (global) | `15s` | Default scrape interval for any other jobs |
-| `evaluation_interval` | `15s` | How often Prometheus evaluates recording and alerting rules |
+| Setting                    | Default | Description                                                 |
+| -------------------------- | ------- | ----------------------------------------------------------- |
+| `scrape_interval` (job)    | `10s`   | Per-job scrape interval for the Attraccess job              |
+| `scrape_interval` (global) | `15s`   | Default scrape interval for any other jobs                  |
+| `evaluation_interval`      | `15s`   | How often Prometheus evaluates recording and alerting rules |
 
 > [!TIP]
 > A 10-second scrape interval provides good granularity for most dashboards. Increase it to 30s or 60s if you want to reduce resource usage.
@@ -201,42 +202,42 @@ The Grafana service uses `service_name: prometheus` for in-network resolution, s
 
 The main dashboard includes panels for:
 
-| Panel | Description |
-|-------|-------------|
-| **HTTP Request Rate** | Requests per second broken down by route |
-| **HTTP Request Latency** | p50, p95, and p99 response times |
-| **HTTP Error Rate** | 4xx and 5xx errors over time |
-| **Authentication** | Successful and failed login attempts, SSO usage |
-| **Users** | Total registered users and new registrations |
-| **Resources** | Total resources and active usage sessions |
-| **Resource Usage Duration** | p50 and p95 session durations |
-| **Resource Usage Sessions** | Sessions started and ended over time |
-| **Connected Devices** | Number of connected Attractap RFID readers |
-| **RFID Tap Events** | Tap events over time |
-| **Billing Transactions** | Transaction counts by status |
-| **Emails Sent** | Email delivery counts |
-| **System Overview** | Projects, groups, MQTT servers, overdue maintenance |
-| **Maintenance Events** | Maintenance activity by type |
+| Panel                       | Description                                         |
+| --------------------------- | --------------------------------------------------- |
+| **HTTP Request Rate**       | Requests per second broken down by route            |
+| **HTTP Request Latency**    | p50, p95, and p99 response times                    |
+| **HTTP Error Rate**         | 4xx and 5xx errors over time                        |
+| **Authentication**          | Successful and failed login attempts, SSO usage     |
+| **Users**                   | Total registered users and new registrations        |
+| **Resources**               | Total resources and active usage sessions           |
+| **Resource Usage Duration** | p50 and p95 session durations                       |
+| **Resource Usage Sessions** | Sessions started and ended over time                |
+| **Connected Devices**       | Number of connected Attractap RFID readers          |
+| **RFID Tap Events**         | Tap events over time                                |
+| **Billing Transactions**    | Transaction counts by status                        |
+| **Emails Sent**             | Email delivery counts                               |
+| **System Overview**         | Projects, groups, MQTT servers, overdue maintenance |
+| **Maintenance Events**      | Maintenance activity by type                        |
 
 ### Node Runtime
 
 The runtime dashboard includes panels for:
 
-| Panel | Description |
-|-------|-------------|
-| **CPU Usage** | User and system CPU time |
-| **Memory Usage** | Heap used, heap total, RSS, external memory |
-| **Event Loop Lag** | Current lag and p99 percentile |
-| **Active Handles & Requests** | Open handles and pending requests |
+| Panel                         | Description                                 |
+| ----------------------------- | ------------------------------------------- |
+| **CPU Usage**                 | User and system CPU time                    |
+| **Memory Usage**              | Heap used, heap total, RSS, external memory |
+| **Event Loop Lag**            | Current lag and p99 percentile              |
+| **Active Handles & Requests** | Open handles and pending requests           |
 
 ### Host and Container Metrics
 
 The bundled Coolify and Balena compose stacks also run:
 
-| Exporter | Purpose |
-|----------|---------|
-| **node-exporter** | Host RAM and filesystem usage |
-| **cAdvisor** | Docker container CPU and memory usage |
+| Exporter          | Purpose                               |
+| ----------------- | ------------------------------------- |
+| **node-exporter** | Host RAM and filesystem usage         |
+| **cAdvisor**      | Docker container CPU and memory usage |
 
 Operational memory alerts use host/container memory metrics. V8 heap usage remains on the Node Runtime dashboard as an application diagnostic, but it is not used as the primary "server is running out of RAM" warning because V8 can run close to its current heap allocation while the host still has plenty of free memory.
 
@@ -254,10 +255,10 @@ The Grafana provisioning and dashboard volumes are treated as Attraccess-managed
 
 Two Grafana warnings watch the readers' reset reports. Both count the exact number of stored reports from all readers in the last hour (`attraccess_attractap_reset_reports_last_hour`, not `increase()` estimates), fire when the count is **four or more** and stays so for **5 continuous minutes** (evaluated every minute), and name the contributing readers and reset reasons in the notification:
 
-| Alert | Counts | Notification summary |
-|-------|--------|----------------------|
-| `AttractapReaderCrashes` | `PANIC`, `INT_WDT`, `TASK_WDT`, `WDT` | "Attractap readers crashing" |
-| `AttractapReaderPowerOnResets` | `POWERON` | "Attractap readers restarting (power-on resets)" |
+| Alert                          | Counts                                | Notification summary                             |
+| ------------------------------ | ------------------------------------- | ------------------------------------------------ |
+| `AttractapReaderCrashes`       | `PANIC`, `INT_WDT`, `TASK_WDT`, `WDT` | "Attractap readers crashing"                     |
+| `AttractapReaderPowerOnResets` | `POWERON`                             | "Attractap readers restarting (power-on resets)" |
 
 The power-on warning never calls the resets crashes. Its message says that a power-on reset alone does not confirm a reader fault: power was cut and restored, for example by an outage, a loose cable or someone power-cycling a frozen reader.
 
@@ -285,15 +286,28 @@ Things to know:
 
 Under database contention, an audit write without a caller transaction can wait up to 5 seconds instead of losing the record, so logins, reader authentication and card linking can briefly slow down.
 
+## Backup alerts
+
+On balena, the `backup` service writes its state to `backup.prom` in the `backup-status` volume. node-exporter publishes the file through its textfile collector (`--collector.textfile.directory=/backup-status`), and four Grafana alerts read it. Stacks without the backup service (Coolify, Docker Compose) have no such metrics, so these alerts stay quiet there.
+
+| Alert                 | Severity | Fires when                                                                                                                                                         |
+| --------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `BackupNotConfigured` | critical | `backup_configured` is 0: the backup service refuses to start because a setting is missing or invalid. Attraccess does not start either.                           |
+| `BackupFailed`        | critical | `backup_last_run_success` is 0: the last run failed (target not reachable, wrong credentials or password). Clears after the next successful run.                   |
+| `BackupTooOld`        | critical | No successful backup for longer than `BACKUP_MAX_AGE_HOURS` (default 30), counted from the last success or, if there has been none, from the start of the service. |
+| `BackupsDisabled`     | warning  | `backup_disabled` is 1: `BACKUP_DISABLED=true` is set on purpose.                                                                                                  |
+
+The log of the `backup` service names the cause (`BACKUP FAILED` and the lines before it). A run that cannot reach the target gives up after `BACKUP_CONNECT_TIMEOUT_SECONDS` (default 120), so `BackupFailed` follows within minutes. Metrics: `backup_configured`, `backup_disabled`, `backup_max_age_seconds`, `backup_scheduler_start_timestamp_seconds`, `backup_last_run_timestamp_seconds`, `backup_last_run_success`, `backup_last_success_timestamp_seconds`. See [Backup & Restore](installation/backup-restore.md#balena-restic-sidecar).
+
 ## Exposing Prometheus Externally (Optional)
 
 By default, Prometheus is only exposed internally (no `ports` mapping). If you need direct access for debugging:
 
 ```yaml
-  prometheus:
-    # ...
-    ports:
-      - '9090:9090'
+prometheus:
+  # ...
+  ports:
+    - '9090:9090'
 ```
 
 > [!WARNING]
@@ -301,15 +315,15 @@ By default, Prometheus is only exposed internally (no `ports` mapping). If you n
 
 ## Troubleshooting
 
-| Problem | Solution |
-|---------|----------|
-| Prometheus shows target as "DOWN" with `401` | Bearer token missing or wrong — set `PROMETHEUS_METRICS_API_KEY` to the value generated in Attraccess and redeploy the stack so `monitoring-init` re-templates the config |
-| Prometheus shows target as "DOWN" with no auth error | Verify the `attraccess` service is reachable from the Prometheus container (network, hostname `attraccess:3000`) |
-| No data in Grafana dashboards | Confirm Prometheus is running and scraping. Check the targets page at `http://prometheus:9090/targets` |
-| Grafana login bounces back to login page | `GF_SERVER_ROOT_URL` is wrong — must be the full external URL with scheme (`https://...`), no port suffix when behind a reverse proxy |
-| Grafana login fails (wrong password) | `GF_SECURITY_ADMIN_PASSWORD` is only applied on first init. After the `grafana-data` volume exists, change the password via `grafana-cli admin reset-admin-password` inside the container or wipe the volume to re-init |
-| Dashboards not appearing | Confirm `monitoring-init` exited 0 (`docker compose ps -a monitoring-init`). If not, inspect its logs and rerun the stack |
-| Stale metrics after restart | Gauge metrics (like total users) are re-populated from the database on startup. Counter metrics reset to zero on restart -- this is normal Prometheus behaviour |
+| Problem                                              | Solution                                                                                                                                                                                                                |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prometheus shows target as "DOWN" with `401`         | Bearer token missing or wrong — set `PROMETHEUS_METRICS_API_KEY` to the value generated in Attraccess and redeploy the stack so `monitoring-init` re-templates the config                                               |
+| Prometheus shows target as "DOWN" with no auth error | Verify the `attraccess` service is reachable from the Prometheus container (network, hostname `attraccess:3000`)                                                                                                        |
+| No data in Grafana dashboards                        | Confirm Prometheus is running and scraping. Check the targets page at `http://prometheus:9090/targets`                                                                                                                  |
+| Grafana login bounces back to login page             | `GF_SERVER_ROOT_URL` is wrong — must be the full external URL with scheme (`https://...`), no port suffix when behind a reverse proxy                                                                                   |
+| Grafana login fails (wrong password)                 | `GF_SECURITY_ADMIN_PASSWORD` is only applied on first init. After the `grafana-data` volume exists, change the password via `grafana-cli admin reset-admin-password` inside the container or wipe the volume to re-init |
+| Dashboards not appearing                             | Confirm `monitoring-init` exited 0 (`docker compose ps -a monitoring-init`). If not, inspect its logs and rerun the stack                                                                                               |
+| Stale metrics after restart                          | Gauge metrics (like total users) are re-populated from the database on startup. Counter metrics reset to zero on restart -- this is normal Prometheus behaviour                                                         |
 
 ## See Also
 

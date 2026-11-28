@@ -36,9 +36,45 @@ Attraccess now runs on PostgreSQL only. This is a breaking change and ships in a
 2. **Add a PostgreSQL service** and point `DATABASE_URL` at an **empty** database. The shipped Compose files (Docker Compose, Portainer, Coolify, balena) already contain one (`postgres:18.6-alpine`, not part of the Attraccess image); see [Docker Compose](installation/docker-compose.md) and [Portainer](installation/portainer.md). If you started Attraccess with a bare `docker run`, you must start a PostgreSQL container and set `DATABASE_URL` **before** you pull the new image, because the new version does not start without it.
 3. Plan for disk space: the old SQLite file stays on disk after the import (see below), next to the new PostgreSQL data. The storage folder and the SQLite file must be writable by the Attraccess container, because the file is migrated in place and then moved. If the file still needs SQLite migrations, a read-only file stops the start before anything is imported (`attempt to write a readonly database`); otherwise the import finishes and only the move fails (see [Failure and retry](#failure-and-retry)).
 4. Write down how your plugins are configured. Plugin data is not moved (see [Plugin data is not moved](#plugin-data-is-not-moved)).
-5. **balena:** the stack no longer contains Duplicati; its backup jobs are gone. Take a last Duplicati backup before you upgrade, then set the `BACKUP_*` variables of the new [restic sidecar](installation/backup-restore.md#balena-restic-sidecar).
+5. **balena:** the update removes Duplicati together with its backup jobs, and Attraccess no longer starts until the new [restic sidecar](installation/backup-restore.md#balena-restic-sidecar) is set up. Copy the Duplicati settings and set the new variables **before** you update, as described in [balena: from Duplicati to the restic sidecar](#balena-from-duplicati-to-the-restic-sidecar).
 
 Do not set `DATABASE_TYPE=sqlite`: the start fails with a message that links to this page.
+
+### balena: from Duplicati to the restic sidecar
+
+Earlier balena releases backed up with Duplicati, which you set up in its web interface. The new release has no Duplicati: the update removes the service, its backup jobs and the settings you entered there. The new `backup` service (restic) takes its place and is set up with device variables. It **refuses to start without its settings, and Attraccess waits for it**: a device without backups does not go unnoticed. Read the Duplicati settings while Duplicati still runs, and set the new variables before the update.
+
+**1. Read the Duplicati settings (old release, before the update).** Open the Duplicati web interface as before (port `8200` of the `duplicati` service, usually through a proxy host in Nginx Proxy Manager). For each backup job, choose **Export**, then **As command line**, and tick **Export passwords**. Keep the result in a password manager. The command holds the target URL with its options, `--passphrase` and `--retention-policy`; the schedule is not part of it, so also note it from the job's schedule page. Use them like this (value in the Duplicati export → setting of the sidecar):
+
+- Target URL `s3://<bucket>/<folder>?s3-server-name=<server>&…` → `BACKUP_REPOSITORY=s3:https://<server>/<bucket>/<new folder>` (with `use-ssl=false`: `s3:http://…`; Amazon S3: `s3:s3.amazonaws.com/<bucket>/<new folder>`)
+- `auth-username` (or `aws-access-key-id`) → `AWS_ACCESS_KEY_ID`
+- `auth-password` (or `aws-secret-access-key`) → `AWS_SECRET_ACCESS_KEY`
+- `s3-location-constraint` (region), if set → `AWS_DEFAULT_REGION`
+- Target URL `b2://<bucket>/<folder>?auth-username=<key id>&auth-password=…` (or `b2-accountid`, `b2-applicationkey`) → `BACKUP_REPOSITORY=b2:<bucket>:<new folder>`, `B2_ACCOUNT_ID=<key id>`, `B2_ACCOUNT_KEY=<application key>`
+- `--passphrase` → Not transferable: restic writes a new repository. Choose a new `BACKUP_PASSWORD`, and **keep the Duplicati passphrase** to read the old backups.
+- Schedule page of the job (e.g. daily at 03:00; not in the export) → `BACKUP_SCHEDULE` (5-field cron, `0 3 * * *` is the default)
+- `--retention-policy` (e.g. "smart" = `1W:1D,4W:1W,12M:1M`) → `BACKUP_KEEP_DAILY`, `BACKUP_KEEP_WEEKLY`, `BACKUP_KEEP_MONTHLY` (for "smart": `7`, `4`, `12`)
+
+Use a **new folder** for the restic repository, not the folder of the Duplicati files: the two formats must not mix, and the old Duplicati backups stay readable next to it. The sidecar backs up the same volumes that were mounted into the shipped `duplicati` service, plus a dump of the PostgreSQL database; other folders you added to your Duplicati job are not carried over. Other Duplicati targets (SFTP, WebDAV, …) map to [restic repositories](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html); check that the sidecar can reach them before you update.
+
+**2. Set the new variables, still on the old release.** Set `BACKUP_REPOSITORY`, `BACKUP_PASSWORD`, the credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, …) and, if you need them, `BACKUP_SCHEDULE` and `BACKUP_KEEP_*` as **device** variables (not fleet variables, see [restic sidecar](installation/backup-restore.md#balena-restic-sidecar)). The `backup` service does not exist yet, so they cannot be service variables; balena restarts the running services once to apply them, which does no harm. If the device has to run without backups for now, set `BACKUP_DISABLED=true` instead: Attraccess then starts and logs a warning.
+
+**3. Take a last Duplicati backup.** Once balena has applied the variables, stop the `attraccess` service in the balena dashboard (step 1 of [Before you upgrade](#before-you-upgrade)): stopping it before step 2 is not enough, because applying the variables can start it again. Run the job with its **Start** button on the Duplicati home page and wait until it succeeds. This backup holds the untouched `attraccess.sqlite`. Leave `attraccess` stopped until the update.
+
+**4. Update the device** to the new release.
+
+**5. Check the sidecar.** Its log shows `backups enabled: schedule …`, and Attraccess starts. The start only checks the settings themselves (present and valid), not that the target works, so run a first backup right away and list it:
+
+```bash
+balena-engine exec -it <backup container> attraccess-backup backup
+balena-engine exec -it <backup container> attraccess-backup snapshots
+```
+
+If the `attraccess` service logs `waiting for the backup service` instead, the `backup` service log names the setting that is missing or invalid. Fix the variable; the services restart and Attraccess starts on its own. If the backup itself ends with `BACKUP FAILED`, the lines before it name the cause (address, credentials, a wrong password for an existing repository); until the next successful run the [`BackupFailed`](monitoring/prometheus-grafana.md#backup-alerts) alert fires.
+
+**6. Keep the old Duplicati backups** until the restic snapshots reach back far enough for you. To restore one of them later, install Duplicati anywhere (for example on a laptop), open **Restores** and choose **Direct restore from backup files**, and enter the target URL and passphrase from step 1. Then delete the Duplicati folder in the bucket.
+
+If the device was already updated without step 1, the Duplicati settings are gone with the service; take the address and the credentials of the target from your storage provider instead.
 
 ### What happens on the first start
 

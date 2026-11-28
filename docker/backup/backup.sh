@@ -5,9 +5,8 @@ set -eu
 # shellcheck source=lib.sh
 . "$(dirname "$0")/lib.sh"
 
-configure_restic || fail "BACKUP_REPOSITORY is not set"
-connect_database
-
+# The lock comes first: a run skipped because another backup or restore holds it is not a failed run, and it must not
+# touch the dump of that run. From here on every way out but success is recorded as a failed run.
 mkdir -p "$STATE_DIR"
 exec 9>"$STATE_DIR/backup.lock"
 flock -n 9 || fail "another backup or restore is already running"
@@ -15,33 +14,39 @@ flock -n 9 || fail "another backup or restore is already running"
 started=$(date +%s)
 log "backup started"
 remove_dump() { rm -f "$DUMP_FILE" "$DUMP_FILE.partial"; }
-trap 'remove_dump; log "BACKUP FAILED (see the messages above)" >&2' EXIT
+# set +e: every step runs, also when one fails (no stderr, disk full); the exit code stays the failed run's.
+trap 'set +e; log "BACKUP FAILED (see the messages above)" >&2; remove_dump; record_run 0' EXIT
+exit_on_signals
 
+configure_restic || fail "BACKUP_REPOSITORY is not set"
+connect_database
 wait_for_postgres
 log "dumping the database"
 remove_dump
 pg_dump --format=custom --no-owner --dbname="$PG_URL" --file="$DUMP_FILE.partial"
 mv "$DUMP_FILE.partial" "$DUMP_FILE"
 
-# A repository that cannot be opened is initialised (first run, also creates a missing bucket) - except when the
-# password is wrong (restic exit code 12): `restic init` would only report "config file already exists" there.
-probe=0
 log "checking the restic repository"
-restic cat config >/dev/null 2>"$STATE_DIR/restic-probe.err" || probe=$?
-if [ "$probe" -eq 12 ]; then
-  cat "$STATE_DIR/restic-probe.err" >&2
-  fail "cannot open the restic repository: wrong BACKUP_PASSWORD for the existing repository"
-elif [ "$probe" -ne 0 ]; then
-  log "initialising the restic repository (opening it failed with restic exit code $probe)"
-  restic init
-fi
+open_repository
 
 paths="$DUMP_DIR"
 [ -d "$DATA_DIR" ] && paths="$paths $DATA_DIR"
 log "uploading: $paths"
+# Exit code 3: the snapshot was saved, but some files could not be read - typically files of the running services that
+# vanished while they were read (SQLite journals, temporary files). The database dump is always readable, so such a
+# run still counts as a success; the skipped files are named above.
+backed_up=0
 # shellcheck disable=SC2086 # the paths are fixed directories without spaces
-restic backup --host "$RESTIC_HOST" --tag attraccess $paths
+restic backup --host "$RESTIC_HOST" --tag attraccess $paths || backed_up=$?
+case "$backed_up" in
+  0) ;;
+  3) log "WARNING: the snapshot was saved, but some files could not be read (see above); they were skipped" ;;
+  *) fail "restic backup failed with exit code $backed_up" ;;
+esac
 remove_dump
+# The snapshot is saved: it is the last successful backup, also if the retention step below fails (that run still
+# counts as failed, so BackupFailed fires, but BackupTooOld does not while snapshots keep arriving).
+set_state last_success "$(date +%s)"
 
 log "applying the retention policy"
 restic forget --prune --host "$RESTIC_HOST" --tag attraccess \
@@ -50,14 +55,6 @@ restic forget --prune --host "$RESTIC_HOST" --tag attraccess \
   --keep-monthly "${BACKUP_KEEP_MONTHLY:-6}"
 
 finished=$(date +%s)
-{
-  echo '# HELP backup_last_success_timestamp_seconds Unix time of the last successful Attraccess backup.'
-  echo '# TYPE backup_last_success_timestamp_seconds gauge'
-  echo "backup_last_success_timestamp_seconds $finished"
-} >"$METRIC_FILE.tmp"
-# No secret in it, and a textfile collector (node-exporter runs as nobody) must be able to read it.
-chmod 0644 "$METRIC_FILE.tmp"
-mv "$METRIC_FILE.tmp" "$METRIC_FILE"
-
 trap - EXIT
+record_run 1
 log "backup SUCCEEDED in $((finished - started))s"

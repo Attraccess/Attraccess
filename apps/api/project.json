@@ -220,6 +220,9 @@
           "env": "ALERTING_REAL_TIME"
         },
         {
+          "env": "ALERTING_HOST_GATEWAY"
+        },
+        {
           "externalDependencies": ["jest", "testcontainers"]
         }
       ],
