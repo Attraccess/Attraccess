@@ -167,7 +167,8 @@ export function ResourceBillingInfoEditor(props: Readonly<ResourceBillingInfoEdi
         configuration.minorUnit,
       ),
     );
-  }, [resourceBillingConfiguration, configuration]);
+    // `isOpen`: what was changed but not saved must not come back, and be saved, the next time.
+  }, [resourceBillingConfiguration, configuration, isOpen]);
 
   const onSubmit = useCallback(async () => {
     if (!configuration) {
