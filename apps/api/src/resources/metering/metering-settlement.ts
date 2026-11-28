@@ -23,6 +23,16 @@ const REINITIALIZED = 'The meter was re-initialized for a later session before t
 const unreadAtProjectSwitch = (reason: string) =>
   `The meter could not be read at the project switch (${reason}); consumption since its last reading is counted after the switch`;
 
+/** Why a session without its final reading is left pending or failed; `superseded` when a later session uses the meter. */
+function unreadReason(session: ResourceMeteringSessionRecord, final: MeterFinal, superseded: boolean): string {
+  // At a project switch the later session is the continuation: nothing was initialized again.
+  const switched = final.status === 'unavailable' && final.atProjectSwitch;
+  if (superseded && !switched) return REINITIALIZED;
+  if (session.compromisedReason) return session.compromisedReason;
+  if (final.status !== 'unavailable') return 'No final reading was collected';
+  return superseded ? unreadAtProjectSwitch(final.reason) : final.reason;
+}
+
 export type MeterFinal =
   { status: 'ready'; operationId: string } | { status: 'unavailable'; reason: string; atProjectSwitch?: boolean };
 
@@ -406,22 +416,11 @@ export class MeteringSettlement {
           ? false
           : await this.store.hasLaterSession(session.resourceId, session.meterId, usageId, context);
       const unrecoverable = superseded || !!session.compromisedReason;
-      // At a project switch the later session is the continuation: nothing was initialized again.
-      const switched = final.status === 'unavailable' && final.atProjectSwitch;
       await this.store.updateSession(
         session.id,
         {
           status: unrecoverable ? ResourceMeteringSessionStatus.Failed : ResourceMeteringSessionStatus.Pending,
-          failureReason:
-            superseded && !switched
-              ? REINITIALIZED
-              : session.compromisedReason
-                ? session.compromisedReason
-                : final.status !== 'unavailable'
-                  ? 'No final reading was collected'
-                  : superseded
-                    ? unreadAtProjectSwitch(final.reason)
-                    : final.reason,
+          failureReason: unreadReason(session, final, superseded),
         },
         context,
       );

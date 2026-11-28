@@ -10,6 +10,7 @@ import { MeteringOperationError } from './metering-readings';
 import type { MeteringSegments } from './metering-segments';
 import type { FinalCollection, MeterFinal } from './metering-settlement';
 import type { MeteringStore } from './metering-store.port';
+import { sleepSeconds } from './sleep-seconds';
 
 export interface MeterHandoverHooks {
   store: MeteringStore;
@@ -69,7 +70,7 @@ export async function handOverMeters(
         successor,
         await hooks.getDefinition(session.resourceId, session.meterId),
         at,
-        (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000)),
+        sleepSeconds,
       );
     } else {
       final = await hooks.collectOwn(session, at);

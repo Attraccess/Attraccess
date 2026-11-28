@@ -361,35 +361,20 @@ export class MeteringSegments {
   ): Promise<MeterFinal> {
     const actives = await this.activeParticipants(undefined, session.resourceId, session.meterId, [session.usageId]);
     const last = actives.length === 0;
-    const { attempts, retryDelaySeconds } = last
-      ? { attempts: definition.collect.finalAttempts, retryDelaySeconds: definition.collect.finalRetryDelaySeconds }
-      : BOUNDARY_ATTEMPT;
-    let reason = 'No attempt was made';
-    for (let attempt = 1; attempt <= attempts; attempt++) {
-      try {
-        const operation = await this.hooks.runOperation(session, last ? 'final' : 'boundary', {
-          trigger: ResourceFlowNodeType.INPUT_METERING_COLLECT,
-          timeoutSeconds: definition.collect.timeoutSeconds,
-          freshAfter,
-        });
-        const meter = await this.requireMeter(session.meterId);
-        const open = await this.store.findOpenSegment(session.meterId);
-        await this.close({
-          resourceId: session.resourceId,
-          meterId: session.meterId,
-          reading: this.readingOf(operation, meter),
-          next: this.nextParticipants(open, actives),
-        });
-        return { status: 'ready', operationId: operation.id };
-      } catch (error) {
-        reason = error instanceof Error ? error.message : String(error);
-        this.logger.warn(
-          `Boundary reading ${attempt}/${attempts} of meter ${session.meterId} for usage ${session.usageId} failed: ${reason}`,
-        );
-        if (attempt < attempts && retryDelaySeconds > 0) await sleep(retryDelaySeconds);
-      }
-    }
-    return { status: 'unavailable', reason };
+    return this.readAndClose(
+      session,
+      {
+        kind: last ? 'final' : 'boundary',
+        label: 'Boundary reading',
+        timeoutSeconds: definition.collect.timeoutSeconds,
+        freshAfter,
+        ...(last
+          ? { attempts: definition.collect.finalAttempts, retryDelaySeconds: definition.collect.finalRetryDelaySeconds }
+          : BOUNDARY_ATTEMPT),
+      },
+      async () => this.nextParticipants(await this.store.findOpenSegment(session.meterId), actives),
+      sleep,
+    );
   }
 
   /**
@@ -410,30 +395,20 @@ export class MeteringSegments {
     const others = running.filter((participant) => participant.session.usageId !== session.usageId);
     const next = await this.store.createSession({ ...successor, accounting: 'segmented' });
     const open = await this.ensureOpen(undefined, meter, running);
-    const { finalAttempts, finalRetryDelaySeconds } = definition.collect;
-    let reason = 'No attempt was made';
-    for (let attempt = 1; attempt <= finalAttempts; attempt++) {
-      try {
-        const operation = await this.hooks.runOperation(session, 'boundary', {
-          trigger: ResourceFlowNodeType.INPUT_METERING_COLLECT,
-          timeoutSeconds: definition.collect.timeoutSeconds,
-          freshAfter,
-        });
-        await this.close({
-          resourceId: session.resourceId,
-          meterId: session.meterId,
-          reading: this.readingOf(operation, await this.requireMeter(meter.id)),
-          next: this.inStartOrder([...this.nextParticipants(open, others), this.toParticipant(next)]),
-        });
-        return { status: 'ready', operationId: operation.id };
-      } catch (error) {
-        reason = error instanceof Error ? error.message : String(error);
-        this.logger.warn(
-          `Switch reading ${attempt}/${finalAttempts} of meter ${session.meterId} for usage ${session.usageId} failed: ${reason}`,
-        );
-        if (attempt < finalAttempts && finalRetryDelaySeconds > 0) await sleep(finalRetryDelaySeconds);
-      }
-    }
+    const final = await this.readAndClose(
+      session,
+      {
+        kind: 'boundary',
+        label: 'Switch reading',
+        timeoutSeconds: definition.collect.timeoutSeconds,
+        freshAfter,
+        attempts: definition.collect.finalAttempts,
+        retryDelaySeconds: definition.collect.finalRetryDelaySeconds,
+      },
+      async () => this.inStartOrder([...this.nextParticipants(open, others), this.toParticipant(next)]),
+      sleep,
+    );
+    if (final.status === 'ready') return final;
     if (session.creditsPerUnit > 0) {
       await this.store.deleteSession(next.id);
     } else {
@@ -444,6 +419,51 @@ export class MeteringSegments {
           participant.usageId === session.usageId ? this.toParticipant(next) : participant,
         ),
       });
+    }
+    return final;
+  }
+
+  /**
+   * Reads the meter for `session` up to `read.attempts` times and closes the segment it is in with the first reading
+   * that succeeds; `next` names who takes part in the segment that follows. Unavailable when no attempt succeeded.
+   */
+  private async readAndClose(
+    session: ResourceMeteringSessionRecord,
+    read: {
+      kind: MeteringOperationKind;
+      /** How the log names the reading. */
+      label: string;
+      timeoutSeconds: number;
+      freshAfter: Date;
+      attempts: number;
+      retryDelaySeconds: number;
+    },
+    next: () => Promise<MeteringSegmentParticipant[]>,
+    sleep: (seconds: number) => Promise<void>,
+  ): Promise<MeterFinal> {
+    let reason = 'No attempt was made';
+    for (let attempt = 1; attempt <= read.attempts; attempt++) {
+      try {
+        const operation = await this.hooks.runOperation(session, read.kind, {
+          trigger: ResourceFlowNodeType.INPUT_METERING_COLLECT,
+          timeoutSeconds: read.timeoutSeconds,
+          freshAfter: read.freshAfter,
+        });
+        const meter = await this.requireMeter(session.meterId);
+        await this.close({
+          resourceId: session.resourceId,
+          meterId: session.meterId,
+          reading: this.readingOf(operation, meter),
+          next: await next(),
+        });
+        return { status: 'ready', operationId: operation.id };
+      } catch (error) {
+        reason = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `${read.label} ${attempt}/${read.attempts} of meter ${session.meterId} for usage ${session.usageId} failed: ${reason}`,
+        );
+        if (attempt < read.attempts && read.retryDelaySeconds > 0) await sleep(read.retryDelaySeconds);
+      }
     }
     return { status: 'unavailable', reason };
   }

@@ -46,6 +46,7 @@ import { MeteringSegments } from './metering-segments';
 import { handOverMeters } from './metering-handover';
 
 import { recordMeterUpdate } from './meter-audit';
+import { sleepSeconds } from './sleep-seconds';
 
 export type { MeterProblem } from './metering-definition';
 
@@ -396,7 +397,7 @@ export class ResourceMeteringService implements OnModuleInit {
         session,
         await this.getDefinition(session.resourceId, session.meterId),
         freshAfter,
-        (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000)),
+        sleepSeconds,
       );
     }
     if (session.collectionMode === 'increment') {
@@ -429,9 +430,8 @@ export class ResourceMeteringService implements OnModuleInit {
         this.logger.warn(
           `Final metering collection ${attempt}/${collect.finalAttempts} for usage ${usageId} failed: ${reason}`,
         );
-        if (attempt < collect.finalAttempts && collect.finalRetryDelaySeconds > 0) {
-          await new Promise((resolve) => setTimeout(resolve, collect.finalRetryDelaySeconds * 1000));
-        }
+        if (attempt < collect.finalAttempts && collect.finalRetryDelaySeconds > 0)
+          await sleepSeconds(collect.finalRetryDelaySeconds);
       }
     }
     return { status: 'unavailable', reason };
