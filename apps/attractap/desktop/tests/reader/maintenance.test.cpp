@@ -9,6 +9,7 @@ void ReaderWorkflow::testMaintenance()
     struct Scenario {
         bool own = false; const char *otherUser = nullptr; bool manager = false;
         bool canRequest = true; bool ask = true; bool underMaintenance = false; bool introduced = true;
+        bool door = false; bool accessOnly = false; const char *name = "Laser";
     };
     const auto maintenanceList = [&](const Scenario &scenario) {
         JsonDocument doc;
@@ -22,7 +23,11 @@ void ReaderWorkflow::testMaintenance()
         auto door = resources.add<JsonObject>();
         door["id"] = 2; door["name"] = "Tür"; door["type"] = "door"; door["isHealthy"] = true; door["hasIntroduction"] = true;
         auto r = resources.add<JsonObject>();
-        r["id"] = 1; r["name"] = "Laser"; r["description"] = ""; r["type"] = "machine";
+        r["id"] = 1; r["name"] = scenario.name; r["description"] = ""; r["type"] = scenario.door ? "door" : "machine";
+        if (scenario.door) {
+            r["accessOnly"] = scenario.accessOnly; r["separateUnlockAndUnlatch"] = !scenario.accessOnly;
+            if (scenario.own) { auto flow = r["flowButtons"].to<JsonArray>().add<JsonObject>(); flow["id"] = "f1"; flow["label"] = "Licht"; }
+        }
         r["isHealthy"] = true; r["hasIntroduction"] = scenario.introduced; r["requiresSupervisor"] = false;
         r["isUnderMaintenance"] = scenario.underMaintenance;
         r["canManageResource"] = scenario.manager; r["canEndOtherSessions"] = scenario.manager;
@@ -257,6 +262,68 @@ void ReaderWorkflow::testMaintenance()
     click("Problem melden");
     assert(Display::maintenanceReasonScreen.reason().empty());
     click("Abbrechen");
+
+    // Where the button sits. A machine with a session to end: beside "End session", two equal buttons in one row.
+    const auto expectBesideStop = [&](const char *stopCaption, const char *reportCaption) {
+        auto *end = buttonOf(lv_screen_active(), stopCaption);
+        auto *reportButton = buttonOf(lv_screen_active(), reportCaption);
+        assert(end && reportButton && lv_obj_is_visible(end) && lv_obj_is_visible(reportButton));
+        const auto left = areaOf(end), right = areaOf(reportButton);
+        assert(left.y1 == right.y1 && left.y2 == right.y2 && left.x2 < right.x1);
+        assert(std::abs(lv_area_get_width(&left) - lv_area_get_width(&right)) <= 1);
+    };
+    maintenanceList(ownSession);
+    expectBesideStop("Sitzung beenden", "Problem melden");
+    display.capture(output, "maintenance-09-machine-own-session");
+    // The picture of the user guide.
+    Scenario guide = ownSession; guide.name = "Lasercutter";
+    maintenanceList(guide);
+    display.capture(output, "maintenance-10-user-guide-details");
+    // The longer caption of a force-stop wraps instead of leaving its half.
+    Scenario forceStop; forceStop.otherUser = "robin"; forceStop.manager = true;
+    maintenanceList(forceStop);
+    expectBesideStop("Fremde Sitzung beenden", "Problem melden");
+    display.capture(output, "maintenance-11-machine-force-stop");
+    State::setUserLanguage(true, "en"); pump();
+    expectBesideStop("End other user's session", "Report a problem");
+    display.capture(output, "maintenance-12-machine-force-stop-english");
+    State::setUserLanguage(true, "de"); pump();
+
+    // Without a session to end, and without a stop button for a card holder who cannot report: full width.
+    maintenanceList(Scenario{});
+    auto *alone = buttonOf(lv_screen_active(), "Problem melden");
+    assert(lv_obj_is_visible(alone) && lv_obj_get_width(alone) == lv_obj_get_width(lv_obj_get_parent(alone)));
+    assert(lv_obj_get_height(alone) == 50);
+    Scenario noReport = ownSession; noReport.canRequest = false;
+    maintenanceList(noReport);
+    auto *wide = buttonOf(lv_screen_active(), "Sitzung beenden");
+    assert(lv_obj_get_width(wide) == lv_obj_get_width(lv_obj_get_parent(wide)));
+    assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Problem melden")));
+
+    // A door: directly below its action buttons, before anything else (here also a flow button).
+    const auto expectBelowDoorButtons = [&](FirmwareI18n::Message action) {
+        auto *door = buttonOf(lv_screen_active(), FirmwareI18n::messageText(action, "de"));
+        auto *reportButton = buttonOf(lv_screen_active(), "Problem melden");
+        assert(door && reportButton && lv_obj_is_visible(door) && lv_obj_is_visible(reportButton));
+        auto *doorRow = lv_obj_get_parent(door);
+        assert(lv_obj_get_parent(reportButton) == lv_obj_get_parent(doorRow));
+        assert(lv_obj_get_index(reportButton) == lv_obj_get_index(doorRow) + 1);
+        const auto buttons = areaOf(doorRow), below = areaOf(reportButton);
+        assert(below.y1 - buttons.y2 - 1 == 10); // only the gap between rows
+        assert(lv_area_get_width(&below) == lv_area_get_width(&buttons));
+    };
+    Scenario doorWithFlow{true}; doorWithFlow.door = true;
+    maintenanceList(doorWithFlow);
+    expectBelowDoorButtons(FirmwareI18n::Message::Unlock);
+    assert(areaOf(buttonOf(lv_screen_active(), "Licht")).y1 > areaOf(buttonOf(lv_screen_active(), "Problem melden")).y2);
+    display.capture(output, "maintenance-13-door");
+    Scenario accessOnlyDoor; accessOnlyDoor.door = true; accessOnlyDoor.accessOnly = true;
+    maintenanceList(accessOnlyDoor);
+    expectBelowDoorButtons(FirmwareI18n::Message::Open);
+    display.capture(output, "maintenance-14-door-access-only");
+    // Back on a machine the button leaves the door controls again.
+    maintenanceList(ownSession);
+    expectBesideStop("Sitzung beenden", "Problem melden");
 
     // Without the right to request maintenance (a maintainer, or no license) there is no button.
     Scenario maintainer; maintainer.canRequest = false; maintainer.ask = false;

@@ -179,7 +179,7 @@ void ResourceDetailsScreen::destroy()
    this->clearProjectButton = nullptr;
    this->startSessionButton = nullptr;
    this->startSessionButtonLabel = nullptr;
-   this->stopSessionButton = nullptr;
+   this->stopSessionRow = this->stopSessionButton = nullptr;
    this->stopSessionButtonLabel = nullptr;
    this->stopOtherUserNote = nullptr;
    this->autoEndLabel = this->extendButton = nullptr;
@@ -399,7 +399,6 @@ void ResourceDetailsScreen::updateOccupancy()
 void ResourceDetailsScreen::refreshAccessState()
 {
    this->updateOccupancy();
-   this->updateReportProblemButton();
    bool underMaintenance = this->resourceCacheValid && this->resourceCache.isUnderMaintenance;
    bool isUnhealthy = this->resourceCacheValid && !this->resourceCache.isHealthy;
 
@@ -535,6 +534,8 @@ void ResourceDetailsScreen::refreshAccessState()
    }
    // The countdown and Extend follow who may stop the session (the own one, or a manager's force-stop).
    this->updateAutoEnd();
+   // Last: it follows which controls show.
+   this->updateReportProblemButton();
    // A failure waiting for this refresh goes back on its button, if it still means the same.
    this->applyActionError();
 }

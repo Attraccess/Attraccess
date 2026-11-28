@@ -89,6 +89,9 @@ private:
     void createStatusPanels();
     void createReportProblemButton(); // resourceDetailsMaintenance.cpp
     void updateReportProblemButton();
+    void placeReportProblemButton(bool stopShown);
+    lv_obj_t *createStopSessionRow();
+    lv_obj_t *stopSessionRow = nullptr;
     lv_obj_t *reportProblemButton = nullptr;
     Logger logger;
     lv_obj_t *screen = nullptr;
