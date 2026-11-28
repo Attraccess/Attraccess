@@ -12,6 +12,7 @@ import {
   ProjectSwitchCharging,
   ResourceFlowNodeType,
   ResourceFormAction,
+  ResourceType,
 } from '@attraccess/application-models';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
@@ -213,6 +214,22 @@ describe('Switching the project of a running session', () => {
     await expect(switchTo(2, 0, started.id)).rejects.toBeInstanceOf(NotFoundException);
     await expect(switchTo(2)).rejects.toBeInstanceOf(NotFoundException);
     expect(await usages()).toHaveLength(1);
+  });
+
+  it('refuses a session that does not run on a machine', async () => {
+    const started = await startInProject();
+    // A session left running on a resource that is a door now.
+    await scope.source.query(`UPDATE resource SET type = $1 WHERE id = 1`, [ResourceType.Door]);
+    scope.flow.runFlow.mockClear();
+
+    await expect(switchTo(2)).rejects.toThrow(
+      new BadRequestException('Only running machine sessions can switch their project'),
+    );
+    await expect(switchTo(2, 0, started.id)).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(flowRuns()).toEqual([]);
+    expect(await usages()).toEqual([expect.objectContaining({ id: started.id, projectId: 1, endTime: null })]);
+    expect(await attempts()).toBe(0);
   });
 
   const expectUnchanged = async (startedId: number) => {
