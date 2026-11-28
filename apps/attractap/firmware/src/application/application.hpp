@@ -155,6 +155,7 @@ private:
     void openProjectSwitch();
     void handleProjectPicked(uint32_t projectId, const std::string &projectName);
     void cancelProjectPicker();
+    void closeStaleProjectSwitch(const API::ResourceBrief &resource);
     void startProjectSwitch(uint32_t resourceId, uint32_t usageId, uint32_t projectId);
     // The form action of the pending start, takeover, stop or project switch.
     API::ResourceUsageFormActionType pendingFormAction() const;

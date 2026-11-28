@@ -8,7 +8,8 @@ void ResourceDetailsScreen::createProjectSwitch()
 {
    this->sessionProjectLabel = lv_label_create(this->sessionControls);
    lv_obj_set_width(this->sessionProjectLabel, lv_pct(100));
-   lv_obj_set_height(this->sessionProjectLabel, LV_SIZE_CONTENT);
+   // One line, ending in dots: LVGL only dots a label of fixed height, a content-sized one wraps.
+   lv_obj_set_height(this->sessionProjectLabel, lv_font_get_line_height(&attractap_font_montserrat_latin1_18));
    lv_label_set_long_mode(this->sessionProjectLabel, LV_LABEL_LONG_DOT);
    lv_obj_set_style_text_font(this->sessionProjectLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
    lv_obj_set_style_text_color(this->sessionProjectLabel, DisplayTheme::text(), LV_PART_MAIN);

@@ -51,7 +51,10 @@ private:
     bool switching = false;
     uint32_t currentProjectId = 0;
     lv_obj_t *titleLabel = nullptr;
-    void createNoProjectButton();
+    // Beside the title while switching, not an entry of the list: a full page leaves the list no room for it.
+    lv_obj_t *noProjectButton = nullptr;
+    void createProjectsTitleRow(lv_obj_t *panel);
+    void updateSwitchChrome();
     static void onNoProjectClick(lv_event_t *e);
     uint32_t projectsCurrentPage = 1;
     uint32_t projectsTotalCount = 0;

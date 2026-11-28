@@ -240,6 +240,7 @@ void Application::updateSelectedResourceDetails() {
       if (this->extendTargets(resource)) Display::extendSessionScreen.update(resource);
       else Display::returnFromTransient();
     }
+    this->closeStaleProjectSwitch(resource);
     const bool personalized = resource.accessKnown && this->cardAuthenticationData.username == this->resourceList.authenticatedUsername;
     const bool legacy = !resource.accessKnown && this->authenticationResourceId == resource.id;
     Display::resourceDetailsScreen.setUserDetails({

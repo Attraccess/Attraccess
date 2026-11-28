@@ -281,6 +281,12 @@ void testGallery(SdlDisplay &display, const std::filesystem::path &screenshots)
             picker.setProjects(projects);
             picker.setSelectedProject(41);
             shot("projects");
+            // Switching a running session (ATT-1421): "No project" beside the title, the long resource name cut short.
+            picker.setSwitchTarget(true, 41);
+            picker.setSelectedProject(0);
+            shot("projects-switch");
+            picker.setSwitchTarget(false);
+            picker.setSelectedProject(41);
             API::ProjectsOfUserResponse none{};
             none.page = 1;
             none.limit = API::MAX_PROJECTS_PER_PAGE;

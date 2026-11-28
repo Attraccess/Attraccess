@@ -47,11 +47,20 @@ To record machine usage against a project, tap the machine's name to open its de
 On a Touch reader with current firmware (the capability **projectSwitch**), the details of your own running session show **Projekt: …** and **Projekt wechseln** (Change project). The button is offered when the session already has a project or you have one to switch to.
 
 1. Tap the machine's name to open its details, then tap **Projekt wechseln**
-2. Pick a project (the list can be searched and paged) or **Kein Projekt** (No project). The current one cannot be picked.
+2. Pick a project from the list (it can be searched and paged), or tap **Kein Projekt** (No project) next to the title. The current choice cannot be picked.
 3. Complete any form required for a project switch
 4. The reader confirms with **Projekt gewechselt** (Project changed) and the new project
 
-The machine keeps running, and the start time shown stays that of your session. If the switch is refused (for example a meter cannot be read, or the balance does not cover a new session where the resource [charges it like one](billing/configuration.md#charging-on-project-switch)), the reader says why and the session keeps its project. Older firmware, Attractap Lite, the BLE Bridge and plugin readers do not offer this. See [Switching the project of a running session](resources/usage-tracking.md#switching-the-project-of-a-running-session).
+The machine keeps running, and the start time shown stays that of your session. If your session ends or its project changes elsewhere while the project list or a switch form is open, the reader closes it and shows the current status.
+
+If the switch is refused, the session keeps its project:
+
+- A meter cannot be read: the button shows **⚠ Zähler nicht lesbar. Projekt unverändert.** (Meter not readable. Project unchanged.)
+- The balance does not cover a new session where the resource [charges the switch like one](billing/configuration.md#charging-on-project-switch): the reader reports [insufficient balance](#results-messages-and-low-balance)
+- Your session ended just as you made your choice: the reader says **Sie haben hier keine eigene Sitzung. Es wurde nichts beendet.** (You have no session of your own here. Nothing was ended.)
+- Other refusals, such as a failed flow, show no specific reason: the button shows **⚠ Fehlgeschlagen – erneut tippen** (⚠ Failed – tap to retry)
+
+Older firmware, Attractap Lite, the BLE Bridge and plugin readers do not offer this. See [Switching the project of a running session](resources/usage-tracking.md#switching-the-project-of-a-running-session).
 
 ### Results, messages and low balance
 
@@ -105,7 +114,7 @@ _The back arrow returns to the resource list. You remain signed in when you move
 
 ### Session finished summary
 
-After you successfully stop your own machine session, the reader shows **Danke, {name}!** with your display name (your name, or your username when none is set). **Dauer** is the elapsed session time in hours, minutes and seconds, not machine operating time or billed minutes. Hours can exceed 24. **Abgerechnet** shows the final formatted charge when there is a nonzero charge; otherwise only the centered duration appears.
+After you successfully stop your own machine session, the reader shows **Danke, {name}!** with your display name (your name, or your username when none is set). **Dauer** is the elapsed session time in hours, minutes and seconds, not machine operating time or billed minutes. Hours can exceed 24. **Abgerechnet** shows the final formatted charge when there is a nonzero charge; otherwise only the centered duration appears. If the [project was switched](#change-the-project-of-a-running-session) during the session, both are about the whole session: **Dauer** counts from its original start, and **Abgerechnet** adds up the charges of all its parts, also when the last part cost nothing.
 
 ![Full-screen goodbye with elapsed duration and final charge](../../_media/attractap/session-summary-billed.png)
 

@@ -53,13 +53,7 @@ void ProjectSelectScreen::buildProjectsView()
    // Header: "‹ Cancel" left, page indicator right; then the title and the resource it is for.
    lv_obj_t *header = ReaderHeader::createFlowHeader(panel, &ProjectSelectScreen::onProjectsCancel, this);
    this->projectsPaginationLabel = ReaderHeader::createPageIndicator(header);
-   lv_obj_t *title = nullptr;
-   ReaderHeader::createFlowTitle(panel, &title, &this->resourceNameLabel);
-   this->titleLabel = title;
-   FirmwareI18n::setLabel(title, this->switching ? FirmwareI18n::Message::ChangeProject : FirmwareI18n::Message::SelectProject);
-   FirmwareI18n::setDynamicLabel(this->resourceNameLabel, this->resourceName.c_str()) /* i18n-data: Server-supplied resource name; preserve exact contents. */;
-   lv_obj_set_style_margin_bottom(this->resourceNameLabel, 8, LV_PART_MAIN);
-
+   this->createProjectsTitleRow(panel);
    this->createProjectsSearchRow(panel);
 
    this->projectsListContainer = lv_obj_create(panel);
@@ -226,9 +220,6 @@ void ProjectSelectScreen::rebuildProjectsList()
       this->updateProjectsPaginationControls();
       return;
    }
-
-   // On the first, unfiltered page: ending the project assignment is not a search result.
-   if (this->switching && this->projectsCurrentPage <= 1 && this->projectsSearchQuery.empty()) this->createNoProjectButton();
 
    if (this->projectsCache.count == 0)
    {
@@ -405,6 +396,7 @@ void ProjectSelectScreen::destroy()
    this->screen = nullptr;
    this->projectsListContainer = nullptr;
    this->titleLabel = nullptr;
+   this->noProjectButton = nullptr;
    this->projectsPaginationLabel = nullptr;
    this->resourceNameLabel = nullptr;
    this->projectsPrevButton = nullptr;

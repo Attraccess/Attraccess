@@ -17,10 +17,26 @@ void Application::openProjectSwitch() {
     // No highlight: the current project is the disabled entry, and its caption has to stay readable.
     Display::projectSelectScreen.setSelectedProject(0);
     Display::projectSelectScreen.setResourceName(resource.name);
+    // Every switch starts on the first page of all projects, not where the picker was last left.
+    Display::projectSelectScreen.resetProjectsSearch();
     Display::projectSelectScreen.begin();
     Display::transitionToScreen(&Display::projectSelectScreen);
     return;
   }
+}
+
+// The session the picker or the usage forms of a switch are for has ended, was moved elsewhere, or is no longer
+// offered for a switch: they close. A request already sent is left alone, its refreshed row may precede the answer.
+void Application::closeStaleProjectSwitch(const API::ResourceBrief &resource) {
+  if (this->cardAuthenticationData.username != this->resourceList.authenticatedUsername) return;
+  const bool picking = this->projectSwitchUsageId != 0 && Display::isActive(&Display::projectSelectScreen);
+  const bool filling = this->pendingActionType == PENDING_ACTION_SWITCH_PROJECT && this->hasPendingFormRequest;
+  if (!picking && !filling) return;
+  const uint32_t resourceId = picking ? this->projectSwitchResourceId : this->pendingActionResourceId;
+  const uint32_t usageId = picking ? this->projectSwitchUsageId : this->pendingActionUsageId;
+  if (resource.id != resourceId || (resource.canSwitchProject && resource.ownUsageId == usageId)) return;
+  if (picking) this->cancelProjectPicker();
+  else this->handleFormsCancel();
 }
 
 void Application::handleProjectPicked(uint32_t projectId, const std::string &projectName) {

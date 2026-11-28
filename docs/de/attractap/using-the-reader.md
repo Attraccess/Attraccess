@@ -47,11 +47,20 @@ Um die Maschinennutzung einem Projekt zuzuordnen, öffnen Sie über den Namen de
 An einem Touch-Leser mit aktueller Firmware (Fähigkeit **projectSwitch**) zeigen die Details Ihrer eigenen laufenden Sitzung **Projekt: …** und **Projekt wechseln**. Die Schaltfläche erscheint, wenn die Sitzung bereits ein Projekt hat oder Sie eines zum Wechseln haben.
 
 1. Öffnen Sie über den Namen der Maschine deren Details und tippen Sie auf **Projekt wechseln**
-2. Wählen Sie ein Projekt (die Liste lässt sich durchsuchen und blättern) oder **Kein Projekt**. Das aktuelle ist nicht wählbar.
+2. Wählen Sie ein Projekt aus der Liste (sie lässt sich durchsuchen und blättern), oder tippen Sie neben der Überschrift auf **Kein Projekt**. Die aktuelle Auswahl ist nicht wählbar.
 3. Füllen Sie die für einen Projektwechsel erforderlichen Formulare aus
 4. Der Leser bestätigt mit **Projekt gewechselt** und dem neuen Projekt
 
-Die Maschine läuft weiter, und die angezeigte Startzeit bleibt die Ihrer Sitzung. Wird der Wechsel abgelehnt (etwa weil ein Zähler nicht lesbar ist oder das Guthaben nicht für eine neue Sitzung reicht, wenn die Ressource [so abrechnet](billing/configuration.md#abrechnung-beim-projektwechsel)), nennt der Leser den Grund, und die Sitzung behält ihr Projekt. Ältere Firmware, Attractap Lite, die BLE-Bridge und Plugin-Leser bieten dies nicht an. Siehe [Das Projekt einer laufenden Sitzung wechseln](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln).
+Die Maschine läuft weiter, und die angezeigte Startzeit bleibt die Ihrer Sitzung. Endet Ihre Sitzung oder wird ihr Projekt anderswo geändert, während die Projektliste oder ein Wechselformular geöffnet ist, schließt der Leser diese und zeigt den aktuellen Stand.
+
+Wird der Wechsel abgelehnt, behält die Sitzung ihr Projekt:
+
+- Ein Zähler ist nicht lesbar: Die Schaltfläche zeigt **⚠ Zähler nicht lesbar. Projekt unverändert.**
+- Das Guthaben reicht nicht für eine neue Sitzung, wenn die Ressource [den Wechsel wie eine solche abrechnet](billing/configuration.md#abrechnung-beim-projektwechsel): Der Leser meldet [zu geringes Guthaben](#ergebnisse-meldungen-und-niedriges-guthaben)
+- Ihre Sitzung ist genau während Ihrer Auswahl geendet: Der Leser meldet **Sie haben hier keine eigene Sitzung. Es wurde nichts beendet.**
+- Andere Ablehnungen, etwa ein fehlgeschlagener Ablauf, nennen keinen genauen Grund: Die Schaltfläche zeigt **⚠ Fehlgeschlagen – erneut tippen**
+
+Ältere Firmware, Attractap Lite, die BLE-Bridge und Plugin-Leser bieten dies nicht an. Siehe [Das Projekt einer laufenden Sitzung wechseln](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln).
 
 ### Ergebnisse, Meldungen und niedriges Guthaben
 
@@ -105,7 +114,7 @@ _Mit dem Zurück-Pfeil gelangen Sie wieder zur Ressourcenliste. Beim Wechsel zwi
 
 ### Zusammenfassung zum Nutzungsende
 
-Nach dem erfolgreichen Beenden Ihrer eigenen Maschinennutzung zeigt der Leser **Danke, {name}!** mit Ihrem Anzeigenamen (Ihr Name oder, ohne Namen, Ihr Benutzername). **Dauer** ist die vergangene Sitzungszeit in Stunden, Minuten und Sekunden, nicht die Betriebszeit oder die abgerechneten Minuten. Die Stunden können 24 überschreiten. **Abgerechnet** zeigt den formatierten Endbetrag bei einer Gebühr ungleich null. Ohne Gebühr steht nur die Dauer mittig.
+Nach dem erfolgreichen Beenden Ihrer eigenen Maschinennutzung zeigt der Leser **Danke, {name}!** mit Ihrem Anzeigenamen (Ihr Name oder, ohne Namen, Ihr Benutzername). **Dauer** ist die vergangene Sitzungszeit in Stunden, Minuten und Sekunden, nicht die Betriebszeit oder die abgerechneten Minuten. Die Stunden können 24 überschreiten. **Abgerechnet** zeigt den formatierten Endbetrag bei einer Gebühr ungleich null. Ohne Gebühr steht nur die Dauer mittig. Wurde während der Sitzung [das Projekt gewechselt](#das-projekt-einer-laufenden-sitzung-wechseln), gelten beide für die ganze Sitzung: **Dauer** zählt ab ihrem ursprünglichen Start, und **Abgerechnet** addiert die Kosten aller Abschnitte, auch wenn der letzte Abschnitt nichts gekostet hat.
 
 ![Vollbild-Zusammenfassung mit Dauer und Endbetrag](../../_media/attractap/session-summary-billed.png)
 

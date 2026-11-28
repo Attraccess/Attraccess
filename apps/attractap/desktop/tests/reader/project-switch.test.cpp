@@ -9,6 +9,8 @@ void ReaderWorkflow::testProjectSwitch()
         bool offered = true;
         uint32_t projectId = 42;
         const char *projectName = "Werkstattprojekt";
+        uint32_t usageId = 9;
+        bool timed = false; // an automatic end adds "Extend" above the project
     };
     const auto runningList = [&](const Running &running) {
         JsonDocument doc;
@@ -26,7 +28,11 @@ void ReaderWorkflow::testProjectSwitch()
         r["isHealthy"] = true; r["hasIntroduction"] = true; r["maxParallelSessions"] = 1;
         r["canStart"] = false; r["activeSessionCount"] = 1;
         auto own = r["ownUsageSession"].to<JsonObject>();
-        own["id"] = 9; own["user"]["username"] = username.c_str(); own["startTime"] = "2026-01-01T10:00:00Z";
+        own["id"] = running.usageId; own["user"]["username"] = username.c_str(); own["startTime"] = "2026-01-01T10:00:00Z";
+        if (running.timed) {
+            own["autoEndAt"] = "2026-01-01T11:00:00Z"; own["autoEndUtcOffsetMinutes"] = 60;
+            own["autoEndInSeconds"] = 3579; own["extendLimitInSeconds"] = 10779; own["hasMaxSessionTime"] = true;
+        }
         r["activeUsageSession"] = own;
         r["activeUsageSessions"].add(own);
         if (running.offered) {
@@ -169,6 +175,158 @@ void ReaderWorkflow::testProjectSwitch()
     reply(R"("error":"INSUFFICIENT_BALANCE","sumUpEnabled":false)");
     runningList({});
     assert(label(lv_screen_active(), "Unzureichendes Guthaben"));
+    clearStatus();
+    assert(label(lv_screen_active(), "Projekt: Werkstattprojekt"));
+
+
+    // A full page: "No project" and all projects of the page are visible without scrolling.
+    const auto pageReply = [&](unsigned page, const char *search, unsigned total, const std::vector<std::string> &names) {
+        const auto request = server.last("PROJECTS_OF_USER");
+        std::string items;
+        for (size_t i = 0; i < names.size(); ++i)
+            items += std::string(i ? "," : "") + "{\"id\":" + std::to_string(50 + 10 * page + i) + ",\"name\":\"" + names[i] + "\"}";
+        server.push("PROJECTS_OF_USER",
+                    "{\"page\":" + std::to_string(page) + ",\"limit\":4,\"total\":" + std::to_string(total) +
+                        ",\"search\":\"" + search + "\",\"hasMore\":" + (page * 4 < total ? "true" : "false") +
+                        ",\"requestId\":" + std::to_string(request["data"]["payload"]["requestId"].as<uint32_t>()) +
+                        ",\"projects\":[" + items + "]}");
+        pump();
+    };
+    const auto fullyVisible = [](const char *caption) {
+        lv_obj_t *button = buttonOf(lv_screen_active(), caption);
+        if (!button || !lv_obj_is_visible(button)) return false;
+        const lv_area_t area = areaOf(button);
+        for (auto *parent = lv_obj_get_parent(button); parent; parent = lv_obj_get_parent(parent))
+            if (!LayoutCheck::inside(area, areaOf(parent))) return false;
+        return true;
+    };
+    const std::vector<std::string> fullPage = {
+        "Alpha", "Beta", "Ein Projekt mit einem sehr langen Namen, der nicht in eine Zeile passt", "Delta"};
+    runningList({});
+    click("Projekt wechseln");
+    pageReply(1, "", 5, fullPage);
+    assert(fullyVisible("Kein Projekt"));
+    assert(fullyVisible("Alpha") && fullyVisible("Beta") && fullyVisible("Delta"));
+    {
+        // The list holds exactly the page, as before a start: nothing is left to scroll to.
+        lv_obj_t *list = lv_obj_get_parent(buttonOf(lv_screen_active(), "Delta"));
+        lv_obj_update_layout(list);
+        assert(lv_obj_get_child_count(list) == fullPage.size() && lv_obj_get_scroll_bottom(list) <= 0);
+    }
+    display.capture(output, "project-switch-06-full-page");
+
+    // "No project" is not an entry of one page: it stays on later pages and in search results.
+    click("Weiter");
+    pageReply(2, "", 5, {"Epsilon"});
+    assert(fullyVisible("Kein Projekt") && fullyVisible("Epsilon"));
+
+    // Reopening starts on the first page of all projects, whatever was viewed last.
+    const auto reopen = [&] {
+        click("Abbrechen");
+        const auto requests = server.count("PROJECTS_OF_USER");
+        click("Projekt wechseln");
+        assert(server.count("PROJECTS_OF_USER") == requests + 1);
+        const auto request = server.last("PROJECTS_OF_USER");
+        assert(request["data"]["payload"]["page"].as<int>() == 1 && request["data"]["payload"]["search"].isNull());
+        assert(!label(lv_screen_active(), "Epsilon"));
+        pageReply(1, "", 5, fullPage);
+    };
+    reopen();
+    assert(label(lv_screen_active(), "Seite 1 von 2") && fullyVisible("Alpha"));
+    // The same for a search.
+    click("Projekte suchen");
+    {
+        std::function<lv_obj_t *(lv_obj_t *)> keyboardIn = [&](lv_obj_t *root) -> lv_obj_t * {
+            if (lv_obj_has_flag(root, LV_OBJ_FLAG_HIDDEN)) return nullptr;
+            if (lv_obj_check_type(root, &lv_keyboard_class)) return root;
+            for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
+                if (auto *found = keyboardIn(lv_obj_get_child(root, i))) return found;
+            return nullptr;
+        };
+        lv_obj_t *keyboard = keyboardIn(lv_screen_active());
+        assert(keyboard);
+        lv_textarea_set_text(lv_keyboard_get_textarea(keyboard), "eps");
+        lv_obj_send_event(keyboard, LV_EVENT_READY, nullptr);
+        pump();
+    }
+    pageReply(1, "eps", 1, {"Epsilon"});
+    assert(fullyVisible("Kein Projekt") && fullyVisible("Epsilon"));
+    reopen();
+    assert(label(lv_screen_active(), "Projekte suchen") && fullyVisible("Alpha"));
+    click("Abbrechen");
+
+    // A long project name ends in dots on one line, so a timed session still shows "End session" completely.
+    const char *longName = "Ein Projekt mit einem sehr langen Namen für schmale Bildschirme ÄÖÜ";
+    runningList({true, 42, longName, 9, true});
+    {
+        std::function<lv_obj_t *(lv_obj_t *)> projectLine = [&](lv_obj_t *root) -> lv_obj_t * {
+            if (lv_obj_check_type(root, &lv_label_class) && std::string(lv_label_get_text(root)).rfind("Projekt: ", 0) == 0)
+                return root;
+            for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
+                if (auto *found = projectLine(lv_obj_get_child(root, i))) return found;
+            return nullptr;
+        };
+        lv_obj_t *line = projectLine(lv_screen_active());
+        assert(line);
+        lv_obj_update_layout(line);
+        const auto *font = lv_obj_get_style_text_font(line, LV_PART_MAIN);
+        assert(lv_obj_get_height(line) == lv_font_get_line_height(font));
+        const std::string shownText = lv_label_get_text(line);
+        assert(shownText.size() > 3 && shownText.compare(shownText.size() - 3, 3, "...") == 0);
+    }
+    assert(fullyVisible("Sitzung beenden"));
+    display.capture(output, "project-switch-07-long-name");
+    // A short name after a long one is shown in full again.
+    runningList({true, 43, "Zweitprojekt", 9, true});
+    assert(label(lv_screen_active(), "Projekt: Zweitprojekt"));
+
+    // The picker closes when its session is no longer offered for a switch, or is another one (it ended, or was
+    // switched elsewhere). A refresh that changes neither leaves it open.
+    const auto onDetails = [] { return lv_screen_active() == Display::resourceDetailsScreen.getScreen(); };
+    const auto switchesBefore = server.count("SWITCH_SESSION_PROJECT");
+    runningList({});
+    openPicker();
+    runningList({});
+    assert(lv_screen_active() == Display::projectSelectScreen.getScreen());
+    runningList({false});
+    assert(onDetails());
+    runningList({});
+    openPicker();
+    runningList({true, 43, "Zweitprojekt", 20});
+    assert(onDetails() && label(lv_screen_active(), "Projekt: Zweitprojekt"));
+    assert(server.count("SWITCH_SESSION_PROJECT") == switchesBefore);
+
+    // So do the usage forms of a switch: the draft is cancelled and the switch is not sent again.
+    runningList({});
+    openPicker();
+    click("Zweitprojekt");
+    server.push("RESOURCE_USAGE_FORM_REQUEST",
+                "{\"requestId\":" + std::to_string(requestIdOf("SWITCH_SESSION_PROJECT")) +
+                    R"(,"resourceId":1,"action":"project-switch","forms":[{"id":8,"name":"Wechselprotokoll","fieldCount":1}]})");
+    pump();
+    assert(lv_screen_active() == Display::formsScreen.getScreen());
+    runningList({});
+    assert(lv_screen_active() == Display::formsScreen.getScreen());
+    const auto cancels = server.count("RESOURCE_USAGE_FORM_CANCEL");
+    runningList({true, 43, "Zweitprojekt", 21});
+    assert(onDetails());
+    assert(server.count("RESOURCE_USAGE_FORM_CANCEL") == cancels + 1);
+    {
+        const auto cancel = server.last("RESOURCE_USAGE_FORM_CANCEL");
+        assert(std::string(cancel["data"]["payload"]["action"].as<const char *>()) == "project-switch");
+    }
+    assert(server.count("SWITCH_SESSION_PROJECT") == switchesBefore + 1);
+    // The row requested after the cancel unblocks the details.
+    runningList({true, 43, "Zweitprojekt", 21});
+    assert(label(lv_screen_active(), "Projekt: Zweitprojekt"));
+
+    // A switch already sent is left alone: the refreshed row may arrive before its answer.
+    openPicker();
+    click("Werkstattprojekt");
+    runningList({true, 42, "Werkstattprojekt", 22});
+    reply(R"("success":true,"usageId":22,"projectName":"Werkstattprojekt")");
+    runningList({true, 42, "Werkstattprojekt", 22});
+    assert(label(lv_screen_active(), "Projekt gewechselt") && label(lv_screen_active(), "Werkstattprojekt"));
     clearStatus();
     assert(label(lv_screen_active(), "Projekt: Werkstattprojekt"));
 
