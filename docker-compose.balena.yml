@@ -89,14 +89,20 @@ services:
       - .env.docker-compose
     # Attraccess only starts once the backup service reports its settings as present and valid (or BACKUP_DISABLED=true):
     # a device without backups must not go unnoticed. The backup service writes /backup-status/status after checking its
-    # settings (not the target, so a boot without internet still starts) and removes it when it stops. Overriding the entrypoint drops the image's CMD, so the
-    # command is repeated here. (No `$` on purpose: balena does not interpolate.)
+    # settings (not the target, so a boot without internet still starts) and removes it when it stops. Overriding the
+    # entrypoint drops the image's CMD, so the command is repeated here. (No `$` on purpose: balena does not interpolate.)
+    # It checks every 2 s, so a normal boot, where both services start together, does not wait long, and it logs only
+    # every 30 s. The trap lets `docker stop` end the wait at once (sh as PID 1 ignores TERM without one).
     entrypoint: ['/bin/sh', '-c']
     command:
       - >
-        while [ ! -s /backup-status/status ]; do
-          echo 'attraccess: waiting for the backup service - backups are not set up. Configure BACKUP_REPOSITORY and BACKUP_PASSWORD, or set BACKUP_DISABLED=true (docs: installation/backup-restore).';
-          sleep 30;
+        trap 'exit 0' TERM INT;
+        until [ -s /backup-status/status ]; do
+          for wait_step in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+            [ -s /backup-status/status ] && break;
+            sleep 2 & wait;
+          done;
+          [ -s /backup-status/status ] || echo 'attraccess: waiting for the backup service - it has no valid backup settings yet. The log of the backup service names the missing or invalid setting. Fix it, or set BACKUP_DISABLED=true to run without backups. Docs: https://docs.attraccess.org/#/en/installation/backup-restore?id=balena-restic-sidecar';
         done;
         if grep -qx disabled /backup-status/status; then echo 'attraccess: WARNING - backups are disabled (BACKUP_DISABLED=true).'; fi;
         exec /entrypoint.sh node dist/apps/api/main.js
@@ -331,7 +337,8 @@ services:
   # Without its settings this service exits with an error and the attraccess service does not start: set
   # BACKUP_REPOSITORY, BACKUP_PASSWORD and the target's credentials (e.g. AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY) as
   # balena device variables, or BACKUP_DISABLED=true to run without backups on purpose. Optional: BACKUP_SCHEDULE
-  # (cron, default '0 3 * * *'), BACKUP_KEEP_DAILY/WEEKLY/MONTHLY (7/4/6) and BACKUP_MAX_AGE_HOURS (30, BackupTooOld).
+  # (cron, default '0 3 * * *'), BACKUP_KEEP_DAILY/WEEKLY/MONTHLY (7/4/6), BACKUP_MAX_AGE_HOURS (30, BackupTooOld) and
+  # BACKUP_CONNECT_TIMEOUT_SECONDS (120); the start checks the values of the schedule, max age and timeout.
   # It writes backup.prom (metrics) to the backup-status volume; node-exporter publishes it for the Grafana backup alerts.
   # One repository per device: BACKUP_REPOSITORY as a fleet variable would share it; then set BACKUP_HOST per device.
   # Restore (stop the other services first): `docker compose run --rm backup restore [snapshot]`, on a balena device

@@ -28,7 +28,7 @@ idle_disabled() {
 not_configured() {
   set_state mode unconfigured
   write_metrics
-  fail "$1 - backups are NOT set up, so Attraccess will not start. Configure the backup (docker/backup/README.md) or set BACKUP_DISABLED=true to run without backups on purpose."
+  fail "$1 - backups are NOT set up, so Attraccess will not start. Configure the backup (https://docs.attraccess.org/#/en/installation/backup-restore?id=balena-restic-sidecar) or set BACKUP_DISABLED=true to run without backups on purpose."
 }
 
 case "${1:-run}" in
