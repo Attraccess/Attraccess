@@ -67,27 +67,31 @@ function MaintenanceCheckContent({
         )}
       </ModalBody>
 
-      <ModalFooter className="flex-wrap">
-        <Button variant="ghost" onPress={onCancel}>
-          {t('cancel')}
-        </Button>
-        {askingReason ? (
+      {askingReason ? (
+        <ModalFooter>
+          <Button variant="ghost" onPress={onCancel}>
+            {t('cancel')}
+          </Button>
           <Button variant="primary" isDisabled={!isReasonValid} onPress={() => onNeedsMaintenance(reason.trim())}>
             {t('continue')}
           </Button>
-        ) : (
-          <>
-            <Button variant="secondary" onPress={() => setAskingReason(true)}>
-              <MessageSquareWarningIcon className="w-4 h-4" />
-              {t('needsMaintenance')}
-            </Button>
-            <Button variant="primary" onPress={onMachineOk}>
-              <CheckCircle2 className="w-4 h-4" />
-              {t('machineOk')}
-            </Button>
-          </>
-        )}
-      </ModalFooter>
+        </ModalFooter>
+      ) : (
+        // Stacked: the three buttons do not fit one row, least of all in German or on a phone.
+        <ModalFooter className="flex-col">
+          <Button fullWidth variant="primary" onPress={onMachineOk}>
+            <CheckCircle2 className="w-4 h-4" />
+            {t('machineOk')}
+          </Button>
+          <Button fullWidth variant="secondary" onPress={() => setAskingReason(true)}>
+            <MessageSquareWarningIcon className="w-4 h-4" />
+            {t('needsMaintenance')}
+          </Button>
+          <Button fullWidth variant="ghost" onPress={onCancel}>
+            {t('cancel')}
+          </Button>
+        </ModalFooter>
+      )}
     </>
   );
 }
