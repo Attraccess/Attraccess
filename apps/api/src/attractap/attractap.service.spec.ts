@@ -9,6 +9,7 @@ import { CoredumpSymbolicationService } from './coredump-symbolication.service';
 import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../notifications/notification-types';
 import { AttractapFirmwareService } from './firmware.service';
+import { CardAlreadyEnrolledError } from './card-store.port';
 import {
   FakeCardStore,
   FakeCrashReportStore,
@@ -93,6 +94,18 @@ describe.each(['en', 'de', 'de-DE', undefined, 'fr'])('AttractapService RFID car
         ? 'RFID-Karte #7 wurde für dein Konto registriert.'
         : 'RFID card #7 was registered for your account.',
     );
+  });
+
+  it('notifies nobody and switches nothing off when another record holds the UID in another letter case', async () => {
+    // The store's own create: the seeded card holds 04AABBCC.
+    jest.mocked(cards.create).mockRestore();
+
+    await expect(service.createNFCCard(user, { uid: '04aabbcc', key: 'secret', keyNo: 1 })).rejects.toBeInstanceOf(
+      CardAlreadyEnrolledError,
+    );
+
+    expect(notifications.dispatch).not.toHaveBeenCalled();
+    expect(cards.cards.map((card) => [card.id, card.isActive])).toEqual([[7, true]]);
   });
 
   it('notifies the card owner when an RFID card is activated', async () => {

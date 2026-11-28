@@ -9,6 +9,15 @@ export function postgresErrorCode(error: unknown): string | undefined {
   return candidates.find((code): code is string => typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code));
 }
 
+/** The constraint (or index) a pg error names: on the driver error, or copied onto TypeORM's QueryFailedError. */
+export function postgresConstraintName(error: unknown): string | undefined {
+  const candidates = [
+    (error as { driverError?: { constraint?: unknown } })?.driverError?.constraint,
+    (error as { constraint?: unknown })?.constraint,
+  ];
+  return candidates.find((name): name is string => typeof name === 'string' && name.length > 0);
+}
+
 /**
  * What pg-pool rejects `connect()` with when every pooled connection stayed checked out past `connectionTimeoutMillis`
  * (TypeORM's `connectTimeoutMS`). It has no SQLSTATE; the message is pg-pool's own and contains nothing of the query.
@@ -60,6 +69,7 @@ export const postgresErrorClassifier: PersistenceErrorClassifier = {
     return undefined;
   },
   diagnosticCode: postgresErrorCode,
+  constraintName: postgresConstraintName,
   isSafeToRetry(error: unknown): boolean {
     const code = postgresErrorCode(error);
     return code !== undefined && SAFE_TO_RETRY.has(code);
