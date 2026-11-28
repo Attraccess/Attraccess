@@ -225,4 +225,11 @@ export class TypeOrmResourceGroupIntroducerStore implements ResourceGroupIntrodu
   async remove(grantId: number): Promise<void> {
     await this.repository.delete({ id: grantId });
   }
+
+  async findGroupName(groupId: number): Promise<string | null> {
+    const group = await this.dataSource
+      .getRepository(ResourceGroup)
+      .findOne({ where: { id: groupId }, select: { id: true, name: true } });
+    return group?.name ?? null;
+  }
 }

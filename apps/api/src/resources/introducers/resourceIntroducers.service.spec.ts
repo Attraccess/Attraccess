@@ -8,6 +8,8 @@ import { fakeTransactionScope } from '../../database/fake-transaction-scope.test
 
 type User = { locale: string };
 
+const flushNotifications = () => new Promise((resolve) => setImmediate(resolve));
+
 describe('ResourceIntroducersService', () => {
   const fixture = registerResourceIntroducersServiceFixture();
 
@@ -204,7 +206,7 @@ describe('ResourceIntroducersService', () => {
       );
 
       const result = await fixture.service.grant(1, 2, ResourceIntroducerType.MAINTAINER);
-      await Promise.resolve(); // flush notification promise chain
+      await flushNotifications();
 
       expect(fixture.store.insert).toHaveBeenCalledWith(1, 2, ResourceIntroducerType.MAINTAINER);
       expect(result.type).toBe(ResourceIntroducerType.MAINTAINER);
@@ -222,15 +224,16 @@ describe('ResourceIntroducersService', () => {
       const request = fixture.notifications.dispatchToUser.mock.calls[0][1];
       const enUser = { locale: 'en' } as User;
       expect(request.title(enUser)).toBe('Your resource access changed');
-      expect(request.body(enUser)).toBe('You were made a maintainer for resource #1.');
-      await request.sendEmail({ id: 2, email: 'user@example.com', locale: 'en' } as User);
+      expect(request.body(enUser)).toBe('You were made a maintainer for resource "Laser Cutter".');
+      expect(fixture.store.findResourceName).toHaveBeenCalledWith(1);
+      await request.sendEmail({ id: 2, email: 'user@example.com', locale: 'en' } as User, 'en');
       expect(fixture.notifications.sendEmailTemplate).toHaveBeenCalledWith(
         expect.objectContaining({ id: 2 }),
         NotificationCategory.ACCESS_CHANGES,
         {
           accessChange: {
             title: 'Your resource access changed',
-            body: 'You were made a maintainer for resource #1.',
+            body: 'You were made a maintainer for resource "Laser Cutter".',
             url: '/resources/1',
           },
         },
@@ -243,11 +246,16 @@ describe('ResourceIntroducersService', () => {
       );
 
       await fixture.service.grant(1, 2);
-      await Promise.resolve(); // flush notification promise chain
+      await flushNotifications();
 
       expect(fixture.store.insert).toHaveBeenCalledWith(1, 2, ResourceIntroducerType.INTRODUCER);
       const defaultsReq = fixture.notifications.dispatchToUser.mock.calls[0][1];
-      expect(defaultsReq.body({ locale: 'en' } as User)).toBe('You were made an introducer for resource #1.');
+      expect(defaultsReq.body({ locale: 'en' } as User)).toBe(
+        'You were made an introducer for resource "Laser Cutter".',
+      );
+      expect(defaultsReq.body({ locale: 'de' } as User)).toBe(
+        'Du wurdest zum Einweiser für die Ressource „Laser Cutter“ ernannt.',
+      );
     });
 
     it('creates a second row when the user already holds the other role', async () => {
@@ -259,7 +267,7 @@ describe('ResourceIntroducersService', () => {
       );
 
       const result = await fixture.service.grant(1, 2, ResourceIntroducerType.INTRODUCER);
-      await Promise.resolve(); // flush notification promise chain
+      await flushNotifications();
 
       expect(result.type).toBe(ResourceIntroducerType.INTRODUCER);
       expect(fixture.store.findDirect).toHaveBeenCalledWith(1, 2, ResourceIntroducerType.INTRODUCER, undefined);
@@ -300,7 +308,7 @@ describe('ResourceIntroducersService', () => {
       );
 
       await fixture.service.revoke(1, 2, ResourceIntroducerType.MAINTAINER);
-      await Promise.resolve(); // flush notification promise chain
+      await flushNotifications();
 
       expect(fixture.store.findDirect).toHaveBeenCalledWith(1, 2, ResourceIntroducerType.MAINTAINER, undefined);
       expect(fixture.store.remove).toHaveBeenCalledWith(8);
@@ -309,7 +317,23 @@ describe('ResourceIntroducersService', () => {
       expect(revokeReq.category).toBe(NotificationCategory.ACCESS_CHANGES);
       expect(fixture.notifications.dispatchToUser.mock.calls[0][0]).toBe(2);
       expect(revokeReq.url).toBe('/resources/1');
-      expect(revokeReq.body({ locale: 'en' } as User)).toBe('Your maintainer status for resource #1 was revoked.');
+      expect(revokeReq.body({ locale: 'en' } as User)).toBe(
+        'Your maintainer status for resource "Laser Cutter" was revoked.',
+      );
+      expect(revokeReq.body({ locale: 'de' } as User)).toBe(
+        'Dein Betreuer-Status für die Ressource „Laser Cutter“ wurde entzogen.',
+      );
+    });
+
+    it('falls back to #<id> when the resource is gone', async () => {
+      fixture.store.findResourceName.mockResolvedValue(null);
+      fixture.store.findDirect.mockResolvedValue(grantRecord({ id: 8, userId: 2 }));
+
+      await fixture.service.revoke(1, 2);
+      await flushNotifications();
+
+      const revokeReq = fixture.notifications.dispatchToUser.mock.calls[0][1];
+      expect(revokeReq.body({ locale: 'en' } as User)).toBe('Your introducer status for resource "#1" was revoked.');
     });
 
     it('does nothing when there is no grant', async () => {

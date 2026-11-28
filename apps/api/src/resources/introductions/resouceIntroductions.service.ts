@@ -18,7 +18,13 @@ import { ResourceRetrainingService } from '../retraining/resourceRetraining.serv
 
 import { AuditActor } from '../../audit/recorder/audit-event';
 
-import { NotificationCategory } from '../../notifications/notification-types';
+import { dispatchAccessChange, nameForAccessChange } from '../access-change-notification';
+
+import { createTranslator } from '../../i18n/translate';
+
+import * as de from './resourceIntroductions.de.json';
+
+import * as en from './resourceIntroductions.en.json';
 
 import { UpdateResourceIntroductionDto } from './dtos/update.request.dto';
 
@@ -28,6 +34,8 @@ import type { AuthenticationMethod } from '@attraccess/application-models';
 import { RESOURCE_INTRODUCTION_STORE, type ResourceIntroductionStore } from './resource-introduction-store.port';
 
 import type { ResourcePersistenceContext } from '../resource-persistence-context';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class ResourceIntroductionsService {
@@ -121,24 +129,18 @@ export class ResourceIntroductionsService {
   }
 
   protected notifyIntroductionChange(resourceId: number, userId: number, granted: boolean): void {
-    const title = 'Your resource access changed';
-    const body = granted
-      ? `You received an introduction for resource #${resourceId}.`
-      : `Your introduction for resource #${resourceId} was revoked.`;
-    const url = `/resources/${resourceId}`;
+    const bodyKey = granted ? 'granted' : 'revoked';
 
-    void this.notifications
-      .dispatchToUser(userId, {
-        category: NotificationCategory.ACCESS_CHANGES,
-        title,
-        body,
-        url,
-        dedupeKey: `resource-introduction-${resourceId}-${userId}-${granted ? 'granted' : 'revoked'}`,
-        sendEmail: (recipient) =>
-          this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
-            accessChange: { title, body, url },
-          }),
-      })
+    void nameForAccessChange(resourceId, (id) => this.store.findResourceName(id), this.logger)
+      .then((resourceName) =>
+        dispatchAccessChange(this.notifications, {
+          userId,
+          title: (language) => t(language, 'title'),
+          body: (language) => t(language, bodyKey, { resourceName }),
+          url: `/resources/${resourceId}`,
+          dedupeKey: `resource-introduction-${resourceId}-${userId}-${bodyKey}`,
+        }),
+      )
       .catch((error) => {
         this.logger.error(
           `Failed to notify user ${userId} about resource introduction changes: ${(error as Error).message}`,

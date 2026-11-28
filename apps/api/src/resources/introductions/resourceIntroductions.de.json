@@ -1,0 +1,5 @@
+{
+  "title": "Dein Ressourcenzugriff hat sich geändert",
+  "granted": "Du hast eine Einweisung für die Ressource „{resourceName}“ erhalten.",
+  "revoked": "Deine Einweisung für die Ressource „{resourceName}“ wurde widerrufen."
+}

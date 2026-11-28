@@ -16,7 +16,13 @@ import { ResourceRetrainingService } from '../../retraining/resourceRetraining.s
 
 import { AuditActor } from '../../../audit/recorder/audit-event';
 
-import { NotificationCategory } from '../../../notifications/notification-types';
+import { dispatchAccessChange, nameForAccessChange } from '../../access-change-notification';
+
+import { createTranslator } from '../../../i18n/translate';
+
+import * as de from './resourceGroups.introductions.de.json';
+
+import * as en from './resourceGroups.introductions.en.json';
 
 import { UpdateResourceGroupIntroductionDto } from './dtos/update.request.dto';
 
@@ -29,6 +35,8 @@ import {
 } from '../../introductions/resource-introduction-store.port';
 
 import type { ResourcePersistenceContext } from '../../resource-persistence-context';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class ResourceGroupsIntroductionsService {
@@ -74,24 +82,18 @@ export class ResourceGroupsIntroductionsService {
   }
 
   protected notifyIntroductionChange(groupId: number, userId: number, granted: boolean): void {
-    const title = 'Your group access changed';
-    const body = granted
-      ? `You received an introduction for group #${groupId}.`
-      : `Your introduction for group #${groupId} was revoked.`;
-    const url = `/resource-groups/${groupId}`;
+    const bodyKey = granted ? 'granted' : 'revoked';
 
-    void this.notifications
-      .dispatchToUser(userId, {
-        category: NotificationCategory.ACCESS_CHANGES,
-        title,
-        body,
-        url,
-        dedupeKey: `group-introduction-${groupId}-${userId}-${granted ? 'granted' : 'revoked'}`,
-        sendEmail: (recipient) =>
-          this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
-            accessChange: { title, body, url },
-          }),
-      })
+    void nameForAccessChange(groupId, (id) => this.store.findGroupName(id), this.logger)
+      .then((groupName) =>
+        dispatchAccessChange(this.notifications, {
+          userId,
+          title: (language) => t(language, 'title'),
+          body: (language) => t(language, bodyKey, { groupName }),
+          url: `/resource-groups/${groupId}`,
+          dedupeKey: `group-introduction-${groupId}-${userId}-${bodyKey}`,
+        }),
+      )
       .catch((error) => {
         this.logger.error(
           `Failed to notify user ${userId} about group introduction changes: ${(error as Error).message}`,

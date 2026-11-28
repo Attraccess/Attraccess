@@ -1,0 +1,7 @@
+{
+  "title": "Your group access changed",
+  "grantedMaintainer": "You were made a maintainer for group \"{groupName}\".",
+  "grantedIntroducer": "You were made an introducer for group \"{groupName}\".",
+  "revokedMaintainer": "Your maintainer status for group \"{groupName}\" was revoked.",
+  "revokedIntroducer": "Your introducer status for group \"{groupName}\" was revoked."
+}

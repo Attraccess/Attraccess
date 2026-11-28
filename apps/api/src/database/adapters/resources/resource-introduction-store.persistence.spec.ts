@@ -108,6 +108,10 @@ describe('introduction stores on real PostgreSQL', () => {
     expect(await targets.resourceIdsOfGroup(group.id)).toEqual([resourceId]);
     expect(await targets.findResourceName(resourceId)).toEqual({ id: resourceId, name: 'Laser' });
     expect(await targets.findGroupName(999)).toBeNull();
+    expect(await store.findResourceName(resourceId)).toBe('Laser');
+    expect(await store.findResourceName(999)).toBeNull();
+    expect(await store.findGroupName(group.id)).toBe('Wood shop');
+    expect(await store.findGroupName(999)).toBeNull();
   });
 
   it('reads retraining data and the latest grant on the connection of the caller transaction', async () => {

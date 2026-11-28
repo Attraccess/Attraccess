@@ -66,4 +66,10 @@ export interface ResourceIntroductionStore {
   markRetrainingRequiredAudited(introductionId: number, at: Date): Promise<void>;
 
   markRetrainingNotified(introductionId: number, at: Date): Promise<void>;
+
+  /** The resource's name, or null when it does not exist. */
+  findResourceName(resourceId: number): Promise<string | null>;
+
+  /** The resource group's name, or null when it does not exist. */
+  findGroupName(groupId: number): Promise<string | null>;
 }

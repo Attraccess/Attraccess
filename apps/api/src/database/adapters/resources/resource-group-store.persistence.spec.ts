@@ -120,5 +120,7 @@ describe('resource group stores on real PostgreSQL', () => {
 
     await introducers.remove(grant.id);
     expect(await introducers.list(group.id)).toEqual([]);
+    expect(await introducers.findGroupName(group.id)).toBe('Wood');
+    expect(await introducers.findGroupName(999)).toBeNull();
   });
 });

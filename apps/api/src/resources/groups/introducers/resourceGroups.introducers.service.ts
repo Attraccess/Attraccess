@@ -3,8 +3,13 @@ import { ResourceIntroducerType, type ResourceIntroducerRecord } from '@attracce
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ResourceGroupIntroducerChangedEvent } from './events/resource-group-introducer-changed.event';
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
-import { NotificationCategory } from '../../../notifications/notification-types';
+import { dispatchAccessChange, nameForAccessChange } from '../../access-change-notification';
+import { createTranslator } from '../../../i18n/translate';
+import * as de from './resourceGroups.introducers.de.json';
+import * as en from './resourceGroups.introducers.en.json';
 import { RESOURCE_GROUP_INTRODUCER_STORE, type ResourceGroupIntroducerStore } from '../resource-group-store.port';
+
+const t = createTranslator({ en, de });
 
 @Injectable()
 export class ResourceGroupsIntroducersService {
@@ -19,25 +24,19 @@ export class ResourceGroupsIntroducersService {
   ) {}
 
   private notifyAccessChange(groupId: number, userId: number, type: ResourceIntroducerType, granted: boolean): void {
-    const role = type === ResourceIntroducerType.MAINTAINER ? 'maintainer' : 'introducer';
-    const title = 'Your group access changed';
-    const body = granted
-      ? `You were made an ${role} for group #${groupId}.`.replace('an maintainer', 'a maintainer')
-      : `Your ${role} status for group #${groupId} was revoked.`;
-    const url = `/resource-groups/${groupId}`;
+    const role = type === ResourceIntroducerType.MAINTAINER ? 'Maintainer' : 'Introducer';
+    const bodyKey = `${granted ? 'granted' : 'revoked'}${role}`;
 
-    void this.notifications
-      .dispatchToUser(userId, {
-        category: NotificationCategory.ACCESS_CHANGES,
-        title,
-        body,
-        url,
-        dedupeKey: `group-access-${groupId}-${userId}-${role}-${granted ? 'granted' : 'revoked'}`,
-        sendEmail: (recipient) =>
-          this.notifications.sendEmailTemplate(recipient, NotificationCategory.ACCESS_CHANGES, {
-            accessChange: { title, body, url },
-          }),
-      })
+    void nameForAccessChange(groupId, (id) => this.store.findGroupName(id), this.logger)
+      .then((groupName) =>
+        dispatchAccessChange(this.notifications, {
+          userId,
+          title: (language) => t(language, 'title'),
+          body: (language) => t(language, bodyKey, { groupName }),
+          url: `/resource-groups/${groupId}`,
+          dedupeKey: `group-access-${groupId}-${userId}-${role.toLowerCase()}-${granted ? 'granted' : 'revoked'}`,
+        }),
+      )
       .catch((error) => {
         this.logger.error(`Failed to notify user ${userId} about group access changes: ${(error as Error).message}`);
       });

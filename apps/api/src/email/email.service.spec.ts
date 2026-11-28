@@ -166,7 +166,7 @@ describe('EmailService', () => {
 
     await service.sendAccessChangeEmail(user, {
       title: 'Your resource access changed',
-      body: 'You were made an introducer for resource #7.',
+      body: 'You were made an introducer for resource Laser Cutter.',
       url: '/resources/7',
     });
 
@@ -175,7 +175,7 @@ describe('EmailService', () => {
     expect(callArg.to).toBe('dana@example.com');
     expect(callArg.subject).toBe('Your resource access changed');
     expect(callArg.html).toContain('Hello dana');
-    expect(callArg.html).toContain('You were made an introducer for resource #7.');
+    expect(callArg.html).toContain('You were made an introducer for resource Laser Cutter.');
     expect(callArg.html).toContain('https://frontend.example/resources/7');
   });
 
@@ -185,7 +185,7 @@ describe('EmailService', () => {
 
     await service.sendAccessChangeEmail({ id: 7 } as NotificationRecipient, {
       title: 'Your group access changed',
-      body: 'You received an introduction for group #5.',
+      body: 'You received an introduction for group Wood shop.',
       url: '/resource-groups/5',
     });
 
@@ -194,6 +194,20 @@ describe('EmailService', () => {
     expect(callArg.to).toBe('riley@example.com');
     expect(callArg.html).toContain('Hello riley');
     expect(callArg.html).toContain('https://frontend.example/resource-groups/5');
+  });
+
+  it('escapes a resource name in the access change email body (#2313)', async () => {
+    const { service, sendMail } = scope.setup();
+
+    await service.sendAccessChangeEmail(scope.makeUser({ username: 'dana' }), {
+      title: 'Your resource access changed',
+      body: 'You received an introduction for resource "<b>Saw & Co</b>".',
+      url: '/resources/7',
+    });
+
+    const callArg = (sendMail as jest.Mock).mock.calls[0][0];
+    expect(callArg.html).toContain('&quot;&lt;b&gt;Saw &amp; Co&lt;/b&gt;&quot;');
+    expect(callArg.html).not.toContain('<b>Saw');
   });
 
   it('sends resource session ended email with resource URL and actor context', async () => {

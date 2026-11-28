@@ -1,7 +1,12 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
-import { ResourceIntroduction, ResourceIntroductionHistoryItem } from '@attraccess/database-entities';
+import {
+  Resource,
+  ResourceGroup,
+  ResourceIntroduction,
+  ResourceIntroductionHistoryItem,
+} from '@attraccess/database-entities';
 import {
   IntroductionHistoryAction,
   type IntroductionHistoryRecord,
@@ -202,5 +207,19 @@ export class TypeOrmResourceIntroductionStore implements ResourceIntroductionSto
 
   async markRetrainingNotified(introductionId: number, at: Date): Promise<void> {
     await this.introductions.update(introductionId, { retrainingNotifiedAt: at });
+  }
+
+  async findResourceName(resourceId: number): Promise<string | null> {
+    const resource = await this.dataSource
+      .getRepository(Resource)
+      .findOne({ where: { id: resourceId }, select: { id: true, name: true } });
+    return resource?.name ?? null;
+  }
+
+  async findGroupName(groupId: number): Promise<string | null> {
+    const group = await this.dataSource
+      .getRepository(ResourceGroup)
+      .findOne({ where: { id: groupId }, select: { id: true, name: true } });
+    return group?.name ?? null;
   }
 }

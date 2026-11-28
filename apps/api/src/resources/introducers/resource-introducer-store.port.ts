@@ -39,4 +39,7 @@ export interface ResourceIntroducerStore {
   insert(resourceId: number, userId: number, type: ResourceIntroducerType): Promise<ResourceIntroducerRecord>;
 
   remove(grantId: number): Promise<void>;
+
+  /** The resource's name, or null when it does not exist. */
+  findResourceName(resourceId: number): Promise<string | null>;
 }

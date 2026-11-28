@@ -8,6 +8,8 @@ import { NotificationCategory } from '../../../notifications/notification-types'
 import { RESOURCE_INTRODUCTION_STORE } from '../../introductions/resource-introduction-store.port';
 import { ResourceRetrainingService } from '../../retraining/resourceRetraining.service';
 
+const flushNotifications = () => new Promise((resolve) => setImmediate(resolve));
+
 describe('ResourceGroupsIntroductionsService notifications', () => {
   let service: ResourceGroupsIntroductionsService;
   let store: Record<string, jest.Mock>;
@@ -31,6 +33,7 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
       })),
       listForGroup: jest.fn(),
       historyOfGroupUser: jest.fn(),
+      findGroupName: jest.fn().mockResolvedValue('Wood shop'),
     };
     notifications = { dispatchToUser: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
     retraining = { getIntroductionRetrainingStatus: jest.fn().mockResolvedValue({ isDue: false }) };
@@ -51,31 +54,54 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
     audit.record.mockClear();
   });
 
-  it('notifies the user when a group introduction is granted', async () => {
-    await service.grant(5, 3);
+  const texts = (locale: string) => {
+    const request = notifications.dispatchToUser.mock.calls[0][1];
+    return { title: request.title({ locale }), body: request.body({ locale }) };
+  };
 
+  it('notifies the user with the group name when a group introduction is granted', async () => {
+    await service.grant(5, 3);
+    await flushNotifications();
+
+    expect(store.findGroupName).toHaveBeenCalledWith(5);
     expect(notifications.dispatchToUser).toHaveBeenCalledWith(
       3,
       expect.objectContaining({
         category: NotificationCategory.ACCESS_CHANGES,
-        title: 'Your group access changed',
-        body: 'You received an introduction for group #5.',
         url: '/resource-groups/5',
+        dedupeKey: 'group-introduction-5-3-granted',
       }),
     );
+    expect(texts('en')).toEqual({
+      title: 'Your group access changed',
+      body: 'You received an introduction for group "Wood shop".',
+    });
+    expect(texts('de')).toEqual({
+      title: 'Dein Gruppenzugriff hat sich geändert',
+      body: 'Du hast eine Einweisung für die Gruppe „Wood shop“ erhalten.',
+    });
     const request = notifications.dispatchToUser.mock.calls[0][1];
-    await request.sendEmail({ id: 3, email: 'user@example.com' });
+    await request.sendEmail({ id: 3, email: 'user@example.com' }, 'de');
     expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(
       expect.objectContaining({ id: 3 }),
       NotificationCategory.ACCESS_CHANGES,
       {
         accessChange: {
-          title: 'Your group access changed',
-          body: 'You received an introduction for group #5.',
+          title: 'Dein Gruppenzugriff hat sich geändert',
+          body: 'Du hast eine Einweisung für die Gruppe „Wood shop“ erhalten.',
           url: '/resource-groups/5',
         },
       },
     );
+  });
+
+  it('falls back to #<id> when the group no longer exists', async () => {
+    store.findGroupName.mockResolvedValue(null);
+
+    await service.grant(5, 3);
+    await flushNotifications();
+
+    expect(texts('en').body).toBe('You received an introduction for group "#5".');
   });
 
   it('records the acting user for a granted introduction', async () => {
@@ -149,16 +175,18 @@ describe('ResourceGroupsIntroductionsService notifications', () => {
     store.lastHistoryItem.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });
 
     await service.revoke(5, 3);
+    await flushNotifications();
 
     expect(notifications.dispatchToUser).toHaveBeenCalledWith(
       3,
       expect.objectContaining({
         category: NotificationCategory.ACCESS_CHANGES,
-        body: 'Your introduction for group #5 was revoked.',
         url: '/resource-groups/5',
         sendEmail: expect.any(Function),
       }),
     );
+    expect(texts('en').body).toBe('Your introduction for group "Wood shop" was revoked.');
+    expect(texts('de').body).toBe('Deine Einweisung für die Gruppe „Wood shop“ wurde widerrufen.');
   });
 
   it('does not notify when a group introduction is revoked twice without an effective access change', async () => {

@@ -6,9 +6,11 @@ import { NotificationDispatchService } from '../../../notifications/notification
 import { RESOURCE_GROUP_INTRODUCER_STORE } from '../resource-group-store.port';
 import { NotificationCategory } from '../../../notifications/notification-types';
 
+const flushNotifications = () => new Promise((resolve) => setImmediate(resolve));
+
 describe('ResourceGroupsIntroducersService notifications', () => {
   let service: ResourceGroupsIntroducersService;
-  let repository: { list: jest.Mock; find: jest.Mock; insert: jest.Mock; remove: jest.Mock };
+  let repository: { list: jest.Mock; find: jest.Mock; insert: jest.Mock; remove: jest.Mock; findGroupName: jest.Mock };
   let notifications: { dispatchToUser: jest.Mock };
 
   beforeEach(async () => {
@@ -17,6 +19,7 @@ describe('ResourceGroupsIntroducersService notifications', () => {
       find: jest.fn().mockResolvedValue(null),
       insert: jest.fn().mockImplementation(async (groupId, userId, type) => ({ id: 1, userId, type })),
       remove: jest.fn().mockResolvedValue(undefined),
+      findGroupName: jest.fn().mockResolvedValue('Wood shop'),
     };
     notifications = { dispatchToUser: jest.fn().mockResolvedValue(undefined) };
 
@@ -32,33 +35,58 @@ describe('ResourceGroupsIntroducersService notifications', () => {
     service = module.get(ResourceGroupsIntroducersService);
   });
 
-  it('notifies the user when group maintainer status is granted', async () => {
+  const texts = (locale: string) => {
+    const request = notifications.dispatchToUser.mock.calls[0][1];
+    return { title: request.title({ locale }), body: request.body({ locale }) };
+  };
+
+  it('notifies the user with the group name when group maintainer status is granted', async () => {
     await service.grant(5, 3, ResourceIntroducerType.MAINTAINER);
+    await flushNotifications();
 
     expect(notifications.dispatchToUser).toHaveBeenCalledWith(
       3,
       expect.objectContaining({
         category: NotificationCategory.ACCESS_CHANGES,
-        title: 'Your group access changed',
-        body: 'You were made a maintainer for group #5.',
         url: '/resource-groups/5',
+        dedupeKey: 'group-access-5-3-maintainer-granted',
       }),
     );
+    expect(texts('en')).toEqual({
+      title: 'Your group access changed',
+      body: 'You were made a maintainer for group "Wood shop".',
+    });
+    expect(texts('de')).toEqual({
+      title: 'Dein Gruppenzugriff hat sich geändert',
+      body: 'Du wurdest zum Betreuer für die Gruppe „Wood shop“ ernannt.',
+    });
+  });
+
+  it('names an introducer grant and falls back to #<id> when the group is gone', async () => {
+    repository.findGroupName.mockResolvedValue(null);
+
+    await service.grant(5, 3, ResourceIntroducerType.INTRODUCER);
+    await flushNotifications();
+
+    expect(texts('en').body).toBe('You were made an introducer for group "#5".');
   });
 
   it('notifies the user when group introducer or maintainer status is revoked', async () => {
     repository.find.mockResolvedValue({ id: 8, userId: 3, type: ResourceIntroducerType.INTRODUCER });
 
     await service.revoke(5, 3, ResourceIntroducerType.INTRODUCER);
+    await flushNotifications();
 
     expect(notifications.dispatchToUser).toHaveBeenCalledWith(
       3,
       expect.objectContaining({
         category: NotificationCategory.ACCESS_CHANGES,
-        body: 'Your introducer status for group #5 was revoked.',
         url: '/resource-groups/5',
+        dedupeKey: 'group-access-5-3-introducer-revoked',
       }),
     );
+    expect(texts('en').body).toBe('Your introducer status for group "Wood shop" was revoked.');
+    expect(texts('de').body).toBe('Dein Einweiser-Status für die Gruppe „Wood shop“ wurde entzogen.');
   });
 
   it('creates a second role without overwriting an existing one', async () => {
