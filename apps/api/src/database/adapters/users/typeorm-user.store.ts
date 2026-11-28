@@ -21,7 +21,7 @@ import {
   type UserLookup,
   type UserStore,
 } from '../../../users-and-auth/users/user-store.port';
-import { isUniqueViolation } from '../../persistence-errors';
+import { uniqueViolationConstraint } from '../../persistence-errors';
 import type { TransactionContext } from '../../transaction-context';
 import { TransactionContextResolver } from '../transaction-context';
 import { toUserAccount, toUserRecord } from './user-mapping';
@@ -36,10 +36,8 @@ const ACCOUNT_CREATION_LOCK = 584_102;
 
 /** The identity column whose unique constraint rejected a user insert, when that was the reason. */
 function takenIdentity(manager: EntityManager, error: unknown): UserIdentityField | undefined {
-  if (!isUniqueViolation(error)) return undefined;
-  const constraint =
-    (error as { driverError?: { constraint?: unknown } }).driverError?.constraint ??
-    (error as { constraint?: unknown }).constraint;
+  const constraint = uniqueViolationConstraint(error);
+  if (!constraint) return undefined;
   const unique = manager.connection
     .getMetadata(User)
     .uniques.find((candidate) => candidate.name === constraint && candidate.columns.length === 1);

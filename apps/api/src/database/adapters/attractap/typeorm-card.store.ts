@@ -10,7 +10,7 @@ import type {
 } from '@attraccess/application-models';
 import { EntityManager, Repository } from 'typeorm';
 import { type AttractapCardStore, CardAlreadyEnrolledError } from '../../../attractap/card-store.port';
-import { isUniqueViolation } from '../../persistence-errors';
+import { uniqueViolationConstraint } from '../../persistence-errors';
 import { toCardOwner, toNfcCard, toPendingChange } from './attractap-mappers';
 
 /**
@@ -31,13 +31,7 @@ async function lockCardOwner(manager: EntityManager, userId: number): Promise<vo
 export const NFC_CARD_UID_INDEX = 'UQ_nfc_card_uid_lower';
 
 /** True only when the unique index on the card UID rejected the write; other violations are not this one. */
-function isDuplicateUid(error: unknown): boolean {
-  if (!isUniqueViolation(error)) return false;
-  const constraint =
-    (error as { driverError?: { constraint?: unknown } }).driverError?.constraint ??
-    (error as { constraint?: unknown }).constraint;
-  return constraint === NFC_CARD_UID_INDEX;
-}
+const isDuplicateUid = (error: unknown): boolean => uniqueViolationConstraint(error) === NFC_CARD_UID_INDEX;
 
 @Injectable()
 export class TypeOrmAttractapCardStore implements AttractapCardStore {
