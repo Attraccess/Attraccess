@@ -92,7 +92,8 @@ export class FakeSidecar {
   private readonly server: Server;
   private readonly wss = new WebSocketServer({ noServer: true });
   port = 0;
-  private seq = 0;
+  /** The sequence of the newest event handed out; the head `hello` names. */
+  seq = 0;
 
   private constructor(private readonly options: FakeOptions) {
     this.tokens = options.tokens ?? [TOKEN];
@@ -286,9 +287,8 @@ export class FakeSidecar {
       this.sockets.delete(ws);
     });
     ws.on('error', () => undefined);
-    ws.send(
-      JSON.stringify({ type: 'hello', wireVersion: 1, streamInstanceId: this.streamInstanceId, headCursor: null }),
-    );
+    const headCursor = this.seq === 0 ? null : formatCursor(this.streamInstanceId, this.seq);
+    ws.send(JSON.stringify({ type: 'hello', wireVersion: 1, streamInstanceId: this.streamInstanceId, headCursor }));
     ws.on('message', (data) => {
       const message = JSON.parse(String(data));
       if (message.type === 'ping') {
