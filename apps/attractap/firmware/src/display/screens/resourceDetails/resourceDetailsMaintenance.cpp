@@ -2,7 +2,7 @@
 #include "../../fonts/attractap_fonts.hpp"
 
 // "Report a problem": for a signed-in card holder who may request maintenance here, whether or not they may use the
-// resource, a session runs or it is under maintenance (like the web).
+// resource, a session runs or it is under maintenance (the web hides its button while a maintenance is active).
 void ResourceDetailsScreen::createReportProblemButton()
 {
    this->reportProblemButton = lv_button_create(this->body);

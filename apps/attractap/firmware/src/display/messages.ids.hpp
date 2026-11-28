@@ -302,7 +302,7 @@ enum class Message {
     SecureConversionBootloader, SecureConversionDontUnplug, SecureConversionRestartHint,
     ReportProblem, MaintenanceCheckTitle, MaintenanceCheckHint, MaintenanceMachineOk, MaintenanceNeeded,
     MaintenanceReasonTitle, MaintenanceReasonPlaceholder, MaintenanceSend, SendingReport, MaintainersNotified,
-    ReportNotSent, ReportNotSentAfterStop,
+    ReportNotSent, ReportNotSentAfterStop, SessionAlreadyEndedReportAgain,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };

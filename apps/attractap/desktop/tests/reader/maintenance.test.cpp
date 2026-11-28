@@ -89,6 +89,7 @@ void ReaderWorkflow::testMaintenance()
     assert(server.count(stop) == stops + 1);
     Display::maintenanceReasonScreen.setText("  Säge stumpf  ");
     assert(!lv_obj_has_state(buttonOf(lv_screen_active(), "Weiter"), LV_STATE_DISABLED));
+    pump(300); // the button finishes its enable animation
     display.capture(output, "maintenance-02-reason");
     click("Weiter");
     assert(server.count(stop) == stops + 2 && sentReason() == "Säge stumpf");
@@ -156,6 +157,34 @@ void ReaderWorkflow::testMaintenance()
     assert(!asking() && server.count(stop) == beforeSilent + 1);
     actionReply(stop, R"("error":"MachineBusyError")");
     maintenanceList(silent);
+    clearStatus();
+
+    // A setting that changes while the question is open must not swallow the stop.
+    maintenanceList(ownSession);
+    if (lv_screen_active() != Display::resourceDetailsScreen.getScreen()) click("Laser");
+    const auto beforeToggle = server.count(stop);
+    click("Sitzung beenden");
+    assert(asking());
+    maintenanceList(silent);
+    click("Maschine ist in Ordnung");
+    assert(server.count(stop) == beforeToggle + 1);
+    actionReply(stop, R"("error":"MachineBusyError")");
+    maintenanceList(ownSession);
+    clearStatus();
+
+    // A session that ends elsewhere while the reason is typed leaves nothing to stop; the reader says that the
+    // report was not sent.
+    if (lv_screen_active() != Display::resourceDetailsScreen.getScreen()) click("Laser");
+    const auto beforeGone = server.count(stop);
+    click("Sitzung beenden");
+    click("Wartung nötig");
+    Display::maintenanceReasonScreen.setText("Öl läuft aus");
+    maintenanceList(Scenario{});
+    click("Weiter");
+    assert(server.count(stop) == beforeGone);
+    assert(label(lv_screen_active(), "Meldung nicht gesendet"));
+    assert(label(lv_screen_active(), "Die Sitzung war schon beendet. Bitte erneut melden."));
+    display.capture(output, "maintenance-08-session-gone");
     clearStatus();
 
     // Force-stopping somebody else's session never asks, whatever the flag says.

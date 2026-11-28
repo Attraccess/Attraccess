@@ -6,17 +6,21 @@
 #include "../platform.hpp"
 
 #ifdef HAS_LVGL_DISPLAY
-bool Application::asksMaintenanceCheck(uint32_t usageId) const {
-  // Only a list personalised for the card holder knows the flag and which session is theirs.
-  if (this->cardAuthenticationData.username != this->resourceList.authenticatedUsername) return false;
+const API::ResourceBrief *Application::ownSessionToStop(uint32_t usageId) const {
+  // Only a list personalised for the card holder knows which session is theirs.
+  if (this->cardAuthenticationData.username != this->resourceList.authenticatedUsername) return nullptr;
   for (uint16_t i = 0; i < this->resourceList.count; ++i) {
     const auto &resource = this->resourceList.items[i];
     if (resource.id != this->selectedResourceId) continue;
-    // Never for a force-stop of somebody else's session.
-    return resource.askMaintenanceCheckOnEnd && resource.hasOwnUsage &&
-           (usageId == 0 || usageId == resource.ownUsageId);
+    // Never a force-stop of somebody else's session.
+    return resource.hasOwnUsage && (usageId == 0 || usageId == resource.ownUsageId) ? &resource : nullptr;
   }
-  return false;
+  return nullptr;
+}
+
+bool Application::asksMaintenanceCheck(uint32_t usageId) const {
+  const auto *resource = this->ownSessionToStop(usageId);
+  return resource && resource->askMaintenanceCheckOnEnd;
 }
 
 void Application::openMaintenanceCheck(uint32_t usageId) {
@@ -56,10 +60,16 @@ void Application::cancelMaintenanceInput() {
 void Application::continueStopAfterCheck(const std::string &reason) {
   // Back to the screen the stop came from, then the interrupted stop runs with the answer.
   Display::returnFromTransient();
+  // Only the session counts here: a setting or license that changed while the question was open must not swallow the
+  // stop.
   if (!this->unlocked || this->selectedResourceId != this->maintenanceResourceId ||
-      !this->asksMaintenanceCheck(this->maintenanceStopUsageId)) {
-    // The session ended or changed while the question was open: the answer belongs to nothing.
+      !this->ownSessionToStop(this->maintenanceStopUsageId)) {
+    // The session ended or changed while the question was open: there is nothing left to stop.
     this->returnToListAfterAction = false;
+    // A typed reason must not vanish without a word.
+    if (this->unlocked && !reason.empty())
+      this->showStatus(StatusScreen::warning(FirmwareI18n::Message::ReportNotSent,
+                                             FirmwareI18n::Message::SessionAlreadyEndedReportAgain));
     return;
   }
   this->pendingActionMaintenanceReason = reason;

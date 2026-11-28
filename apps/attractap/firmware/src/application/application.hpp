@@ -159,6 +159,8 @@ private:
     bool extendTargets(const API::ResourceBrief &resource) const;
     void handleExtend(uint32_t minutes, bool toMax);
     // Maintenance requests, application_maintenance.cpp
+    // The selected resource, if a stop with `usageId` (0: the card holder's own session) would end their own session.
+    const API::ResourceBrief *ownSessionToStop(uint32_t usageId) const;
     bool asksMaintenanceCheck(uint32_t usageId) const;
     void openMaintenanceCheck(uint32_t usageId);
     void openProblemReport();

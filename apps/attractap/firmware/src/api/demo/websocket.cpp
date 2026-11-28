@@ -85,8 +85,7 @@ void DemoWebsocket::enqueue(const std::string &msg)
 
 void DemoWebsocket::processOutbound(const char *data, size_t len)
 {
-    // Room for a stop or a report with a 500 character maintenance reason.
-    StaticJsonDocument<2048> doc;
+    StaticJsonDocument<1024> doc;
     if (deserializeJson(doc, data, len) != DeserializationError::Ok)
         return;
 

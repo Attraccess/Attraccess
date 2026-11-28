@@ -19,6 +19,7 @@ inline constexpr Entry maintenanceCatalog[] = {
     {Message::MaintainersNotified, "Wartungsteam benachrichtigt", "Maintainers have been notified"},
     {Message::ReportNotSent, "Meldung nicht gesendet", "Report not sent"},
     {Message::ReportNotSentAfterStop, "Meldung nicht gesendet. Bitte erneut melden.", "Report not sent. Please report it again."},
+    {Message::SessionAlreadyEndedReportAgain, "Die Sitzung war schon beendet. Bitte erneut melden.", "The session had already ended. Please report it again."},
 };
 static_assert(sizeof(catalog) / sizeof(Entry) + sizeof(cardRelayCatalog) / sizeof(Entry) +
                       sizeof(networkStatusCatalog) / sizeof(Entry) + sizeof(sessionUsersCatalog) / sizeof(Entry) +
