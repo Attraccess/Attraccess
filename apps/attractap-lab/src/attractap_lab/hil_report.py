@@ -3,7 +3,8 @@
 One HIL run shares a single reader, so a test that fails can leave state behind that later tests
 trip over. ``hil/conftest.py`` resets the reader before each test and records here what it had to
 clean up; this module lists the failures in the order they happened, marks the first one, and
-names failures that repeat an earlier error (a shared fixture that failed once).
+names failures that repeat an earlier error (a shared fixture that failed once). It also lists every
+drop of the reader's serial connection the reset ran into (``serial_recovery``), recovered or not.
 """
 
 from dataclasses import dataclass, field
@@ -29,9 +30,24 @@ class Reset:
 
 
 @dataclass
+class SerialDrop:
+    nodeid: str  # the reset that found the connection gone ran before this test
+    left_by: str | None
+    fault: str
+    steps: list = field(default_factory=list)
+    outcome: str = "not recovered"
+
+    def text(self):
+        after = f" (after {short(self.left_by)})" if self.left_by else ""
+        steps = f" Steps: {'; '.join(self.steps)}." if self.steps else ""
+        return f"before {short(self.nodeid)}{after}: {flatten(self.fault)} -> {flatten(self.outcome)}.{steps}"
+
+
+@dataclass
 class RunReport:
     failures: list = field(default_factory=list)
     resets: list = field(default_factory=list)
+    drops: list = field(default_factory=list)
     previous: str | None = None  # the last test that finished
     checks: int = 0
     check_seconds: float = 0.0
@@ -52,12 +68,21 @@ class RunReport:
         if actions:
             self.resets.append(Reset(nodeid, self.previous, list(actions), seconds))
 
+    def dropped(self, nodeid, fault):
+        """Record that the serial connection was gone before ``nodeid``; returns the record to complete."""
+        drop = SerialDrop(nodeid, self.previous, fault)
+        self.drops.append(drop)
+        return drop
+
     def first(self):
         return self.failures[0] if self.failures else None
 
     def lines(self):
         """Plain-text summary; empty when nothing failed and nothing needed cleaning up."""
         out = []
+        if self.drops:
+            out.append("WARNING: the reader's serial connection dropped (a lab or reader fault):")
+            out.extend(f"  {drop.text()}" for drop in self.drops)
         if self.failures:
             first = self.failures[0]
             out.append(f"FIRST FAILURE: {first.nodeid} [{first.when}]")
@@ -82,7 +107,7 @@ class RunReport:
     def markdown(self):
         """The same summary for a GitHub job summary."""
         lines = self.lines()
-        if not self.failures and not self.resets:
+        if not self.failures and not self.resets and not self.drops:
             return ""
         return "### HIL failure order\n\n```\n" + "\n".join(lines) + "\n```\n"
 
@@ -91,8 +116,22 @@ class RunReport:
         first = self.first()
         if first is None:
             return ""
-        message = f"{first.nodeid} [{first.when}]: {first.message}".replace("%", "%25").replace("\r", "").replace("\n", " ")
-        return f"::error title=First HIL failure::{message}"
+        return f"::error title=First HIL failure::{escape(f'{first.nodeid} [{first.when}]: {first.message}')}"
+
+    def warning_annotations(self):
+        """One GitHub workflow command per serial drop, so a recovered one still shows on the run page."""
+        return [f"::warning title=HIL reader serial connection dropped::{escape(drop.text())}" for drop in self.drops]
+
+
+def escape(message):
+    """Text for the message part of a GitHub workflow command."""
+    return message.replace("%", "%25").replace("\r", "").replace("\n", " ")
+
+
+def flatten(message):
+    """One line, shortened to MESSAGE_LIMIT."""
+    message = " ".join(str(message).split())
+    return message if len(message) <= MESSAGE_LIMIT else message[: MESSAGE_LIMIT - 1] + "…"
 
 
 def short(nodeid):
@@ -113,7 +152,4 @@ def describe(longrepr):
         text = str(longrepr).strip().splitlines()
         message = text[-1] if text else ""
         key = (message,)
-    message = " ".join(message.split())
-    if len(message) > MESSAGE_LIMIT:
-        message = message[: MESSAGE_LIMIT - 1] + "…"
-    return message, key
+    return flatten(message), key

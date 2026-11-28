@@ -74,3 +74,15 @@ def test_annotation_escapes_workflow_command_characters():
     summary = RunReport()
     run(summary, "hil/test_a.py::test_one", error=crash("100% broken"))
     assert summary.annotation().endswith("100%25 broken")
+
+
+def test_a_serial_drop_alone_still_reaches_the_job_summary():
+    summary = RunReport()
+    drop = summary.dropped("hil/test_a.py::test_two", "SerialException: Broken pipe")
+    drop.outcome = "recovered"
+
+    assert summary.lines()[1] == "  before test_a.py::test_two: SerialException: Broken pipe -> recovered."
+    assert summary.markdown().startswith("### HIL failure order")
+    assert summary.warning_annotations() == [
+        "::warning title=HIL reader serial connection dropped::before test_a.py::test_two: "
+        "SerialException: Broken pipe -> recovered."]

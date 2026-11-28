@@ -390,11 +390,26 @@ about 0.2 s. Each cleanup is logged to `reader-resets.jsonl` with the test
 that left the state behind. If even a reboot fails, the later tests fail at
 setup at once instead of rebooting again.
 
+A full chip reset, such as a watchdog reset, re-enumerates the reader's USB
+serial port, and labgrid's RFC 2217 connection to it dies for good
+(`BrokenPipeError`), also when the reader itself comes back. When the console
+capture or the reset finds the connection gone
+(`attractap_lab.serial_recovery`), the reset reopens the port. If the reader
+still does not answer, it power-cycles it through the place's power driver (see
+Reader power), logging to `power-cycle.log`. A run recovers once: a second drop,
+or a failed recovery, makes the later tests fail at setup. A recovery hides
+nothing. The test that ran into the drop still fails, and every drop is a
+pytest warning, a line in `serial-drops.jsonl`, a block in the end-of-run
+summary and a warning annotation on GitHub Actions. A drop between two tests
+that breaks neither is reported the same way and leaves the run green, so read
+the warnings. The capture also marks the drop in `reader-serial.log`; what the
+reader printed between the drop and the reopened port is lost.
+
 The end of the pytest output (section "HIL failure order and reader resets")
 names the first failure, lists the later ones in order, marks failures that
-repeat one shared fixture error, and shows the resets. On GitHub Actions the
-first failure is also an error annotation and the summary goes to the job
-summary.
+repeat one shared fixture error, and shows the resets and serial drops. On
+GitHub Actions the first failure is also an error annotation and the summary
+goes to the job summary.
 
 The tests in `test_nfc_cards.py` build on each other: one whose prerequisite
 (an enrolled card from an earlier test) is missing fails and names it, so
