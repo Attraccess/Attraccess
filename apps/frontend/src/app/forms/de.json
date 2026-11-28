@@ -95,7 +95,7 @@
   },
   "globalList": {
     "title": "Formulare",
-    "subtitle": "Formulare, die Mitglieder beim Starten, Übernehmen oder Beenden einer Sitzung ausfüllen. Ein Formular gilt für eine Ressource, eine Ressourcengruppe oder alle Ressourcen.",
+    "subtitle": "Formulare, die Mitglieder beim Starten, Übernehmen oder Beenden einer Sitzung oder beim Projektwechsel ausfüllen. Ein Formular gilt für eine Ressource, eine Ressourcengruppe oder alle Ressourcen.",
     "create": "Neues Formular",
     "tableLabel": "Formulare",
     "empty": "Noch keine Formulare",

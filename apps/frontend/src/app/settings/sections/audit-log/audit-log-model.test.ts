@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import en from './en.json';
+import de from './de.json';
 import { ApiError } from '@attraccess/react-query-client';
 import type { AuditEntryDto, AuditMetaDto } from '@attraccess/react-query-client';
 import {
@@ -209,5 +211,16 @@ describe('audit export and filtering', () => {
       { field: 'enabled', before: undefined, after: 0 },
       { field: 'name', before: undefined, after: undefined },
     ]);
+  });
+});
+
+describe('project switch audit entry', () => {
+  it.each([
+    ['en', en],
+    ['de', de],
+  ])('names the action and its details in %s', (_language, translations) => {
+    expect(translations.events).toHaveProperty(['usage_session.project_switched']);
+    expect(translations.fields).toHaveProperty('newUsageId');
+    expect(translations.fields).toHaveProperty('previousProjectId');
   });
 });

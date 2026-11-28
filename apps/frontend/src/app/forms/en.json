@@ -95,7 +95,7 @@
   },
   "globalList": {
     "title": "Forms",
-    "subtitle": "Forms members fill in when they start, take over or end a session. A form applies to one resource, a resource group or every resource.",
+    "subtitle": "Forms members fill in when they start, take over or end a session or switch its project. A form applies to one resource, a resource group or every resource.",
     "create": "New form",
     "tableLabel": "Forms",
     "empty": "No forms yet",

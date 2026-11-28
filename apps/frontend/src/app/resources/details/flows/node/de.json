@@ -100,7 +100,7 @@
           },
           "project-switched": {
             "title": "Projekt gewechselt",
-            "description": "Wird ausgelöst, wenn jemand das Projekt der eigenen laufenden Sitzung wechselt. Die Maschine läuft weiter: „Nutzung gestartet“, „Nutzung gestoppt“ und „Nutzung übernommen“ werden nicht ausgeführt. Schlägt dieser Flow fehl, wird der Wechsel abgelehnt. Hier hinzugefügte Abrechnungsposten gehören zum Abschnitt, der endet.",
+            "description": "Wird ausgelöst, wenn jemand das Projekt der eigenen laufenden Sitzung wechselt. Die Maschine läuft weiter: „Nutzung gestartet“, „Nutzung beendet“ und „Nutzung übernommen“ werden nicht ausgeführt. Schlägt dieser Flow fehl, wird der Wechsel abgelehnt. Hier hinzugefügte Abrechnungsposten gehören zum Abschnitt, der endet.",
             "outputs": {
               "output": "Ausgabe"
             }
