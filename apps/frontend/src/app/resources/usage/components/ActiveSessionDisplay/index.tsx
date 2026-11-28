@@ -143,8 +143,6 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
         <SessionTimer startTime={startTime} variant="hero" />
         {myUsage?.autoEndAt && <SessionAutoEnd resourceId={resourceId} usage={myUsage} canExtend centered />}
 
-        {myUsage && <SessionProjectSection resourceId={resourceId} usage={myUsage} />}
-
         {myUsage?.supervisorUser && (
           <div className="min-w-0 border-t border-divider pt-4">
             <p className="text-xs uppercase tracking-wide text-default-500 mb-1">{t('supervisedBy')}</p>
@@ -185,6 +183,9 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
           </Dropdown>
         </ButtonGroup>
         <NetworkRestrictedHint actions={NetworkRestrictedAction.UsageEnd} />
+
+        {/* Below the buttons: in the fixed-height dashboard tile End Session must show without scrolling. */}
+        {myUsage && <SessionProjectSection resourceId={resourceId} usage={myUsage} />}
       </SessionStatusCard>
 
       <SessionNotesModal

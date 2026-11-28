@@ -12,6 +12,8 @@ import usePluginState, { PluginManifestWithPlugin } from '../../../../plugins/pl
 import { ActiveSessionDisplay } from './index';
 
 const network = vi.hoisted(() => ({ restricted: new Set<string>() }));
+const session = vi.hoisted(() => ({ own: null as null | { id: number } }));
+vi.mock('./SessionProjectSection', () => ({ SessionProjectSection: () => <div>project section</div> }));
 vi.mock('../../../../../hooks/useNetworkRestriction', () => ({
   useNetworkRestriction: () => ({ isRestricted: (action: string) => network.restricted.has(action) }),
 }));
@@ -24,7 +26,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useResourceUsageEndSession: () => ({ mutate: vi.fn(), isPending: false }),
-  useResourceUsageGetActiveSession: () => ({ data: null }),
+  useResourceUsageGetActiveSession: () => ({ data: session.own ? { usage: session.own } : null }),
   UseResourceUsageGetActiveSessionKeyFn: () => [],
   UseResourceUsageGetHistoryKeyFn: () => [],
 }));
@@ -61,6 +63,16 @@ describe('ActiveSessionDisplay plugin slot', () => {
   beforeEach(() => {
     usePluginState.setState({ plugins: [] });
     network.restricted = new Set();
+    session.own = null;
+  });
+
+  // In the fixed-height dashboard tile only what comes first is visible without scrolling.
+  it('keeps End Session above the project of the session', () => {
+    session.own = { id: 22 };
+    render(<ActiveSessionDisplay resourceId={11} usageId={22} startTime="2026-08-27T10:00:00.000Z" />);
+
+    const end = screen.getByRole('button', { name: 'endSession' });
+    expect(end.compareDocumentPosition(screen.getByText('project section'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('renders the active-session contribution with resource and usage context', () => {
