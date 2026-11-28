@@ -15,7 +15,7 @@ GEOM = [ch("d313", RAISED), ch("d314", RAISED), ch("d331", RAISED), ch("d332", R
         ch("d335", RAISED - 3.2), ch("d336", RAISED - 3.2), ch("d339", RAISED - 5.2), ch("d340", RAISED - 5.2),
         ch("d351", 30.0), ch("d352", 30.0)]          # channel inner edge 15.0 from the centre, under the inner row
 def dots(skin, bottom=20.6):
-    top = RIM_TOP - skin
+    top = RIM_TOP - skin + (0.05 if skin == 0 else 0)
     return [{"command": "solid.cylinder", "params": {"name": f"Px{k}", "base": [x, TC + y, bottom], "axis": "Z",
              "diameter": D, "height": round(top - bottom, 3), "operation": "cut", "targets": ["Tile"]}}
             for k, (x, y) in enumerate(DOTS)]
@@ -25,11 +25,12 @@ def marks(n):
 TILE = ["Tile", "Tile top", "Tile inlay", "Tile keyhole"]
 PROBE = lambda skin: {"command": "inspect.classify_points", "params": {"body": "Tile", "points": [
     [DOTS[0][0], TC + DOTS[0][1], 23.8 - skin - 0.03], [DOTS[0][0], TC + DOTS[0][1], 23.8 - skin + 0.03],
-    [DOTS[0][0], TC + DOTS[0][1], 21.5], [15.2, TC, 20.0], [14.8, TC, 20.0], [0, TC + 15.0, 24.3], [0, TC + 18, 24.3]]}}
+    [DOTS[0][0], TC + DOTS[0][1], 21.5], [15.2, TC, 20.0], [14.8, TC, 20.0], [15.2, TC, 22.4], [15.2, TC, 22.8], [21.6, TC, 22.4], [22.0, TC, 22.4], [0, TC + 15.0, 24.3], [0, TC + 18, 24.3]]}}
 print(len(DOTS), "dots")
-for n, skin in enumerate(sys.argv[1:] and [float(a) for a in sys.argv[1:]] or [0.1, 0.2], 1):
-    name = f"tile-grid-skin{skin}"
-    script = GEOM + dots(skin) + marks(n) + [PROBE(skin),
+ROOF12 = [ch("d349", 5.8), ch("d353", 5.8), ch("d347", 43.6), ch("d348", 43.6), ch("d350", 5.4)]  # channel top 22.6: roof 1.2
+VARIANTS = {"grid-v3-open": (3, [], 0, 20.6), "grid-v6-roof1.2-skin0.2": (6, ROOF12, 0.2, 22.0)}
+for name, (n, extra, skin, bottom) in VARIANTS.items():
+    script = GEOM + extra + dots(skin, bottom) + marks(n) + [PROBE(skin),
         {"command": "solid.move", "params": {"bodies": TILE, "name": "TileLay", "translate": [0, -TC, -18.5]}},
         {"command": "file.export", "params": {"path": os.path.join(HERE, name + ".3mf"), "bodies": TILE, "quality": "fine"}},
         {"command": "file.export", "params": {"path": os.path.join(HERE, name + ".step"), "bodies": TILE}}]
