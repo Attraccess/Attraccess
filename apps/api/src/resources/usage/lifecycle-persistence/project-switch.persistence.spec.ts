@@ -173,9 +173,9 @@ describe('Switching the project of a running session', () => {
     const started = await startInProject();
 
     await expect(switchTo(1)).rejects.toBeInstanceOf(BadRequestException);
-    // Somebody else, naming the session or not; even a manager.
-    await expect(switchTo(2, 1)).rejects.toBeInstanceOf(ForbiddenException);
+    // Somebody else naming the session, even a manager. Without a name they simply have no session to switch.
     await expect(switchTo(2, 1, started.id)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(switchTo(2, 1)).rejects.toBeInstanceOf(NotFoundException);
     await expect(switchTo(2, 0, started.id + 100)).rejects.toBeInstanceOf(NotFoundException);
 
     await scope.usage.endSession(1, scope.users[0], {});

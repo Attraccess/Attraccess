@@ -427,7 +427,7 @@ export class ResourceUsageController {
       'Bad Request - the session already belongs to this project, a required form is missing, the balance does not cover a new session, or a meter could not be read',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
-  @ApiResponse({ status: 403, description: 'Forbidden - The running session belongs to somebody else' })
+  @ApiResponse({ status: 403, description: 'Forbidden - The named session belongs to somebody else' })
   @ApiResponse({ status: 404, description: 'No such running session, or the project is not one of yours' })
   @ApiResponse({ status: 409, description: 'Conflict - another change of the machine is in progress' })
   async switchSessionProject(

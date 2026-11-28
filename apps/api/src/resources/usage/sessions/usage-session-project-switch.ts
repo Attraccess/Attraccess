@@ -165,17 +165,19 @@ export class UsageSessionProjectSwitch {
     return switched;
   }
 
-  /** The running session the request means: the named one, or the caller's own. */
+  /**
+   * The running session the request means: the named one, or the caller's own. Only naming somebody else's session is
+   * forbidden; without a name, other people's sessions are not the caller's concern, so having none is simply 404.
+   */
   private pickOwnSession(sessions: UsageSession[], user: UsageSessionUser, usageId: number | undefined): UsageSession {
     const session = sessions.find((candidate) =>
       usageId === undefined ? candidate.userId === user.id : candidate.id === usageId,
     );
-    if (session && session.userId === user.id) return session;
-    // Somebody else's session, named or the only kind there is; a named one that is gone is simply not there.
-    if (session || (usageId === undefined && sessions.length > 0)) {
+    if (!session) throw new NoSessionToSwitchError();
+    if (session.userId !== user.id) {
       throw new ForbiddenException('Only the owner of a running session can switch its project');
     }
-    throw new NoSessionToSwitchError();
+    return session;
   }
 
   private pickSwitchableSession(

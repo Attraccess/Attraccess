@@ -3,6 +3,7 @@ import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { InsufficientBalanceError } from '../../../../billing/errors/insufficient-balance.error';
 import { MachineBusyError } from '../../../../resources/usage/errors/machine-busy.error';
 import { NoSessionToSwitchError } from '../../../../resources/usage/errors/no-session-to-switch.error';
+import { FlowExecutionError } from '../../../../resources/flows/errors/flow-execution.error';
 import { AttractapEventType, type AuthenticatedWebSocket } from '../../websocket.types';
 import { AttractapProjectSwitchHandler } from './project-switch.handler';
 
@@ -84,6 +85,40 @@ describe('AttractapProjectSwitchHandler', () => {
     ]);
   });
 
+  it('leaves the answer to the resource-action guard when it refuses the resource', async () => {
+    const { services, request, replies } = setUp();
+    services.resourceActionGuard.validateResourceAction.mockResolvedValue(false);
+
+    await request();
+
+    expect(services.resourceActionGuard.validateResourceAction).toHaveBeenCalledWith(
+      expect.anything(),
+      10,
+      AttractapEventType.SWITCH_SESSION_PROJECT,
+      3,
+    );
+    expect(replies()).toEqual([]);
+    expect(services.resourceUsageService.assertSessionProjectSwitchable).not.toHaveBeenCalled();
+    expect(services.formsHandler.ensureFormsSatisfied).not.toHaveBeenCalled();
+    expect(services.resourceUsageService.switchSessionProject).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['the reader has no verified user', { verifiedUserId: undefined }],
+    ['the verified user no longer exists', {}],
+  ])('answers USER_NOT_FOUND when %s', async (_case, state) => {
+    const { services, request, replies } = setUp({ projectSwitch: true, ...state });
+    services.usersService.findOne.mockResolvedValue(null);
+
+    await request();
+
+    expect(replies()).toEqual([
+      { type: AttractapEventType.SWITCH_SESSION_PROJECT, requestId: 3, error: 'USER_NOT_FOUND' },
+    ]);
+    expect(services.resourceUsageService.assertSessionProjectSwitchable).not.toHaveBeenCalled();
+    expect(services.resourceUsageService.switchSessionProject).not.toHaveBeenCalled();
+  });
+
   it('passes "no project" on as null', async () => {
     const { services, request } = setUp();
 
@@ -148,6 +183,8 @@ describe('AttractapProjectSwitchHandler', () => {
     ['a session that ended while the switch was asked for', new NoSessionToSwitchError(), 'NoOwnActiveSessionError'],
     ['a project that is gone', new NotFoundException('Project not found'), 'Project not found'],
     ['a failed meter reading', new Error('METER_SWITCH_FAILED: "Energy": meter offline'), 'METER_SWITCH_FAILED'],
+    // The flow's own message is not for the reader's screen, only the code.
+    ['a failed project-switch flow', new FlowExecutionError('Webhook "Booking" answered 500'), 'FLOW_EXECUTION_ERROR'],
     ['a busy machine', new MachineBusyError(), new MachineBusyError().message],
   ])('answers %s and refreshes the row', async (_case, error, expected) => {
     const { services, request, replies } = setUp();
