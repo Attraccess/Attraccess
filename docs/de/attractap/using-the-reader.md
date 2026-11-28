@@ -86,9 +86,9 @@ Energiewerte benötigen eine eingerichtete Verbrauchsmessung; die Betriebszeit b
 3. Fragt der Leser, ob die Maschine in Ordnung ist, beantworten Sie die Frage (siehe unten).
 4. Füllen Sie gegebenenfalls das Formular zum Nutzungsende aus und warten Sie, bis das Display das Ende der Nutzung bestätigt.
 
-![Maschinendetails mit Nutzer, Startzeit, Dauer und der Schaltfläche Sitzung beenden](../../_media/attractap/usage-details.png)
+![Maschinendetails mit Nutzer, Startzeit, Dauer, den Schaltflächen Sitzung beenden und Problem melden nebeneinander und der aktuellen Nutzung](../../_media/attractap/usage-details.png)
 
-_Mit dem Zurück-Pfeil gelangen Sie wieder zur Ressourcenliste. Beim Wechsel zwischen Liste und Details bleiben Sie angemeldet._
+_Mit dem Zurück-Pfeil gelangen Sie wieder zur Ressourcenliste. Beim Wechsel zwischen Liste und Details bleiben Sie angemeldet. **Problem melden** erscheint nur, wenn Sie [ein Problem melden](#ein-problem-melden) dürfen; sonst nimmt **Sitzung beenden** die ganze Breite ein._
 
 > [!IMPORTANT]
 > **Abmelden** beendet Ihre Anmeldung am Leser. Eine laufende Maschinennutzung wird dadurch **nicht** beendet. Nutzen Sie **Stop** oder **Sitzung beenden**, wenn Sie mit der Maschine fertig sind.
@@ -122,7 +122,10 @@ Die Gerätebeschriftungen bleiben vorerst deutsch, einschließlich **Bis bald!**
 Sie können jederzeit ein Problem melden, egal ob eine Sitzung läuft, und auch während die Ressource gewartet wird:
 
 1. Melden Sie sich mit Ihrer Karte an und tippen Sie auf den Namen der Ressource, um ihre Details zu öffnen.
-2. Tippen Sie unten auf **Problem melden**.
+2. Tippen Sie auf **Problem melden**. Wo die Schaltfläche steht, hängt davon ab, was Sie tun können:
+   - Bei einer Maschine mit einer Sitzung, die Sie beenden können, steht sie neben **Sitzung beenden** beziehungsweise neben der Schaltfläche zum Beenden einer fremden Sitzung.
+   - Bei einer Tür steht sie direkt unter den Tür-Schaltflächen.
+   - Sonst, etwa ohne Sitzung zum Beenden oder ohne Zugang zur Ressource, steht sie unten in den Details.
 3. Beschreiben Sie das Problem (3 bis 500 Zeichen) und tippen Sie auf **Senden**.
 
 Der Leser bestätigt mit **Wartungsteam benachrichtigt** oder zeigt **Meldung nicht gesendet** auf der Schaltfläche, damit Sie es erneut versuchen können. Ihr Text bleibt erhalten: Er wird beim nächsten Öffnen der Problemmeldung oder des Grunds nach **Wartung nötig** an derselben Ressource wieder angeboten, bis er gesendet ist oder Sie **Abbrechen** tippen. Die Taste zum Ausblenden der Tastatur blendet nur die Tastatur aus; tippen Sie auf das Textfeld, um sie wieder einzublenden. Die Schaltfläche erscheint nur mit dem Lizenzmodul maintenance, nur bei Ressourcen, die Sie sehen dürfen, und nur, wenn Sie die Wartung der Ressource nicht selbst verwalten dürfen. Attractap-Lite-Reader haben keinen Bildschirm und bieten weder die Schaltfläche noch die Frage.

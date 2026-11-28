@@ -86,9 +86,9 @@ Energy readings require configured metering; operating time requires operating-s
 3. If the reader asks whether the machine is OK, answer it (see below).
 4. Complete any required end-of-use form and wait until the display confirms that the usage has ended.
 
-![Machine details showing the user, start time, duration and Sitzung beenden button](../../_media/attractap/usage-details.png)
+![Machine details showing the user, start time, duration, the Sitzung beenden and Problem melden buttons side by side, and the current usage](../../_media/attractap/usage-details.png)
 
-_The back arrow returns to the resource list. You remain signed in when you move between the list and details._
+_The back arrow returns to the resource list. You remain signed in when you move between the list and details. **Problem melden** (Report a problem) appears only when you can [report a problem](#report-a-problem); otherwise **Sitzung beenden** spans the full width._
 
 > [!IMPORTANT]
 > **Abmelden** (Sign out) ends your sign-in on the reader. It does **not** stop machine usage. Use **Stop** or **Sitzung beenden** when you have finished using a machine.
@@ -122,7 +122,10 @@ The device currently uses German labels, including **Bis bald!**. Future English
 You can report a problem at any time, whether or not a session is running and even while the resource is under maintenance:
 
 1. Sign in with your card and tap the resource's name to open its details.
-2. Tap **Problem melden** (Report a problem) at the bottom.
+2. Tap **Problem melden** (Report a problem). Where it is depends on what you can do:
+   - On a machine with a session you can end, it is next to **Sitzung beenden** (End session), or next to the button that ends another person's session.
+   - On a door, it is directly below the door buttons.
+   - Otherwise, for example when there is no session to end or you cannot use the resource, it is at the bottom of the details.
 3. Describe the problem (3 to 500 characters) and tap **Senden** (Send).
 
 The reader confirms with **Wartungsteam benachrichtigt** (Maintainers have been notified), or shows **Meldung nicht gesendet** (Report not sent) on the button so you can try again. The text you typed is kept: it is offered again the next time you open the problem report or the reason after **Wartung nötig** on the same resource, until it was sent or you tap **Abbrechen** (Cancel). The keyboard's hide key only hides the keyboard; tap the text field to bring it back. The button appears only with the maintenance license module, only on resources you can see, and only if you cannot manage the resource's maintenance yourself. Attractap Lite readers have no screen, so they have neither the button nor the question.
