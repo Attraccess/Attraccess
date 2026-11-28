@@ -9,6 +9,7 @@ import { ResourceUsageSessionExtendedEvent } from '../events/resource-usage.even
 import { RESOURCE_USAGE_LOG_CONTEXT, UsageLifecycle } from '../lifecycle/usage-lifecycle';
 import { acrossProjectSwitches } from '../sessions/across-project-switches';
 import { pickSessionToEnd } from '../sessions/active-usage';
+import { SESSION_CHANGE_WAIT_MS } from '../sessions/session-change-queue';
 import { UsageSessionEnds } from '../sessions/usage-session-ends';
 import { SESSION_DEADLINE_STORE, SessionDeadlineStore } from './session-deadline-store.port';
 import { SessionExtensionNotPossibleException } from './session-duration.errors';
@@ -43,13 +44,18 @@ export class UsageSessionExtensions {
     const extend = (named: ExtendUsageSessionDto) =>
       this.ends.runSessionChange(resourceId, randomUUID(), () => this.extendNow(resourceId, user, named, auditOrigin));
     // Without a usageId the caller means their running session. Knowing which one that is now lets the extension follow
-    // a switch of it, also one that commits while the extension waits.
+    // a switch of it, also one that commits while the extension waits. Someone waits for the answer, so a pending switch
+    // holds it up no longer than a busy machine would; then it is refused and can be retried.
     const meantId = dto.usageId ?? (await this.findOwnSessionId(resourceId, user));
     const updated =
       meantId === undefined
         ? await extend(dto)
-        : await acrossProjectSwitches(this.lifecycle.sessions, resourceId, meantId, (usageId) =>
-            extend({ ...dto, usageId }),
+        : await acrossProjectSwitches(
+            this.lifecycle.sessions,
+            resourceId,
+            meantId,
+            (usageId) => extend({ ...dto, usageId }),
+            { waitMs: SESSION_CHANGE_WAIT_MS },
           );
     this.eventEmitter.emit(
       ResourceUsageSessionExtendedEvent.EVENT_NAME,
