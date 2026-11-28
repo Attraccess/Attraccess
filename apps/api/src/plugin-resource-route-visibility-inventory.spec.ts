@@ -97,15 +97,15 @@ describe('per-machine plugin routes answer 404 for hidden machines (ATT-1407)', 
     }));
     expect(uncovered(stripped)).toEqual(machineRoutes);
 
-    const wago = controllers.find((entry) => entry.controller.endsWith(':WagoDiagnosticsController'));
+    const wago = controllers.filter((entry) => entry.controller.endsWith(':WagoDiagnosticsController'));
     const availability = controllers
       .flatMap((entry) => entry.routes)
       .find((route) => route.route.startsWith('availability '));
     // The reservations decorator reads `:resourceId`, which would never fire on WAGO's `resources/:id`.
-    const misread = {
-      ...wago!,
-      routes: wago!.routes.map((route) => ({ ...route, decorator: availability?.decorator })),
-    };
-    expect(uncovered([misread])).toHaveLength(1);
+    const misread = wago.map((entry) => ({
+      ...entry,
+      routes: entry.routes.map((route) => ({ ...route, decorator: availability?.decorator })),
+    }));
+    expect(uncovered(misread)).toHaveLength(1);
   });
 });
