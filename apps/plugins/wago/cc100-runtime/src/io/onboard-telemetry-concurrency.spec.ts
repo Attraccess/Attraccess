@@ -34,16 +34,21 @@ describe('CC100 packed digital I/O', () => {
     await started.promise;
     try {
       await reconnect;
-      await fixture.command('DO1', true, 'pulse', 'pulse');
-      await new Promise((resolve) => setTimeout(resolve, 80));
-      expect(await readFile(fixture.paths.output, 'utf8')).toBe('0');
-      await fixture.command('DO2', true);
+      // A timed sleep can end before the shutdown's file I/O, or read the register while it is rewritten.
+      const pulseEnded = deferred();
       const writtenOff = deferred();
       const write = fixture.adapter.write.bind(fixture.adapter);
-      jest.spyOn(fixture.adapter, 'write').mockImplementation(async (physical, value) => {
-        await write(physical, value);
-        if (physical.channel === 3 && !value) writtenOff.resolve();
+      jest.spyOn(fixture.adapter, 'write').mockImplementation(async (physical, value, admit) => {
+        await write(physical, value, admit);
+        if (value) return;
+        if (physical.channel === 0) pulseEnded.resolve();
+        if (physical.channel === 3) writtenOff.resolve();
       });
+      await fixture.command('DO1', true, 'pulse', 'pulse');
+      // Telemetry stays stalled here: a shutdown that waited for it would time out the test.
+      await pulseEnded.promise;
+      expect(await readFile(fixture.paths.output, 'utf8')).toBe('0');
+      await fixture.command('DO2', true);
       const disconnect = fixture.runtime.setConnected(false);
       await writtenOff.promise;
       expect(await readFile(fixture.paths.output, 'utf8')).toBe('0');

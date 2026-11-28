@@ -33,10 +33,16 @@ describe('CC100 packed digital I/O', () => {
       outputs as unknown as { writePulseShutdown: (typeof outputs)['writePulseShutdown'] },
       'writePulseShutdown',
     );
+    const pulseEnded = deferred();
+    const write = fixture.adapter.write.bind(fixture.adapter);
+    jest.spyOn(fixture.adapter, 'write').mockImplementation(async (physical, value, admit) => {
+      await write(physical, value, admit);
+      if (physical.channel === 0 && !value) pulseEnded.resolve();
+    });
     const action = fixture.command('DO1', true, 'pulse', 'pulse');
     await started.promise;
     try {
-      await new Promise((resolve) => setTimeout(resolve, 80));
+      await pulseEnded.promise;
       expect(await readFile(fixture.paths.output, 'utf8')).toBe('0');
     } finally {
       release.resolve();

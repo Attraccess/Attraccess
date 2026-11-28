@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
 import { WagoRuntime } from '../runtime';
-import { OnboardIoFixture, snapshot } from './onboard-io.test-utils';
+import { OnboardIoFixture, snapshot, deferred } from './onboard-io.test-utils';
 jest.mock('node:fs/promises', () => ({ __esModule: true, ...jest.requireActual('node:fs/promises') }));
 describe('CC100 packed digital I/O', () => {
   let fixture: OnboardIoFixture;
@@ -50,10 +50,16 @@ describe('CC100 packed digital I/O', () => {
     pulsed.logicalChannels[0].pulse = { durationMs: 20 };
     await fixture.apply(pulsed);
     await Promise.all([fixture.command('DO2', true), fixture.command('DO3', true), fixture.command('DO4', true)]);
+    const pulseEnded = deferred();
+    const write = fixture.adapter.write.bind(fixture.adapter);
+    jest.spyOn(fixture.adapter, 'write').mockImplementation(async (physical, value, admit) => {
+      await write(physical, value, admit);
+      if (physical.channel === 0 && !value) pulseEnded.resolve();
+    });
     await fixture.command('DO1', true, 'pulse', 'pulse');
     await fixture.command('DO1', true, 'pulse', 'pulse');
     expect(fixture.messages.at(-1)?.payload.status).toBe('duplicate');
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    await pulseEnded.promise;
     expect(await readFile(fixture.paths.output, 'utf8')).toBe('14');
     await fixture.runtime.setConnected(false);
     expect(await readFile(fixture.paths.output, 'utf8')).toBe('0');
