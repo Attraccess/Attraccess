@@ -189,6 +189,8 @@ def features():
              'inside corners r 1.0'),
             ('Corner cut-away, right', '%.1f to %.1f' % (G.NOTCH_X, G.BOARD_W), '%.1f to %.1f' % (G.NOTCH_Y, G.BOARD_H),
              'Ethernet plug'),
+            ('Tab in the right cut-away', '%.1f to %.1f' % (G.NOTCH_X, G.ETH_TAB_X), '%.1f to %.1f' % (G.ETH_TAB_TOP, G.BOARD_H),
+             'r %.1f round hole 4, inside corner r %.1f' % (G.ETH_TAB_R, G.ETH_TAB_FILLET)),
             ('Corner cut-away, left', '0 to %.1f' % G.POCKET_X, '%.1f to %.1f' % (G.POCKET_Y, G.BOARD_H), 'DC plug'),
             ('LED windows (%d), square ring' % len(G.LEDS), '%.2f, %.2f' % (G.TILE_C[0] - G.LED_RING, G.TILE_C[0] + G.LED_RING),
              '%.2f, %.2f' % (G.TILE_C[1] - G.LED_RING, G.TILE_C[1] + G.LED_RING),

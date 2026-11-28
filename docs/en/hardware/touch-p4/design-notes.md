@@ -55,14 +55,14 @@ The 3D-printable case itself is described in [Case](hardware/touch-p4/case.md).
 | LCD module (metal back) | x 5.6 to 80.4, y 12.8 to 89.4 |
 | Flex slot (behind the display) | x 33.05 to 54.65, y 73.3 to 83.8 |
 | Ethernet jack | x 68.8 to 84.9, y 71.2 to 92.8, opens downwards into its cut-away. Pin rows at y 73.0 and 75.55, behind the display |
-| Cut-away for the Ethernet plug | x above 69.5, y above 92.5 (16.5 x 51) |
+| Cut-away for the Ethernet plug | x above 69.5, y above 92.5 (16.5 x 51); in its bottom a tab of board round the fourth mounting hole, x 69.5 to 73.5, y 135.5 to 143.5 |
 | Cut-away for the DC plug | x below 12, y above 107.5 (12 x 36) |
 | Tap tile (on the case) | centred at (43, 117), on the case's centre line; loop, LED ring and tile share this centre |
 | NFC loop | 35 x 37, centre (43, 117), on the display side |
 | LEDs | 16 on a square ring 21.4 from (43, 117) on every side (x 21.6 and 64.4, y 95.6 and 138.4), four per side at 5.35 and 16.05 from the side's middle, 10.7 apart along the ring; each in a 3.4 x 3.0 window with relieved corners, long side along the ring |
 | LED supply | switch U705, level shifter U701 and the 100 uF C725 in a row between the flex slot and the ring's top side, x 36 to 58, y 84 to 93; the second 100 uF C726 between the DC cut-away and the ring's left side (x 12.6 to 19.2, y 110 to 117); the data line's carrier filter R709 (in the gap round the loop) and C727 at LED 6 (D707) |
 | PN532 block | below the display, chip at (21.5, 80.1), transmitter pins down towards the antenna feeds |
-| Mounting holes (3.2 mm) | (4, 3.5), (82, 3.5), (17.4, 140), (16, 122) |
+| Mounting holes (3.2 mm) | (4, 3.5), (82, 3.5), (17.4, 140), (70, 140) |
 | DC jack | x 0.2 to 9.2, y 93.6 to 108, opens downwards into the DC cut-away |
 | DC terminal | centre (15.5, 100.2), wires enter from below at 40 degrees |
 | USB-C | right board edge, y 13.5 to 22.5, opens sideways |
@@ -133,15 +133,21 @@ MIPI DSI on a 20-pin flex, 77 x 80 mm: it does not fit; using it would be a new 
 - **Wi-Fi antenna.** Keep metal off the strip above the display for x below 50.5: no screws, and a metal face plate
   only with a window over that strip (see [Antenna](#antenna)).
 - **Bottom corners.** The Ethernet jack opens into the right cut-away (16.5 x 51), the DC jack into the left one (12 x
-  36). Plugs and cables stay inside the board outline and go down or back into the wall.
+  36). Plugs and cables stay inside the board outline and go down or back into the wall. A tab of board round the
+  fourth mounting hole fills the bottom of the right cut-away (x 69.5 to 73.5, y 135.5 to 143.5, see Mounting holes);
+  above it the cut-away is open for 43 mm.
 - **Ethernet plug room.** What counts is the stiff part below the jack (body and boot, less the 13.5 mm inside the
   jack): 24 to 31 mm for common moulded patch cables (37 to 44 mm overall).
 
   | Cable | Bend radius (4 x diameter) | Stiff part may end below the jack: into the wall | Straight down through the bottom notch |
   |---|---|---|---|
-  | Patch 5.5 mm | 22 mm | 31 mm | 49 mm |
-  | Cat 6 patch 6.3 mm | 25 mm | 29 mm | 49 mm |
-  | Slim patch 3.8 mm (28 AWG) | 15 mm | 37 mm | 49 mm |
+  | Patch 5.5 mm | 22 mm | 31 mm | 44 mm |
+  | Cat 6 patch 6.3 mm | 25 mm | 29 mm | 44 mm |
+  | Slim patch 3.8 mm (28 AWG) | 15 mm | 37 mm | 44 mm |
+
+  Straight down the stiff part ended at 49 mm before the fourth screw moved below the tile. Now the screw's head
+  (14.5 to 16.9 mm from the wall, x 67.25 to 72.75, from y 137.25) ends it at 44 mm, unless it is no taller than the
+  plug: the plug's 8 mm pass 0.35 mm behind the head.
 
   A normal patch cable fits either way; a slim one leaves the most room and carries the PoE current (below 0.3 A).
   Field-termination plugs on 7 to 8 mm installation cable (30 mm bend) fit the bottom exit only: end installation
@@ -159,15 +165,37 @@ MIPI DSI on a 20-pin flex, 77 x 80 mm: it does not fit; using it would be a new 
   the board there.
 - **USB-C** is on the side edge behind the display and needs no housing opening if flashing is done before assembly.
 - **Mounting holes.** No outer-layer tracks within 3.3 mm of a hole centre (screw heads or standoffs up to 6.6 mm). The
-  fourth hole stood in the gap of the copper round the NFC loop at (66.3, 117) until the tap tile grew to about 44 mm.
-  The case puts a boss of radius 3.7 round each hole. The tile's flange, flat on the display side, reaches 23.6 mm
-  from the tile's centre (47.2 mm square, corners r 7). Right of the tile a boss clear of it needs x 70.3 or more,
-  and the Ethernet cut-away leaves 66.0 at most for the 1.9 mm of board the other holes have; below the tile and
-  between it and the display there is no room either. The hole is at (16, 122), between the tile and the DC
-  cut-away (2.4 mm of board to the cut-away), level with an LED of the ring, clear of the ring's 5 V vias. Its boss
-  stands in a notch of radius 3.9 in the flange, 0.2 mm all round. The third hole moved 0.6 mm towards
-  the corner, to (17.4, 140), clear of the ring's lower left LED (1.9 mm of board to the lower edge). The lower right
-  quarter of the board has no screw now: the tile's body, flat on the display side round the loop, holds it.
+  case puts a boss of radius 3.7 round each hole. The tile's flange, flat on the display side, reaches 23.6 mm from
+  the tile's centre (47.2 mm square, corners r 7). The two lower holes stand below the tile, one on each side: (17.4,
+  140) between the tile and the DC cut-away, clear of the ring's lower left LED (1.9 mm of board to the lower edge),
+  and (70, 140) in a tab of board in the bottom of the Ethernet cut-away. Both bosses clear the flange's rounded
+  corners (0.3 and 1.5 mm), so the flange has no notch.
+  - **History.** The fourth hole stood in the gap of the copper round the NFC loop at (66.3, 117) until the tap tile
+    grew to about 44 mm. Right of the tile a boss clear of the flange needs x 70.3 or more, and the cut-away leaves
+    66.0 at most for the 1.9 mm of board the other holes have. So the hole went left of the tile, to (16, 122), and
+    the lower right quarter of the board had no screw: the tile's back was to hold it. In the first printed case
+    (28 November 2026) it did not, and the board had no stability there.
+  - **The tab.** 1.9 mm of board round the hole (a circle of r 3.5) down to the lower board edge: x 69.5 to 73.5,
+    y 135.5 to 143.5, its inside corner at the cut-away's edge r 1, its outer lower corner r 2
+    (`geometry.ETH_TAB_*`). Above it the cut-away stays open from y 92.5 to 135.5, 42.7 mm below the jack's opening:
+    12 mm more than the stiff part of common patch cables needs. Plug, boot and cable lie behind the board (the
+    plug 6.15 to 14.15 mm from the wall, the component side at 16.9), so a tab in the board's plane is not in their
+    way.
+  - **Position.** The mirror image of the third hole about the tile's centre line is (68.6, 140). There the lower
+    right LED's 5 V via (67.0, 137.65) and its track would sit under the screw head, inside the 3.3 mm keep-out:
+    the ring's LEDs all face the same way round it, so its 5 V vias are not mirrored. At (70, 140) the via's pad
+    edge is 3.41 mm from the hole centre. The fiducial FID803 moved from (67, 141) to (63, 141.5) to make room.
+  - **Screw head and cable.** The M3 pan head (5.5 mm across, 2.4 mm high, 14.5 to 16.9 mm from the wall) lies on
+    the tab. In the case model it keeps 3.2 mm from a 5.5 mm cable running straight down from the plug on its axis
+    (x 76.8), 14.5 mm from the plug's reference body and 9.25 mm from the dock; a cable that goes down through the
+    cap's bottom notch (centre 7 mm from the wall) or bends into the wall moves away from it.
+  - **Case.** The fourth PCB boss and its insert moved with the hole, to case (-27, -90.85); the tile's flange lost
+    its notch, and the display frame (it ends at y 93.6) needs none. The boss keeps 2.8 mm from the nearest
+    faceplate magnet's boss. The tab keeps 1.0 mm from the cap's lock bar below the board's lower edge (as the rest
+    of that edge), 6.0 mm from the faceplate magnet, 9.6 mm from the plug and 12.5 mm from the dock; the
+    interference check of cap, tile, display frame, magnets, board and dock finds nothing new.
+  - **NFC.** The tab hangs on the copper below the loop and reaches nowhere near the gap at y 117, so it closes no
+    turn round the loop (`simulate`: no closed copper, the loop's inductance unchanged).
 - **Buzzer** BZ701 fires sideways, towards the lower board edge (port on the side facing U701): leave an opening
   nearby.
 - **LEDs** need a diffuser in front of the windows: the tap tile's white body. A channel 2.3 mm wide and 2.5 mm deep

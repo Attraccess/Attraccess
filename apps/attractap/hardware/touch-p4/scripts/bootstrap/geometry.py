@@ -5,6 +5,8 @@ F.Cu is the component side and faces the wall (product back). B.Cu carries the
 NFC loop and faces the user; the display is taped onto that side.
 """
 
+import math
+
 BOARD_W = 86.0
 BOARD_H = 143.5
 ORIGIN = (60.0, 30.0)          # where the board's top-left corner sits on the KiCad sheet
@@ -164,13 +166,27 @@ POE_ROUTER_KEEPOUT = [(77.35, 35.0, 86.0, 71.4), (79.0, 30.6, 86.0, 35.0), (79.6
 # The case puts a boss of radius TILE_BOSS_R round each hole, and the tile's body (the LED ring plus
 # TILE_BODY_MARGIN, corners rounded with up to TILE_BODY_CORNER) must keep TILE_BOSS_GAP from it. Between the
 # tile and the Ethernet cut-away there is no room for that (x 69.2 at least, and 66.0 at most for the web the
-# other holes have), nor below the tile or between the tile and the display. On the left there is: between the
-# tile and the DC cut-away, beside an LED (not a 5 V via) of the ring. The third hole moved 0.6 mm towards the
+# other holes have), nor between the tile and the display. Left of the tile, at (16, 122), the hole left the
+# board's lower right quarter without a screw, and the tile's back did not hold it (first print, 28 November
+# 2026). Now the fourth hole stands below the tile on the Ethernet side, near the mirror of the third one
+# (68.6, 140) about the tile's centre line: in a tab of board in the bottom of the Ethernet cut-away
+# (ETH_TAB), past the plug and its boot. It sits 1.4 mm further out than the mirror image, so that the lower
+# right LED's 5 V via (67.0, 137.65) stays outside MOUNT_KEEPOUT_R. The third hole moved 0.6 mm towards the
 # corner, clear of the ring's lower left LED.
-MOUNT_HOLES = ((4.0, 3.5), (82.0, 3.5), (17.4, 140.0), (16.0, 122.0))
+MOUNT_HOLES = ((4.0, 3.5), (82.0, 3.5), (17.4, 140.0), (70.0, 140.0))
 MOUNT_HOLE_R = 1.6
 TILE_BOSS_R, TILE_BOSS_GAP, TILE_BODY_MARGIN, TILE_BODY_CORNER = 3.7, 0.3, 0.8, 6.0
 MOUNT_WEB = 1.9                             # board material round a hole: what the upper holes have to the top edge
+# The tab in the bottom of the Ethernet cut-away round the fourth hole: MOUNT_WEB of board round the hole (a
+# circle of ETH_TAB_R about it) down to the lower board edge, its inside corner with the cut-away's edge
+# rounded with ETH_TAB_FILLET, its outer lower corner with the board's 2 mm. Above it the cut-away stays open
+# from NOTCH_Y to ETH_TAB_TOP for the plug and its boot (the screw head on the component side stands
+# 14.5 to 16.9 mm from the wall, behind the board: see the design notes).
+ETH_TAB_HOLE = MOUNT_HOLES[3]
+ETH_TAB_R = MOUNT_HOLE_R + MOUNT_WEB
+ETH_TAB_FILLET = 1.0
+ETH_TAB_X = ETH_TAB_HOLE[0] + ETH_TAB_R      # the tab's right edge
+ETH_TAB_TOP = ETH_TAB_HOLE[1] - math.sqrt((ETH_TAB_R + ETH_TAB_FILLET) ** 2 - (NOTCH_X + ETH_TAB_FILLET - ETH_TAB_HOLE[0]) ** 2)
 # The copper round the NFC loop (pours of every layer, the LED ring's 5 V rail) is open in one place, between
 # the loop's right edge and the Ethernet cut-away, between the two right-hand LEDs next to the loop's centre
 # line: closed, it would be a shorted turn (simulated: 1.25 uH become 1.08 uH). x1, y1, x2, y2.

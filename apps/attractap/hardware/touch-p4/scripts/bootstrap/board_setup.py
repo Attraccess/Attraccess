@@ -17,6 +17,14 @@ def outline(B):
     r = 2.0
     k = r * (1 - math.sqrt(0.5))
     px, py = G.POCKET_X, G.POCKET_Y
+    # the tab round the fourth hole in the bottom of the Ethernet cut-away (geometry.ETH_TAB_*): from the
+    # cut-away's edge a fillet onto a circle round the hole, along it to the tab's right edge, down to the
+    # lower board edge
+    (hx, hy), tr, tf, tx, ty = G.ETH_TAB_HOLE, G.ETH_TAB_R, G.ETH_TAB_FILLET, G.ETH_TAB_X, G.ETH_TAB_TOP
+    fc = (nx + tf, ty)                                  # the fillet's centre
+    d = math.hypot(fc[0] - hx, fc[1] - hy)
+    tp = (hx + (fc[0] - hx) * tr / d, hy + (fc[1] - hy) * tr / d)     # where the fillet meets the circle
+    ry = hy                                             # the circle meets the right edge level with the hole
     # outer contour: rectangle with both bottom corners cut away (Ethernet plug on the right, DC plug on
     # the left), rounded corners
     ax1, ax2, ad = G.WIFI_NOTCH                 # cut under the Wi-Fi antenna, inside corners rounded
@@ -25,7 +33,7 @@ def outline(B):
     pts_lines = [
         ((r, 0), (ax1, 0)), ((ax1, 0), (ax1, ad - ar)), ((ax1 + ar, ad), (ax2 - ar, ad)), ((ax2, ad - ar), (ax2, 0)),
         ((ax2, 0), (W - r, 0)), ((W, r), (W, ny - r)), ((W - r, ny), (nx + r, ny)),
-        ((nx, ny + r), (nx, H - r)), ((nx - r, H), (px + r, H)), ((px, H - r), (px, py + r)),
+        ((nx, ny + r), (nx, ty)), ((tx, ry), (tx, H - r)), ((tx - r, H), (px + r, H)), ((px, H - r), (px, py + r)),
         ((px - r, py), (r, py)), ((0, py - r), (0, r)),
     ]
     for a, c in pts_lines:
@@ -41,7 +49,15 @@ def outline(B):
     arc((W - r, 0), (W - k, k), (W, r))
     arc((W, ny - r), (W - k, ny - k), (W - r, ny))
     arc((nx + r, ny), (nx + k, ny + k), (nx, ny + r))          # inside corner of the notch
-    arc((nx, H - r), (nx - k, H - k), (nx - r, H))
+
+    def mid(c, rad, a, b):
+        """The point halfway along the shorter arc of radius rad round c from a to b."""
+        mx, my = (a[0] + b[0]) / 2 - c[0], (a[1] + b[1]) / 2 - c[1]
+        m = math.hypot(mx, my)
+        return (c[0] + mx / m * rad, c[1] + my / m * rad)
+    arc((nx, ty), mid(fc, tf, (nx, ty), tp), tp)                 # tab: fillet at the cut-away's edge
+    arc(tp, mid((hx, hy), tr, tp, (tx, ry)), (tx, ry))           # tab: round the hole
+    arc((tx, H - r), (tx - k, H - k), (tx - r, H))               # tab: outer lower corner
     arc((px + r, H), (px + k, H - k), (px, H - r))
     arc((px, py + r), (px - k, py + k), (px - r, py))            # inside corner of the DC cut-away
     arc((r, py), (k, py - k), (0, py - r))

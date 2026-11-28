@@ -1,8 +1,8 @@
 {
-  "board-fab": "e104fab549bdec76e8365abfe04c6323b047f01016c3362d331b5c1a5508daed",
-  "board-render": "add7002e66079f4bb37c8eaba25d1666ff82ee16f3dfe200e1a9a42dae4a0578",
-  "case-parts": "38610458b86346b8521a1c4eccbd2f74460cff35dca41f1d81967b6cbf58e408",
+  "board-fab": "2dd6c44deae652c302777ae8b6f3c3d2e6ccc61a0a5be9829f96ea23ac579ace",
+  "board-render": "fdbda1452fc7d9bd11777c18a1da188cdea43073d358d2dd0b1921dab0aa5310",
+  "case-parts": "bff437189f641da4fa03125c9f4b29a35ff3c3f3b556a34f4d65c860a6c72c90",
   "manual-figures": "1affa88aaf68816d2fddd69ce5c33137c692be15cca2e43b4d0dd0beecfd612d",
-  "manual-pdf": "f330a3eab6a034bb4c32bbfaf469e9d77ad114debb44645a4d28c18f0e4b8e58",
-  "mock-board": "be7e90f0567e5508598079dfc2c295180d2e9ed94cc0cb3fa1a04342de456018"
+  "manual-pdf": "6e08d76ca4a4866aab67ade9b292712693e0381c7530ccc64c6fae07b919b9ea",
+  "mock-board": "0c2bedad074082676c1b89bd93f7761c7bf05eedc7c919334c1aee89f941b11e"
 }

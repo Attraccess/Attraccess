@@ -45,10 +45,11 @@ both. Nothing has been printed or test-fitted yet: see [Not yet verified](#not-y
   - **Core.** Inside the ring the tile stays white. In white plastic light scatters instead of being guided:
     a white core sends what strays inwards back towards the rim, while a black one would absorb it and
     dim the rim. The black top hides the core.
-  - **Holding the board.** The tile is clamped between the cap's front wall and the board, its back flat
-    on the board round the NFC loop. That holds the corner of the board that has no screw (lower left
-    seen from the front). Of the two board screws right of the tile (seen from the front), the upper one
-    sits in a notch in the flange and the lower one clears its rounded corner.
+  - **Held by the board.** The tile is clamped between the cap's front wall and the board, its back flat
+    on the board round the NFC loop. The two lower board screws stand below the tile, one on each side;
+    both bosses clear the flange's rounded corners, so the flange has no notch. Until 28 November 2026
+    the fourth screw stood beside the tile and the tile's back was to hold the board's lower left corner
+    (seen from the front) instead. On the first print it did not: that corner had no hold.
 - **Dock**: the back plate, 13.9 mm from the board's component side. It is screwed to the wall (five
   holes; the lower pair matches the 60 mm spacing of a flush-mount box) or onto the stand. Under the
   Ethernet jack and the PoE module the plate has recesses 0.8 mm deep, and a window through it under
@@ -149,7 +150,7 @@ The hardware (heat-set inserts, screws, tape, cable ties) is listed in the
 | [`cad/attractap-assembly.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-assembly.step) | The whole reader assembled, for other CAD tools. |
 | Mock board: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.stl) | Printable stand-in for the board, with the bodies of all its components, to check the fit by eye and by hand before the real board is at hand. It is the Ethernet and PoE build (`lan`), which fits every part; the Wi-Fi build only leaves parts out. Print it at full scale on its back face (the display side), components up, with supports from the build plate: the end of the Wi-Fi module over the antenna cut-out and the USB-C socket in its notch overhang the board. The openings of the RJ45 jack and the DC jack print as bridges. The 3MF and STL files have the shapes of the component models, with the pins cut off at the back face and the space under the PoE module filled; the STEP file has a box round each part instead, to stay small. Made from the KiCad board by `cad/tools/mock_board.py`. |
 | Mock display: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.stl) | Stand-in for the display, with the assumed display dimensions (see [Not yet verified](#not-yet-verified)). |
-| [`board/attractap-touch-p4.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/board/attractap-touch-p4.step) | The bare board (no parts) exported from the current layout. The design embeds this file, re-imported on 27 November 2026 for the LED ring and the moved mounting holes; import it again after a change to the board outline or holes. |
+| [`board/attractap-touch-p4.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/board/attractap-touch-p4.step) | The bare board (no parts) exported from the current layout. The design embeds this file, re-imported on 28 November 2026 for the fourth mounting hole below the tile and the tab round it; import it again after a change to the board outline or holes. |
 | [`logo/attraccess-wordmark.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-wordmark.svg), [`attraccess-keyhole.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-keyhole.svg), [`attraccess-logo-mono.svg`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/logo/attraccess-logo-mono.svg) | Logo outlines for the inlays of the faceplate and the tap tile; the board's silkscreen logo is drawn from the same folder. |
 | [`manual/`](https://github.com/Attraccess/Attraccess/tree/main/apps/attractap/hardware/touch-p4/case/manual) | The scene file the manual's figures are rendered from, and the scripts that make the figures and the PDF (see [Changing the design](#changing-the-design)). |
 
@@ -249,12 +250,12 @@ files for it, and use `rsvg-convert` for labels.
   - How evenly and how brightly the rim lights up. The light channel and the 2.8 mm of white over it are
     a first guess; LED spots on the rim would call for a deeper channel or small black masks over the
     LEDs, and a dim rim for a thinner roof.
-  - Whether the tile's back holds the board's lower left corner (seen from the front) without play. It
-    lies on the board with no gap in CAD. If the board then does not sit on all four bosses, sand the
-    tile's back.
-  - Backwards (towards the wall) nothing but the board itself supports that corner: the dock has its
-    cable opening behind it. A card pressed on the tile bends it back elastically, by an estimated
-    0.1 mm for 5 N on the tile's centre.
+  - Whether the board sits on all four bosses with the tile clamped under it. The tile's back lies on
+    the board with no gap in CAD. If a corner of the board then stands off its boss, sand the tile's back.
+  - The board's lower left corner (seen from the front) is screwed since 28 November 2026: the fourth
+    board screw moved from beside the tile to below it, into a tab of the board in the bottom of the
+    Ethernet cut-away. Checked in CAD only. Check on the next print that the board no longer gives
+    there, and that the screw head clears the Ethernet plug and cable.
 - **Faceplate magnets.** Five magnets glued into bosses behind the cap's front wall, 0.4 mm of it in
   front of them, and five washers on the faceplate. The magnets' backs clear the board's display side by
   0.2 mm; a magnet glued proud of its boss presses on the board. Check the holding force and that the

@@ -57,14 +57,14 @@ Das 3D-druckbare Gehäuse selbst ist unter [Gehäuse](hardware/touch-p4/case.md)
 | LCD-Modul (Metallrückseite) | x 5,6 bis 80,4, y 12,8 bis 89,4 |
 | Flexkabel-Schlitz (hinter dem Display) | x 33,05 bis 54,65, y 73,3 bis 83,8 |
 | Ethernet-Buchse | x 68,8 bis 84,9, y 71,2 bis 92,8, öffnet nach unten in ihren Ausschnitt. Pin-Reihen bei y 73,0 und 75,55, hinter dem Display |
-| Ausschnitt für den Ethernet-Stecker | x über 69,5, y über 92,5 (16,5 x 51) |
+| Ausschnitt für den Ethernet-Stecker | x über 69,5, y über 92,5 (16,5 x 51); in seinem unteren Ende eine Zunge aus Platine um das vierte Befestigungsloch, x 69,5 bis 73,5, y 135,5 bis 143,5 |
 | Ausschnitt für den DC-Stecker | x unter 12, y über 107,5 (12 x 36) |
 | Tap-Kachel (am Gehäuse) | Mitte (43; 117), auf der Mittellinie des Gehäuses; Schleife, LED-Ring und Kachel haben diese Mitte gemeinsam |
 | NFC-Schleife | 35 x 37, Mitte (43; 117), auf der Displayseite |
 | LEDs | 16 auf einem quadratischen Ring, auf jeder Seite 21,4 von (43; 117) entfernt (x 21,6 und 64,4, y 95,6 und 138,4), vier je Seite bei 5,35 und 16,05 von der Seitenmitte, 10,7 voneinander entlang des Rings; jede in einem Fenster von 3,4 x 3,0 mit freigestellten Ecken, die lange Seite entlang des Rings |
 | LED-Versorgung | Schalter U705, Pegelwandler U701 und der 100-uF-Kondensator C725 in einer Reihe zwischen dem Flex-Schlitz und der Oberseite des Rings, x 36 bis 58, y 84 bis 93; der zweite 100-uF-Kondensator C726 zwischen dem DC-Ausschnitt und der linken Seite des Rings (x 12,6 bis 19,2, y 110 bis 117); das Trägerfilter der Datenleitung, R709 (in der Lücke um die Schleife) und C727 an LED 6 (D707) |
 | PN532-Block | unter dem Display, Chip bei (21,5; 80,1), Senderpins nach unten zu den Antennenzuleitungen |
-| Befestigungslöcher (3,2 mm) | (4; 3,5), (82; 3,5), (17,4; 140), (16; 122) |
+| Befestigungslöcher (3,2 mm) | (4; 3,5), (82; 3,5), (17,4; 140), (70; 140) |
 | DC-Buchse | x 0,2 bis 9,2, y 93,6 bis 108, öffnet nach unten in den DC-Ausschnitt |
 | DC-Klemme | Mitte (15,5; 100,2), die Drähte treten von unten im Winkel von 40 Grad ein |
 | USB-C | rechter Platinenrand, y 13,5 bis 22,5, öffnet seitlich |
@@ -143,15 +143,21 @@ verwenden wäre ein neuer Display-Abschnitt.
 - **WLAN-Antenne.** Metall vom Streifen über dem Display für x unter 50,5 fernhalten: keine Schrauben, und eine
   Frontplatte aus Metall nur mit einem Fenster über diesem Streifen (siehe [Antenne](#antenne)).
 - **Untere Ecken.** Die Ethernet-Buchse öffnet in den rechten Ausschnitt (16,5 x 51), die DC-Buchse in den linken (12 x
-  36). Stecker und Kabel bleiben innerhalb des Platinenumrisses und gehen nach unten oder zurück in die Wand.
+  36). Stecker und Kabel bleiben innerhalb des Platinenumrisses und gehen nach unten oder zurück in die Wand. Eine
+  Zunge aus Platine um das vierte Befestigungsloch füllt das untere Ende des rechten Ausschnitts (x 69,5 bis 73,5,
+  y 135,5 bis 143,5, siehe Befestigungslöcher); darüber ist der Ausschnitt 43 mm weit offen.
 - **Platz für den Ethernet-Stecker.** Es zählt der steife Teil unterhalb der Buchse (Körper und Knickschutz, abzüglich
   der 13,5 mm in der Buchse): 24 bis 31 mm bei gängigen gespritzten Patchkabeln (37 bis 44 mm insgesamt).
 
   | Kabel | Biegeradius (4 x Durchmesser) | Der steife Teil darf unterhalb der Buchse enden: in die Wand | Gerade nach unten durch die untere Aussparung |
   |---|---|---|---|
-  | Patchkabel 5,5 mm | 22 mm | 31 mm | 49 mm |
-  | Cat-6-Patchkabel 6,3 mm | 25 mm | 29 mm | 49 mm |
-  | Schlankes Patchkabel 3,8 mm (28 AWG) | 15 mm | 37 mm | 49 mm |
+  | Patchkabel 5,5 mm | 22 mm | 31 mm | 44 mm |
+  | Cat-6-Patchkabel 6,3 mm | 25 mm | 29 mm | 44 mm |
+  | Schlankes Patchkabel 3,8 mm (28 AWG) | 15 mm | 37 mm | 44 mm |
+
+  Gerade nach unten endete der steife Teil bei 49 mm, bevor die vierte Schraube unter die Kachel rückte. Jetzt
+  begrenzt ihn der Schraubenkopf (14,5 bis 16,9 mm von der Wand, x 67,25 bis 72,75, ab y 137,25) auf 44 mm, außer er
+  ist nicht höher als der Stecker: Dessen 8 mm gehen 0,35 mm hinter dem Kopf vorbei.
 
   Ein normales Patchkabel passt in beiden Fällen; ein schlankes lässt den meisten Platz und trägt den PoE-Strom (unter
   0,3 A). Stecker für die Feldkonfektionierung auf 7 bis 8 mm dickem Installationskabel (30 mm Bogen) passen nur zum
@@ -170,16 +176,43 @@ verwenden wäre ein neuer Display-Abschnitt.
 - **USB-C** liegt am Seitenrand hinter dem Display und braucht keine Öffnung im Gehäuse, wenn vor dem Zusammenbau
   geflasht wird.
 - **Befestigungslöcher.** Keine Leiterbahnen auf den äußeren Lagen innerhalb von 3,3 mm um die Mitte eines Lochs
-  (Schraubenköpfe oder Abstandshalter bis 6,6 mm). Das vierte Loch stand bei (66,3; 117) in der Lücke des Kupfers um
-  die NFC-Schleife, bis die Tap-Kachel auf etwa 44 mm wuchs. Das Gehäuse setzt um jedes Loch einen Dom mit 3,7 mm
-  Radius. Der Flansch der Kachel, flach auf der Displayseite, reicht 23,6 mm von der Mitte der Kachel (47,2 mm im
-  Quadrat, Ecken r 7). Rechts der Kachel bräuchte ein Dom, der ihn frei lässt, x 70,3 oder mehr, der
-  Ethernet-Ausschnitt lässt für die 1,9 mm Platine, die die anderen Löcher haben, höchstens 66,0; unter der Kachel und
-  zwischen ihr und dem Display ist auch kein Platz. Das Loch sitzt bei (16; 122), zwischen Kachel und DC-Ausschnitt
-  (2,4 mm Platine zum Ausschnitt), auf Höhe einer LED des Rings, abseits seiner 5-V-Vias. Sein Dom steht in einer
-  Aussparung mit 3,9 mm Radius im Flansch, 0,2 mm rundum. Das dritte Loch rückte 0,6 mm zur Ecke, nach (17,4; 140), weg
-  von der unteren linken LED des Rings (1,9 mm Platine zum unteren Rand). Das untere rechte Viertel der Platine hat
-  jetzt keine Schraube: Der Körper der Kachel, flach auf der Displayseite um die Schleife, hält es.
+  (Schraubenköpfe oder Abstandshalter bis 6,6 mm). Das Gehäuse setzt um jedes Loch einen Dom mit 3,7 mm Radius. Der
+  Flansch der Kachel, flach auf der Displayseite, reicht 23,6 mm von der Mitte der Kachel (47,2 mm im Quadrat, Ecken
+  r 7). Die beiden unteren Löcher stehen unter der Kachel, auf jeder Seite eins: (17,4; 140) zwischen Kachel und
+  DC-Ausschnitt, abseits der unteren linken LED des Rings (1,9 mm Platine zum unteren Rand), und (70; 140) in einer
+  Zunge aus Platine im unteren Ende des Ethernet-Ausschnitts. Beide Dome bleiben frei von den gerundeten Ecken des
+  Flansches (0,3 und 1,5 mm), daher hat der Flansch keine Aussparung.
+  - **Vorgeschichte.** Das vierte Loch stand bei (66,3; 117) in der Lücke des Kupfers um die NFC-Schleife, bis die
+    Tap-Kachel auf etwa 44 mm wuchs. Rechts der Kachel bräuchte ein Dom, der den Flansch frei lässt, x 70,3 oder
+    mehr, der Ausschnitt lässt für die 1,9 mm Platine, die die anderen Löcher haben, höchstens 66,0. Also kam das
+    Loch links der Kachel nach (16; 122), und das untere rechte Viertel der Platine hatte keine Schraube: Die
+    Rückseite der Kachel sollte es halten. Im ersten gedruckten Gehäuse (28. November 2026) tat sie das nicht, und
+    die Platine hatte dort keinen Halt.
+  - **Die Zunge.** 1,9 mm Platine um das Loch (ein Kreis mit r 3,5) bis zum unteren Platinenrand: x 69,5 bis 73,5,
+    y 135,5 bis 143,5, ihre Innenecke am Rand des Ausschnitts r 1, ihre äußere untere Ecke r 2
+    (`geometry.ETH_TAB_*`). Darüber bleibt der Ausschnitt von y 92,5 bis 135,5 offen, 42,7 mm unterhalb der Öffnung
+    der Buchse: 12 mm mehr, als der steife Teil gängiger Patchkabel braucht. Stecker, Knickschutz und Kabel liegen
+    hinter der Platine (der Stecker 6,15 bis 14,15 mm von der Wand, die Bestückungsseite bei 16,9), daher ist eine
+    Zunge in der Ebene der Platine ihnen nicht im Weg.
+  - **Lage.** Das Spiegelbild des dritten Lochs an der Mittellinie der Kachel ist (68,6; 140). Dort lägen das 5-V-Via
+    der unteren rechten LED (67,0; 137,65) und seine Leiterbahn unter dem Schraubenkopf, innerhalb der 3,3 mm
+    Sperrfläche: Die LEDs des Rings zeigen alle in dieselbe Umlaufrichtung, daher sind ihre 5-V-Vias nicht
+    gespiegelt. Bei (70; 140) ist der Rand des Via-Pads 3,41 mm von der Lochmitte entfernt. Die Passmarke FID803
+    rückte dafür von (67; 141) nach (63; 141,5).
+  - **Schraubenkopf und Kabel.** Der M3-Flachkopf (5,5 mm Durchmesser, 2,4 mm hoch, 14,5 bis 16,9 mm von der Wand)
+    liegt auf der Zunge. Im Gehäusemodell hält er 3,2 mm Abstand zu einem 5,5-mm-Kabel, das in der Achse des
+    Steckers (x 76,8) gerade nach unten läuft, 14,5 mm zum Referenzkörper des Steckers und 9,25 mm zum Dock; ein
+    Kabel, das durch die untere Aussparung der Kappe (Mitte 7 mm von der Wand) nach unten geht oder sich in die Wand
+    biegt, entfernt sich von ihm.
+  - **Gehäuse.** Der vierte Platinen-Schraubdom und seine Einschmelzmutter rückten mit dem Loch nach Gehäuse
+    (-27; -90,85); der Flansch der Kachel verlor seine Aussparung, und der Displayrahmen (er endet bei y 93,6)
+    braucht keine. Der Dom hält 2,8 mm zum nächsten Magnetdom der Frontplatte. Die Zunge hält 1,0 mm zum Verriegelungsbügel der
+    Kappe unter dem unteren Platinenrand (wie der Rest dieses Randes), 6,0 mm zum Magneten der Frontplatte, 9,6 mm
+    zum Stecker und 12,5 mm zum Dock; die Kollisionsprüfung von Kappe, Kachel, Displayrahmen, Magneten, Platine und
+    Dock findet nichts Neues.
+  - **NFC.** Die Zunge hängt am Kupfer unter der Schleife und reicht nicht in die Nähe der Lücke bei y 117, schließt
+    also keine Windung um die Schleife (`simulate`: kein geschlossenes Kupfer, die Induktivität der Schleife
+    unverändert).
 - **Summer** BZ701 strahlt seitlich ab, zum unteren Platinenrand (Schallöffnung auf der Seite zu U701): Nahe daran eine
   Öffnung lassen.
 - **LEDs** brauchen einen Diffusor vor den Fenstern: den weißen Körper der Tap-Kachel. Ein Kanal, 2,3 mm breit und

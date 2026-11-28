@@ -466,7 +466,7 @@ def place(B):
         put(ref, x, y, 0)
     put('FID801', 3.0, 9.6, 0)     # below the upper left hole: the cut under the Wi-Fi antenna takes the corner
     put('FID802', 76.6, 2.4, 0)
-    put('FID803', 67.0, 141.0, 0)
+    put('FID803', 63.0, 141.5, 0)    # left of the lower right hole, clear of its screw head
     # local fiducials for the 0.35 mm pitch MCU, at two opposite corners of its package
     put('FID804', 29.9, 47.4, 0)
     put('FID805', 51.2, 59.8, 0)

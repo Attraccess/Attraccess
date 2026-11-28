@@ -376,7 +376,7 @@ class GeometryTest(unittest.TestCase):
                                         (hx, hy))
             web = geometry.MOUNT_HOLE_R + geometry.MOUNT_WEB
             self.assertTrue(web <= hx <= geometry.BOARD_W - web and web <= hy <= geometry.BOARD_H - web)
-            if hy > geometry.NOTCH_Y - web:
+            if hy > geometry.NOTCH_Y - web and (hx, hy) != geometry.ETH_TAB_HOLE:
                 self.assertLessEqual(hx, geometry.NOTCH_X - web)
             if hy > geometry.POCKET_Y - web:
                 self.assertGreaterEqual(hx, geometry.POCKET_X + web)
@@ -410,6 +410,22 @@ class GeometryTest(unittest.TestCase):
     def test_room_for_the_plug(self):
         # plug with boot (30 mm) and the cable's bend into the wall (19 mm for a 5.5 mm cable)
         self.assertGreaterEqual(geometry.BOARD_H - geometry.NOTCH_Y, 49.0)
+
+    def test_tab_in_the_ethernet_cut_away_holds_its_hole_and_leaves_the_plug_room(self):
+        # the board round the fourth hole: MOUNT_WEB to the tab's edges and to the lower board edge; above the
+        # tab the cut-away stays open for the plug with its boot (the stiffest common patch cables end 31 mm
+        # below the jack's opening, y 92.8); the screw's head lies on the tab, not over the open cut-away
+        hx, hy = geometry.ETH_TAB_HOLE
+        web = geometry.MOUNT_HOLE_R + geometry.MOUNT_WEB
+        self.assertIn(geometry.ETH_TAB_HOLE, geometry.MOUNT_HOLES)
+        self.assertGreater(hx + geometry.MOUNT_HOLE_R, geometry.NOTCH_X)      # it does need the tab
+        self.assertGreaterEqual(geometry.ETH_TAB_X, hx + web)
+        self.assertLessEqual(geometry.ETH_TAB_X, geometry.BOARD_W - 10)       # the plug's 12 mm stay mostly open
+        self.assertLessEqual(hy, geometry.BOARD_H - web)
+        self.assertGreaterEqual(geometry.ETH_TAB_TOP - 92.8, 31 + 5)
+        head = 2.75                                                           # M3 pan head, 5.5 mm across
+        self.assertGreaterEqual(hy - head, geometry.ETH_TAB_TOP)
+        self.assertLessEqual(hx + head, geometry.ETH_TAB_X)
 
 
 class FootprintLibraryTest(unittest.TestCase):
