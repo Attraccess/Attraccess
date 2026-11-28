@@ -12,6 +12,7 @@ import {
 } from '../../../analytics/analytics-reader.port';
 import { DateRangeValue } from '../../../analytics/dtos/dateRangeValue';
 import { toBillingTransactionExportRow, toResourceUsageExportRow } from './export-rows';
+import { lastPartCondition } from '../usage/session-part-conditions';
 
 @Injectable()
 export class TypeOrmAnalyticsReader implements AnalyticsReader {
@@ -123,9 +124,7 @@ export class TypeOrmAnalyticsReader implements AnalyticsReader {
       .andWhere('usage.usageAction = :action AND usage.lifecyclePending = :pending', params)
       .andWhere('usage.startTime < :asOf AND (usage.endTime IS NULL OR usage.endTime > :start)', params)
       // A session whose project was switched is one use: of its parts in the range, only the last counts.
-      .andWhere(
-        'NOT EXISTS (SELECT 1 FROM "resource_usage" "next" WHERE "next"."previousUsageId" = "usage"."id" AND "next"."lifecyclePending" = false AND "next"."startTime" < :asOf)',
-      )
+      .andWhere(lastPartCondition('usage', { startedBefore: ':asOf' }))
       .groupBy('usage.resourceId')
       .getRawMany<{ resourceId: number; sessions: string }>();
     return new Map(sessionCounts.map((row) => [Number(row.resourceId), Number(row.sessions)]));

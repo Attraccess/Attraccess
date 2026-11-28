@@ -1,3 +1,5 @@
+import { lastPartCondition } from '../usage/session-part-conditions';
+
 /**
  * PostgreSQL returns `timestamptz` columns as `Date` and accepts `Date` parameters, so no format bridging is needed.
  * Identifiers are quoted: PostgreSQL folds unquoted camelCase names to lower case. Parameters are `$n`: the
@@ -55,10 +57,7 @@ export const buildScheduleEvaluationQuery = (
            AND u."endTime" IS NOT NULL
            AND u."endTime" >= b.baseline
            -- A session whose project was switched is one use, counted when its last part ends.
-           AND NOT EXISTS (
-             SELECT 1 FROM "${usageTable}" next
-             WHERE next."previousUsageId" = u.id AND next."lifecyclePending" = false
-           )
+           AND ${lastPartCondition('u', { table: usageTable })}
           GROUP BY b."resourceId", b."scheduleId", b.baseline, b."hasActiveMaintenance"`;
 };
 

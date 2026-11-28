@@ -3,6 +3,7 @@ import { ResourceUsageAction, type UsageSessionWithParties } from '@attraccess/a
 import { EntityManager, IsNull } from 'typeorm';
 import type { ContinuationDraft } from '../../../resources/usage/usage-session-store.port';
 import { toUsageSession } from './usage-session-mapping';
+import { lastPartCondition } from './session-part-conditions';
 
 /** Inserts the pending continuation of a running session, as part of the caller's transaction. */
 export async function createContinuation(
@@ -95,8 +96,6 @@ export function countCompletedSupervised(
     .andWhere('usage.userId = :userId', { userId })
     .andWhere('usage.supervisorUserId IS NOT NULL')
     .andWhere('usage.endTime IS NOT NULL')
-    .andWhere(
-      'NOT EXISTS (SELECT 1 FROM "resource_usage" "next" WHERE "next"."previousUsageId" = "usage"."id" AND "next"."lifecyclePending" = false)',
-    )
+    .andWhere(lastPartCondition('usage'))
     .getCount();
 }

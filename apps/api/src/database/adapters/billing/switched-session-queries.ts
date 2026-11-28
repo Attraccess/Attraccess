@@ -1,5 +1,6 @@
 import { BillingTransactionStatus, type SwitchedSessionCharge } from '@attraccess/application-models';
 import type { EntityManager } from 'typeorm';
+import { continuedCondition } from '../usage/session-part-conditions';
 
 interface Row {
   isContinuation: boolean;
@@ -35,10 +36,7 @@ export async function findSwitchedSessionCharge(
        JOIN "billing_transaction" "correction" ON "correction"."correctionOfId" = "bill"."id"
      )
      SELECT "usage"."previousUsageId" IS NOT NULL AS "isContinuation",
-       EXISTS (
-         SELECT 1 FROM "resource_usage" "next"
-         WHERE "next"."previousUsageId" = "usage"."id" AND "next"."lifecyclePending" = false
-       ) AS "continues",
+       ${continuedCondition('usage')} AS "continues",
        (SELECT COALESCE(SUM("amount"), 0) FROM "charge" WHERE "userId" = $2 AND "status" = $3) AS "sessionAmount",
        "resource"."name" AS "resourceName"
      FROM "resource_usage" "usage"
