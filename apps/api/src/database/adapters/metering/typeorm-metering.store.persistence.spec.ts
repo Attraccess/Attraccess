@@ -13,6 +13,7 @@ import {
   User,
 } from '@attraccess/database-entities';
 import {
+  ProjectSwitchCharging,
   ResourceMeteringSessionStatus,
   ResourceType,
   ResourceUsageAction,
@@ -191,6 +192,52 @@ describe('TypeOrmMeteringStore with two independent connections', () => {
       ).rejects.toThrow('abort');
       expect(await b.store.findMeterById(1)).toMatchObject({ lifetimeValue: '0', counterValue: null });
     });
+  });
+
+  it('sums what the earlier parts of a continued run settled on the meter, back to the part that rounded alone', async () => {
+    const { CONTINUE, NEW_SESSION } = ProjectSwitchCharging;
+    const chain: Array<[number, ProjectSwitchCharging | null, ResourceMeteringSessionStatus, string | null]> = [
+      [11, null, ResourceMeteringSessionStatus.Settled, '1000000000'],
+      [12, CONTINUE, ResourceMeteringSessionStatus.Settled, '2000000000'],
+      [13, NEW_SESSION, ResourceMeteringSessionStatus.Settled, '4000000000'],
+      [14, CONTINUE, ResourceMeteringSessionStatus.Settled, '8000000000'],
+      [15, CONTINUE, ResourceMeteringSessionStatus.Failed, null],
+      [16, CONTINUE, ResourceMeteringSessionStatus.Active, null],
+    ];
+    for (const [id, mode, status, consumedValue] of chain) {
+      await a.source.getRepository(ResourceUsage).save({
+        id,
+        resourceId: 1,
+        userId: 1,
+        usageAction: ResourceUsageAction.Usage,
+        startTime: START,
+        endTime: id === 16 ? null : END,
+        isFinalized: true,
+        previousUsageId: id === 11 ? null : id - 1,
+        projectSwitchCharging: mode,
+      });
+      await a.source.getRepository(ResourceMeteringSession).save({
+        id: `part-${id}`,
+        resourceId: 1,
+        usageId: id,
+        meterId: 1,
+        meterName: 'Energy',
+        status,
+        consumedValue,
+        creditsPerUnit: 30,
+      });
+    }
+    const consumed = (usageId: number, rate = 30) => a.store.findContinuedMeterConsumption(usageId, 1, rate);
+
+    expect(await consumed(11)).toBe(BigInt(0));
+    expect(await consumed(12)).toBe(BigInt(1_000_000_000));
+    // A part charged like a new session starts a run of its own.
+    expect(await consumed(13)).toBe(BigInt(0));
+    expect(await consumed(14)).toBe(BigInt(4_000_000_000));
+    // The failed part's consumption is unknown and counts for nothing.
+    expect(await consumed(16)).toBe(BigInt(12_000_000_000));
+    // Another rate never rounds together.
+    expect(await consumed(16, 31)).toBe(BigInt(0));
   });
 
   describe('settlement', () => {

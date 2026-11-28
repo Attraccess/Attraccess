@@ -9,7 +9,8 @@ import {
 import type { TransactionContext } from '../../database/transaction-context';
 import { meterDefinitionFromFlow } from './metering-definition';
 import { MeterNameTakenError, MeteringStore } from './metering-store.port';
-import { meterCharge, formatMeterValue } from './quantity';
+import { partMeterCharge, priorConsumptionOf } from './continued-meter-charge';
+import { formatMeterValue } from './quantity';
 import { findActiveMeterSessions, getMeteringSessionLimit } from './meter-sessions';
 import { ClosedSegment, sessionShare } from './segment-charges';
 
@@ -93,7 +94,7 @@ export class MeteringCatalog {
     const counter = meter.counterValue ?? open?.startValue ?? '0';
     const soFar: ClosedSegment[] = open ? [...closed, { ...open, endedAt: now, endValue: counter }] : closed;
     if (!soFar.length) return null;
-    const share = sessionShare(soFar, usage.id);
+    const share = sessionShare(soFar, usage.id, await priorConsumptionOf(this.store, session));
     return {
       session,
       shared: !share.solo,
@@ -103,6 +104,12 @@ export class MeteringCatalog {
       credits: share.credits,
       breakdown: share.breakdown,
     };
+  }
+
+  /** What a session on its own total owes so far, rounded with the earlier parts of a switched session as billed. */
+  private async ownCharge(session: ResourceMeteringSessionRecord, rate: number): Promise<number | null> {
+    if (session.latestValue == null) return null;
+    return partMeterCharge(await priorConsumptionOf(this.store, session), BigInt(session.latestValue), rate);
   }
 
   async listMeters(resourceId: number, options: ListMetersOptions = {}) {
@@ -139,11 +146,7 @@ export class MeteringCatalog {
               : session.latestValue == null
                 ? null
                 : formatMeterValue(BigInt(session.latestValue)),
-            chargeCredits: live
-              ? live.credits
-              : session.latestValue == null
-                ? null
-                : meterCharge(BigInt(session.latestValue), sessionRate),
+            chargeCredits: live ? live.credits : await this.ownCharge(session, sessionRate),
             latestObservedAt: session.latestObservedAt ?? (live ? meter.latestObservedAt : null),
             source: session.source,
             // Only a session that shares the meter with others has a share and segments to show.

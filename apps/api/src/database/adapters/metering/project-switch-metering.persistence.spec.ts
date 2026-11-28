@@ -193,6 +193,53 @@ describe('Metering a project switch', () => {
 
       expect([await charged(first.id), await charged(second.id), await charged(third.id)]).toEqual([30, 90, 150]);
     });
+
+    it('rounds the meter over many switches like one unsplit session, not each part on its own', async () => {
+      await setUpMeter();
+      // One credit per unit: 0.46 units, 0.46 credits, round to nothing in each part on its own.
+      await scope.metering.setRate(1, 1, 1);
+      const consume = (units: number) => (counter = Number((counter + units).toFixed(2)));
+      const parts = [await start()];
+      for (let index = 0; index < 5; index++) {
+        consume(0.46);
+        parts.push(await switchProject(0, index % 2 ? 1 : 2));
+      }
+      consume(0.46);
+      await end();
+      // The same consumption without a switch.
+      const unsplit = await start();
+      consume(6 * 0.46);
+      await end();
+
+      const split = await Promise.all(parts.map((part) => charged(part.id)));
+      // 0.46, 0.92, 1.38, 1.84, 2.30, 2.76 credits so far: each part bills what the run's whole credits grew by.
+      expect(split).toEqual([0, 1, 0, 1, 0, 1]);
+      expect(await charged(unsplit.id)).toBe(3);
+      expect(split.reduce((sum, credits) => sum + credits, 0)).toBe(3);
+      expect((await meterSessions()).slice(0, 6).map((session) => Number(session.chargeCredits))).toEqual(split);
+    });
+
+    it('rounds a late reading of the last part together with the parts before it', async () => {
+      await setUpMeter();
+      await scope.metering.setRate(1, 1, 1);
+      await start();
+      counter = 100.46;
+      const last = await switchProject();
+      counter = 100.92;
+      scope.onCollect = async () => {
+        throw new Error('meter offline');
+      };
+      const ended = await end();
+      const pending = (await meterSessions()).find((session) => session.usageId === last.id);
+      expect(pending?.status).toBe(ResourceMeteringSessionStatus.Pending);
+
+      scope.onCollect = ({ complete }) =>
+        complete({ kind: 'reading', value: String(counter), observedAt: ended.endTime?.toISOString() });
+      await scope.metering.retrySettlement(1, pending?.id as string, scope.users[0].id);
+
+      // 0.92 credits after both parts are 1 whole credit; the first part billed none of it.
+      expect((await scope.correctionsOf(last.id)).corrections.map((correction) => correction.amount)).toEqual([-1]);
+    });
   });
 
   describe('a meter shared on a machine with parallel sessions', () => {
