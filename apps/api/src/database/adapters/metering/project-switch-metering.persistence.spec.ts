@@ -241,6 +241,146 @@ describe('Metering a project switch', () => {
       expect(await charged(b.id)).toBe(3 * 30);
     });
 
+    describe('when a meter that costs the switching person nothing cannot be read at the switch', () => {
+      const OWNER = 0;
+      const OTHER = 1;
+
+      /** The owner's frozen rate is 0, the other person's is 30: the rate changed between their starts. */
+      async function frozenRates(first: typeof OWNER | typeof OTHER) {
+        await setUpMeter(2);
+        const startAt = async (user: number) => {
+          await scope.metering.setRate(1, 1, user === OWNER ? 0 : 30);
+          return start(user);
+        };
+        const earlier = await startAt(first);
+        counter = 102;
+        const later = await startAt(first === OWNER ? OTHER : OWNER);
+        counter = 106;
+        return first === OWNER ? { own: earlier, others: later } : { own: later, others: earlier };
+      }
+
+      const unreadSwitch = async (projectId: number) => {
+        scope.onCollect = async () => {
+          throw new Error('meter offline');
+        };
+        const continuation = await switchProject(OWNER, projectId);
+        readCounter();
+        return continuation;
+      };
+
+      /** What the other person pays and what the owner's whole chain was measured to consume. */
+      async function outcome(otherUsageId: number) {
+        const sessions = await meterSessions();
+        expect(sessions.filter((session) => session.status === ResourceMeteringSessionStatus.Pending)).toEqual([]);
+        const consumed = sessions
+          .filter((session) => session.usageId !== otherUsageId)
+          .reduce((total, session) => total + BigInt(session.consumedValue ?? '0'), BigInt(0));
+        const corrections = await scope.correctionsOf(otherUsageId);
+        return {
+          otherPays:
+            (await charged(otherUsageId)) +
+            corrections.corrections.reduce((total, correction) => total + Math.abs(correction.amount), 0),
+          ownConsumed: consumed,
+        };
+      }
+
+      async function run(first: typeof OWNER | typeof OTHER, switches: number, stops: number[]) {
+        const { others } = await frozenRates(first);
+        for (let index = 0; index < switches; index++) await unreadSwitch(index % 2 === 0 ? 2 : 1);
+        for (const user of stops) {
+          counter += 4;
+          await end(user);
+        }
+        const segments = await scope.source.getRepository(ResourceMeteringSegment).find();
+        expect(segments.every((segment) => segment.status === 'closed')).toBe(true);
+        return outcome(others.id);
+      }
+
+      it.each([
+        ['first', 1, OWNER],
+        ['first', 3, OWNER],
+        ['second', 1, OTHER],
+        ['second', 3, OTHER],
+      ] as const)(
+        'splits like without a switch: the person switching started %s, switches: %i',
+        async (_order, switches, first) => {
+          const unswitched = await run(first, 0, [OWNER, OTHER]);
+          await resetTestFixture(scope);
+          await scope.source.getRepository(Project).save([
+            { id: 1, name: 'Old', owner: scope.users[0] },
+            { id: 2, name: 'New', owner: scope.users[0] },
+          ]);
+
+          expect(await run(first, switches, [OWNER, OTHER])).toEqual(unswitched);
+        },
+      );
+
+      it('says why the part before the switch has no reading when it never had one', async () => {
+        const { own } = await frozenRates(OTHER);
+
+        const continuation = await unreadSwitch(2);
+
+        expect((await meterSessions()).find((session) => session.usageId === own.id)).toMatchObject({
+          status: ResourceMeteringSessionStatus.Failed,
+          consumedValue: null,
+          failureReason:
+            'The meter could not be read at the project switch (meter offline); ' +
+            'consumption since its last reading is counted after the switch',
+        });
+        expect((await scope.items(own.id)).items.map((item) => item.allocation)).not.toContainEqual(
+          expect.objectContaining({ pending: true }),
+        );
+        await end(OWNER);
+        await end(OTHER);
+        expect((await meterSessions()).find((session) => session.usageId === continuation.id)?.status).toBe(
+          ResourceMeteringSessionStatus.Settled,
+        );
+      });
+
+      it('keeps what was read before the switch on the part before it', async () => {
+        const { own } = await frozenRates(OWNER);
+
+        await unreadSwitch(2);
+
+        // The 2 units the owner used alone, up to the reading at the other person's start.
+        expect((await meterSessions()).find((session) => session.usageId === own.id)).toMatchObject({
+          status: ResourceMeteringSessionStatus.Settled,
+          consumedValue: '2000000000',
+          chargeCredits: 0,
+        });
+      });
+
+      it('gives the session its place back when the switch flow fails afterwards', async () => {
+        const { own, others } = await frozenRates(OWNER);
+        const restore = failSwitchFlow();
+
+        await expect(unreadSwitch(2)).rejects.toThrow('relay offline');
+
+        restore();
+        readCounter();
+        expect((await meterSessions()).map((session) => session.usageId)).toEqual([own.id, others.id]);
+        counter = 110;
+        await end(OWNER);
+        await end(OTHER);
+        // The owner: 2 alone and half of 8; the other person pays half of 8.
+        expect(await outcome(others.id)).toEqual({ otherPays: 4 * 30, ownConsumed: BigInt('6000000000') });
+      });
+
+      it('settles the chain once a later reading closes a segment that nobody could read', async () => {
+        const { others } = await frozenRates(OWNER);
+        await unreadSwitch(2);
+        scope.onCollect = async () => {
+          throw new Error('meter offline');
+        };
+        await end(OWNER);
+        readCounter();
+        counter = 110;
+        await end(OTHER);
+
+        expect(await outcome(others.id)).toEqual({ otherPays: 4 * 30, ownConsumed: BigInt('6000000000') });
+      });
+    });
+
     it('gives the session its share back when the switch flow fails after the boundary', async () => {
       const { a, b } = await twoPeople();
       const restore = failSwitchFlow();

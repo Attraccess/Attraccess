@@ -395,7 +395,8 @@ export class MeteringSegments {
   /**
    * The owner of a session switches its project: one reading closes the segment `session` is in, and `successor`
    * takes its place in the next one. A billed meter that cannot be read refuses the switch and leaves `session` as
-   * it was. A tracking-only meter lets both stay in the open segment until a later reading closes it.
+   * it was. When a tracking-only meter cannot be read, `successor` takes that place in the open segment instead, so
+   * what is still unread is counted after the switch.
    */
   async handOver(
     session: ResourceMeteringSessionRecord,
@@ -436,8 +437,12 @@ export class MeteringSegments {
     if (session.creditsPerUnit > 0) {
       await this.store.deleteSession(next.id);
     } else {
+      // One person, one share: with both parts in the segment, the others would get less of it than without a switch.
+      // The place stays the same, which decides a rounding tie as it would without the switch.
       await this.store.updateSegment(open.id, {
-        participants: this.inStartOrder([...open.participants, this.toParticipant(next)]),
+        participants: open.participants.map((participant) =>
+          participant.usageId === session.usageId ? this.toParticipant(next) : participant,
+        ),
       });
     }
     return { status: 'unavailable', reason };

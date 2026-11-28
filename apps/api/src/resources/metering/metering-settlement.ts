@@ -156,6 +156,12 @@ export class MeteringSettlement {
     });
   }
 
+  private async hasSegments(context: TransactionContext, session: ResourceMeteringSessionRecord): Promise<boolean> {
+    const usage = await this.store.findUsage(session.usageId, context);
+    if (!usage) throw new Error(`The usage ${session.usageId} does not exist`);
+    return (await this.store.findUsageSegments(session.meterId, usage, context)).length > 0;
+  }
+
   /**
    * The item a session's shares of its shared segments become. Null while a segment it took part in is still open;
    * `abandoned` when the meter was re-initialized before such a segment got its closing reading, so the share can
@@ -206,6 +212,28 @@ export class MeteringSettlement {
       await this.store.updateSession(
         session.id,
         { status: ResourceMeteringSessionStatus.Failed, failureReason: REINITIALIZED },
+        context,
+      );
+      return;
+    }
+    // A part before a project switch that has no segment: the continuation took its place in the one still open, and
+    // no earlier reading ever measured it. Nothing is left that a later reading could bill to it.
+    if (
+      !billed &&
+      final.status === 'unavailable' &&
+      final.atProjectSwitch &&
+      !(await this.hasSegments(context, session))
+    ) {
+      await this.addUnavailableItem(
+        context,
+        session.usageId,
+        session.meterName,
+        session.creditsPerUnit,
+        `metering:${session.id}:unavailable`,
+      );
+      await this.store.updateSession(
+        session.id,
+        { status: ResourceMeteringSessionStatus.Failed, failureReason: unreadAtProjectSwitch(final.reason) },
         context,
       );
       return;
