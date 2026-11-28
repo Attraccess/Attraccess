@@ -12,6 +12,22 @@ both. Nothing has been printed or test-fitted yet: see [Not yet verified](#not-y
 ## How it works
 
 - **Cap**: the front shell. It carries the display and the board; its front is a plain 1.4 mm wall.
+- **Display frame**: a printed tray, 2.9 mm deep, between the board and the cap's front wall. The display is
+  taped into it over the whole metal back of the LCD, not by the glass border.
+  - **Floor.** 1.5 mm thick, on the board. 0.2 mm double-sided tape on it (`back_tape_t`) holds the metal back,
+    so the display rests on the floor when the screen is pressed. The glass front lies at floor + tape +
+    `disp_t`, 0.1 mm under the faceplate's front.
+  - **Openings in the floor.** A wide one for the folded display flex, open along the display's lower edge
+    so the fold slides in (the flex area plus 1 mm, slot included); a 7 mm square hole over each of the
+    board's four ground pads, so the conductive gaskets reach the metal back; reliefs over the Ethernet
+    jack's pins and the USB-C socket's shell tabs, each 1 mm larger than the pads.
+  - **Pocket.** Walls round the LCD module, 0.25 mm per side, locate it while it is taped. The pocket is
+    open at the bottom, where the flex folds round.
+  - **Rim.** It fits the cap's screen window with 0.1 mm per side and locates the frame sideways. It
+    carries no tape and stays 1.1 mm under the glass (`rim_gap`); its 77.3 mm opening clears the touch
+    sensor's edges.
+  - **No play in depth.** The frame is as deep as the space between the board and the cap's front wall:
+    the board, screwed onto its bosses, clamps it against the wall.
 - **Faceplate**: a 1 mm cover over the whole front, held on the cap by five magnets without glue or
   tape; the display's glass lies flush with it. Five steel washers on its back sit over magnets hidden
   in the cap's front wall, so faceplates can be swapped by hand (see [Faceplate interface](#faceplate-interface)). It is plain by default, with a white stripe from the tap tile down to the bottom edge. The
@@ -129,7 +145,7 @@ The hardware (heat-set inserts, screws, tape, cable ties) is listed in the
 
 | File | What it is |
 | --- | --- |
-| [`cad/attractap-touch-case.sc`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-touch-case.sc) | The design, a SolidCraft document (version 0.45.0). Every print file is exported from it. |
+| [`cad/attractap-touch-case.sc`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-touch-case.sc) | The design, a SolidCraft document (saved with version 0.51.2). Every print file is exported from it. |
 | [`cad/attractap-assembly.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-assembly.step) | The whole reader assembled, for other CAD tools. |
 | Mock board: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.stl) | Printable stand-in for the board, with the bodies of all its components, to check the fit by eye and by hand before the real board is at hand. It is the Ethernet and PoE build (`lan`), which fits every part; the Wi-Fi build only leaves parts out. Print it at full scale on its back face (the display side), components up, with supports from the build plate: the end of the Wi-Fi module over the antenna cut-out and the USB-C socket in its notch overhang the board. The openings of the RJ45 jack and the DC jack print as bridges. The 3MF and STL files have the shapes of the component models, with the pins cut off at the back face and the space under the PoE module filled; the STEP file has a box round each part instead, to stay small. Made from the KiCad board by `cad/tools/mock_board.py`. |
 | Mock display: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.stl) | Stand-in for the display, with the assumed display dimensions (see [Not yet verified](#not-yet-verified)). |
@@ -152,8 +168,14 @@ The hardware (heat-set inserts, screws, tape, cable ties) is listed in the
   X = 43 − x, Y = 49.15 − y; in KiCad coordinates (board corner at (60, 30)) at X = 103 − x,
   Y = 79.15 − y.
 - **Parameters**: the depth stack is parametric (`plate_t`, `cav`, `pcb_t`, `disp_gap`, `disp_t`,
-  `lens_t`, `tape_t`, `lens_recess`, `wall`, `pcb_ins_depth`). X and Y positions are plain numbers
-  taken from the board.
+  `back_tape_t`, `lens_t`, `rim_gap`, `lens_recess`, `wall`, `pcb_ins_depth`). X and Y positions are plain numbers
+  taken from the board. Each parameter's comment in the design says what it is. For the display:
+  - `disp_gap`: board to the LCD's metal back, filled by the display frame's floor (`disp_gap` −
+    `back_tape_t`) and the tape on it.
+  - `disp_t`: the display from the front of the glass to the metal back, measured.
+  - `back_tape_t`: the tape between the frame's floor and the metal back.
+  - `lens_t`: the cover lens alone. It places only the reference bodies and the frame's rim.
+  - `rim_gap`: how far the frame's rim stays under the back of the glass; keep it at 0.3 mm or more.
 - **Export**: after a change, run `cad/tools/export_parts.py`. It writes cap,
   the faceplate (plain and with the wordmark), tap tile, dock, display frame, mock display and the assembly; stand and mock
   board are not exported by it. The mock board is made from the KiCad board: `bash tools/pcb.sh export-3d <folder>` where
@@ -162,7 +184,7 @@ The hardware (heat-set inserts, screws, tape, cable ties) is listed in the
   has no effect, so the script turns each part with a temporary move before the export.
 - **Manual scenes**: `manual/attractap-manual-scenes.sc` is a copy of the design with extra bodies
   for illustration; print files never come from it. It, the renders on this page and the manual's
-  figures still show an earlier depth stack: a cap 0.64 mm deeper, with the display 2 mm off the board,
+  figures still show the display frame without its floor (before 28 November 2026) and an earlier depth stack: a cap 0.64 mm deeper, with the display 2 mm off the board,
   and the display flex's earlier route through the board below the display. They also still show the
   old front with light windows, LED diffusers and inlays in the cap, from before the faceplate and the
   tap tile (27 November 2026).
@@ -188,30 +210,36 @@ files for it, and use `rsvg-convert` for labels.
   from the front of the glass to the metal back (`disp_t`; the drawing on the display's product page,
   AliExpress item 1005005675144653, says 3.14 mm). The display frame printed from the drawing's LCD
   outline fits the sample. Not measured: the cover lens alone (`lens_t`, 0.55 mm by the drawing) and the
-  corner radius (at least 1 mm assumed). They decide whether the screen sits flush. Measure the panel you
-  buy; if it differs, set `disp_t` and `lens_t` and export the parts again.
-  - First print (27 November 2026): with `tape_t` 0.3 mm the glass stood about 0.7 mm proud. `tape_t` is now
-    1.1 mm, which lowers the frame's rim by 0.8 mm. It covers the tape and whatever the lens has beyond 0.55 mm;
-    which of the two it is was not measured.
-  - `lens_t` is the lens alone: the touch sensor (76.5 x 76.7 mm) is smaller than the lens, so the
-    border the frame holds has no sensor behind it.
-  - The sensor is 0.9 mm wider than the frame's opening for the LCD module (75.6 mm). The frame's rim
-    reaches 0.4 mm under each side edge of the sensor. With the 0.3 mm tape it pressed on it by 0.05 mm;
-    since the rim went 0.8 mm lower it clears it in CAD. An opening of 77.3 mm would clear it with any tape.
+  corner radius (at least 1 mm assumed). Measure the panel you buy; if it differs, set `disp_t` and export
+  the parts again.
+  - The glass height follows from `disp_t` and the tape under the metal back (`back_tape_t`, 0.2 mm), no
+    longer from `lens_t` or a tape under the glass border. A tape of another thickness raises or lowers the
+    glass by the difference: set `back_tape_t` to it.
+  - The touch sensor behind the lens is 76.5 x 76.7 mm. The rim's opening, 77.3 mm, clears it on every
+    side if the sensor is centred on the lens (assumed, not measured).
   - The sample's lens border carries its own tape (3M, with a liner; 0.175 mm 3M 9495 by the drawing,
-    not measured). It can replace the manual's tape only with a frame exported for it: set `tape_t` from a test
-    fit and widen the opening first.
-- **Display distance to the board.** The case holds the display 1.7 mm off the board (`disp_gap`).
+    not measured). The frame does not use it; the rim stays 1.1 mm under the glass, by estimate clear of
+    that tape with its liner on.
+  - Until 28 November 2026 the frame held the display by 0.3 mm tape under the glass border alone. On the
+    first print (27 November 2026) the glass stood about 0.7 mm proud, likely because the rim pressed on
+    the sensor, which is wider than the old 75.6 mm opening. The display also flexed back into the gap
+    behind it when the screen was pressed, and the frame had play in the cap. Hence the floor, the wider
+    rim opening and the frame clamped in depth.
+  - The new frame is checked in CAD only: no interference with the cap, the display, the tile or the
+    board, the floor's top 0.2 mm under the metal back. How well the tape holds and whether the pocket's
+    0.25 mm suits a real print is open.
+- **Display distance to the board.** The case holds the display 1.7 mm off the board (`disp_gap`): the
+  display frame's 1.5 mm floor and 0.2 mm of tape.
   Details in the [design notes](hardware/touch-p4/design-notes.md#display-mounting-and-flex).
   - The display's flex folds flat onto the LCD's metal back and goes through a slot behind the display.
     The touch controller on it faces the board, 1.3 mm high; the board allows 1.5 to 2.0 mm, and 1.7 mm
-    leaves room for print tolerance. The frame is open along the display's lower edge, where the fold
-    lies.
+    leaves room for print tolerance. The frame's floor is open over the whole flex and along the display's
+    lower edge, where the fold lies.
   - On the lan version the Ethernet jack J401 has its solder pins behind the display: 16 pins, two
     shield tabs and two plastic posts, 11 of them behind the LCD's metal back, standing at least
     1.45 mm out of the board. They are clipped to 1 mm and that corner of the LCD gets polyimide tape
     (both steps are in the manual). The USB-C socket has its shell tabs under the edge of the glass.
-  - The jack's two 48 V pins come out 0.5 mm beside the LCD's metal edge, inside the frame's pocket
+  - The jack's two 48 V pins come out 0.5 mm beside the LCD's metal edge, inside the frame's relief
     for the pins. The frame cannot put a wall there (the nearer pin's pad ends 0.1 mm from the LCD's
     edge); the tape on the LCD is the insulation.
   - Turning the jack the other way does not work without a longer case: below the display its plug

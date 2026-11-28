@@ -98,6 +98,11 @@ stimmt mit der Zeichnung überein: Der danach gedruckte Displayrahmen passt auf 
 - Den Abstand von der Platine zur Metallrückseite begrenzen unten der Chip (1,3 mm, plus 0,2) und die Pins der
   Ethernet-Buchse, oben die Länge des Flexkabels für die S-Biegung: **1,5 bis 2,0 mm**. Das Gehäuse hält das Display
   bei **1,7 mm**.
+- Der Displayrahmen des Gehäuses füllt diesen Spalt: ein 1,5 mm dicker Boden auf der Platine, mit 0,2 mm
+  doppelseitigem Klebeband auf die ganze Metallrückseite geklebt, sodass das Display darauf aufliegt, wenn auf den
+  Bildschirm gedrückt wird. Der Boden ist offen über der Fläche des Flexkabels und an der Unterkante des Moduls, über
+  den vier Massepads und über den Pins der Buchse und den Laschen der USB-C-Buchse; die Platine klemmt den Rahmen
+  gegen die Frontwand der Kappe (siehe [Gehäuse](hardware/touch-p4/case.md)).
 - Die Pins der Ethernet-Buchse stehen mindestens 1,45 mm aus der Displayseite heraus (Mindest-Pinlänge laut Datenblatt
   3,05 mm, kein Maximum). Hinter der Metallrückseite liegen die Pins 1 bis 8, 11, 12 (Signale, 3,3 V), eine
   Schirmlasche und ein Kunststoffzapfen; die 48-V-Pins 9 und 10 kommen 0,8 und 2,1 mm daneben heraus.
@@ -113,7 +118,8 @@ stimmt mit der Zeichnung überein: Der danach gedruckte Displayrahmen passt auf 
   den Build ab. Auf der Displayseite deckt es x 14,5 bis 62,5, y 72,5 bis 89,4 ab (`geometry.FLEX_BEHIND_LCD`); dort
   liegt kein Massepad (ein Test prüft das).
 - Die Metallrückseite wird über Leitband oder Leitschaum auf mindestens zwei der vier blanken Massepads mit der Masse
-  der Platine verbunden, außerhalb des Bereichs des Montagebands. Entladungen auf das Glas landen auf der
+  der Platine verbunden, die sie durch quadratische Löcher im Boden des Displayrahmens erreichen, außerhalb des
+  Bereichs des Montagebands. Entladungen auf das Glas landen auf der
   Metallrückseite.
 
 Bezugsquellen für das Panel. Das Panel ist ein gängiger Typ: 84,3 x 84,3 mm, 40-poliges Flexkabel mit 0,5 mm Raster, die

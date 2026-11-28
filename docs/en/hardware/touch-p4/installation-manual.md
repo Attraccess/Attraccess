@@ -32,7 +32,7 @@ One reader needs five printed parts for the wall, six for the desk. The print fi
 | M3 heat-set insert, standard (5.7 mm long) | 2 | Lock bar in the cap |
 | M3 × 4 pan head screw | 4 | PCB to cap |
 | M3 × 8 countersunk screw, ideally Torx with pin | 2 | Lock screws, from below |
-| Double-sided tape, 0.3 mm thick | 3 strips | Display glass to frame |
+| Double-sided tape, thin and strong, about 0.2 mm thick (for example tesa 4965 or 3M 9495LE), 25 mm wide | about 250 mm | Floor of the display frame to the display's metal back |
 | Polyimide tape (Kapton), 25 mm wide | 30 mm, plus 80 mm | Back of the display, over the Ethernet jack's solder pins (Ethernet version); over the display's flex where it leaves the display |
 | Conductive gasket, fabric over foam, 5 × 5 mm, about 2 mm thick, self-adhesive | 2 to 4 | On the bare square ground pads on the PCB's display side, against the display's metal back. It ties the metal back to ground, which the reader needs to pass the static-discharge test |
 | Neodymium disc magnet, 10 mm across, 3 mm thick (N42 or stronger) | 6 | One in the ring on the dock's inner face: the reader senses it and knows when it is taken off the dock. Five behind the cap's front wall: they hold the faceplate |
@@ -76,11 +76,11 @@ Everything is shown lifted out of the cap in the order it goes in, lowest first.
 
 1. Ethernet version only: turn the PCB so the side without components faces you. The Ethernet jack's solder pins stand out of it in one corner: 16 pins, two wider shield tabs and two plastic posts. Clip every one of them to 1 mm with flush cutters. Cut above the solder cone, not through it.
 2. Ethernet version only: lay the display glass-down, flex cable toward you. Stick a 25 × 30 mm piece of polyimide tape onto the metal back in the corner at the lower right, flush with the lower edge, and fold 2 mm of it round the right side edge of the metal. That is the corner that will lie over the clipped pins; two of them carry 48 V.
-3. Stick 0.3 mm double-sided tape onto the raised rim of the display frame: one strip each on the left, right and top. The fourth side is open for the display's flex cable.
-4. Lay the display glass-down on a clean cloth. Place the frame onto the back of the glass, rim down, with the open side over the flex cable. Line the frame up with the glass edges and press along the three strips.
-5. Fold the flex cable over the lower edge of the display onto the metal back, so it lies flat on it with the small chip facing away from the display. Fold round the edge without creasing it. Then lay a strip of polyimide tape across the fold, over the frame's open side, and fold its ends onto the frame. It covers the flex's traces behind the gap round the glass, where a static discharge on the glass edge would otherwise land on them.
+3. Cover the floor of the display frame with the double-sided tape, on the side with the raised rim: three strips across the floor, then short pieces beside the wide opening at the open side. Do not overlap the strips. Cut the tape away over the four square holes and the openings with a sharp knife.
+4. Lay the display glass-down on a clean cloth, flex cable toward you. Peel the liner off the tape. Hold the frame rim-down over the display, open side over the flex cable, and lower it so the display's metal back drops into the frame's pocket. Press the floor firmly onto the metal back all over.
+5. Fold the flex cable over the lower edge of the display into the wide opening in the frame's floor, so it lies flat on the metal back with the small chip facing away from the display. Fold round the edge without creasing it. Then lay a strip of polyimide tape across the fold, over the frame's open side, and fold its ends onto the frame. It covers the flex's traces behind the gap round the glass, where a static discharge on the glass edge would otherwise land on them.
 6. Lower display and frame into the cap so the glass drops into the window. Turn the cap over once and check that the glass sits flush with an even gap all round.
-7. Stick a conductive gasket onto at least two of the four bare square pads on the PCB's side without components (the gold squares behind where the display will lie), two far apart from each other. The gaskets press against the display's metal back when the PCB goes in.
+7. Stick a conductive gasket onto at least two of the four bare square pads on the PCB's side without components (the gold squares behind where the display will lie), two far apart from each other. When the PCB goes in, the gaskets reach the display's metal back through the four square holes in the frame's floor.
 8. Lift the end of the flex, the narrow strip with the contacts, off the metal back. Hold the PCB with its components facing you and the Ethernet jack toward the bottom of the cap. Thread the flex's end through the slot in the middle of the PCB from the side without components, then lower the PCB onto the four bosses. The part with the chip stays flat on the display's back; only the narrow strip bends through the slot.
 9. Plug the flex into its connector on the PCB and close the latch.
 10. Fasten the PCB with the four M3 × 4 screws. Hand-tight is enough; the inserts sit in plastic. The PCB now lies flat on the back of the tap tile, which clamps the tile and holds the corner of the PCB that has no screw. If a corner of the PCB stands off its boss, the tile's back is too thick: sand it flat and try again.
@@ -198,7 +198,7 @@ Two screws release the reader; four more release the PCB. USB-C, the reset and b
 2. Swing the reader's bottom about 20 mm away from the wall, then lift the reader 6 mm off the cleat.
 3. Cut the cable tie if a cable is tied down. Press the latch of the Ethernet plug and unplug the cables. USB-C, reset and boot are now reachable for flashing.
 4. To take the PCB out, remove the four M3 × 4 screws, open the flex connector latch and lift the board.
-5. The display comes out together with its frame. To replace the display itself, peel the glass off the tape and re-tape the new one.
+5. The display comes out together with its frame. To replace the display itself, peel the frame off the metal back and tape the new display in with fresh tape (steps 3 to 5 under "Assemble the reader"). If the frame breaks, print a new one.
 
 ## Not yet verified
 
@@ -207,10 +207,11 @@ Nothing below has been checked on real parts. Each item can change a step or a p
 - [ ] **Printed fits.** Glass in its window (0.25 mm gap per side), tongue in its slot (0.4 mm), hook on the cleat (0.1 mm). Tune on the first print.
 - [ ] **Display dimensions.** The total thickness, 3.5 mm, is measured on one sample panel; the cover lens (0.55 mm) is taken from the drawing on the display's product page, a corner radius of at least 1 mm is assumed. They decide whether the screen sits flush. Measure the panel before printing.
 - [ ] **Inserts in the PCB bosses.** Their holes reach into the front wall and leave 1.1 mm of it. Check on the first print that the front shows no marks after the inserts are pressed in.
-- [ ] **Display distance and flex.** The frame holds the display 1.7 mm off the PCB; the folded flex with its chip lies in that gap (see the [case](hardware/touch-p4/case.md#not-yet-verified)). Check with the real panel that the part with the chip lies flat on the display's back and that the flex reaches its connector through the slot.
+- [ ] **Display frame floor.** New on 28 Nov 2026 and checked in CAD only: the floor glued to the whole metal back, the pocket round the LCD (0.25 mm per side) and the rim in the window (0.1 mm per side). The glass height now follows from the display's 3.5 mm and the 0.2 mm tape: a thicker or thinner tape raises or lowers the glass by the difference.
+- [ ] **Display distance and flex.** The frame's floor and its tape hold the display 1.7 mm off the PCB; the folded flex with its chip lies in that gap (see the [case](hardware/touch-p4/case.md#not-yet-verified)). Check with the real panel that the part with the chip lies flat on the display's back and that the flex reaches its connector through the slot.
 - [ ] **Dock magnet.** With the reader hung on the dock the board must report "on the dock", and "off" once it is lifted away. The figures do not show the magnet's ring yet.
 - [ ] **Dock plate and proximity sensor.** The board also measures the infrared light that the dock's plate reflects. What it reads on the dock, with every dock colour in use, and whether light on the case changes it, is not measured yet (see the board's bring-up notes).
-- [ ] **Figures.** The figures show the case before its depth changed: the cap was 1.2 mm deeper. The steps are the same.
+- [ ] **Figures.** The figures show the case before its depth changed: the cap was 1.2 mm deeper. They also show the old display frame, without its floor. The steps are the same.
 - [ ] **Jack pins behind the display.** Clipped to 1 mm they should clear the display's metal back by 0.5 mm or more. Measure how far the pins of a soldered jack stand out, and check the gap with the display fitted.
 - [ ] **PoE module height.** Assumed 10 mm.
 - [ ] **Swing-on motion.** Collision-free in CAD at five angles between 7° and closed, after the dock's tongue was tapered on 19 Nov 2026. Docks sliced before that need re-slicing.

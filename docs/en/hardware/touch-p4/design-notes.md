@@ -93,6 +93,10 @@ drawing: the display frame printed from it fits the sample.
   The slot allows that end anywhere from 7.5 to 18 mm.
 - The board-to-metal-back distance is bounded by the chip (1.3 mm, plus 0.2) and the Ethernet jack's pins below, and
   by the S-bend's flex length above: **1.5 to 2.0 mm**. The case holds the display at **1.7 mm**.
+- The case's display frame fills that gap: a 1.5 mm floor on the board, taped to the whole metal back with 0.2 mm
+  double-sided tape, so the display rests on it when the screen is pressed. The floor is open over the flex area
+  and along the module's bottom edge, over the four ground pads and over the jack's pins and the USB-C socket's
+  tabs; the board clamps the frame against the cap's front wall (see [Case](hardware/touch-p4/case.md)).
 - The Ethernet jack's pins stand at least 1.45 mm out of the display side (datasheet minimum pin length 3.05 mm, no
   maximum). Behind the metal back are pins 1 to 8, 11, 12 (signals, 3.3 V), one shield tab and one plastic post; the
   48 V pins 9 and 10 come out 0.8 and 2.1 mm beside it.
@@ -107,7 +111,7 @@ drawing: the display frame printed from it fits the sample.
   otherwise. On the display side it covers x 14.5 to 62.5, y 72.5 to 89.4 (`geometry.FLEX_BEHIND_LCD`); no ground pad
   lies there (a test checks it).
 - The metal back is tied to board ground through conductive tape or foam on at least two of the four bare ground pads,
-  kept out of the mounting tape's area. Discharges onto the glass end up on the metal back.
+  which reach it through square holes in the display frame's floor, kept out of the mounting tape's area. Discharges onto the glass end up on the metal back.
 
 Panel sources. The panel is a common type: 84.3 x 84.3 mm, 40-pin 0.5 mm flex, pins 16 to 33 are DB0 to DB17. The
 board uses 16 data lines; pin 16 (blue LSB) and pin 28 (red LSB) are tied to ground. The drawing comes from the

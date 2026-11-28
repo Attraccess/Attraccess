@@ -13,6 +13,23 @@ passt in beide. Noch nichts wurde gedruckt oder anprobiert: siehe [Noch nicht ge
 
 - **Kappe**: die vordere Schale. Sie trägt das Display und die Platine; ihre Front ist eine schlichte,
   1,4 mm dicke Wand.
+- **Displayrahmen**: eine gedruckte Schale, 2,9 mm tief, zwischen der Platine und der Frontwand der Kappe. Das
+  Display ist über die ganze Metallrückseite des LCD in sie geklebt, nicht am Glasrand.
+  - **Boden.** 1,5 mm dick, auf der Platine. 0,2 mm doppelseitiges Klebeband darauf (`back_tape_t`) hält die
+    Metallrückseite, sodass das Display auf dem Boden aufliegt, wenn auf den Bildschirm gedrückt wird. Die
+    Vorderseite des Glases liegt bei Boden + Klebeband + `disp_t`, 0,1 mm unter der Vorderseite der Frontplatte.
+  - **Öffnungen im Boden.** Eine breite für das gefaltete Flexkabel des Displays, am unteren Rand des Displays
+    offen, damit die Faltung hineingleitet (die Fläche des Flexkabels plus 1 mm, Schlitz eingeschlossen); ein
+    7 mm großes quadratisches Loch über jedem der vier Masse-Pads der Platine, damit die leitfähigen Dichtungen
+    die Metallrückseite erreichen; Aussparungen über den Pins der Ethernet-Buchse und den Schirmlaschen der
+    USB-C-Buchse, jeweils 1 mm größer als die Pads.
+  - **Tasche.** Wände um das LCD-Modul, 0,25 mm pro Seite, richten es beim Einkleben aus. Die Tasche ist unten
+    offen, wo sich das Flexkabel um die Kante faltet.
+  - **Rand.** Er sitzt mit 0,1 mm pro Seite im Bildschirmfenster der Kappe und richtet den Rahmen seitlich aus.
+    Er trägt kein Klebeband und bleibt 1,1 mm unter dem Glas (`rim_gap`); seine Öffnung von 77,3 mm lässt die
+    Kanten des Touch-Sensors frei.
+  - **Kein Spiel in der Tiefe.** Der Rahmen ist so tief wie der Raum zwischen Platine und Frontwand der Kappe:
+    Die auf ihre Schraubdome geschraubte Platine klemmt ihn gegen die Wand.
 - **Frontplatte**: eine 1 mm dicke Abdeckung über die ganze Front, von fünf Magneten an der Kappe gehalten,
   ohne Kleber oder Klebeband; das Displayglas liegt bündig mit ihr. Fünf Stahlscheiben auf ihrer Rückseite
   liegen über Magneten, die in der Frontwand der Kappe verborgen sind, so lassen sich Frontplatten von Hand
@@ -134,7 +151,7 @@ Die Hardware (Einschmelzmuttern, Schrauben, Klebeband, Kabelbinder) ist in der
 
 | Datei | Was sie ist |
 | --- | --- |
-| [`cad/attractap-touch-case.sc`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-touch-case.sc) | Die Konstruktion, ein SolidCraft-Dokument (Version 0.45.0). Jede Druckdatei wird daraus exportiert. |
+| [`cad/attractap-touch-case.sc`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-touch-case.sc) | Die Konstruktion, ein SolidCraft-Dokument (gespeichert mit Version 0.51.2). Jede Druckdatei wird daraus exportiert. |
 | [`cad/attractap-assembly.step`](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-assembly.step) | Der ganze Leser zusammengebaut, für andere CAD-Programme. |
 | Platinen-Attrappe: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-pcb.stl) | Druckbarer Platzhalter für die Platine, mit den Körpern aller Bauteile, um die Passung mit Auge und Hand zu prüfen, bevor die echte Platine vorliegt. Es ist die Ethernet- und PoE-Ausführung (`lan`), in der jedes Bauteil bestückt ist; die WLAN-Ausführung lässt nur Bauteile weg. Drucken Sie sie in voller Größe auf der Rückseite (der Displayseite), Bauteile oben, mit Stützen von der Druckplatte: das Ende des WLAN-Moduls über dem Antennenausschnitt und die USB-C-Buchse in ihrer Aussparung ragen über die Platine. Die Öffnungen der RJ45-Buchse und der Hohlstecker-Buchse werden als Brücken gedruckt. Die 3MF- und STL-Dateien haben die Formen der Bauteilmodelle, mit an der Rückseite abgeschnittenen Pins und ausgefülltem Raum unter dem PoE-Modul; die STEP-Datei hat stattdessen um jedes Bauteil einen Quader, damit sie klein bleibt. Erzeugt aus der KiCad-Platine von `cad/tools/mock_board.py`. |
 | Display-Attrappe: [3MF](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.3mf), [STEP](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.step), [STL](https://github.com/Attraccess/Attraccess/blob/main/apps/attractap/hardware/touch-p4/case/cad/attractap-mock-display.stl) | Platzhalter für das Display, mit den angenommenen Displaymaßen (siehe [Noch nicht geprüft](#noch-nicht-geprüft)). |
@@ -157,8 +174,14 @@ Die Hardware (Einschmelzmuttern, Schrauben, Klebeband, Kabelbinder) ist in der
   Gehäuse bei X = 43 − x, Y = 49,15 − y; in KiCad-Koordinaten (Platinenecke bei (60, 30)) bei X = 103 − x,
   Y = 79,15 − y.
 - **Parameter**: Der Tiefenaufbau ist parametrisch (`plate_t`, `cav`, `pcb_t`, `disp_gap`, `disp_t`,
-  `lens_t`, `tape_t`, `lens_recess`, `wall`, `pcb_ins_depth`). Positionen in X und Y sind einfache Zahlen,
-  die der Platine entnommen sind.
+  `back_tape_t`, `lens_t`, `rim_gap`, `lens_recess`, `wall`, `pcb_ins_depth`). Positionen in X und Y sind einfache Zahlen,
+  die der Platine entnommen sind. Was jeder Parameter ist, sagt sein Kommentar im Design. Für das Display:
+  - `disp_gap`: Platine bis zur Metallrückseite des LCD, gefüllt vom Boden des Displayrahmens (`disp_gap` −
+    `back_tape_t`) und dem Klebeband darauf.
+  - `disp_t`: das Display von der Vorderseite des Glases bis zur Metallrückseite, gemessen.
+  - `back_tape_t`: das Klebeband zwischen dem Boden des Rahmens und der Metallrückseite.
+  - `lens_t`: die Deckscheibe allein. Sie legt nur die Referenzkörper und den Rand des Rahmens fest.
+  - `rim_gap`: wie weit der Rand des Rahmens unter der Rückseite des Glases bleibt; mindestens 0,3 mm.
 - **Export**: Führen Sie nach einer Änderung `cad/tools/export_parts.py` aus. Es schreibt Kappe,
   Frontplatte (schlicht und mit Schriftzug), Tap-Kachel, Dock, Displayrahmen, Display-Attrappe und die Baugruppe; Ständer und
   Platinen-Attrappe exportiert es nicht. Die Platinen-Attrappe entsteht aus der KiCad-Platine:
@@ -168,7 +191,7 @@ Die Hardware (Einschmelzmuttern, Schrauben, Klebeband, Kabelbinder) ist in der
   vorübergehenden Verschiebung.
 - **Szenen der Anleitung**: `manual/attractap-manual-scenes.sc` ist eine Kopie des Designs mit zusätzlichen
   Körpern zur Illustration; Druckdateien kommen nie daraus. Sie, die Renderings auf dieser Seite und die
-  Abbildungen der Anleitung zeigen noch einen früheren Tiefenaufbau: eine um 0,64 mm tiefere Kappe, mit dem
+  Abbildungen der Anleitung zeigen noch den Displayrahmen ohne seinen Boden (vor dem 28. November 2026) und einen früheren Tiefenaufbau: eine um 0,64 mm tiefere Kappe, mit dem
   Display 2 mm von der Platine entfernt, und den früheren Weg des Display-Flexkabels durch die Platine unterhalb des
   Displays. Außerdem zeigen sie noch die alte Front mit Lichtfenstern, LED-Diffusoren und Einlagen in der Kappe,
   von vor der Frontplatte und der Tap-Kachel (27. November 2026).
@@ -194,29 +217,36 @@ schreiben Step-Dateien dafür und nutzen `rsvg-convert` für Beschriftungen.
   Vorderseite des Glases bis zur Metallrückseite (`disp_t`; die Zeichnung auf der Produktseite des Displays,
   AliExpress-Artikel 1005005675144653, sagt 3,14 mm). Der nach dem LCD-Umriss der Zeichnung gedruckte Displayrahmen
   passt auf das Muster. Nicht gemessen: die Deckscheibe allein (`lens_t`, 0,55 mm laut Zeichnung) und der Eckenradius
-  (angenommen mindestens 1 mm). Sie entscheiden, ob der Bildschirm bündig sitzt. Vermessen Sie das Panel, das Sie
-  kaufen; weicht es ab, setzen Sie `disp_t` und `lens_t` und exportieren Sie die Teile erneut.
-  - `lens_t` ist nur die Deckscheibe: Der Touch-Sensor (76,5 x 76,7 mm) ist kleiner als die Deckscheibe,
-    sodass der Rand, den der Rahmen hält, keinen Sensor dahinter hat.
-  - Der Sensor ist 0,9 mm breiter als die Öffnung des Rahmens für das LCD-Modul (75,6 mm). Der Rand des
-    Rahmens reicht 0,4 mm unter jede Seitenkante des Sensors und drückt mit dem 0,3-mm-Klebeband mit
-    0,05 mm darauf. Eine Öffnung von 77,3 mm würde ihn freilassen.
+  (angenommen mindestens 1 mm). Vermessen Sie das Panel, das Sie kaufen; weicht es ab, setzen Sie `disp_t`
+  und exportieren Sie die Teile erneut.
+  - Die Höhe des Glases ergibt sich aus `disp_t` und dem Klebeband unter der Metallrückseite (`back_tape_t`,
+    0,2 mm), nicht mehr aus `lens_t` oder einem Klebeband unter dem Glasrand. Ein Band anderer Dicke hebt
+    oder senkt das Glas um den Unterschied: Setzen Sie `back_tape_t` darauf.
+  - Der Touch-Sensor hinter der Deckscheibe misst 76,5 x 76,7 mm. Die Öffnung des Rands, 77,3 mm, lässt
+    ihn auf jeder Seite frei, wenn der Sensor mittig auf der Deckscheibe sitzt (angenommen, nicht gemessen).
   - Der Rand der Deckscheibe des Musters trägt ein eigenes Klebeband (3M, mit Schutzfolie; laut Zeichnung
-    3M 9495 mit 0,175 mm, nicht gemessen). Es kann das 0,3-mm-Klebeband der Anleitung ersetzen; das Glas sitzt dann
-    0,1 mm tiefer, und der Rand drückt mit 0,2 mm auf die Kanten des Sensors, weiten Sie also zuerst die
-    Öffnung.
+    3M 9495 mit 0,175 mm, nicht gemessen). Der Rahmen nutzt es nicht; sein Rand bleibt 1,1 mm unter dem
+    Glas, geschätzt frei von diesem Band samt Schutzfolie.
+  - Bis zum 28. November 2026 hielt der Rahmen das Display nur mit 0,3-mm-Klebeband unter dem Glasrand. Beim
+    ersten Druck (27. November 2026) stand das Glas etwa 0,7 mm vor, wahrscheinlich weil der Rand auf den
+    Sensor drückte, der breiter ist als die alte Öffnung von 75,6 mm. Außerdem gab das Display beim Drücken
+    auf den Bildschirm in den Spalt dahinter nach, und der Rahmen hatte Spiel in der Kappe. Daher der Boden,
+    die weitere Öffnung im Rand und der in der Tiefe geklemmte Rahmen.
+  - Der neue Rahmen ist nur im CAD geprüft: keine Überschneidung mit Kappe, Display, Kachel oder Platine,
+    die Oberseite des Bodens 0,2 mm unter der Metallrückseite. Wie gut das Klebeband hält und ob die
+    0,25 mm der Tasche zu einem echten Druck passen, ist offen.
 - **Abstand des Displays zur Platine.** Das Gehäuse hält das Display 1,7 mm von der Platine entfernt
-  (`disp_gap`). Einzelheiten in den [Designnotizen](hardware/touch-p4/design-notes.md#displaymontage-und-flexkabel).
+  (`disp_gap`): der 1,5 mm dicke Boden des Displayrahmens und 0,2 mm Klebeband. Einzelheiten in den [Designnotizen](hardware/touch-p4/design-notes.md#displaymontage-und-flexkabel).
   - Das Flexkabel des Displays faltet sich flach auf die Metallrückseite des LCD und geht durch einen Schlitz
     hinter dem Display. Der Touch-Controller darauf zeigt zur Platine, 1,3 mm hoch; die Platine erlaubt 1,5 bis
-    2,0 mm, und 1,7 mm lassen Raum für Drucktoleranzen. Der Rahmen ist am unteren Rand des Displays offen, wo die
-    Faltung liegt.
+    2,0 mm, und 1,7 mm lassen Raum für Drucktoleranzen. Der Boden des Rahmens ist über dem ganzen Flexkabel und am
+    unteren Rand des Displays offen, wo die Faltung liegt.
   - Bei der LAN-Version hat die Ethernet-Buchse J401 ihre Lötpins hinter dem Display: 16 Pins, zwei
     Schirmlaschen und zwei Kunststoffzapfen, 11 davon hinter der Metallrückseite des LCD, die mindestens
     1,45 mm aus der Platine herausstehen. Sie werden auf 1 mm gekürzt, und diese Ecke des LCD bekommt
     Polyimidband (die Anleitung enthält beide Schritte). Die USB-C-Buchse hat ihre Schirmlaschen unter dem
     Rand des Glases.
-  - Die beiden 48-V-Pins der Buchse treten 0,5 mm neben der Metallkante des LCD aus, innerhalb der Tasche
+  - Die beiden 48-V-Pins der Buchse treten 0,5 mm neben der Metallkante des LCD aus, innerhalb der Aussparung
     des Rahmens für die Pins. Der Rahmen kann dort keine Wand setzen (das Pad des näheren Pins endet 0,1 mm
     von der Kante des LCD); das Band auf dem LCD ist die Isolierung.
   - Die Buchse andersherum zu drehen geht nicht ohne ein längeres Gehäuse: Unter dem Display schrumpft ihr
