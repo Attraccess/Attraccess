@@ -1,5 +1,5 @@
 import { Project, Resource, ResourceUsage } from '@attraccess/database-entities';
-import { ResourceFlowNodeType } from '@attraccess/application-models';
+import { ProjectChangeMode, ResourceFlowNodeType } from '@attraccess/application-models';
 import {
   closeLifecycleFixture,
   resetTestFixture,
@@ -67,7 +67,8 @@ describe('Extending a session whose project is being switched', () => {
     if (limit > 1) await scope.usage.startSession(1, scope.users[1], { estimatedDurationMinutes: 60 });
     return own;
   };
-  const switchOwn = (usageId: number) => scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId });
+  const switchOwn = (usageId: number) =>
+    scope.usage.switchSessionProject(1, scope.users[0], { mode: ProjectChangeMode.SPLIT, projectId: 2, usageId });
   const extend = (usageId: number | undefined) =>
     scope.usage.extendSession(1, scope.users[0], { extendByMinutes: 60, ...(usageId ? { usageId } : {}) });
 

@@ -42,7 +42,7 @@ export class ResourceBillingConfiguration {
 
   @Column({ type: 'varchar', default: ProjectSwitchCharging.CONTINUE })
   @ApiProperty({
-    description: 'How a running session is charged when its owner switches its project',
+    description: 'How a running session is charged when its owner splits it between projects',
     enum: ProjectSwitchCharging,
     enumName: 'ProjectSwitchCharging',
   })

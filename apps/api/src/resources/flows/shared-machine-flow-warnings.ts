@@ -9,7 +9,7 @@ export interface SharedMachineFlowWarning {
   triggerNodeId: string;
   triggerType: string;
   /**
-   * Nodes with an external effect that a start, stop, takeover or project switch reaches without an active session
+   * Nodes with an external effect that a start, stop, takeover or project change reaches without an active session
    * check.
    */
   effectNodes: { nodeId: string; nodeType: string }[];
@@ -21,6 +21,7 @@ const SESSION_TRIGGERS = new Set<string>([
   ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
   // A switch keeps the machine running, so a power effect on it must check `activeSessions` like the others.
   ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_SWITCHED,
+  ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_REASSIGNED,
 ]);
 
 /** Core effect nodes are marked in the node presentations; plugin nodes count when they act as outputs. */
@@ -44,7 +45,7 @@ function checksSessionCount(node: FlowNodeRecord): boolean {
 }
 
 /**
- * Which start, stop, takeover and project-switch triggers lead to an external effect on some path that never passes an IF node
+ * Which start, stop, takeover and project-change triggers lead to an external effect on some path that never passes an IF node
  * checking `activeSessions`. On a machine shared by several people such a flow runs for every single session.
  */
 export function findFlowsWithoutSessionCountCheck(

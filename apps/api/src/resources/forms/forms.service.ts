@@ -51,6 +51,7 @@ const REQUIRED_FLAG = {
   [ResourceFormAction.TAKEOVER]: 'isRequiredOnResourceUsageTakeOver',
   [ResourceFormAction.END]: 'isRequiredOnResourceUsageEnd',
   [ResourceFormAction.PROJECT_SWITCH]: 'isRequiredOnResourceUsageProjectSwitch',
+  [ResourceFormAction.PROJECT_REASSIGN]: 'isRequiredOnResourceUsageProjectReassign',
 } as const satisfies Record<ResourceFormAction, keyof FormRequiredFlags>;
 
 @Injectable()
@@ -148,6 +149,7 @@ export class ResourceFormsService {
       isRequiredOnResourceUsageTakeOver: dto.isRequiredOnResourceUsageTakeOver ?? null,
       isRequiredOnResourceUsageEnd: dto.isRequiredOnResourceUsageEnd ?? null,
       isRequiredOnResourceUsageProjectSwitch: dto.isRequiredOnResourceUsageProjectSwitch ?? null,
+      isRequiredOnResourceUsageProjectReassign: dto.isRequiredOnResourceUsageProjectReassign ?? null,
     });
     const applicable = saved ? await this.findApplicable(resourceId, formId) : undefined;
     if (!applicable) {
@@ -185,6 +187,7 @@ export class ResourceFormsService {
     dto.isRequiredOnResourceUsageTakeOver = override.isRequiredOnResourceUsageTakeOver;
     dto.isRequiredOnResourceUsageEnd = override.isRequiredOnResourceUsageEnd;
     dto.isRequiredOnResourceUsageProjectSwitch = override.isRequiredOnResourceUsageProjectSwitch;
+    dto.isRequiredOnResourceUsageProjectReassign = override.isRequiredOnResourceUsageProjectReassign;
     return dto;
   }
 
@@ -194,6 +197,7 @@ export class ResourceFormsService {
     dto.isRequiredOnResourceUsageTakeOver = flags.isRequiredOnResourceUsageTakeOver;
     dto.isRequiredOnResourceUsageEnd = flags.isRequiredOnResourceUsageEnd;
     dto.isRequiredOnResourceUsageProjectSwitch = flags.isRequiredOnResourceUsageProjectSwitch;
+    dto.isRequiredOnResourceUsageProjectReassign = flags.isRequiredOnResourceUsageProjectReassign;
     return dto;
   }
 
@@ -287,6 +291,7 @@ export class ResourceFormsService {
     response.isRequiredOnResourceUsageTakeOver = form.isRequiredOnResourceUsageTakeOver;
     response.isRequiredOnResourceUsageEnd = form.isRequiredOnResourceUsageEnd;
     response.isRequiredOnResourceUsageProjectSwitch = form.isRequiredOnResourceUsageProjectSwitch;
+    response.isRequiredOnResourceUsageProjectReassign = form.isRequiredOnResourceUsageProjectReassign;
     response.resourceId = form.resourceId;
     response.groupId = form.groupId;
     response.fields = (form.fields ?? [])
@@ -544,6 +549,7 @@ export class ResourceFormsService {
       isRequiredOnResourceUsageTakeOver: dto.isRequiredOnResourceUsageTakeOver,
       isRequiredOnResourceUsageEnd: dto.isRequiredOnResourceUsageEnd,
       isRequiredOnResourceUsageProjectSwitch: dto.isRequiredOnResourceUsageProjectSwitch ?? false,
+      isRequiredOnResourceUsageProjectReassign: dto.isRequiredOnResourceUsageProjectReassign ?? false,
     };
   }
 

@@ -1,3 +1,4 @@
+import { ProjectChangeMode } from '@attraccess/application-models';
 import type { UsageBillingItemDraft, UsageSession, UsageSessionUser } from '@attraccess/application-models';
 
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
@@ -34,6 +35,7 @@ import { SessionEndTarget, UsageSessionEnds } from './usage-session-ends';
 
 import { UsageSessionRecords } from './usage-session-records';
 
+import { UsageSessionProjectReassign } from './usage-session-project-reassign';
 import { SwitchProjectOptions, UsageSessionProjectSwitch } from './usage-session-project-switch';
 
 import { SwitchUsageSessionProjectDto } from '../dtos/switchUsageSessionProject.dto';
@@ -68,6 +70,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     private readonly ends: UsageSessionEnds,
     private readonly extensions: UsageSessionExtensions,
     private readonly projectSwitch: UsageSessionProjectSwitch,
+    private readonly projectReassign: UsageSessionProjectReassign,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -209,7 +212,7 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     return this.ends.endSession(resourceId, user, dto, options);
   }
 
-  /** Refuses a project switch that can be told to fail before anything is asked of the person. */
+  /** Refuses a project change that can be told to fail before anything is asked of the person. */
   public assertSessionProjectSwitchable(
     resourceId: number,
     user: UsageSessionUser,
@@ -218,14 +221,19 @@ export class ResourceUsageService implements OnModuleInit, OnModuleDestroy {
     return this.projectSwitch.assertSwitchable(resourceId, user, dto);
   }
 
-  /** Continues the caller's running session under another project, without stopping the machine. */
+  /**
+   * Changes the project of the caller's running session without stopping the machine: of the whole session, or by
+   * splitting it, as `dto.mode` says.
+   */
   async switchSessionProject(
     resourceId: number,
     user: UsageSessionUser,
     dto: SwitchUsageSessionProjectDto,
     options: SwitchProjectOptions = {},
   ): Promise<UsageSession> {
-    return this.projectSwitch.switchProject(resourceId, user, dto, options);
+    return dto.mode === ProjectChangeMode.WHOLE_SESSION
+      ? this.projectReassign.reassignProject(resourceId, user, dto, options)
+      : this.projectSwitch.switchProject(resourceId, user, dto, options);
   }
 
   /** Moves the automatic end of a running session later; refused past its cap. */

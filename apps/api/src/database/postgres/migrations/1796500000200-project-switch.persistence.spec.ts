@@ -51,6 +51,9 @@ describe('ProjectSwitch1796500000200 (persistence)', () => {
     expect(await source.query(`SELECT "isRequiredOnResourceUsageProjectSwitch" AS required FROM "form"`)).toEqual([
       { required: false },
     ]);
+    expect(await source.query(`SELECT "isRequiredOnResourceUsageProjectReassign" AS required FROM "form"`)).toEqual([
+      { required: false },
+    ]);
   });
 
   it('allows one continuation per part and keeps it when the part is deleted', async () => {
@@ -76,7 +79,7 @@ describe('ProjectSwitch1796500000200 (persistence)', () => {
     expect(
       await source.query(
         `SELECT column_name FROM information_schema.columns
-         WHERE column_name IN ('previousUsageId', 'projectSwitchCharging', 'sessionStartTime', 'isRequiredOnResourceUsageProjectSwitch')
+         WHERE column_name IN ('previousUsageId', 'projectSwitchCharging', 'sessionStartTime', 'isRequiredOnResourceUsageProjectSwitch', 'isRequiredOnResourceUsageProjectReassign')
            AND table_name IN ('resource_usage', 'resource_billing_configuration', 'form', 'form_resource_override')`,
       ),
     ).toEqual([]);

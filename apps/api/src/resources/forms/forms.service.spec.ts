@@ -438,6 +438,7 @@ describe('ResourceFormsService forms of a resource', () => {
       isRequiredOnResourceUsageTakeOver: null,
       isRequiredOnResourceUsageEnd: null,
       isRequiredOnResourceUsageProjectSwitch: null,
+      isRequiredOnResourceUsageProjectReassign: null,
     });
   });
 

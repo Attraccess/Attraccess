@@ -127,7 +127,7 @@ export type UsageSessionWithParties = UsageSession & {
   user: UsageSessionUserRecord | null;
 };
 
-export type UsageLifecycleKind = 'start' | 'end' | 'takeover' | 'project-switch';
+export type UsageLifecycleKind = 'start' | 'end' | 'takeover' | 'project-switch' | 'project-reassign';
 
 export interface UsageFormAnswer {
   value: string;

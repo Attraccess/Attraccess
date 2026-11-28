@@ -4,6 +4,7 @@ export enum ResourceFlowNodeType {
   INPUT_RESOURCE_USAGE_STOPPED = 'input.resource.usage.stopped',
   INPUT_RESOURCE_USAGE_TAKEOVER = 'input.resource.usage.takeover',
   INPUT_RESOURCE_USAGE_PROJECT_SWITCHED = 'input.resource.usage.project-switched',
+  INPUT_RESOURCE_USAGE_PROJECT_REASSIGNED = 'input.resource.usage.project-reassigned',
   INPUT_RESOURCE_DOOR_UNLOCKED = 'input.resource.door.unlocked',
   INPUT_RESOURCE_DOOR_LOCKED = 'input.resource.door.locked',
   INPUT_RESOURCE_DOOR_UNLATCHED = 'input.resource.door.unlatched',

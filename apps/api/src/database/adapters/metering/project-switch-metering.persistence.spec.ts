@@ -7,7 +7,7 @@ import {
   ResourceUsage,
   User,
 } from '@attraccess/database-entities';
-import { ResourceFlowNodeType, ResourceMeteringSessionStatus } from '@attraccess/application-models';
+import { ProjectChangeMode, ResourceFlowNodeType, ResourceMeteringSessionStatus } from '@attraccess/application-models';
 import { FlowExecutionError } from '../../../resources/flows/errors/flow-execution.error';
 import { closeMeteringFixture, resetTestFixture } from './fixtures/setup.test-fixture';
 import { createFlowDefinedMeteringFixture } from './fixtures/flow-defined-meters.test-fixture';
@@ -49,7 +49,7 @@ describe('Metering a project switch', () => {
 
   const start = (user = 0) => scope.usage.startSession(1, scope.users[user], { projectId: 1 } as never);
   const switchProject = (user = 0, projectId = 2) =>
-    scope.usage.switchSessionProject(1, scope.users[user], { projectId });
+    scope.usage.switchSessionProject(1, scope.users[user], { mode: ProjectChangeMode.SPLIT, projectId });
   const end = (user = 0) => scope.usage.endSession(1, scope.users[user], {} as never);
   const charged = async (usageId: number) => Math.abs((await scope.items(usageId)).transaction.amount);
   const meterSessions = () => scope.source.getRepository(ResourceMeteringSession).find({ order: { usageId: 'ASC' } });

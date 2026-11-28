@@ -47,6 +47,7 @@ const nodeDataSchemas = {
   [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED]: NodeWithoutDataSchema,
   [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER]: NodeWithoutDataSchema,
   [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_SWITCHED]: NodeWithoutDataSchema,
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_REASSIGNED]: NodeWithoutDataSchema,
   [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLOCKED]: NodeWithoutDataSchema,
   [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_LOCKED]: NodeWithoutDataSchema,
   [ResourceFlowNodeType.INPUT_RESOURCE_DOOR_UNLATCHED]: NodeWithoutDataSchema,

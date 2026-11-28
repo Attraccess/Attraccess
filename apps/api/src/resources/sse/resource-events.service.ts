@@ -3,6 +3,7 @@ import { Observable, Subject } from 'rxjs';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   ResourceSessionStartedEvent,
+  ResourceUsageProjectReassignedEvent,
   ResourceUsageProjectSwitchedEvent,
   ResourceUsageSessionExtendedEvent,
   ResourceUsageSessionEndedEvent,
@@ -186,6 +187,16 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
   handleResourceUsageProjectSwitched(event: ResourceUsageProjectSwitchedEvent) {
     this.emitWithSessionStatus(event.resourceId, {
       eventType: ResourceUsageProjectSwitchedEvent.EVENT_NAME,
+      resourceId: event.resourceId,
+      ownerUserId: event.userId,
+    });
+  }
+
+  /** The running session moved as a whole to another project. */
+  @OnEvent(ResourceUsageProjectReassignedEvent.EVENT_NAME)
+  handleResourceUsageProjectReassigned(event: ResourceUsageProjectReassignedEvent) {
+    this.emitWithSessionStatus(event.resourceId, {
+      eventType: ResourceUsageProjectReassignedEvent.EVENT_NAME,
       resourceId: event.resourceId,
       ownerUserId: event.userId,
     });

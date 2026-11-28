@@ -411,20 +411,20 @@ export class ResourceUsageController {
   @Post('sessions/active/project')
   @Auth()
   @ApiOperation({
-    summary: 'Switch the project of a running session',
+    summary: 'Change the project of a running session',
     description:
-      "Moves your own running machine session to another of your projects, or to no project, without stopping the machine: the current usage record ends now and a continuation (linked through `previousUsageId`) starts at the same instant. Usage before the switch is booked to the old project, usage after it to the new one; how the continuation is charged follows the resource's billing setting `projectSwitchCharging`. Only flows and forms of the project-switch action take part. If a meter reading or a switch flow fails, nothing changes. Use `PUT sessions/{usageId}/project` for sessions that have ended.",
+      "Moves your own running machine session to another of your projects, or to no project, without stopping the machine. The required `mode` says what the change applies to.\n\n`whole-session`: the running usage record only changes its project, so everything used in it so far counts for the new project. Nothing is metered or billed, and `projectSwitchCharging` plays no role. Only the project-reassigned flows and project-reassign forms take part. Earlier parts of a session that was split before keep their projects.\n\n`split`: the running record ends now and a continuation (linked through `previousUsageId`) starts at the same instant. Usage before the split is booked to the old project, usage after it to the new one; how the continuation is charged follows the resource's billing setting `projectSwitchCharging`. Only the project-switched flows and project-switch forms take part.\n\nIf a flow, or with `split` a meter reading or the balance check, fails, nothing changes. Use `PUT sessions/{usageId}/project` for sessions that have ended.",
     operationId: 'resourceUsageSwitchSessionProject',
   })
   @ApiResponse({
     status: 201,
-    description: 'The continuation, now the running session.',
+    description: "The running session: the same record for 'whole-session', the continuation for 'split'.",
     type: ResourceUsageResponseDto,
   })
   @ApiResponse({
     status: 400,
     description:
-      'Bad Request - the session already belongs to this project, a required form is missing, the balance does not cover a new session, or a meter could not be read',
+      'Bad Request - `mode` is missing or unknown, the session already belongs to this project, a required form is missing or a flow failed; with `split` also: the balance does not cover a new session, or a meter could not be read',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
   @ApiResponse({ status: 403, description: 'Forbidden - The named session belongs to somebody else' })

@@ -33,6 +33,7 @@ import {
   ResourceSupervisedUsageEndedEvent,
   ResourceSupervisedUsageStartedEvent,
   ResourceUsageNoteAddedEvent,
+  ResourceUsageProjectReassignedEvent,
   ResourceUsageProjectSwitchedEvent,
   ResourceUsageSessionEndedEvent,
   ResourceUsageSessionTakenOverEvent,
@@ -231,6 +232,25 @@ export class UsageSessionNotifications {
       );
     } catch (error) {
       this.logger.error('Failed to emit the project switched event after commit', (error as Error).stack);
+    }
+  }
+
+  /** The live update of a session that moved as a whole to another project. */
+  notifyProjectReassigned(previous: UsageSession, reassigned: UsageSession, changeTime: Date): void {
+    try {
+      this.eventEmitter.emit(
+        ResourceUsageProjectReassignedEvent.EVENT_NAME,
+        new ResourceUsageProjectReassignedEvent(
+          reassigned.resourceId,
+          reassigned.userId as number,
+          reassigned.id,
+          previous.projectId,
+          reassigned.projectId,
+          changeTime,
+        ),
+      );
+    } catch (error) {
+      this.logger.error('Failed to emit the project reassigned event after commit', (error as Error).stack);
     }
   }
 

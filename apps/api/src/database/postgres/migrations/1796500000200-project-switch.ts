@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
- * Switching the project of a running session (ATT-1421). A switch ends the current usage and continues it in a new
+ * Changing the project of a running session (ATT-1421): moving the whole session only needs the form flags. A split ends the current usage and continues it in a new
  * one that links back through `previousUsageId`. Nothing is backfilled: every existing session is a session of its
  * own, every existing resource charges continuations in the default mode, and no existing form is required on a
  * switch.
@@ -29,9 +29,19 @@ export class ProjectSwitch1796500000200 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "form_resource_override" ADD "isRequiredOnResourceUsageProjectSwitch" boolean`,
     );
+    await queryRunner.query(
+      `ALTER TABLE "form" ADD "isRequiredOnResourceUsageProjectReassign" boolean NOT NULL DEFAULT false`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "form_resource_override" ADD "isRequiredOnResourceUsageProjectReassign" boolean`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE "form_resource_override" DROP COLUMN "isRequiredOnResourceUsageProjectReassign"`,
+    );
+    await queryRunner.query(`ALTER TABLE "form" DROP COLUMN "isRequiredOnResourceUsageProjectReassign"`);
     await queryRunner.query(
       `ALTER TABLE "form_resource_override" DROP COLUMN "isRequiredOnResourceUsageProjectSwitch"`,
     );

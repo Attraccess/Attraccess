@@ -1,17 +1,11 @@
-import {
-  ProjectSwitchCharging,
-  ResourceFlowNodeType,
-  ResourceFormAction,
-  ResourceType,
-  ResourceUsageAction,
-} from '@attraccess/application-models';
+import { ProjectSwitchCharging, ResourceFlowNodeType, ResourceFormAction } from '@attraccess/application-models';
 import type {
   UsageSession,
   UsageSessionUser,
   UsageSessionWithParties,
   UsageFormSubmissionDraft,
 } from '@attraccess/application-models';
-import { BadRequestException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
 import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../../audit/recorder/audit-event';
@@ -22,11 +16,11 @@ import { ResourceFormsService } from '../../forms/forms.service';
 import type { FinalCollection } from '../../metering/resource-metering.service';
 import type { SwitchUsageSessionProjectDto } from '../dtos/switchUsageSessionProject.dto';
 import { MachineBusyError } from '../errors/machine-busy.error';
-import { NoSessionToSwitchError } from '../errors/no-session-to-switch.error';
 import { SessionChangeInterruptedError } from '../errors/session-change-interrupted.error';
 import { ActiveSessionCounts, UsageLifecycle } from '../lifecycle/usage-lifecycle';
 import { usageFlowPayload } from '../lifecycle/usage-flow-payload';
 import { assertNewSessionPayableAfterCharge } from './switch-balance-precheck';
+import { findTargetProject, pickChangeableSession } from './project-change-target';
 import { UsageSessionEnds } from './usage-session-ends';
 import { UsageSessionNotifications } from './usage-session-notifications';
 import { UsageSessionRecords } from './usage-session-records';
@@ -45,8 +39,8 @@ interface PreparedProjectSwitch {
 }
 
 /**
- * Moves a running session to another project without stopping the machine: the current usage ends and a
- * continuation starts at the same instant. It is a session change like a takeover (one attempt, one turn on the
+ * Splits a running session between two projects without stopping the machine: the current usage ends and a
+ * continuation for the new project starts at the same instant. It is a session change like a takeover (one attempt, one turn on the
  * machine, all or nothing), but only the project-switch flows and forms take part in it.
  */
 @Injectable()
@@ -81,13 +75,11 @@ export class UsageSessionProjectSwitch {
   async assertSwitchable(resourceId: number, user: UsageSessionUser, dto: SwitchUsageSessionProjectDto): Promise<void> {
     const projectId = await this.targetProjectId(user, dto);
     const active = await this.records.getActiveSessionsForResource(resourceId);
-    this.pickSwitchableSession(active, user, dto.usageId, projectId);
+    pickChangeableSession(active, user, dto.usageId, projectId);
   }
 
   private async targetProjectId(user: UsageSessionUser, dto: SwitchUsageSessionProjectDto): Promise<number | null> {
-    if (dto.projectId === undefined) throw new BadRequestException('Project assignment is required');
-    // The same membership check as at the start; resolved before the transaction, as it reads on its own connection.
-    return dto.projectId === null ? null : (await this.projectsService.findOneById(user.id, dto.projectId)).id;
+    return (await findTargetProject(this.projectsService, user, dto.projectId))?.id ?? null;
   }
 
   private async switchNow(
@@ -164,37 +156,6 @@ export class UsageSessionProjectSwitch {
     return switched;
   }
 
-  /**
-   * The running session the request means: the named one, or the caller's own. Only naming somebody else's session is
-   * forbidden; without a name, other people's sessions are not the caller's concern, so having none is simply 404.
-   */
-  private pickOwnSession(sessions: UsageSession[], user: UsageSessionUser, usageId: number | undefined): UsageSession {
-    const session = sessions.find((candidate) =>
-      usageId === undefined ? candidate.userId === user.id : candidate.id === usageId,
-    );
-    if (!session) throw new NoSessionToSwitchError();
-    if (session.userId !== user.id) {
-      throw new ForbiddenException('Only the owner of a running session can switch its project');
-    }
-    return session;
-  }
-
-  private pickSwitchableSession(
-    sessions: UsageSession[],
-    user: UsageSessionUser,
-    usageId: number | undefined,
-    projectId: number | null,
-  ): UsageSession {
-    const session = this.pickOwnSession(sessions, user, usageId);
-    if (session.usageAction !== ResourceUsageAction.Usage || session.resource?.type !== ResourceType.Machine) {
-      throw new BadRequestException('Only running machine sessions can switch their project');
-    }
-    if (session.projectId === projectId) {
-      throw new BadRequestException('The session already belongs to this project');
-    }
-    return session;
-  }
-
   private prepare(
     resourceId: number,
     user: UsageSessionUser,
@@ -208,7 +169,7 @@ export class UsageSessionProjectSwitch {
       const sharedMachine = sessionLimit > 1;
       await this.lifecycle.assertLifecycleAvailable(scope, resourceId, sharedMachine);
       const active = await this.records.getActiveSessionsForResource(resourceId, scope);
-      const previous = this.pickSwitchableSession(active, user, dto.usageId, projectId);
+      const previous = pickChangeableSession(active, user, dto.usageId, projectId);
       if (sharedMachine && (await sessions.isSessionBeingEnded(previous.id, scope))) {
         throw new MachineBusyError();
       }

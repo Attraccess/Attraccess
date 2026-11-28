@@ -36,6 +36,7 @@ export function toUsageSessionForm(form: Form): UsageSessionForm {
     isRequiredOnResourceUsageTakeOver: form.isRequiredOnResourceUsageTakeOver,
     isRequiredOnResourceUsageEnd: form.isRequiredOnResourceUsageEnd,
     isRequiredOnResourceUsageProjectSwitch: form.isRequiredOnResourceUsageProjectSwitch,
+    isRequiredOnResourceUsageProjectReassign: form.isRequiredOnResourceUsageProjectReassign,
     resourceId: form.resourceId,
     groupId: form.groupId,
     deletedAt: form.deletedAt,

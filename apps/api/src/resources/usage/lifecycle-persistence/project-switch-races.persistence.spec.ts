@@ -1,3 +1,4 @@
+import { ProjectChangeMode } from '@attraccess/application-models';
 import { Project, ResourceUsage, ResourceUsageLifecycleAttempt } from '@attraccess/database-entities';
 import { ConflictException } from '@nestjs/common';
 import {
@@ -20,7 +21,7 @@ describe('Switching the project of a running session while other changes race it
   const openSessions = async () => (await usages()).filter((usage) => !usage.endTime);
   const startInProject = () => scope.usage.startSession(1, scope.users[0], { projectId: 1 });
   const switchTo = (service: ResourceUsageService, projectId: number | null, usageId: number) =>
-    service.switchSessionProject(1, scope.users[0], { projectId, usageId });
+    service.switchSessionProject(1, scope.users[0], { mode: ProjectChangeMode.SPLIT, projectId, usageId });
 
   /** Another API instance on the same database, with its own queue and no common turn: it sees only the database. */
   const otherInstance = () =>

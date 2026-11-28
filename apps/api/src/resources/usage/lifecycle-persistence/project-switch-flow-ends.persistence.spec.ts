@@ -1,5 +1,10 @@
 import { Project, Resource, ResourceUsage, ResourceUsageLifecycleAttempt } from '@attraccess/database-entities';
-import { type FlowNodeRecord, ResourceFlowNodeType, ResourceType } from '@attraccess/application-models';
+import {
+  ProjectChangeMode,
+  type FlowNodeRecord,
+  ResourceFlowNodeType,
+  ResourceType,
+} from '@attraccess/application-models';
 import {
   closeLifecycleFixture,
   resetTestFixture,
@@ -102,7 +107,11 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
   it.each(cases)('target "%s", limit %i: ends the continuation of a switch that commits', async (target, limit) => {
     const own = await arrange(limit);
     const parked = parkSwitchFlow();
-    const switching = scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: own.id });
+    const switching = scope.usage.switchSessionProject(1, scope.users[0], {
+      mode: ProjectChangeMode.SPLIT,
+      projectId: 2,
+      usageId: own.id,
+    });
     await parked.entered;
     const holdUps = watchSwitchHoldUps(scope.usage);
 
@@ -126,7 +135,11 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
   it.each(cases)('target "%s", limit %i: ends the old part of a switch that is rolled back', async (target, limit) => {
     const own = await arrange(limit);
     const parked = parkSwitchFlow();
-    const switching = scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: own.id });
+    const switching = scope.usage.switchSessionProject(1, scope.users[0], {
+      mode: ProjectChangeMode.SPLIT,
+      projectId: 2,
+      usageId: own.id,
+    });
     const refused = expect(switching).rejects.toBeInstanceOf(FlowExecutionError);
     await parked.entered;
     const holdUps = watchSwitchHoldUps(scope.usage);
@@ -154,7 +167,11 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
     const own = await arrange(limit);
     const other = forkUsageInstance(scope.usage, () => undefined);
     const parked = parkSwitchFlow();
-    const switching = scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: own.id });
+    const switching = scope.usage.switchSessionProject(1, scope.users[0], {
+      mode: ProjectChangeMode.SPLIT,
+      projectId: 2,
+      usageId: own.id,
+    });
     await parked.entered;
     const holdUps = watchSwitchHoldUps(other);
 
@@ -184,7 +201,11 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
       }),
     );
     const parked = parkSwitchFlow();
-    const switching = scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: own.id });
+    const switching = scope.usage.switchSessionProject(1, scope.users[0], {
+      mode: ProjectChangeMode.SPLIT,
+      projectId: 2,
+      usageId: own.id,
+    });
     await parked.entered;
     const holdUps = watchSwitchHoldUps(other, queueOf(other));
 
@@ -208,7 +229,11 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
       const own = await scope.usage.startSession(1, scope.users[0], { projectId: 1 });
       Object.assign(usageInternals(scope.usage).turns, { sessionChangeWaitMs: 100 });
       const parked = parkSwitchFlow();
-      const switching = scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: own.id });
+      const switching = scope.usage.switchSessionProject(1, scope.users[0], {
+        mode: ProjectChangeMode.SPLIT,
+        projectId: 2,
+        usageId: own.id,
+      });
       await parked.entered;
       const holdUps = watchSwitchHoldUps(scope.usage);
 
@@ -242,7 +267,11 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
   it('leaves a person’s own stop refused while the switch runs', async () => {
     const own = await arrange(1);
     const parked = parkSwitchFlow();
-    const switching = scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: own.id });
+    const switching = scope.usage.switchSessionProject(1, scope.users[0], {
+      mode: ProjectChangeMode.SPLIT,
+      projectId: 2,
+      usageId: own.id,
+    });
     await parked.entered;
 
     await expect(scope.usage.endSession(1, scope.users[0], {})).rejects.toThrow(
@@ -259,8 +288,12 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
     'limit %i: a late "triggering" end follows the switches made since, and only those',
     async (limit) => {
       const own = await arrange(limit);
-      await scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: own.id });
-      await scope.usage.switchSessionProject(1, scope.users[0], { projectId: null });
+      await scope.usage.switchSessionProject(1, scope.users[0], {
+        mode: ProjectChangeMode.SPLIT,
+        projectId: 2,
+        usageId: own.id,
+      });
+      await scope.usage.switchSessionProject(1, scope.users[0], { mode: ProjectChangeMode.SPLIT, projectId: null });
 
       await pressEnd(scope.usage, 'triggering', { usageId: own.id });
 

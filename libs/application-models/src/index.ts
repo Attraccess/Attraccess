@@ -29,6 +29,7 @@ export * from './lib/user-role';
 export * from './lib/operating-interval';
 export * from './lib/usage-session';
 export * from './lib/session-start';
+export * from './lib/project-change-mode';
 export * from './lib/project-switch-charging';
 export * from './lib/billing-ledger';
 export * from './lib/passkey';

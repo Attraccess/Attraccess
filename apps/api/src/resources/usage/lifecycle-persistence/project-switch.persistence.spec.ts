@@ -8,6 +8,7 @@ import {
   ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
 import {
+  ProjectChangeMode,
   BillingTransactionStatus,
   ProjectSwitchCharging,
   ResourceFlowNodeType,
@@ -44,7 +45,11 @@ describe('Switching the project of a running session', () => {
   const flowRuns = () => scope.flow.runFlow.mock.calls.map((call) => call[1] as ResourceFlowNodeType);
   const startInProject = (user = 0, projectId = 1) => scope.usage.startSession(1, scope.users[user], { projectId });
   const switchTo = (projectId: number | null, user = 0, usageId?: number) =>
-    scope.usage.switchSessionProject(1, scope.users[user], { projectId, ...(usageId ? { usageId } : {}) });
+    scope.usage.switchSessionProject(1, scope.users[user], {
+      mode: ProjectChangeMode.SPLIT,
+      projectId,
+      ...(usageId ? { usageId } : {}),
+    });
 
   /** Parks the next flow run inside the flow; `entered` resolves once the change is waiting there. */
   const parkNextFlow = () => {
@@ -223,7 +228,7 @@ describe('Switching the project of a running session', () => {
     scope.flow.runFlow.mockClear();
 
     await expect(switchTo(2)).rejects.toThrow(
-      new BadRequestException('Only running machine sessions can switch their project'),
+      new BadRequestException('Only running machine sessions can change their project'),
     );
     await expect(switchTo(2, 0, started.id)).rejects.toBeInstanceOf(BadRequestException);
 
@@ -253,7 +258,7 @@ describe('Switching the project of a running session', () => {
     const continuation = await scope.usage.switchSessionProject(
       1,
       scope.users[0],
-      { projectId: 2 },
+      { mode: ProjectChangeMode.SPLIT, projectId: 2 },
       { auditOrigin: { id: 1, authenticationMethod: 'api-token' } },
     );
     const toNone = await switchTo(null);

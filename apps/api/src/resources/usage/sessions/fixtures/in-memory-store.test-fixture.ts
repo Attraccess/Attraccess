@@ -267,6 +267,13 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     return this.withRelations(stored);
   }
 
+  async assignRunningProject(usageId: number, projectId: number | null, _context: TransactionScope): Promise<boolean> {
+    const stored = this.required(usageId);
+    if (stored.endTime !== null || stored.lifecyclePending) return false;
+    stored.projectId = projectId;
+    return true;
+  }
+
   async findSessionForEvent(usageId: number, _context?: TransactionScope): Promise<UsageSessionWithParties | null> {
     const found = this.sessions.find((stored) => stored.id === usageId);
     return found ? this.withRelations(found) : null;
@@ -356,13 +363,13 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
 
   async isSessionBeingSwitched(usageId: number, _context?: TransactionScope): Promise<boolean> {
     return [...this.attempts.values()].some(
-      (attempt) => attempt.kind === 'project-switch' && attempt.previousUsageId === usageId,
+      (attempt) => attempt.kind.startsWith('project-') && attempt.previousUsageId === usageId,
     );
   }
 
   async isProjectSwitchPending(resourceId: number): Promise<boolean> {
     return [...this.attempts.values()].some(
-      (attempt) => attempt.kind === 'project-switch' && attempt.resourceId === resourceId,
+      (attempt) => attempt.kind.startsWith('project-') && attempt.resourceId === resourceId,
     );
   }
 

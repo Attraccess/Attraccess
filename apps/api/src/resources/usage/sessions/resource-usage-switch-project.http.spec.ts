@@ -59,12 +59,16 @@ describe('POST /resources/:resourceId/usage/sessions/active/project', () => {
     request(app.getHttpServer()).post('/resources/5/usage/sessions/active/project').send(body);
 
   it.each([
-    ['no project at all', {}],
-    ['project 0', { projectId: 0 }],
-    ['a negative project', { projectId: -3 }],
-    ['a fractional project', { projectId: 1.5 }],
-    ['a project that is not a number', { projectId: 'thesis' }],
-    ['a usage id that is not positive', { projectId: 2, usageId: 0 }],
+    ['no project at all', { mode: 'split' }],
+    ['project 0', { mode: 'split', projectId: 0 }],
+    ['a negative project', { mode: 'split', projectId: -3 }],
+    ['a fractional project', { mode: 'whole-session', projectId: 1.5 }],
+    ['a project that is not a number', { mode: 'split', projectId: 'thesis' }],
+    ['a usage id that is not positive', { mode: 'split', projectId: 2, usageId: 0 }],
+    // No default: nobody gets a billing behaviour they did not choose.
+    ['a missing mode', { projectId: 2 }],
+    ['a null mode', { mode: null, projectId: 2 }],
+    ['an unknown mode', { mode: 'whole', projectId: 2 }],
   ])('refuses %s with 400 before anything is switched', async (_name, body) => {
     const response = await post(body);
 
@@ -73,26 +77,26 @@ describe('POST /resources/:resourceId/usage/sessions/active/project', () => {
   });
 
   it('accepts null: the session continues without a project', async () => {
-    const response = await post({ projectId: null });
+    const response = await post({ mode: 'whole-session', projectId: null });
 
     expect(response.status).toBe(201);
     expect(switchSessionProject).toHaveBeenCalledWith(
       5,
       expect.objectContaining({ id: 7 }),
-      expect.objectContaining({ projectId: null }),
+      expect.objectContaining({ mode: 'whole-session', projectId: null }),
       expect.anything(),
     );
   });
 
   it('accepts a project and a named session', async () => {
-    const response = await post({ projectId: 2, usageId: 1204 });
+    const response = await post({ mode: 'split', projectId: 2, usageId: 1204 });
 
     expect(response.status).toBe(201);
-    expect(switchSessionProject.mock.calls[0][2]).toMatchObject({ projectId: 2, usageId: 1204 });
+    expect(switchSessionProject.mock.calls[0][2]).toMatchObject({ mode: 'split', projectId: 2, usageId: 1204 });
   });
 
   it('reads a numeric string as that number, like every number in a body of this API', async () => {
-    const response = await post({ projectId: '7' });
+    const response = await post({ mode: 'split', projectId: '7' });
 
     expect(response.status).toBe(201);
     expect(switchSessionProject.mock.calls[0][2]).toMatchObject({ projectId: 7 });

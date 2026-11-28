@@ -62,6 +62,8 @@ export const DETAIL_RELATIONS = [
 const toSession = toUsageSession;
 const toSessions = (rows: ResourceUsage[]): UsageSession[] => rows.map(toUsageSession);
 const toAttempt = toUsageLifecycleAttempt;
+/** Attempts that change the project of a running session, whole or split. */
+const PROJECT_CHANGE_KINDS = In(['project-switch', 'project-reassign']);
 /** For reads that load the resource and the user relation. */
 const toSessionWithParties = (row: ResourceUsage): UsageSessionWithParties =>
   toUsageSession(row) as UsageSessionWithParties;
@@ -241,6 +243,13 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
     );
   }
 
+  async assignRunningProject(usageId: number, projectId: number | null, context: TransactionContext): Promise<boolean> {
+    const result = await this.managers
+      .resolve(context)
+      .update(ResourceUsage, { id: usageId, ...activeUsageWhere() }, { projectId });
+    return result.affected === 1;
+  }
+
   async findSessionForEvent(usageId: number, context?: TransactionContext): Promise<UsageSessionWithParties | null> {
     const session = await this.managers
       .resolve(context)
@@ -326,11 +335,11 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
   isSessionBeingSwitched(usageId: number, context?: TransactionContext): Promise<boolean> {
     return this.managers
       .resolve(context)
-      .existsBy(ResourceUsageLifecycleAttempt, { kind: 'project-switch', previousUsageId: usageId });
+      .existsBy(ResourceUsageLifecycleAttempt, { kind: PROJECT_CHANGE_KINDS, previousUsageId: usageId });
   }
 
   isProjectSwitchPending(resourceId: number): Promise<boolean> {
-    return this.managers.resolve().existsBy(ResourceUsageLifecycleAttempt, { resourceId, kind: 'project-switch' });
+    return this.managers.resolve().existsBy(ResourceUsageLifecycleAttempt, { resourceId, kind: PROJECT_CHANGE_KINDS });
   }
 
   findContinuationId(usageId: number, context?: TransactionContext): Promise<number | null> {

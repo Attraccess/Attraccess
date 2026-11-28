@@ -33,6 +33,7 @@ export interface FormInput extends FormPlacement {
   isRequiredOnResourceUsageTakeOver: boolean;
   isRequiredOnResourceUsageEnd: boolean;
   isRequiredOnResourceUsageProjectSwitch: boolean;
+  isRequiredOnResourceUsageProjectReassign: boolean;
 }
 
 /** A field of an update: an existing one (with its id) is changed, one without an id is added. */
@@ -71,6 +72,7 @@ export interface FormOverrideInput {
   isRequiredOnResourceUsageTakeOver: boolean | null;
   isRequiredOnResourceUsageEnd: boolean | null;
   isRequiredOnResourceUsageProjectSwitch: boolean | null;
+  isRequiredOnResourceUsageProjectReassign: boolean | null;
 }
 
 /**

@@ -25,7 +25,7 @@ export class ResourceUsageLifecycleAttempt {
   resource!: Resource;
 
   @Column({ type: 'varchar' })
-  kind!: 'start' | 'end' | 'takeover' | 'project-switch';
+  kind!: 'start' | 'end' | 'takeover' | 'project-switch' | 'project-reassign';
 
   @Column({ type: 'integer', nullable: true })
   candidateUsageId!: number | null;

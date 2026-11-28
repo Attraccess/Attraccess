@@ -5,7 +5,12 @@ import {
   ResourceUsageLifecycleAttempt,
   User,
 } from '@attraccess/database-entities';
-import { BillingTransactionStatus, ProjectSwitchCharging, ResourceFlowNodeType } from '@attraccess/application-models';
+import {
+  ProjectChangeMode,
+  BillingTransactionStatus,
+  ProjectSwitchCharging,
+  ResourceFlowNodeType,
+} from '@attraccess/application-models';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
 import {
   closeLifecycleFixture,
@@ -27,7 +32,8 @@ describe('Switching to a new session the balance has to pay for', () => {
   const OLD_PART = 23;
   const NEW_SESSION_NEEDS = 7;
 
-  const switchOwn = () => scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2 });
+  const switchOwn = () =>
+    scope.usage.switchSessionProject(1, scope.users[0], { mode: ProjectChangeMode.SPLIT, projectId: 2 });
   const switchFlowRuns = () =>
     scope.flow.runFlow.mock.calls.filter(
       (call) => call[1] === ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_SWITCHED,

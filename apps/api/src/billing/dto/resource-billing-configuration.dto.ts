@@ -54,7 +54,8 @@ export class ResourceBillingConfigurationValuesDto {
   creditsPerOperatingMinute!: number;
 
   @ApiProperty({
-    description: 'How a running session is charged when its owner switches its project',
+    description:
+      'How a running session is charged when its owner splits it between projects. Moving a whole session charges nothing.',
     enum: ProjectSwitchCharging,
     enumName: 'ProjectSwitchCharging',
   })

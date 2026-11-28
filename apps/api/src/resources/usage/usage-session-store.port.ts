@@ -130,11 +130,11 @@ export interface UsageSessionStore {
   isLifecycleBlocked(resourceId: number, sharedMachine: boolean, context?: TransactionScope): Promise<boolean>;
   /** The attempt; inside a unit of work it stays locked until commit, so attempt changes never interleave. */
   findAttempt(attemptId: string, resourceId: number, context?: TransactionScope): Promise<UsageLifecycleAttempt | null>;
-  /** Whether a stop, takeover or project switch attempt is already working on this running session. */
+  /** Whether a stop, takeover or project change attempt is already working on this running session. */
   isSessionBeingEnded(usageId: number, context?: TransactionScope): Promise<boolean>;
-  /** Whether a project switch of this running session is pending: it still runs on, here or as its continuation. */
+  /** Whether a project change of this running session is pending: it still runs on, here or as its continuation. */
   isSessionBeingSwitched(usageId: number, context?: TransactionScope): Promise<boolean>;
-  /** Whether a project switch of any session of the resource is pending: on a shared machine it holds the turn. */
+  /** Whether a project change of any session of the resource is pending: on a shared machine it holds the turn. */
   isProjectSwitchPending(resourceId: number): Promise<boolean>;
   /** The published part that continues this one after a project switch, or null. */
   findContinuationId(usageId: number, context?: TransactionScope): Promise<number | null>;
@@ -170,6 +170,8 @@ export interface UsageSessionStore {
     end: { endTime: Date; endNotes: string | null | undefined },
     context?: TransactionScope,
   ): Promise<boolean>;
+  /** Books a running session to another project. Reports `false` when it is not running (any more). */
+  assignRunningProject(usageId: number, projectId: number | null, context: TransactionScope): Promise<boolean>;
   /** Stores the running time attributed to an ended session. */
   setAttributedOperatingDuration(usageId: number, minutes: number, context?: TransactionScope): Promise<void>;
   /** A session with the relations a stop, takeover or start returns. */

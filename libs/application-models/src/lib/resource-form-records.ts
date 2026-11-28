@@ -25,6 +25,7 @@ export interface FormRecord {
   isRequiredOnResourceUsageTakeOver: boolean;
   isRequiredOnResourceUsageEnd: boolean;
   isRequiredOnResourceUsageProjectSwitch: boolean;
+  isRequiredOnResourceUsageProjectReassign: boolean;
   resourceId: number | null;
   groupId: number | null;
   /** Set when the form was deleted; deleted forms only stay for the history of their submissions. */
@@ -38,6 +39,7 @@ export interface FormRequiredFlags {
   isRequiredOnResourceUsageTakeOver: boolean;
   isRequiredOnResourceUsageEnd: boolean;
   isRequiredOnResourceUsageProjectSwitch: boolean;
+  isRequiredOnResourceUsageProjectReassign: boolean;
 }
 
 /** How one resource deviates from a form that applies to it. A `null` flag inherits the form's default. */
@@ -50,6 +52,7 @@ export interface FormResourceOverrideRecord {
   isRequiredOnResourceUsageTakeOver: boolean | null;
   isRequiredOnResourceUsageEnd: boolean | null;
   isRequiredOnResourceUsageProjectSwitch: boolean | null;
+  isRequiredOnResourceUsageProjectReassign: boolean | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -84,6 +87,7 @@ export function effectiveFormFlags(
     | 'isRequiredOnResourceUsageTakeOver'
     | 'isRequiredOnResourceUsageEnd'
     | 'isRequiredOnResourceUsageProjectSwitch'
+    | 'isRequiredOnResourceUsageProjectReassign'
   > | null,
 ): FormRequiredFlags {
   return {
@@ -93,5 +97,7 @@ export function effectiveFormFlags(
     isRequiredOnResourceUsageEnd: override?.isRequiredOnResourceUsageEnd ?? form.isRequiredOnResourceUsageEnd,
     isRequiredOnResourceUsageProjectSwitch:
       override?.isRequiredOnResourceUsageProjectSwitch ?? form.isRequiredOnResourceUsageProjectSwitch,
+    isRequiredOnResourceUsageProjectReassign:
+      override?.isRequiredOnResourceUsageProjectReassign ?? form.isRequiredOnResourceUsageProjectReassign,
   };
 }

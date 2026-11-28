@@ -119,9 +119,9 @@ export interface ActiveSessionCounts {
  * would run the stop flow of a machine that keeps running. A switch flow that fails refuses the switch instead.
  */
 function assertCandidateMayBeCancelled(attempt: UsageLifecycleAttempt): void {
-  if (attempt.kind === 'project-switch') {
+  if (attempt.kind === 'project-switch' || attempt.kind === 'project-reassign') {
     throw new FlowExecutionError(
-      'A project switch flow cannot end the session being switched; name a user or all sessions to end them after the switch',
+      'A project change flow cannot end the session being changed; name a user or all sessions to end them after the change',
     );
   }
 }
@@ -256,8 +256,10 @@ export class UsageLifecycle {
       await this.metering?.discardCandidate(scope, attempt.candidateUsageId);
       await this.sessions.deletePendingSession(attempt.candidateUsageId, scope);
     }
-    // The session a stop or takeover was about to end keeps running, so it still shares the meter.
-    if (attempt.previousUsageId !== null) await this.metering?.restoreParticipant(scope, attempt.previousUsageId);
+    // The session a stop or takeover was about to end keeps running, so it still shares the meter. Moving a whole
+    // session to another project never touched its meters.
+    if (attempt.previousUsageId !== null && attempt.kind !== 'project-reassign')
+      await this.metering?.restoreParticipant(scope, attempt.previousUsageId);
   }
 
   /** A flow may end the tentative session it was started for before it becomes visible. */

@@ -140,7 +140,7 @@ describe('network restriction on the resource action endpoints', () => {
       action: NetworkRestrictedAction.UsageStart,
       method: 'post',
       path: '/resources/5/usage/sessions/active/project',
-      body: { projectId: null },
+      body: { mode: 'whole-session', projectId: null },
       effect: 'switchSessionProject',
     },
     { action: NetworkRestrictedAction.DoorOpen, method: 'post', path: '/resources/5/usage/open', effect: 'openDoor' },

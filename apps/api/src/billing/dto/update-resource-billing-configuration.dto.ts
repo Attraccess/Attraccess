@@ -41,7 +41,7 @@ export class UpdateResourceBillingConfigurationDto {
 
   @ApiProperty({
     description:
-      'How a running session is charged when its owner switches its project. `continue`: no new fee per use and minutes rounded on cumulative boundaries, so the parts together never bill more than one unsplit session. `continue-per-part-rounding`: no new fee per use, every part rounds its own minutes up. `new-session`: every part is billed like a session of its own, including the balance check.',
+      'How a running session is charged when its owner splits it between projects (moving a whole session to another project charges nothing). `continue`: no new fee per use and minutes rounded on cumulative boundaries, so the parts together never bill more than one unsplit session. `continue-per-part-rounding`: no new fee per use, every part rounds its own minutes up. `new-session`: every part is billed like a session of its own, including the balance check.',
     enum: ProjectSwitchCharging,
     enumName: 'ProjectSwitchCharging',
     required: false,
