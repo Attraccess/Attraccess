@@ -1,5 +1,6 @@
 import { BillingTransactionStatus, ProjectSwitchCharging } from '@attraccess/application-models';
 import { applyPartBillingFactor } from '@attraccess/shared';
+import { firstValueFrom } from 'rxjs';
 import { BillingTransaction, BillingTransactionItem, ResourceUsage } from '@attraccess/database-entities';
 import { InsufficientBalanceError } from '../../../billing/errors/insufficient-balance.error';
 import type { LiveNotificationsService } from '../../../billing/live-notifications/live-notifications.service';
@@ -86,10 +87,11 @@ describe('Billing a switched session', () => {
 
     await billing.unitOfWork.run(async (scope) => {
       const walked = await billing.ledger.findContinuedUsageParts(parts[3].id, scope);
-      expect(walked.map((part) => [part.startTime, part.projectSwitchCharging])).toEqual([
-        [at(4.2), CONTINUE],
-        [at(3), CONTINUE],
-        [at(1.5), NEW_SESSION],
+      // Each with what its bill charged before the billing factor: 5 per use and 2 per minute rounded together.
+      expect(walked.map((part) => [part.startTime, part.projectSwitchCharging, part.grossCredits])).toEqual([
+        [at(4.2), CONTINUE, BigInt(2)],
+        [at(3), CONTINUE, BigInt(2)],
+        [at(1.5), NEW_SESSION, BigInt(9)],
       ]);
     });
   });
@@ -136,6 +138,74 @@ describe('Billing a switched session', () => {
     expect(await charges([running])).toEqual([estimate]);
     await expect(billing.service.getRunningPartBilling(running.id)).resolves.toBeNull();
   });
+
+  interface FactorPart {
+    /** The part ends this many minutes after the session started. */
+    end: number;
+    /** Attributed operating minutes, fractions allowed. */
+    operating: number;
+    /** A meter or flow item on the part's bill. */
+    items: number;
+  }
+
+  /** Bills the parts of one `continue` session at 5 per use, 2 per minute and 7 per operating minute. */
+  async function billWithFactor(name: string, factor: number, chain: FactorPart[]) {
+    const { user, resource } = await db.seed(db.primary, name);
+    const parts: ResourceUsage[] = [];
+    for (const [index, part] of chain.entries()) {
+      const usage = await db.seedUsage(db.primary, user.id, resource.id, {
+        startTime: at(index ? chain[index - 1].end : 0),
+        endTime: at(part.end),
+        previousUsageId: parts[index - 1]?.id ?? null,
+        projectSwitchCharging: index ? CONTINUE : null,
+        operatingDurationCreditsPerMinute: 7,
+        attributedOperatingDurationInMinutes: part.operating,
+        billingFactor: factor,
+      });
+      const pending = await billing.ledger.insertTransaction({
+        userId: user.id,
+        resourceUsageId: usage.id,
+        amount: 0,
+        status: BillingTransactionStatus.Pending,
+      });
+      if (part.items)
+        await db.primary.getRepository(BillingTransactionItem).save({
+          billingTransactionId: pending.id,
+          name: 'Energy',
+          unitPrice: part.items,
+          quantity: 1,
+          meterQuantity: '1',
+          meterCreditsPerUnit: part.items,
+        });
+      await billing.service.chargeForResourceUsage({
+        ...usage,
+        resource: { id: resource.id },
+        user: { billingFactor: 100 },
+      });
+      parts.push(usage);
+    }
+    return charges(parts);
+  }
+
+  it.each([33, 50])(
+    'bills fractional operating minutes and items at a factor of %i %% exactly like one unsplit session',
+    async (factor) => {
+      const chain: FactorPart[] = [
+        { end: 0.7, operating: 0.46, items: 3 },
+        { end: 1.9, operating: 0.33, items: 0 },
+        { end: 2.3, operating: 0.21, items: 1 },
+        { end: 4.05, operating: 1.37, items: 0 },
+      ];
+      const split = await billWithFactor(`factor ${factor}`, factor, chain);
+      const [whole] = await billWithFactor(`factor ${factor} unsplit`, factor, [
+        { end: 4.05, operating: 0.46 + 0.33 + 0.21 + 1.37, items: 4 },
+      ]);
+
+      // Unsplit: 5 + 5 minutes x 2 + 3 operating minutes x 7 + 4 = 40 before the factor.
+      expect(whole).toBe(factor === 33 ? 13 : 20);
+      expect(split.reduce((sum, charge) => sum + charge, 0)).toBe(whole);
+    },
+  );
 
   it('sums the charges and meter corrections of all parts up to the one asked about', async () => {
     const { user, resource, parts } = await billChain('totals', [0, 1.5, 1.7, 4.4], [null, CONTINUE, CONTINUE]);
@@ -185,12 +255,14 @@ describe('Billing a switched session', () => {
         amount: 0,
         status: BillingTransactionStatus.Pending,
       });
+      const published = firstValueFrom(live.getTransactionSubject(user.id));
       await billing.service.chargeForResourceUsage({
         ...usage,
         resource: { id: resource.id },
         user: { billingFactor: 100 },
       });
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // The event is published once the charge committed.
+      await published;
     };
 
     const first = await db.seedUsage(db.primary, user.id, resource.id, { startTime: at(0), endTime: at(1.5) });

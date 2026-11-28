@@ -33,10 +33,16 @@ import {
   BILLING_LEDGER_STORE,
   BillingLedgerStore,
   BillingTransactionContext,
+  ContinuedUsagePart,
   NewBillingTransactionItem,
 } from '../ports/billing-ledger.port';
 import { BillablePriceSnapshot, BillableUsage } from './billable-usage';
-import { roundsWithPreviousParts, runningPartBilling, usagePartCharges } from './project-switch-charges';
+import {
+  roundsWithPreviousParts,
+  runningPartBilling,
+  usagePartCharges,
+  type UsagePartRates,
+} from './project-switch-charges';
 
 @Injectable()
 export class BillingService {
@@ -210,21 +216,10 @@ export class BillingService {
 
     const configuration = await this.getResourceBillingConfiguration(usage.resource.id, context);
 
-    const sessionDurationRate = usage.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute;
-    const operatingDurationRate = usage.operatingDurationCreditsPerMinute ?? 0;
+    const { rates, previous } = await this.partPricing(usage, configuration, context);
+    const { creditsPerMinute: sessionDurationRate, creditsPerOperatingMinute: operatingDurationRate } = rates;
     // A part of a switched session may share the fee per use and the minute rounding with the parts before it.
-    const part = usagePartCharges(
-      usage,
-      {
-        // Legacy sessions have no complete snapshot; preserve their existing configuration fallback.
-        creditsPerUsage: usage.creditsPerUsage ?? configuration.creditsPerUsage,
-        creditsPerMinute: sessionDurationRate,
-        creditsPerOperatingMinute: operatingDurationRate,
-      },
-      roundsWithPreviousParts(usage)
-        ? await this.ledgerStore.findContinuedUsageParts(usage.previousUsageId as number, context)
-        : [],
-    );
+    const part = usagePartCharges(usage, rates, previous);
     const {
       durationMs: sessionDurationMs,
       minutes: roundedMinutes,
@@ -406,22 +401,37 @@ export class BillingService {
       const usage = await this.ledgerStore.findRunningUsagePricing(usageId, scope);
       if (!usage) return null;
       const configuration = await this.getResourceBillingConfiguration(usage.resourceId, scope);
-      return {
-        userId: usage.userId,
-        // The same fallbacks as at settlement.
-        ...runningPartBilling(
-          usage,
-          {
-            creditsPerUsage: usage.creditsPerUsage ?? configuration.creditsPerUsage,
-            creditsPerMinute: usage.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute,
-            creditsPerOperatingMinute: usage.operatingDurationCreditsPerMinute ?? 0,
-          },
-          roundsWithPreviousParts(usage)
-            ? await this.ledgerStore.findContinuedUsageParts(usage.previousUsageId as number, scope)
-            : [],
-        ),
-      };
+      const { rates, previous } = await this.partPricing(usage, configuration, scope);
+      return { userId: usage.userId, ...runningPartBilling(usage, rates, previous) };
     });
+  }
+
+  /**
+   * The rates a usage part is billed at and the earlier parts it is rounded with, the same at settlement and for a
+   * running estimate. Legacy sessions have no complete snapshot; they keep the configuration fallback.
+   */
+  private async partPricing(
+    usage: Pick<
+      BillableUsage,
+      | 'previousUsageId'
+      | 'projectSwitchCharging'
+      | 'creditsPerUsage'
+      | 'sessionDurationCreditsPerMinute'
+      | 'operatingDurationCreditsPerMinute'
+    >,
+    configuration: ResourceBillingConfigurationRecord,
+    context: BillingTransactionContext,
+  ): Promise<{ rates: UsagePartRates; previous: ContinuedUsagePart[] }> {
+    return {
+      rates: {
+        creditsPerUsage: usage.creditsPerUsage ?? configuration.creditsPerUsage,
+        creditsPerMinute: usage.sessionDurationCreditsPerMinute ?? configuration.creditsPerMinute,
+        creditsPerOperatingMinute: usage.operatingDurationCreditsPerMinute ?? 0,
+      },
+      previous: roundsWithPreviousParts(usage)
+        ? await this.ledgerStore.findContinuedUsageParts(usage.previousUsageId as number, context)
+        : [],
+    };
   }
 
   async createManualTransaction(

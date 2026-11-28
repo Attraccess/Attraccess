@@ -55,6 +55,11 @@ export interface ContinuedUsagePart {
   attributedOperatingDurationInMinutes: number | null;
   /** Null on the part the session started with. */
   projectSwitchCharging: ProjectSwitchCharging | null;
+  /**
+   * What the part's own bill charged before the billing factor: all its items (fee, minutes, meters, flow items) but
+   * the billing factor's. Late meter corrections of the part are not included.
+   */
+  grossCredits: bigint;
 }
 
 /** A usage that has not ended, with what pricing it reads. */

@@ -1,12 +1,9 @@
 import { ProjectSwitchCharging, type RunningPartBilling } from '@attraccess/application-models';
-import { toExactCredits } from '@attraccess/shared';
+import { cumulativeStartedMinutes, startedMinutes } from '@attraccess/shared';
 import type { ContinuedUsagePart } from '../ports/billing-ledger.port';
 import type { BillableUsage } from './billable-usage';
 
 const MINUTE_MS = 60_000;
-
-/** Whole minutes as billed: every started minute counts. */
-const startedMinutes = (ms: number) => Math.ceil(Math.max(0, ms) / MINUTE_MS);
 
 /** Attribution originates from integer-millisecond intervals; remove only minute-storage float noise. */
 const operatingMsOf = (minutes: number | null | undefined) => Math.round((minutes ?? 0) * MINUTE_MS);
@@ -31,8 +28,8 @@ export interface UsagePartCharges {
   operatingMs: number;
   operatingMinutes: number;
   /**
-   * The time charges the earlier parts of a cumulatively rounded run made. The billing factor is rounded on the
-   * running total too, so a switched session costs what an unsplit one does.
+   * What the earlier parts of a cumulatively rounded run charged before the billing factor, every item included. The
+   * billing factor is rounded on the running total too, so a switched session costs what an unsplit one does.
    */
   priorCredits: bigint;
 }
@@ -42,8 +39,9 @@ const paysFlatFee = (mode: ProjectSwitchCharging | null | undefined) =>
   !mode || mode === ProjectSwitchCharging.NEW_SESSION;
 
 /** Whether the part's minutes are rounded together with the parts before it, which then have to be read. */
-export const roundsWithPreviousParts = (usage: UsagePartTimes): boolean =>
-  usage.projectSwitchCharging === ProjectSwitchCharging.CONTINUE && usage.previousUsageId != null;
+export const roundsWithPreviousParts = (
+  usage: Pick<UsagePartTimes, 'previousUsageId' | 'projectSwitchCharging'>,
+): boolean => usage.projectSwitchCharging === ProjectSwitchCharging.CONTINUE && usage.previousUsageId != null;
 
 /**
  * `previous` are the earlier parts the usage is rounded together with, newest first, down to the first one that
@@ -73,18 +71,13 @@ export function usagePartCharges(
     (total, part) => total + operatingMsOf(part.attributedOperatingDurationInMinutes),
     0,
   );
-  const priorMinutes = startedMinutes(elapsedBeforeMs);
-  const priorOperatingMinutes = startedMinutes(priorOperatingMs);
   return {
     flatCredits,
     durationMs,
-    minutes: startedMinutes(elapsedBeforeMs + durationMs) - priorMinutes,
+    minutes: cumulativeStartedMinutes(elapsedBeforeMs, durationMs),
     operatingMs,
-    operatingMinutes: startedMinutes(priorOperatingMs + operatingMs) - priorOperatingMinutes,
-    priorCredits:
-      toExactCredits(paysFlatFee(first.projectSwitchCharging) ? rates.creditsPerUsage : 0) +
-      toExactCredits(rates.creditsPerMinute) * BigInt(priorMinutes) +
-      toExactCredits(rates.creditsPerOperatingMinute) * BigInt(priorOperatingMinutes),
+    operatingMinutes: cumulativeStartedMinutes(priorOperatingMs, operatingMs),
+    priorCredits: previous.reduce((total, part) => total + part.grossCredits, BigInt(0)),
   };
 }
 

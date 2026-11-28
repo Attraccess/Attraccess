@@ -1,5 +1,6 @@
 import {
   BillingTransactionStatus,
+  ProjectSwitchCharging,
   ResourceMeteringSessionStatus,
   type BillingTransactionDetail,
   type BillingTransactionRecord,
@@ -24,6 +25,9 @@ import { findSwitchedSessionCharge } from './switched-session-queries';
 import { TransactionContextResolver } from '../transaction-context';
 import { toTransactionDetail, toTransactionRecord, toUsageReceipt } from './billing-mappers';
 import { findRelations } from '../find-options';
+
+/** The line the billing factor adds to a bill; it is no charge of its own. */
+const BILLING_FACTOR_ITEM = 'BILLING_FACTOR';
 
 const DETAIL_RELATIONS = ['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf', 'items'];
 
@@ -112,22 +116,31 @@ export class TypeOrmBillingLedgerStore implements BillingLedgerStore {
   }
 
   async findContinuedUsageParts(usageId: number, context: BillingTransactionContext): Promise<ContinuedUsagePart[]> {
-    return this.contexts.manager(context).query(
-      `WITH RECURSIVE "chain" AS (
-         SELECT "previousUsageId", "startTime", "attributedOperatingDurationInMinutes", "projectSwitchCharging",
-                1 AS "depth"
-         FROM "resource_usage" WHERE "id" = $1
-         UNION ALL
-         SELECT "part"."previousUsageId", "part"."startTime", "part"."attributedOperatingDurationInMinutes",
-                "part"."projectSwitchCharging", "chain"."depth" + 1
-         FROM "resource_usage" "part"
-         JOIN "chain" ON "part"."id" = "chain"."previousUsageId"
-         WHERE "chain"."projectSwitchCharging" = 'continue'
-       )
-       SELECT "startTime", "attributedOperatingDurationInMinutes", "projectSwitchCharging"
-       FROM "chain" ORDER BY "depth"`,
-      [usageId],
-    );
+    const rows: (Omit<ContinuedUsagePart, 'grossCredits'> & { grossCredits: string })[] = await this.contexts
+      .manager(context)
+      .query(
+        `WITH RECURSIVE "chain" AS (
+           SELECT "id", "previousUsageId", "startTime", "attributedOperatingDurationInMinutes",
+                  "projectSwitchCharging", 1 AS "depth"
+           FROM "resource_usage" WHERE "id" = $1
+           UNION ALL
+           SELECT "part"."id", "part"."previousUsageId", "part"."startTime",
+                  "part"."attributedOperatingDurationInMinutes", "part"."projectSwitchCharging", "chain"."depth" + 1
+           FROM "resource_usage" "part"
+           JOIN "chain" ON "part"."id" = "chain"."previousUsageId"
+           WHERE "chain"."projectSwitchCharging" = $2
+         )
+         SELECT "chain"."startTime", "chain"."attributedOperatingDurationInMinutes", "chain"."projectSwitchCharging",
+           (SELECT COALESCE(SUM("item"."unitPrice" * "item"."quantity"), 0)::text
+            FROM "billing_transaction" "bill"
+            JOIN "billing_transaction_item" "item" ON "item"."billingTransactionId" = "bill"."id"
+            WHERE "bill"."resourceUsageId" = "chain"."id"
+              AND NOT ("item"."name" = $3 AND "item"."meterQuantity" IS NULL
+                       AND "item"."meterCreditsPerUnit" IS NULL)) AS "grossCredits"
+         FROM "chain" ORDER BY "chain"."depth"`,
+        [usageId, ProjectSwitchCharging.CONTINUE, BILLING_FACTOR_ITEM],
+      );
+    return rows.map((row) => ({ ...row, grossCredits: BigInt(row.grossCredits) }));
   }
 
   async findRunningUsagePricing(

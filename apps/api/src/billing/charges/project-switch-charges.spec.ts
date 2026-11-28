@@ -15,6 +15,8 @@ interface Part {
   /** Attributed operating minutes of the part. */
   operating?: number;
   mode?: ProjectSwitchCharging;
+  /** Meter and flow items on the part's bill, before the billing factor. */
+  items?: number;
 }
 
 /** Bills a chain of parts one after the other, as the switches and the final stop settle them. */
@@ -44,16 +46,18 @@ function bill(parts: Part[], factor = 100, rates = RATES) {
       }
     }
     const charges = usagePartCharges(usage, rates, previous);
+    const gross = BigInt(
+      charges.flatCredits +
+        charges.minutes * rates.creditsPerMinute +
+        charges.operatingMinutes * rates.creditsPerOperatingMinute +
+        (part.items ?? 0),
+    );
     settled.push({
       startTime,
       attributedOperatingDurationInMinutes: part.operating ?? 0,
       projectSwitchCharging: mode,
+      grossCredits: gross,
     });
-    const gross = BigInt(
-      charges.flatCredits +
-        charges.minutes * rates.creditsPerMinute +
-        charges.operatingMinutes * rates.creditsPerOperatingMinute,
-    );
     return { ...charges, total: applyPartBillingFactor(charges.priorCredits, gross, factor).amount };
   });
 }
@@ -109,6 +113,25 @@ describe('charging the parts of a session whose project was switched', () => {
         expect(sum(bill(parts).map((p) => p.total))).toBe(whole.total);
       }
     });
+  });
+
+  it.each([33, 50])('rounds the billing factor of %i %% on the earlier parts meter and flow items too', (factor) => {
+    const rates = { creditsPerUsage: 0, creditsPerMinute: 1, creditsPerOperatingMinute: 0 };
+    // Part A: a minute and a meter item of one credit; part B: a minute. Unsplit: 3 credits.
+    const parts = bill([{ minutes: 1, items: 1 }, { minutes: 1 }], factor, rates);
+    const [whole] = bill([{ minutes: 2, items: 1 }], factor, rates);
+
+    expect(parts[1].priorCredits).toBe(BigInt(2));
+    expect(whole.total).toBe(1);
+    expect(sum(parts.map((p) => p.total))).toBe(whole.total);
+  });
+
+  it('keeps the sum with items on every part, whatever the factor', () => {
+    const withItems = several.map((part, index) => ({ ...part, items: [1, 0, 3, 7, 2][index] }));
+    const unsplitWithItems = [{ ...unsplit[0], items: 13 }];
+    for (const factor of [0, 33, 50, 67, 100, 150]) {
+      expect(sum(bill(withItems, factor).map((p) => p.total))).toBe(bill(unsplitWithItems, factor)[0].total);
+    }
   });
 
   it('continue-per-part-rounding bills one fee and rounds every part up on its own', () => {
