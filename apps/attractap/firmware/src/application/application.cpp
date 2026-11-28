@@ -206,6 +206,7 @@ void Application::beginSessionSummary(const API::ActionResult &result) {
   this->waitingForResourceRefresh = false;
   this->returnToListAfterAction = false;
   this->actionCompletionMessage.clear();
+  this->actionCompletionIsWarning = false;
   this->billingSummaryShown = false;
   this->api.cancelResourceAction();
   this->resetPauseAccounting();
@@ -268,6 +269,7 @@ void Application::logoutReader() {
   this->api.cancelResourceAction();
   this->waitingForResourceRefresh = false;
   this->actionCompletionMessage.clear();
+  this->actionCompletionIsWarning = false;
   Display::resourceDetailsScreen.hideActionProgress();
   this->currentProjectsUser.clear();
   this->cardAuthenticationData = {};

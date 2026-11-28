@@ -238,6 +238,23 @@ void ReaderWorkflow::testMaintenance()
     assert(label(lv_screen_active(), warned("Meldung nicht gesendet").c_str()));
     display.capture(output, "maintenance-07-report-failed");
 
+    // The unsent text comes back on the next try. The keyboard's hide key only hides the keyboard; Cancel discards it.
+    click("Problem melden");
+    assert(enteringReason() && Display::maintenanceReasonScreen.reason() == "Notaus klemmt");
+    lv_obj_t *keyboard = nullptr;
+    for (uint32_t i = 0; i < lv_obj_get_child_count(lv_screen_active()); ++i)
+        if (lv_obj_check_type(lv_obj_get_child(lv_screen_active(), i), &lv_keyboard_class))
+            keyboard = lv_obj_get_child(lv_screen_active(), i);
+    assert(keyboard);
+    lv_obj_send_event(keyboard, LV_EVENT_CANCEL, nullptr);
+    pump();
+    assert(enteringReason() && lv_obj_has_flag(keyboard, LV_OBJ_FLAG_HIDDEN));
+    assert(Display::maintenanceReasonScreen.reason() == "Notaus klemmt" && server.count(create) == reports + 2);
+    click("Abbrechen");
+    click("Problem melden");
+    assert(Display::maintenanceReasonScreen.reason().empty());
+    click("Abbrechen");
+
     // Without the right to request maintenance (a maintainer, or no license) there is no button.
     Scenario maintainer; maintainer.canRequest = false; maintainer.ask = false;
     maintenanceList(maintainer);

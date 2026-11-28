@@ -60,11 +60,16 @@ void Application::handleResourceListUpdate(
     Display::resourceDetailsScreen.hideActionProgress();
     if (!this->actionCompletionMessage.empty() && !this->billingSummaryShown) {
       // Back on the list when the action was started there; routing does that once the screen is done.
-      this->showStatus(StatusScreen::success(this->actionCompletionMessage,
-                                             FirmwareI18n::Text::literal(this->completedResourceName) /* i18n-data: Server-supplied resource name; preserve exact contents. */),
-                       this->returnToListAfterAction);
+      if (this->actionCompletionIsWarning)
+        this->showStatus(StatusScreen::warning(this->actionCompletionMessage, FirmwareI18n::Message::ReportNotSentAfterStop),
+                         this->returnToListAfterAction);
+      else
+        this->showStatus(StatusScreen::success(this->actionCompletionMessage,
+                                               FirmwareI18n::Text::literal(this->completedResourceName) /* i18n-data: Server-supplied resource name; preserve exact contents. */),
+                         this->returnToListAfterAction);
     }
     this->billingSummaryShown = false;
+    this->actionCompletionIsWarning = false;
     this->returnToListAfterAction = false;
     this->actionCompletionMessage.clear();
   }
@@ -186,6 +191,7 @@ void Application::resetSessionOnDisconnect() {
   this->returnToListAfterAction = false;
   this->waitingForResourceRefresh = false;
   this->actionCompletionMessage.clear();
+  this->actionCompletionIsWarning = false;
   Display::formsScreen.resetForm();
   this->billingSummaryShown = false;
   this->topUpPending = false;

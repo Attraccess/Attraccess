@@ -103,16 +103,6 @@ Mit dem Lizenzmodul maintenance fragt der Leser **Ist die Maschine in Ordnung?**
 
 Die Formulare zum Nutzungsende folgen auf die Antwort; danach fragt der Leser nicht erneut. Die Zusammenfassung oder die Bestätigung zeigt **Wartungsteam benachrichtigt**, oder **Meldung nicht gesendet. Bitte erneut melden.**, wenn die Sitzung beendet wurde, die Anfrage aber nicht erstellt werden konnte. Wird die Sitzung an anderer Stelle beendet, während Sie den Grund eingeben, zeigt der Leser **Meldung nicht gesendet** und bittet Sie, das Problem erneut zu melden. Beim Beenden einer fremden Sitzung wird nie gefragt.
 
-## Ein Problem melden
-
-Sie können jederzeit ein Problem melden, egal ob eine Sitzung läuft, und auch während die Ressource gewartet wird:
-
-1. Melden Sie sich mit Ihrer Karte an und tippen Sie auf den Namen der Ressource, um ihre Details zu öffnen.
-2. Tippen Sie unten auf **Problem melden**.
-3. Beschreiben Sie das Problem (3 bis 500 Zeichen) und tippen Sie auf **Senden**.
-
-Der Leser bestätigt mit **Wartungsteam benachrichtigt** oder zeigt **Meldung nicht gesendet** auf der Schaltfläche, damit Sie es erneut versuchen können. Die Schaltfläche erscheint nur mit dem Lizenzmodul maintenance und nur, wenn Sie die Wartung der Ressource nicht selbst verwalten dürfen. Attractap-Lite-Reader haben keinen Bildschirm und bieten weder die Schaltfläche noch die Frage.
-
 ### Zusammenfassung zum Nutzungsende
 
 Nach dem erfolgreichen Beenden Ihrer eigenen Maschinennutzung zeigt der Leser **Danke, {name}!** mit Ihrem Anzeigenamen (Ihr Name oder, ohne Namen, Ihr Benutzername). **Dauer** ist die vergangene Sitzungszeit in Stunden, Minuten und Sekunden, nicht die Betriebszeit oder die abgerechneten Minuten. Die Stunden können 24 überschreiten. **Abgerechnet** zeigt den formatierten Endbetrag bei einer Gebühr ungleich null. Ohne Gebühr steht nur die Dauer mittig.
@@ -126,6 +116,16 @@ Die Zusammenfassung bleibt etwa **3,5 Sekunden** sichtbar (etwa **6 Sekunden**, 
 Das Beenden aus der Liste, aus den Details oder nach dem Absenden eines Pflichtformulars zeigt dieselbe Zusammenfassung. Bei einem fehlgeschlagenen Stop erscheint sie nicht. Wenn Sie als Ressourcenverwalter, Einweiser oder Wartender die Sitzung einer anderen Person beenden, bleibt die bisherige Bestätigung erhalten und Sie bleiben angemeldet. Mit einem älteren Server ohne Zusammenfassungsdaten bleibt die bisherige Bestätigung erhalten.
 
 Die Gerätebeschriftungen bleiben vorerst deutsch, einschließlich **Bis bald!**. Vorgesehene englische Entsprechungen: **Thanks, {name}!**, **Duration**, **Charged**, **See you soon!**.
+
+## Ein Problem melden
+
+Sie können jederzeit ein Problem melden, egal ob eine Sitzung läuft, und auch während die Ressource gewartet wird:
+
+1. Melden Sie sich mit Ihrer Karte an und tippen Sie auf den Namen der Ressource, um ihre Details zu öffnen.
+2. Tippen Sie unten auf **Problem melden**.
+3. Beschreiben Sie das Problem (3 bis 500 Zeichen) und tippen Sie auf **Senden**.
+
+Der Leser bestätigt mit **Wartungsteam benachrichtigt** oder zeigt **Meldung nicht gesendet** auf der Schaltfläche, damit Sie es erneut versuchen können. Ihr Text bleibt erhalten: Er wird beim nächsten Öffnen der Problemmeldung oder des Grunds nach **Wartung nötig** an derselben Ressource wieder angeboten, bis er gesendet ist oder Sie **Abbrechen** tippen. Die Taste zum Ausblenden der Tastatur blendet nur die Tastatur aus; tippen Sie auf das Textfeld, um sie wieder einzublenden. Die Schaltfläche erscheint nur mit dem Lizenzmodul maintenance, nur bei Ressourcen, die Sie sehen dürfen, und nur, wenn Sie die Wartung der Ressource nicht selbst verwalten dürfen. Attractap-Lite-Reader haben keinen Bildschirm und bieten weder die Schaltfläche noch die Frage.
 
 ## Sitzungsdauer und Verlängern
 

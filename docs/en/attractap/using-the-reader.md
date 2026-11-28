@@ -103,16 +103,6 @@ With the maintenance license module, the reader asks **Ist die Maschine in Ordnu
 
 End-of-use forms follow the answer; the reader does not ask again after them. The session summary or the confirmation says **Wartungsteam benachrichtigt** (Maintainers have been notified), or **Meldung nicht gesendet. Bitte erneut melden.** (Report not sent. Please report it again.) if the session ended but the request could not be filed. If the session is ended elsewhere while you type the reason, the reader says **Meldung nicht gesendet** (Report not sent) and asks you to report the problem again. Ending someone else's session never asks.
 
-## Report a problem
-
-You can report a problem at any time, whether or not a session is running and even while the resource is under maintenance:
-
-1. Sign in with your card and tap the resource's name to open its details.
-2. Tap **Problem melden** (Report a problem) at the bottom.
-3. Describe the problem (3 to 500 characters) and tap **Senden** (Send).
-
-The reader confirms with **Wartungsteam benachrichtigt** (Maintainers have been notified), or shows **Meldung nicht gesendet** (Report not sent) on the button so you can try again. The button appears only with the maintenance license module and only if you cannot manage the resource's maintenance yourself. Attractap Lite readers have no screen, so they have neither the button nor the question.
-
 ### Session finished summary
 
 After you successfully stop your own machine session, the reader shows **Danke, {name}!** with your display name (your name, or your username when none is set). **Dauer** is the elapsed session time in hours, minutes and seconds, not machine operating time or billed minutes. Hours can exceed 24. **Abgerechnet** shows the final formatted charge when there is a nonzero charge; otherwise only the centered duration appears.
@@ -126,6 +116,16 @@ The summary stays visible for about **3.5 seconds** (about **6 seconds** when it
 Stopping from the list, details or after submitting a required end form produces the same summary. A failed stop does not show it. If you end another person's session as a resource manager, introducer or maintainer, you keep the existing confirmation and remain signed in. Readers using an older server without summary metadata keep the previous confirmation behavior.
 
 The device currently uses German labels, including **Bis bald!**. Future English equivalents are **Thanks, {name}!**, **Duration**, **Charged**, and **See you soon!**.
+
+## Report a problem
+
+You can report a problem at any time, whether or not a session is running and even while the resource is under maintenance:
+
+1. Sign in with your card and tap the resource's name to open its details.
+2. Tap **Problem melden** (Report a problem) at the bottom.
+3. Describe the problem (3 to 500 characters) and tap **Senden** (Send).
+
+The reader confirms with **Wartungsteam benachrichtigt** (Maintainers have been notified), or shows **Meldung nicht gesendet** (Report not sent) on the button so you can try again. The text you typed is kept: it is offered again the next time you open the problem report or the reason after **Wartung nötig** on the same resource, until it was sent or you tap **Abbrechen** (Cancel). The keyboard's hide key only hides the keyboard; tap the text field to bring it back. The button appears only with the maintenance license module, only on resources you can see, and only if you cannot manage the resource's maintenance yourself. Attractap Lite readers have no screen, so they have neither the button nor the question.
 
 ## Session duration and extending
 

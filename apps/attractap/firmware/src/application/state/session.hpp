@@ -52,6 +52,8 @@ uint32_t resourceRefreshRequestId = 0;
 
 #if defined(HAS_LVGL_DISPLAY)
     FirmwareI18n::Text actionCompletionMessage;
+    // The completion says the session ended but its maintenance request was not filed: a warning, not a success.
+    bool actionCompletionIsWarning = false;
     std::string completedResourceName;
     // The billing total screen already answers the action; the completion screen must not replace it.
     bool billingSummaryShown = false;

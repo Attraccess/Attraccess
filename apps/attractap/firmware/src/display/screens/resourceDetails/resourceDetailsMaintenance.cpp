@@ -11,8 +11,9 @@ void ResourceDetailsScreen::createReportProblemButton()
    lv_obj_remove_flag(this->reportProblemButton, LV_OBJ_FLAG_SCROLLABLE);
    DisplayTheme::secondaryButton(this->reportProblemButton);
    lv_obj_add_flag(this->reportProblemButton, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_add_event_cb(this->reportProblemButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED,
-                       new ButtonClickEventData{this, BUTTON_CLICK_TYPE_REPORT_PROBLEM, {}});
+   auto *evt = new ButtonClickEventData{this, BUTTON_CLICK_TYPE_REPORT_PROBLEM, {}};
+   lv_obj_add_event_cb(this->reportProblemButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, evt);
+   lv_obj_add_event_cb(this->reportProblemButton, &ResourceDetailsScreen::onContainerDelete, LV_EVENT_DELETE, evt);
 
    lv_obj_t *label = lv_label_create(this->reportProblemButton);
    FirmwareI18n::setLabel(label, FirmwareI18n::Message::ReportProblem);

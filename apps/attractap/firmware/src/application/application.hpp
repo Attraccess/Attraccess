@@ -168,6 +168,7 @@ private:
     void cancelMaintenanceInput();
     void continueStopAfterCheck(const std::string &reason);
     void sendProblemReport(const std::string &reason);
+    void clearMaintenanceReasonDraft();
     // Forgets the start or stop in progress: its type, target, takeover flag, estimate and chosen session.
     void resetPendingAction();
     void finishCardAuthentication(bool success);

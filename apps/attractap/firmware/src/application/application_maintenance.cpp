@@ -46,14 +46,31 @@ void Application::openProblemReport() {
 
 void Application::openMaintenanceReason(const FirmwareI18n::Text &confirmLabel,
                                         std::function<void(const std::string &)> onConfirm) {
-  Display::maintenanceReasonScreen.configure({this->resourceNameOf(this->maintenanceResourceId), confirmLabel,
-                                              std::move(onConfirm), [this] { this->cancelMaintenanceInput(); }});
+  const bool draftFits = this->maintenanceReasonDraftResourceId == this->maintenanceResourceId &&
+                         this->maintenanceReasonDraftUser == this->cardAuthenticationData.username;
+  Display::maintenanceReasonScreen.configure(
+      {this->resourceNameOf(this->maintenanceResourceId), confirmLabel,
+       [this, onConfirm = std::move(onConfirm)](const std::string &reason) {
+         // Kept until the request is filed, so a failed send or a refused stop can offer it again.
+         this->maintenanceReasonDraft = reason;
+         this->maintenanceReasonDraftUser = this->cardAuthenticationData.username;
+         this->maintenanceReasonDraftResourceId = this->maintenanceResourceId;
+         onConfirm(reason);
+       },
+       [this] { this->cancelMaintenanceInput(); }, draftFits ? this->maintenanceReasonDraft : std::string()});
   Display::transitionToScreen(&Display::maintenanceReasonScreen);
 }
 
-// Cancel keeps the session running; nothing is sent.
+void Application::clearMaintenanceReasonDraft() {
+  this->maintenanceReasonDraft.clear();
+  this->maintenanceReasonDraftUser.clear();
+  this->maintenanceReasonDraftResourceId = 0;
+}
+
+// Cancel keeps the session running; nothing is sent, and a kept reason is discarded.
 void Application::cancelMaintenanceInput() {
   this->returnToListAfterAction = false;
+  this->clearMaintenanceReasonDraft();
   Display::returnFromTransient();
 }
 
@@ -83,9 +100,13 @@ void Application::continueStopAfterCheck(const std::string &reason) {
 
 void Application::sendProblemReport(const std::string &reason) {
   Display::returnFromTransient();
-  if (!this->unlocked || !this->pendingUiAction.empty() || this->waitingForResourceRefresh ||
-      this->selectedResourceId != this->maintenanceResourceId)
+  if (!this->unlocked) return;
+  if (!this->pendingUiAction.empty() || this->waitingForResourceRefresh ||
+      this->selectedResourceId != this->maintenanceResourceId) {
+    // Not sent; the reason is kept for the next try.
+    this->showStatus(StatusScreen::warning(FirmwareI18n::Message::ReportNotSent, FirmwareI18n::Message::PleaseTryAgain));
     return;
+  }
   this->pendingUiAction = "CREATE_MAINTENANCE_REQUEST";
   this->pendingUiResourceId = this->maintenanceResourceId;
   this->pendingUiStartedAt = millis();

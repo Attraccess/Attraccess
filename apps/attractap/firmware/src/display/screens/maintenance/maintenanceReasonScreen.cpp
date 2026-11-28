@@ -45,9 +45,15 @@ void MaintenanceReasonScreen::build()
     textArea = TextEditor::createTextArea(screen);
     lv_textarea_set_max_length(textArea, MaxCharacters);
     FirmwareI18n::setPlaceholder(textArea, FirmwareI18n::Message::MaintenanceReasonPlaceholder);
+    lv_textarea_set_text(textArea, config.initialText.c_str());
     lv_obj_add_event_cb(textArea, [](lv_event_t *e) {
         static_cast<MaintenanceReasonScreen *>(lv_event_get_user_data(e))->refresh();
     }, LV_EVENT_VALUE_CHANGED, this);
+    // Tapping the text brings back a hidden keyboard.
+    lv_obj_add_event_cb(textArea, [](lv_event_t *e) {
+        auto *self = static_cast<MaintenanceReasonScreen *>(lv_event_get_user_data(e));
+        if (self->keyboard) lv_obj_remove_flag(self->keyboard, LV_OBJ_FLAG_HIDDEN);
+    }, LV_EVENT_CLICKED, this);
 
     lv_obj_t *buttons = ResultLayout::createButtonRow(screen);
     ResultLayout::createButton(buttons, FirmwareI18n::Message::Cancel, DisplayTheme::primary(), true, [](lv_event_t *e) {
@@ -58,10 +64,12 @@ void MaintenanceReasonScreen::build()
     }, this);
     lv_obj_set_style_opa(confirmButton, LV_OPA_50, LV_PART_MAIN | LV_STATE_DISABLED);
 
-    lv_obj_t *keyboard = TextEditor::createKeyboard(screen, [](lv_event_t *e) {
+    // The hide key only hides the keyboard: unlike in the form editor, discarding here would also abort the stop.
+    keyboard = TextEditor::createKeyboard(screen, [](lv_event_t *e) {
         auto *self = static_cast<MaintenanceReasonScreen *>(lv_event_get_user_data(e));
         if (lv_event_get_code(e) == LV_EVENT_READY) self->confirm();
-        else if (lv_event_get_code(e) == LV_EVENT_CANCEL) self->cancel();
+        else if (lv_event_get_code(e) == LV_EVENT_CANCEL && self->keyboard)
+            lv_obj_add_flag(self->keyboard, LV_OBJ_FLAG_HIDDEN);
     }, this);
     lv_keyboard_set_textarea(keyboard, textArea);
     refresh();
@@ -110,4 +118,5 @@ void MaintenanceReasonScreen::destroy()
     screen = nullptr;
     textArea = nullptr;
     confirmButton = nullptr;
+    keyboard = nullptr;
 }

@@ -56,6 +56,11 @@ bool maintenanceCheckAnswered = false;
 // The resource and chosen session the open maintenance screens belong to.
 uint32_t maintenanceResourceId = 0;
 uint32_t maintenanceStopUsageId = 0;
+// The last reason a card holder confirmed, offered again on the reason screen for the same user and resource until it
+// was filed or discarded, so a failed send or a refused stop does not cost the typing.
+std::string maintenanceReasonDraft;
+std::string maintenanceReasonDraftUser;
+uint32_t maintenanceReasonDraftResourceId = 0;
 #endif
 
 #if defined(HAS_LVGL_DISPLAY)

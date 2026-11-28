@@ -22,6 +22,8 @@ public:
         // The reason without surrounding spaces.
         std::function<void(const std::string &)> onConfirm;
         std::function<void()> onCancel;
+        // What the text area starts with: a reason that could not be sent before.
+        std::string initialText;
     };
 
     void init() override;
@@ -32,7 +34,7 @@ public:
     void destroy() override;
     bool parksOrigin() const override { return true; }
 
-    // Starts with an empty reason.
+    // Starts with `config.initialText`, usually empty.
     void configure(Config config);
 
     // As typed or tapped by the user (host tests).
@@ -46,6 +48,7 @@ private:
     lv_obj_t *screen = nullptr;
     lv_obj_t *textArea = nullptr;
     lv_obj_t *confirmButton = nullptr;
+    lv_obj_t *keyboard = nullptr;
     Config config;
 
     void build();
