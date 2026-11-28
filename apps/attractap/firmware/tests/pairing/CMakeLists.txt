@@ -39,3 +39,10 @@ target_include_directories(session-outbox-tests PRIVATE "${FIRMWARE_DIR}/src")
 target_compile_options(session-outbox-tests PRIVATE -Wall -Wextra -UNDEBUG)
 add_test(NAME session-outbox-tests COMMAND session-outbox-tests)
 set_tests_properties(session-outbox-tests PROPERTIES TIMEOUT 10)
+
+# heap_guard::reserveFor: vectors grow only after a check of the size they really allocate (ATT-1394).
+add_executable(heap-guard-tests heap_guard_test.cpp)
+target_include_directories(heap-guard-tests PRIVATE "${FIRMWARE_DIR}/src")
+target_compile_options(heap-guard-tests PRIVATE -Wall -Wextra -UNDEBUG)
+add_test(NAME heap-guard-tests COMMAND heap-guard-tests)
+set_tests_properties(heap-guard-tests PROPERTIES TIMEOUT 10)
