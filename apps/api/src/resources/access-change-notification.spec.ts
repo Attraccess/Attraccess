@@ -111,5 +111,19 @@ describe('access-change notifications', () => {
 
       expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('group #5: smtp down'));
     });
+
+    it('logs a rejection that is not an Error', async () => {
+      const notifications = { dispatchToUser: jest.fn().mockRejectedValue(undefined), sendEmailTemplate: jest.fn() };
+
+      notifyAccessChange(
+        notifications,
+        logger,
+        { kind: 'group', id: 5, findName: async () => 'Wood shop' },
+        notification,
+      );
+      await flush();
+
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('group #5: undefined'));
+    });
   });
 });

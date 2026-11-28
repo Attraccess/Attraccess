@@ -4,6 +4,8 @@ import type { NotificationDispatchService } from '../notifications/notification-
 
 import { NotificationCategory } from '../notifications/notification-types';
 
+const errorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
 type AccessChangeNotifications = Pick<NotificationDispatchService, 'dispatchToUser' | 'sendEmailTemplate'>;
 
 /**
@@ -34,7 +36,7 @@ export async function nameForAccessChange(subject: AccessChangeSubject, logger: 
     return (await subject.findName(subject.id)) ?? `#${subject.id}`;
   } catch (error) {
     logger.warn(
-      `Failed to look up the name of ${subject.kind} #${subject.id} for an access-change notification: ${(error as Error).message}`,
+      `Failed to look up the name of ${subject.kind} #${subject.id} for an access-change notification: ${errorMessage(error)}`,
     );
     return `#${subject.id}`;
   }
@@ -74,7 +76,7 @@ export function notifyAccessChange(
     )
     .catch((error) => {
       logger.error(
-        `Failed to notify user ${notification.userId} about an access change on ${subject.kind} #${subject.id}: ${(error as Error).message}`,
+        `Failed to notify user ${notification.userId} about an access change on ${subject.kind} #${subject.id}: ${errorMessage(error)}`,
       );
     });
 }
