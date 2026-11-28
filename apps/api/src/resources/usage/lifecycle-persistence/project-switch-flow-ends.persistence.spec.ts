@@ -192,6 +192,31 @@ describe('Ends asked by other flow runs while a project switch is pending', () =
     expect(await openUserIds()).toEqual([]);
   });
 
+  /** The held-up end names another session than the one being switched: here the older one, which "all" takes first. */
+  it.each(['all', 'triggering'] as const)(
+    'target "%s": ends another session although a switch holds the shared machine longer than the wait',
+    async (target) => {
+      await scope.source.getRepository(Resource).update(1, { maxParallelSessions: 2 });
+      const others = await scope.usage.startSession(1, scope.users[1], {});
+      const own = await scope.usage.startSession(1, scope.users[0], { projectId: 1 });
+      Object.assign(usageInternals(scope.usage).turns, { sessionChangeWaitMs: 100 });
+      const parked = parkSwitchFlow();
+      const switching = scope.usage.switchSessionProject(1, scope.users[0], { projectId: 2, usageId: own.id });
+      await parked.entered;
+
+      const end = track(pressEnd(scope.usage, target, { usageId: others.id }));
+      await settle();
+      expect(end.state.done).toBe(false);
+      parked.release();
+      await switching;
+      await end.finished;
+
+      expect(end.state.error).toBeUndefined();
+      expect(await openUserIds()).toEqual(target === 'all' ? [] : [1]);
+      expect(await attempts()).toBe(0);
+    },
+  );
+
   it('still reports a busy machine when it is not a switch that holds it up', async () => {
     await arrange(2);
     const turns = usageInternals(scope.usage).turns;

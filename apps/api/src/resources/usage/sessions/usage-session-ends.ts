@@ -92,7 +92,9 @@ export class UsageSessionEnds {
       );
     };
     if (!options.followProjectSwitch || dto.usageId === undefined) return end(dto);
-    return acrossProjectSwitches(this.lifecycle.sessions, dto.usageId, (usageId) => end({ ...dto, usageId }));
+    return acrossProjectSwitches(this.lifecycle.sessions, resourceId, dto.usageId, (usageId) =>
+      end({ ...dto, usageId }),
+    );
   }
 
   private async endSessionNow(

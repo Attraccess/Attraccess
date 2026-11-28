@@ -134,6 +134,8 @@ export interface UsageSessionStore {
   isSessionBeingEnded(usageId: number, context?: TransactionScope): Promise<boolean>;
   /** Whether a project switch of this running session is pending: it still runs on, here or as its continuation. */
   isSessionBeingSwitched(usageId: number, context?: TransactionScope): Promise<boolean>;
+  /** Whether a project switch of any session of the resource is pending: on a shared machine it holds the turn. */
+  isProjectSwitchPending(resourceId: number): Promise<boolean>;
   /** The published part that continues this one after a project switch, or null. */
   findContinuationId(usageId: number, context?: TransactionScope): Promise<number | null>;
   saveAttempt(attempt: UsageLifecycleAttempt, context?: TransactionScope): Promise<UsageLifecycleAttempt>;

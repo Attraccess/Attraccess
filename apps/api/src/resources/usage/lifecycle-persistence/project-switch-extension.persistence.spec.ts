@@ -121,23 +121,51 @@ describe('Extending a session whose project is being switched', () => {
     expect(continuation.autoEndAt).toEqual(extendedBy(own.autoEndAt, 60));
   });
 
-  it('extends the continuation when the switch commits while the extension waits for the row', async () => {
-    const own = await arrange(1);
-    const commit = parkTransactionAt('usage_session.project_switched');
-    const switching = switchOwn(own.id);
-    await commit.entered;
+  it.each([true, false])(
+    'session named: %s: extends the continuation when the switch commits while the extension waits for the row',
+    async (named) => {
+      const own = await arrange(1);
+      const commit = parkTransactionAt('usage_session.project_switched');
+      const switching = switchOwn(own.id);
+      await commit.entered;
 
-    const extension = track(extend(own.id));
-    await settle();
-    expect(extension.state.done).toBe(false);
-    commit.release();
+      const extension = track(extend(named ? own.id : undefined));
+      await settle();
+      expect(extension.state.done).toBe(false);
+      commit.release();
 
-    const continuation = await switching;
-    expect((await extension.finished).id).toBe(continuation.id);
-    expect((await usages()).find((usage) => usage.id === continuation.id)?.autoEndAt).toEqual(
-      extendedBy(own.autoEndAt, 60),
-    );
-  });
+      const continuation = await switching;
+      expect((await extension.finished).id).toBe(continuation.id);
+      expect((await usages()).find((usage) => usage.id === continuation.id)?.autoEndAt).toEqual(
+        extendedBy(own.autoEndAt, 60),
+      );
+    },
+  );
+
+  it.each([true, false])(
+    'session named: %s: another person’s extension waits for a switch that outlasts the wait for a shared machine',
+    async (named) => {
+      const own = await arrange(2);
+      const others = (await usages()).find((usage) => usage.id !== own.id) as ResourceUsage;
+      Object.assign(usageInternals(scope.usage).turns, { sessionChangeWaitMs: 100 });
+      const parked = parkSwitchFlow();
+      const switching = switchOwn(own.id);
+      await parked.entered;
+
+      const extension = track(
+        scope.usage.extendSession(1, scope.users[1], {
+          extendByMinutes: 60,
+          ...(named ? { usageId: others.id } : {}),
+        }),
+      );
+      await settle();
+      expect(extension.state.done).toBe(false);
+      parked.release();
+      await switching;
+
+      expect(await extension.finished).toMatchObject({ id: others.id, autoEndAt: extendedBy(others.autoEndAt, 60) });
+    },
+  );
 
   it('keeps the old end when the switch is rolled back after the extension, which stays', async () => {
     const own = await arrange(1);

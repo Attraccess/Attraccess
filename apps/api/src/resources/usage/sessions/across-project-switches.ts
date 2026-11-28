@@ -25,13 +25,15 @@ export async function findLatestPartId(
 }
 
 /**
- * Applies a change to a session whose project may be switched at the same time. `change` gets the id of the part the
- * session runs on as. It runs again on the continuation when a switch committed first, and after a wait while a
- * switch is pending: it then reaches the continuation, or the old part when the switch was rolled back. It reports a
- * pending switch with `ProjectSwitchPendingError`, or gives up on a busy machine with `MachineBusyError`.
+ * Applies a change to a session while projects of the machine's sessions may be switched. `change` gets the id of the
+ * part the session runs on as. It runs again on the continuation when a switch committed first, and after a wait while
+ * a switch is pending: it then reaches the continuation, or the old part when the switch was rolled back. It reports a
+ * pending switch of its session with `ProjectSwitchPendingError`, or gives up on a busy machine with
+ * `MachineBusyError`; the switch holding a shared machine may be another session's.
  */
 export async function acrossProjectSwitches<T>(
-  sessions: Pick<UsageSessionStore, 'findContinuationId' | 'isSessionBeingSwitched'>,
+  sessions: Pick<UsageSessionStore, 'findContinuationId' | 'isProjectSwitchPending'>,
+  resourceId: number,
   usageId: number,
   change: (partId: number) => Promise<T>,
 ): Promise<T> {
@@ -39,14 +41,14 @@ export async function acrossProjectSwitches<T>(
   let partId = usageId;
   for (;;) {
     partId = await findLatestPartId(sessions, partId);
-    const wasSwitching = await sessions.isSessionBeingSwitched(partId);
+    const wasSwitching = await sessions.isProjectSwitchPending(resourceId);
     try {
       return await change(partId);
     } catch (error) {
       if ((await sessions.findContinuationId(partId)) !== null) continue;
       const heldUpBySwitch =
         error instanceof ProjectSwitchPendingError ||
-        (error instanceof MachineBusyError && (wasSwitching || (await sessions.isSessionBeingSwitched(partId))));
+        (error instanceof MachineBusyError && (wasSwitching || (await sessions.isProjectSwitchPending(resourceId))));
       if (!heldUpBySwitch || Date.now() >= giveUpAt) throw error;
       await sleep(RETRY_EVERY_MS);
     }

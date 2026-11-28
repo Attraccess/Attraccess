@@ -360,6 +360,12 @@ export class InMemoryUsageSessionStore implements UsageSessionStore {
     );
   }
 
+  async isProjectSwitchPending(resourceId: number): Promise<boolean> {
+    return [...this.attempts.values()].some(
+      (attempt) => attempt.kind === 'project-switch' && attempt.resourceId === resourceId,
+    );
+  }
+
   async findContinuationId(usageId: number, _context?: TransactionScope): Promise<number | null> {
     const next = this.sessions.find((stored) => stored.previousUsageId === usageId && !stored.lifecyclePending);
     return next?.id ?? null;

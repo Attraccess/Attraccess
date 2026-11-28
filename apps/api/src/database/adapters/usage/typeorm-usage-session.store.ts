@@ -329,6 +329,10 @@ export class TypeOrmUsageSessionStore implements UsageSessionStore {
       .existsBy(ResourceUsageLifecycleAttempt, { kind: 'project-switch', previousUsageId: usageId });
   }
 
+  isProjectSwitchPending(resourceId: number): Promise<boolean> {
+    return this.managers.resolve().existsBy(ResourceUsageLifecycleAttempt, { resourceId, kind: 'project-switch' });
+  }
+
   findContinuationId(usageId: number, context?: TransactionContext): Promise<number | null> {
     return findContinuationId(this.managers.resolve(context), usageId);
   }

@@ -42,15 +42,26 @@ export class UsageSessionExtensions {
   ): Promise<UsageSession> {
     const extend = (named: ExtendUsageSessionDto) =>
       this.ends.runSessionChange(resourceId, randomUUID(), () => this.extendNow(resourceId, user, named, auditOrigin));
+    // Without a usageId the caller means their running session. Knowing which one that is now lets the extension follow
+    // a switch of it, also one that commits while the extension waits.
+    const meantId = dto.usageId ?? (await this.findOwnSessionId(resourceId, user));
     const updated =
-      dto.usageId === undefined
+      meantId === undefined
         ? await extend(dto)
-        : await acrossProjectSwitches(this.lifecycle.sessions, dto.usageId, (usageId) => extend({ ...dto, usageId }));
+        : await acrossProjectSwitches(this.lifecycle.sessions, resourceId, meantId, (usageId) =>
+            extend({ ...dto, usageId }),
+          );
     this.eventEmitter.emit(
       ResourceUsageSessionExtendedEvent.EVENT_NAME,
       new ResourceUsageSessionExtendedEvent(updated),
     );
     return updated;
+  }
+
+  /** The newest of the user's running sessions on the machine: the one `pickSessionToEnd` takes without a usageId. */
+  private async findOwnSessionId(resourceId: number, user: UsageSessionUser): Promise<number | undefined> {
+    const sessions = await this.lifecycle.sessions.findActiveSessions(resourceId);
+    return [...sessions].reverse().find((session) => session.userId === user.id)?.id;
   }
 
   private extendNow(
