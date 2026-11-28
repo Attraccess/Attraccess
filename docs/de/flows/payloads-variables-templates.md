@@ -32,6 +32,8 @@ Die Anfangsdaten hängen vom Trigger ab. Bei Objekt-Payloads ergänzt Attraccess
 
 Überall, wo eine Payload oder ein Vorlagenkontext einen Benutzer enthält (`user`, `previousUser` sowie `newUser` und `oldUser` einer Übernahme), hat der Benutzer zusätzlich `firstName`, `lastName` (beide können leer sein) und `displayName`: „Vorname Nachname“, ersatzweise der Benutzername. Verwenden Sie `{{user.displayName}}` in Nachrichten für Menschen; `username` bleibt die stabile Kennung.
 
+Nach einem [Projektwechsel](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln) beschreibt **Nutzung beendet** nur den letzten Abschnitt der Sitzung: `id`, `startTime` und die Nutzungsminuten gehören zu diesem Abschnitt, und `previousUsageId` nennt den Abschnitt davor. `sessionStartTime` enthält den Start der ganzen Sitzung; bei einer Sitzung ohne Wechsel ist es `null`. Für eine Nachricht über die ganze Sitzung nehmen Sie den Start aus `{{#if sessionStartTime}}{{sessionStartTime}}{{else}}{{startTime}}{{/if}}` und das Ende aus `endTime`.
+
 Formularantworten einer Nutzung werden über Formular-ID und Feld-ID adressiert, etwa `formSubmissions.12.answers.34.value`. Nur eingereichte Formulare sind enthalten. Notizen, Endzeiten und optionale Benutzerfelder können leer sein oder fehlen. Nutzungs- und Tür-Trigger liefern unterschiedliche Strukturen; prüfen Sie den tatsächlichen Durchlauf, bevor Sie Pfade wählen.
 
 Eine MQTT-Nachricht auf `workshop/laser/status` mit dem Inhalt `{"temperature":42,"running":true}` liefert nachfolgenden Knoten beispielsweise:

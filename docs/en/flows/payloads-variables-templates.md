@@ -32,6 +32,8 @@ The starting data depends on the trigger. For object payloads, Attraccess adds `
 
 Wherever a payload or template context carries a user (`user`, `previousUser`, and the `newUser` and `oldUser` of a takeover), the user also has `firstName`, `lastName` (both may be empty) and `displayName`: "First Last", or the username when no name is set. Use `{{user.displayName}}` in messages meant for people; `username` stays the stable identifier.
 
+After a [project switch](resources/usage-tracking.md#switching-the-project-of-a-running-session), **Usage Stopped** describes only the last part of the session: `id`, `startTime` and the usage minutes are those of that part, and `previousUsageId` names the part before it. `sessionStartTime` holds the start of the whole session; it is `null` on a session that was never switched. For a message about the whole session, take the start from `{{#if sessionStartTime}}{{sessionStartTime}}{{else}}{{startTime}}{{/if}}` and the end from `endTime`.
+
 Usage form answers are addressed by form ID and field ID, for example `formSubmissions.12.answers.34.value`. Only submitted forms are present. Notes, end times and optional user fields may be empty or absent. Usage and door triggers have different shapes; inspect the actual run before choosing paths.
 
 For an MQTT message on `workshop/laser/status` containing `{"temperature":42,"running":true}`, downstream nodes receive an object like:

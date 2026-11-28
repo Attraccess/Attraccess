@@ -32,7 +32,7 @@ Läuft während eines Nutzungsstarts. Keine Einstellungen. Die Payload enthält 
 
 Typ: `input.resource.usage.stopped` · Maschinen
 
-Läuft während eines Nutzungsendes. Keine Einstellungen. Die Payload enthält die bisherige Sitzung, eingereichte Formulare und Endfelder wie `endTime`, `endNotes` sowie [`activeSessions`](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen). Beispiel: Relais ausschalten oder vor der Abrechnung einen Posten ergänzen. Läuft nicht für eine Sitzung, die durch eine Übernahme endet; siehe [Nutzung übernommen](flows/node-types.md#nutzung-übernommen).
+Läuft während eines Nutzungsendes. Keine Einstellungen. Die Payload enthält die bisherige Sitzung, eingereichte Formulare und Endfelder wie `endTime`, `endNotes` sowie [`activeSessions`](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen). Beispiel: Relais ausschalten oder vor der Abrechnung einen Posten ergänzen. Läuft nicht für eine Sitzung, die durch eine Übernahme endet; siehe [Nutzung übernommen](flows/node-types.md#nutzung-übernommen). Nach einem [Projektwechsel](flows/node-types.md#projekt-gewechselt) läuft er einmal und nur für den letzten Abschnitt: `startTime` ist dessen Start, `sessionStartTime` der Start der ganzen Sitzung (`null` ohne Wechsel). Siehe [Welche Daten ein Trigger liefert](flows/payloads-variables-templates.md#welche-daten-ein-trigger-liefert).
 
 ### Nutzung übernommen
 

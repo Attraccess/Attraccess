@@ -34,7 +34,7 @@ Runs during a usage start. No settings. Payload contains the new usage session's
 
 Type: `input.resource.usage.stopped` · Machines
 
-Runs during a usage stop. No settings. Payload contains the outgoing session, submitted forms, stop fields such as `endTime` and `endNotes`, and [`activeSessions`](flows/payloads-variables-templates.md#active-sessions-on-shared-machines). Example: switch off a relay or add a billing item before settlement. It does not run for a session that ends through a takeover; see [Resource Usage Takeover](flows/node-types.md#resource-usage-takeover).
+Runs during a usage stop. No settings. Payload contains the outgoing session, submitted forms, stop fields such as `endTime` and `endNotes`, and [`activeSessions`](flows/payloads-variables-templates.md#active-sessions-on-shared-machines). Example: switch off a relay or add a billing item before settlement. It does not run for a session that ends through a takeover; see [Resource Usage Takeover](flows/node-types.md#resource-usage-takeover). After a [project switch](flows/node-types.md#resource-usage-project-switched) it runs once, for the last part only: `startTime` is that part's start, while `sessionStartTime` is the start of the whole session (`null` if it was never switched). See [What a trigger provides](flows/payloads-variables-templates.md#what-a-trigger-provides).
 
 ### Resource Usage Takeover
 
