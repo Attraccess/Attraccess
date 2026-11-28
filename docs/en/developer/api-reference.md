@@ -121,6 +121,37 @@ A reader announces `capabilities.sessionDuration: true` in `READER_FIRMWARE_INFO
 
 `EXTEND_RESOURCE_USAGE_SESSION` with `payload: { resourceId, usageId?, extendByMinutes?, toMax?, requestId? }` extends the card holder's session under the same identity rules as a stop. The reply is `{ success: true, usageId }` or `{ error }` with the codes above. The reader receives a fresh resource list, also when the session was extended elsewhere.
 
+## Project switch
+
+`POST /api/resources/{resourceId}/usage/sessions/active/project` moves your own running machine session to another of your projects, or to none, without stopping the machine (see [Switching the project of a running session](resources/usage-tracking.md#switching-the-project-of-a-running-session)). The body:
+
+```json
+{ "projectId": 12, "usageId": 123, "formSubmissions": [] }
+```
+
+`projectId` is a project you are a member of, or `null` for no project. `usageId` is optional and names the running session, so a session that ended or was switched meanwhile is not mistaken for its successor. `formSubmissions` answers the forms required for the project switch action. The current usage record ends and a continuation starts at the same instant; the response (`201`) is the continuation, whose `previousUsageId` names the part that ended. If a meter reading or a project switch flow fails, nothing changes. For ended sessions use `PUT /api/resources/{resourceId}/usage/sessions/{usageId}/project` as before. Errors:
+
+| Status | Meaning |
+|--------|---------|
+| `400` | The session already belongs to this project, it is not a running machine session, a required form is missing, the balance does not cover a new session (when the resource charges a switch as one), a billed meter could not be read (`METER_SWITCH_FAILED`), or a project switch flow failed (`FLOW_EXECUTION_ERROR`). |
+| `403` | The session belongs to somebody else (only its owner can switch it), or the network restriction for starting a session applies. |
+| `404` | No running session of yours on the resource, or the project does not exist or you are not a member of it. |
+| `409` | Another change of the machine's sessions is in progress, or the session changed during the switch. Try again. |
+
+`GET /api/billing/usages/{usageId}/running-part` returns how the running part of a continuation will be billed, for estimating its bill: `flatCredits` (the fee per usage this part pays, `0` when an earlier part paid it), `roundingStartTime` (minutes are counted from here) and `priorCredits` (what earlier parts of the same rounding charged). It answers the session's owner, billing managers and resource managers; for anybody else, and for a session that is not running, it answers `404`.
+
+## Attractap WebSocket: project switch
+
+A reader announces `capabilities.projectSwitch: true` in `READER_FIRMWARE_INFO` when it can switch the project of a running session. Only such readers get the fields below and may send the event; others are refused with `PROJECT_SWITCH_NOT_SUPPORTED`.
+
+| Direction | Event | Payload |
+|-----------|-------|---------|
+| Server → reader | `RESOURCE_LIST` | per machine with a running session of the card holder: `canSwitchProject: true`, `ownProjectId` (int or `null`) and `ownProjectName` (string or `null`). Left out when the session has no project and the card holder has none to switch to. |
+| Reader → server | `SWITCH_SESSION_PROJECT` | `resourceId`, `usageId` (the running session shown), `projectId` (int, or `null` for no project), `cardSessionId`, `requestId` |
+| Server → reader | `SWITCH_SESSION_PROJECT` | `success: true` with `usageId` (the continuation) and `projectName` (or `null`), or `error` |
+
+Error codes: `PROJECT_SWITCH_NOT_SUPPORTED`, `INVALID_PROJECT_ID`, `USER_NOT_FOUND`, `INSUFFICIENT_BALANCE` (with `sumUpEnabled`), `METER_SWITCH_FAILED`, `FLOW_EXECUTION_ERROR`, `PROJECT_SWITCH_SESSION_CHANGED` (the named session was switched elsewhere and a continuation of the card holder runs), `NoOwnActiveSessionError` (no session of the card holder runs any more); any other refusal carries the server's message. Required project switch forms go through the same forms exchange as a start. After a refusal the reader receives a fresh row of the resource; after a switch, made there or elsewhere, a fresh resource list.
+
 ## Regenerating Clients
 
 After making changes to API endpoints, regenerate the client libraries to keep them in sync with the backend. Refer to the project's build scripts for the exact regeneration commands.

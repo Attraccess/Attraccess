@@ -376,6 +376,29 @@ Compatibility: an older reader ignores the new list fields and never sends `esti
 server sends none of the fields, so the reader shows nothing new. `EXTEND_RESOURCE_USAGE_SESSION` is only sent to a
 server that put `autoEndInSeconds` in the list.
 
+## Project switch protocol (2.16.0)
+
+The card holder can move their own running machine session to another project without stopping the machine
+(ATT-1421): **Projekt wechseln** in the session area of the details screen opens the project picker (search, paging,
+**Kein Projekt**; the current choice is disabled), then any required project switch forms. Touch and Touch V2 readers
+(also their demo variants) announce this with `capabilities.projectSwitch: true` in their firmware info; the server
+refuses the event from readers without it.
+
+| Direction       | Event                    | Payload                                                                                                                                                                                                                                                                                                         |
+| --------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reader → server | `READER_FIRMWARE_INFO`   | `capabilities.projectSwitch: true`                                                                                                                                                                                                                                                                              |
+| Server → reader | `RESOURCE_LIST`          | per machine with the card holder's running session: `canSwitchProject: true`, `ownProjectId` (int or `null`), `ownProjectName` (string or `null`); absent when there is nothing to switch to                                                                                                                    |
+| Reader → server | `SWITCH_SESSION_PROJECT` | `resourceId`, `usageId` (the running session shown), `projectId` (int, or `null` for no project), `cardSessionId`, `requestId`                                                                                                                                                                                  |
+| Server → reader | `SWITCH_SESSION_PROJECT` | `success: true` with `usageId` (the continuation) and `projectName` (or `null`), or `error` (`PROJECT_SWITCH_NOT_SUPPORTED`, `INVALID_PROJECT_ID`, `INSUFFICIENT_BALANCE`, `METER_SWITCH_FAILED`, `FLOW_EXECUTION_ERROR`, `PROJECT_SWITCH_SESSION_CHANGED`, `NoOwnActiveSessionError`, or the server's message) |
+
+Forms required for the project switch action go through the same `RESOURCE_USAGE_FORM_REQUEST` exchange as a start
+(action `project-switch`). After a refusal the server resends the resource's row; after a switch, made on the reader or
+elsewhere, the whole list. A switch does not run start, stop or takeover flows, so the machine keeps running and the
+reader shows the original start time.
+
+Compatibility: an older reader never announces the capability and gets none of the list fields; an older server sends
+none of them, so the reader offers no switch.
+
 ## Bluetooth setup (2.11.0)
 
 `src/bt_setup/` (ATT-1315 for the bridge, ATT-1371 for the readers): the web app's **Set up over Bluetooth**

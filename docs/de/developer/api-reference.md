@@ -119,6 +119,37 @@ Ein Leser meldet in `READER_FIRMWARE_INFO` `capabilities.sessionDuration: true`,
 
 `EXTEND_RESOURCE_USAGE_SESSION` mit `payload: { resourceId, usageId?, extendByMinutes?, toMax?, requestId? }` verlängert die Sitzung des Karteninhabers nach denselben Identitätsregeln wie ein Stopp. Die Antwort ist `{ success: true, usageId }` oder `{ error }` mit den oben genannten Codes. Der Leser erhält eine neue Ressourcenliste, auch wenn die Sitzung anderswo verlängert wurde.
 
+## Projektwechsel
+
+`POST /api/resources/{resourceId}/usage/sessions/active/project` ordnet Ihre eigene laufende Maschinensitzung einem anderen Ihrer Projekte oder keinem Projekt zu, ohne die Maschine anzuhalten (siehe [Das Projekt einer laufenden Sitzung wechseln](resources/usage-tracking.md#das-projekt-einer-laufenden-sitzung-wechseln)). Der Inhalt:
+
+```json
+{ "projectId": 12, "usageId": 123, "formSubmissions": [] }
+```
+
+`projectId` ist ein Projekt, in dem Sie Mitglied sind, oder `null` für kein Projekt. `usageId` ist optional und benennt die laufende Sitzung, damit eine inzwischen beendete oder gewechselte Sitzung nicht mit ihrer Nachfolgerin verwechselt wird. `formSubmissions` beantwortet die für die Aktion Projektwechsel erforderlichen Formulare. Der aktuelle Nutzungseintrag endet, und im selben Augenblick beginnt eine Fortsetzung; die Antwort (`201`) ist die Fortsetzung, deren `previousUsageId` den beendeten Abschnitt nennt. Schlägt eine Zählerablesung oder ein Projektwechsel-Flow fehl, ändert sich nichts. Für beendete Sitzungen gilt weiterhin `PUT /api/resources/{resourceId}/usage/sessions/{usageId}/project`. Fehler:
+
+| Status | Bedeutung |
+|--------|-----------|
+| `400` | Die Sitzung gehört bereits zu diesem Projekt, sie ist keine laufende Maschinensitzung, ein erforderliches Formular fehlt, das Guthaben reicht nicht für eine neue Sitzung (wenn die Ressource einen Wechsel wie eine solche abrechnet), ein abgerechneter Zähler war nicht lesbar (`METER_SWITCH_FAILED`) oder ein Projektwechsel-Flow ist fehlgeschlagen (`FLOW_EXECUTION_ERROR`). |
+| `403` | Die Sitzung gehört jemand anderem (nur die Person, der sie gehört, kann sie wechseln), oder die Netzwerkbeschränkung für den Sitzungsstart greift. |
+| `404` | Keine laufende Sitzung von Ihnen an der Ressource, oder das Projekt existiert nicht bzw. Sie sind kein Mitglied. |
+| `409` | Eine andere Änderung an den Sitzungen der Maschine läuft gerade, oder die Sitzung hat sich während des Wechsels geändert. Versuchen Sie es erneut. |
+
+`GET /api/billing/usages/{usageId}/running-part` liefert, wie der laufende Abschnitt einer Fortsetzung abgerechnet wird, um seine Kosten zu schätzen: `flatCredits` (die Gebühr pro Nutzung dieses Abschnitts, `0`, wenn ein früherer Abschnitt sie bezahlt hat), `roundingStartTime` (ab hier werden Minuten gezählt) und `priorCredits` (was frühere Abschnitte derselben Rundung berechnet haben). Es antwortet der Person, der die Sitzung gehört, Abrechnungs- und Ressourcenverwaltenden; allen anderen und für eine nicht laufende Sitzung antwortet es mit `404`.
+
+## Attractap-WebSocket: Projektwechsel
+
+Ein Leser meldet in `READER_FIRMWARE_INFO` `capabilities.projectSwitch: true`, wenn er das Projekt einer laufenden Sitzung wechseln kann. Nur solche Leser erhalten die folgenden Felder und dürfen das Ereignis senden; andere werden mit `PROJECT_SWITCH_NOT_SUPPORTED` abgewiesen.
+
+| Richtung | Ereignis | Payload |
+|----------|----------|---------|
+| Server → Leser | `RESOURCE_LIST` | pro Maschine mit einer laufenden Sitzung des Karteninhabers: `canSwitchProject: true`, `ownProjectId` (Zahl oder `null`) und `ownProjectName` (Text oder `null`). Fehlt, wenn die Sitzung kein Projekt hat und der Karteninhaber keines zum Wechseln hat. |
+| Leser → Server | `SWITCH_SESSION_PROJECT` | `resourceId`, `usageId` (die angezeigte laufende Sitzung), `projectId` (Zahl oder `null` für kein Projekt), `cardSessionId`, `requestId` |
+| Server → Leser | `SWITCH_SESSION_PROJECT` | `success: true` mit `usageId` (die Fortsetzung) und `projectName` (oder `null`), oder `error` |
+
+Fehlercodes: `PROJECT_SWITCH_NOT_SUPPORTED`, `INVALID_PROJECT_ID`, `USER_NOT_FOUND`, `INSUFFICIENT_BALANCE` (mit `sumUpEnabled`), `METER_SWITCH_FAILED`, `FLOW_EXECUTION_ERROR`, `PROJECT_SWITCH_SESSION_CHANGED` (die benannte Sitzung wurde anderswo gewechselt, und eine Fortsetzung des Karteninhabers läuft), `NoOwnActiveSessionError` (keine Sitzung des Karteninhabers läuft mehr); jede andere Ablehnung enthält die Meldung des Servers. Erforderliche Projektwechsel-Formulare laufen über denselben Formularaustausch wie ein Start. Nach einer Ablehnung erhält der Leser eine neue Zeile der Ressource, nach einem Wechsel, ob dort oder anderswo, eine neue Ressourcenliste.
+
 ## Clients neu generieren
 
 Nach Änderungen an API-Endpunkten müssen die Client-Bibliotheken neu generiert werden, um sie mit dem Backend synchron zu halten. Die genauen Regenerierungsbefehle finden Sie in den Build-Skripten des Projekts.
