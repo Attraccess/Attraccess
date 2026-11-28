@@ -8,6 +8,13 @@ on:
     - cron: '0 2 * * *'
   workflow_dispatch:
 
+# One nightly at a time: a HIL run holds its lab places for about an hour, but
+# run.sh waits only 30 minutes for one by default, so a second nightly would fail
+# its HIL jobs. A waiting run is replaced if a newer one is queued behind it.
+concurrency:
+  group: docker-nightly-latest-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   GHCR_IMAGE_NAME: ${{ vars.GHCR_IMAGE_NAME }}
   DOCKERHUB_IMAGE_NAME: ${{ vars.DOCKERHUB_IMAGE_NAME }}

@@ -114,7 +114,13 @@ test('every main pipeline tests all deliverables and bundles artifacts built in 
 test('nightly publishes plugins and the image from one gate and never moves nightly-latest backwards', () => {
   const nightly = workflow('docker-nightly-latest');
   const { jobs } = nightly;
-  assert.equal(nightly.concurrency, undefined, 'a concurrency group would cancel queued runs');
+  // A second nightly waits for the first one's lab places. A newer run may replace a waiting one: it publishes whatever
+  // npm still lacks. The HIL workflow stays without a group, which could cancel a queued release.
+  assert.deepEqual(nightly.concurrency, {
+    group: 'docker-nightly-latest-${{ github.ref }}',
+    'cancel-in-progress': false,
+  });
+  assert.equal(workflow('attractap-lab-hil').concurrency, undefined);
   for (const [name, job] of Object.entries(jobs)) assert.equal(job.concurrency, undefined, name);
   assert.ok(!jobs.plugins.steps.some((step) => /publish/.test(step.run ?? '')), 'pack/test job must not publish');
 
