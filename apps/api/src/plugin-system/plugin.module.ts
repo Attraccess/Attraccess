@@ -108,6 +108,7 @@ import {
   createHostResourceHealthContext,
   PluginHostRefs,
 } from './runtime/host-contexts';
+import { createResourceVisibilityHost } from './runtime/resource-access';
 import { LicenseService } from '../license/license.service';
 import { createPluginLicenseContext } from './runtime/plugin-license-context';
 import { arePluginsDisabled, setPluginsDisabled } from './plugins-disabled';
@@ -509,7 +510,8 @@ export class PluginModule {
   protected static resourceVisibilityProvider(): FactoryProvider<PluginResourceVisibilityHost> {
     return {
       provide: PLUGIN_RESOURCE_VISIBILITY_HOST,
-      useFactory: () => createHostResourceAccessContext(getImplementationClass().hostRefs()),
+      useFactory: () =>
+        createResourceVisibilityHost(createHostResourceAccessContext(getImplementationClass().hostRefs())),
     };
   }
 

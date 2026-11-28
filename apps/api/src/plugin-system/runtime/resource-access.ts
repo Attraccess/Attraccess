@@ -7,6 +7,7 @@ import type {
   PluginHostDataContext,
   PluginMaintenanceWindow,
   PluginResourceAccessContext,
+  PluginResourceVisibilityHost,
 } from '@attraccess/plugins-backend-sdk';
 import type { ResourceGroupsService } from '../../resources/groups/resourceGroups.service';
 import type { ResourceListVisibilityService } from '../../resources/visibility/resource-list-visibility.service';
@@ -60,7 +61,10 @@ export function createResourceAccessContext(getDeps: () => ResourceAccessDeps): 
 
   /** Loads the user and attaches the request scope, mirroring what core's auth strategy hands its services. */
   const resolveUser = async (principal: PluginAccessPrincipal): Promise<PluginCoreUser | AuthenticatedUser | null> => {
-    const user = await getDeps().findUser(principalId(principal));
+    const id = principalId(principal);
+    // A malformed principal names no user; it must never reach a lookup that could ignore an undefined condition.
+    if (!Number.isSafeInteger(id) || id <= 0) return null;
+    const user = await getDeps().findUser(id);
     if (!user) return null;
     const effectivePermissions = await scopedPermissions(principal);
     return effectivePermissions ? ({ ...user, effectivePermissions } as AuthenticatedUser) : user;
@@ -206,4 +210,14 @@ export function createResourceAccessContext(getDeps: () => ResourceAccessDeps): 
       }));
     },
   };
+}
+
+/**
+ * The host side of the SDK's `@ResourceVisible()` decorator: only `canSee`. Its token is global, so every plugin module
+ * can inject it whatever the plugin's permissions; the full `resourceAccess` stays behind `ACCESS_RESOURCES`.
+ */
+export function createResourceVisibilityHost(access: PluginResourceAccessContext): PluginResourceVisibilityHost {
+  return Object.freeze({
+    canSee: (principal: PluginAccessPrincipal, resourceId: number) => access.canSee(principal, resourceId),
+  });
 }

@@ -4,7 +4,7 @@ import { SupervisionMode } from '@attraccess/application-models';
 import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import { createFakeStoreUsageScope } from '../../resources/usage/sessions/fixtures/fake-store.test-fixture';
 import { ResourceActivityVisibilityService } from '../../resources/usage/authorization/resource-activity-visibility.service';
-import { createResourceAccessContext, ResourceAccessDeps } from './resource-access';
+import { createResourceAccessContext, createResourceVisibilityHost, ResourceAccessDeps } from './resource-access';
 
 /**
  * The usage service is the real ResourceUsageService and canMaintain runs the real
@@ -20,6 +20,7 @@ describe('plugin resourceAccess', () => {
   let groupMaintainer: boolean;
   let maintenance: jest.Mocked<ResourceAccessDeps['maintenance']>;
   let access: ReturnType<typeof createResourceAccessContext>;
+  let deps: ResourceAccessDeps;
   let activityVisibility: 'all' | 'introduced';
 
   beforeEach(async () => {
@@ -62,7 +63,7 @@ describe('plugin resourceAccess', () => {
       supervisionModesFrom(async () => [...resources.values()]) as never,
       scope.service,
     );
-    access = createResourceAccessContext(() => ({
+    deps = {
       usage: scope.service,
       visibility,
       maintenance,
@@ -70,7 +71,8 @@ describe('plugin resourceAccess', () => {
       findUser: async (id) => (id === user.id ? user : null),
       findResource: async (id) => resources.get(id) ?? null,
       listResourceIds: async () => [...resources.keys()],
-    }));
+    } as ResourceAccessDeps;
+    access = createResourceAccessContext(() => deps);
   });
 
   describe('canSeeUsageAttribution', () => {
@@ -303,6 +305,15 @@ describe('plugin resourceAccess', () => {
     );
   });
 
+  it('gives the global @ResourceVisible() host only canSee, not the permission-gated resourceAccess', async () => {
+    const canSee = jest.spyOn(access, 'canSee').mockResolvedValue(true);
+    const host = createResourceVisibilityHost(access);
+    expect(Object.keys(host)).toEqual(['canSee']);
+    expect(Object.isFrozen(host)).toBe(true);
+    await expect(host.canSee(user.id, 1)).resolves.toBe(true);
+    expect(canSee).toHaveBeenCalledWith(user.id, 1);
+  });
+
   describe('resource lists', () => {
     beforeEach(() => {
       resources.set(2, { id: 2, supervisionMode: SupervisionMode.INTRODUCTION_REQUIRED });
@@ -324,6 +335,15 @@ describe('plugin resourceAccess', () => {
     it('returns nothing for unknown users', async () => {
       await expect(access.listResourceIdsIntroduced(404)).resolves.toEqual([]);
       await expect(access.listResourceIdsMaintained(404)).resolves.toEqual([]);
+    });
+
+    it('never looks up a principal without a valid user id', async () => {
+      const findUser = jest.fn();
+      const malformed = createResourceAccessContext(() => ({ ...deps, findUser }));
+      for (const principal of [{ id: undefined as unknown as number }, 0, -1, 1.5]) {
+        await expect(malformed.listResourceIdsIntroduced(principal)).resolves.toEqual([]);
+      }
+      expect(findUser).not.toHaveBeenCalled();
     });
 
     it('lists maintained resources through the core bulk lookup', async () => {
