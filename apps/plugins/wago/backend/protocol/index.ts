@@ -212,22 +212,14 @@ export function parseHeartbeat(payload: Buffer): WagoHeartbeat {
   return heartbeatFromObject(parseObject(payload, 'announcement'));
 }
 
-/** The largest sequence a controller row can store (`decimal(15, 0)`); epoch milliseconds stay far below it. */
-export const MAX_SEQUENCE = 999_999_999_999_999;
-
 export function heartbeatFromObject(input: Record<string, unknown>): WagoHeartbeat {
   const required = ['hardwareId', 'protocolVersion', 'runtimeVersion'];
   for (const key of required)
     if (typeof input[key] !== 'string' || !input[key].trim()) throw new Error(`announcement ${key} is required`);
   if (!Array.isArray(input.capabilities) || input.capabilities.some((item) => typeof item !== 'string'))
     throw new Error('announcement capabilities must be an array of strings');
-  if (
-    input.sequence !== undefined &&
-    (!Number.isSafeInteger(input.sequence) ||
-      (input.sequence as number) < 0 ||
-      (input.sequence as number) > MAX_SEQUENCE)
-  )
-    throw new Error('announcement sequence must be a non-negative integer of at most 15 digits');
+  if (input.sequence !== undefined && (!Number.isSafeInteger(input.sequence) || (input.sequence as number) < 0))
+    throw new Error('announcement sequence must be a non-negative integer');
   if (
     input.runtimeImageId !== undefined &&
     (typeof input.runtimeImageId !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(input.runtimeImageId))
@@ -271,8 +263,7 @@ export function requiredTimestamp(value: unknown): string {
 }
 
 export function requiredSequence(value: unknown): number {
-  if (!Number.isSafeInteger(value) || (value as number) < 1 || (value as number) > MAX_SEQUENCE)
-    throw new Error('operational sequence is invalid');
+  if (!Number.isSafeInteger(value) || (value as number) < 1) throw new Error('operational sequence is invalid');
   return value as number;
 }
 

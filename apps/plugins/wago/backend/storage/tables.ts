@@ -39,7 +39,7 @@ export const wagoTables = {
       runtimeVersion: f.text({ column: 'runtime_version' }),
       /** JSON array of capability names. */
       capabilities: f.text(),
-      /** Discovery announces epoch milliseconds (see storage version 3); the protocol caps sequences at 15 digits. */
+      /** Discovery announces epoch milliseconds (see storage version 3); larger values are refused (`MAX_STORED_SEQUENCE`). */
       lastSequence: f.decimal(15, 0, { column: 'last_sequence' }).withDefault('0'),
       lastHeartbeatAt: f.string({ column: 'last_heartbeat_at' }).optional(),
       lastSeenAt: f.string({ column: 'last_seen_at' }),
@@ -262,6 +262,9 @@ export const wagoTables = {
     },
   ),
 };
+
+/** The largest controller sequence `lastSequence` (`decimal(15, 0)`) stores; epoch milliseconds stay far below it. */
+export const MAX_STORED_SEQUENCE = 999_999_999_999_999;
 
 /** The lease deadline column that storage version 2 puts in place of the baseline's integer one. */
 export const wagoLeaseDeadlineField = wagoTables.deviceOperations.fields.leaseUntil;

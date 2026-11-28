@@ -46,6 +46,6 @@ export function openWagoStorage(context: WagoStorageHost): WagoStorage {
 }
 
 export { WAGO_LEGACY_MIGRATIONS } from './legacy-migrations';
-export { wagoBaselineTables, wagoTables } from './tables';
+export { MAX_STORED_SEQUENCE, wagoBaselineTables, wagoTables } from './tables';
 export * from './rows';
 export type { TypedInsert, TypedRow, TypedTableApi } from './typed';

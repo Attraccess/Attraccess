@@ -28,7 +28,12 @@ describe('isolated broker / executable simulator', () => {
     async (failSave) => {
       fixture.disconnectOnRevoke = true;
       fixture.service.onModuleDestroy();
-      const { WagoService: MainService } = require(process.env.WAGO_INTEGRATION_MAIN_SOURCE!);
+      const mainSource = process.env.WAGO_INTEGRATION_MAIN_SOURCE!;
+      const mainBackend = mainSource.slice(0, mainSource.lastIndexOf('/backend/') + '/backend'.length);
+      const { WagoService: MainService } = require(mainSource);
+      const { createWagoTestStorage: createMainStorage } = require(join(mainBackend, 'storage/testing'));
+      const { wagoStorage: mainStorage } = require(join(mainBackend, 'storage'));
+      await fixture.useStorage(createMainStorage(), mainStorage);
       fixture.service = new MainService(fixture.context);
       await fixture.service.onApplicationBootstrap();
       const enrollment = await fixture.service.createEnrollment(hardwareId, 1);

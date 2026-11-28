@@ -18,6 +18,7 @@ import { freshness } from '../diagnostics/store';
 import { canonicalEnvelope, sourceTime, validEnvelope } from '../diagnostics/envelope';
 
 import { hash, isValidHardwareId } from './model';
+import { MAX_STORED_SEQUENCE } from '../storage';
 
 import { WagoController } from './entity';
 
@@ -121,7 +122,8 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
     controller.capabilities = JSON.stringify(heartbeat.capabilities);
     if (!canonical) {
       const legacySequence = this.diagnostics.read(controller.id).legacyHeartbeatSequence;
-      if (legacySequence !== undefined && legacySequence !== null) controller.lastSequence = String(legacySequence);
+      if (typeof legacySequence === 'number' && legacySequence <= MAX_STORED_SEQUENCE)
+        controller.lastSequence = String(legacySequence);
       controller.lastHeartbeatAt = now;
     } else {
       controller.lastHeartbeatAt = heartbeatAt ?? controller.lastHeartbeatAt;
@@ -170,6 +172,10 @@ export abstract class WagoSubscriptions extends WagoControllerEnrollment {
       this.context.logger.warn(
         `Ignoring invalid WAGO announcement: ${error instanceof Error ? error.message : String(error)}`,
       );
+      return null;
+    }
+    if (announcement.sequence !== undefined && announcement.sequence > MAX_STORED_SEQUENCE) {
+      this.context.logger.warn(`Ignoring WAGO announcement with a sequence beyond 15 digits on ${topic}`);
       return null;
     }
     if (announcement.hardwareId === hardwareId) return announcement;

@@ -3,6 +3,7 @@ import type { WagoEnrollment } from './enrollment.entity';
 import { controller, createWagoServiceFixture } from '../wago-service.test-fixture';
 import { hash } from './model';
 import { WagoService } from './service';
+import { MAX_STORED_SEQUENCE } from '../storage';
 
 describe('WagoService discovery', () => {
   const services: WagoService[] = [];
@@ -78,6 +79,12 @@ describe('WagoService discovery', () => {
     const sequence = Date.UTC(2026, 10, 27, 16, 50, 34);
     await discover(announcement({ sequence }));
     expect(test.rows('controllers')[0]).toMatchObject({ lastSequence: String(sequence) });
+  });
+
+  it('ignores an announcement whose sequence the controller row cannot store', async () => {
+    const { test, discover } = await setup();
+    await discover(announcement({ sequence: MAX_STORED_SEQUENCE + 1 }));
+    expect(test.rows('controllers')).toEqual([]);
   });
 
   it('stores an announcement whose identity, fingerprint and versions exceed 255 characters', async () => {

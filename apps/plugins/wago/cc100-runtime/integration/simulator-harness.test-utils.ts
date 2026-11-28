@@ -208,6 +208,19 @@ export class SimulatorFixture {
     await this.service.onApplicationBootstrap();
   }
 
+  /**
+   * Serves `context.storage` from another revision's in-memory port and storage definition. The "main" service writes
+   * rows in its own layout; a column type that changed since (WAGO storage v2/v3) would reject them in this one.
+   */
+  async useStorage(storage: WagoTestStorage, definition: unknown): Promise<void> {
+    this.storage = storage;
+    await storage.tables.settings.insert({ id: 1, defaultMqttServerId: 1, operationalPrefix: prefix });
+    Object.assign(this.context, {
+      storage: { ...storage.storage, open: () => storage.storage.open(definition as typeof wagoStorage) },
+      persistence: storage.persistence,
+    });
+  }
+
   async cleanup() {
     await this.stop();
     this.service?.onModuleDestroy();
