@@ -57,7 +57,7 @@ Erstellen Sie Ihr erstes Benutzerkonto. Dieses wird Ihr Administrator-Konto.
 | **Benutzername** | 3–32 Zeichen, Buchstaben, Zahlen, Unterstriche, Bindestriche und Punkte |
 | **E-Mail-Adresse** | Gültige E-Mail-Adresse |
 | **Vorname / Nachname** | Optional |
-| **Passwort** | 12 bis 128 Zeichen, darf weder Benutzernamen noch E-Mail-Adresse enthalten und muss schwer zu erraten sein (der Assistent zeigt eine Stärkeanzeige und kann ein starkes Passwort erzeugen) |
+| **Passwort** | 12 bis 128 Zeichen, darf weder den Benutzernamen noch einen Teil der E-Mail-Adresse enthalten (geprüft werden nur Benutzernamen und Teile ab vier Zeichen) und muss schwer zu erraten sein (der Assistent zeigt eine Stärkeanzeige und kann ein starkes Passwort erzeugen) |
 | **Passwort bestätigen** | Muss mit dem Passwort übereinstimmen |
 
 ## Schritt 5: Fertig
@@ -84,7 +84,7 @@ Die genauen Regeln stehen unter [Sichtbarkeit der Maschinenliste](settings/overv
 
 ## Nach der Ersteinrichtung
 
-Der Einrichtungsassistent ist nur verfügbar, solange kein Benutzerkonto existiert. Nach Abschluss können Sie die Einstellungen jederzeit unter **Einstellungen** in der Seitenleiste ändern.
+Der Einrichtungsassistent bleibt verfügbar, bis die E-Mail-Adresse des Administrators bestätigt ist. Sobald das Administrator-Konto existiert, können Sie dort noch dessen Angaben korrigieren, aber der Assistent speichert keine Anwendungs-, E-Mail- oder Lizenzeinstellungen mehr. Nach der Bestätigung können Sie die Einstellungen jederzeit unter **Einstellungen** in der Seitenleiste ändern.
 
 Empfohlene nächste Schritte:
 

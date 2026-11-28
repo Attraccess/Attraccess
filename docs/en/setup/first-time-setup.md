@@ -57,7 +57,7 @@ Create your first user account. This will be your administrator account.
 | **Username** | 3–32 characters, letters, numbers, underscores, hyphens and dots |
 | **Email address** | Valid email address |
 | **First name / Last name** | Optional |
-| **Password** | 12 to 128 characters, must not contain your username or email address, and must be hard enough to guess (the wizard shows a strength indicator and can generate a strong password) |
+| **Password** | 12 to 128 characters, must not contain your username or a part of your email address (only usernames and parts with at least four characters are checked), and must be hard enough to guess (the wizard shows a strength indicator and can generate a strong password) |
 | **Confirm password** | Must match the password |
 
 ## Step 5: You're All Set
@@ -84,7 +84,7 @@ See [Machine List Visibility](settings/overview.md#machine-list-visibility) for 
 
 ## After First-Time Setup
 
-The setup wizard is only available as long as no user account exists. After completion, you can change the settings at any time under **Settings** in the sidebar.
+The setup wizard stays available until the administrator's email address is verified. Once the administrator account exists, you can still correct its details there, but the wizard no longer saves application, email or license settings. After verification, you can change the settings at any time under **Settings** in the sidebar.
 
 Recommended next steps:
 
