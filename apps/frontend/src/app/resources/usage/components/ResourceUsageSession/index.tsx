@@ -22,7 +22,8 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLiveUpdates } from '../../../../../utils/live-updates';
-import { SESSION_EVENTS, SESSION_EXTENDED_EVENT } from '../../sessionEvents';
+import { PROJECT_SWITCHED_EVENT, SESSION_EVENTS, SESSION_EXTENDED_EVENT } from '../../sessionEvents';
+import { invalidateSwitchedRecords } from '../ActiveSessionDisplay/invalidateSwitchedSession';
 import { mySessionsQueryKey } from '../../../../resourceOverview/activeUsageSessionsBanner/mySessionsQuery';
 import en from './translations/en.json';
 import de from './translations/de.json';
@@ -83,6 +84,7 @@ export function ResourceUsageSession({
         invalidateSessionDeadline();
       } else if (data.eventType && SESSION_EVENTS.has(data.eventType)) {
         invalidateSessionQueries();
+        if (data.eventType === PROJECT_SWITCHED_EVENT) void invalidateSwitchedRecords(queryClient, resourceId);
       }
     },
   });

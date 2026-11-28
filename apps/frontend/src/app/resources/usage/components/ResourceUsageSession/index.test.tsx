@@ -96,6 +96,9 @@ vi.mock('@attraccess/react-query-client', async () => ({
     { resourceId },
   ],
   useFindMaintenances: () => ({ data: { data: [] } }),
+  UseResourceUsageGetHistoryKeyFn: (params: unknown) => ['history', params],
+  useGetProjectUsageHistoryKey: 'projectHistory',
+  useGetProjectUsageStatsKey: 'projectStats',
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -254,6 +257,18 @@ describe('ResourceUsageSession routing', () => {
       invalidateQueries.mockClear();
       liveUpdate.onUpdate?.({ eventType: 'resource.health_changed', activeSessionCount: 1 });
       expect(invalidateQueries).not.toHaveBeenCalled();
+    });
+
+    it('also refetches the history and what the projects were charged when a session switched its project', () => {
+      parallel.value = response([other]);
+      renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
+
+      liveUpdate.onUpdate?.({ eventType: 'resource.usage.project_switched', inUse: true, activeSessionCount: 1 });
+
+      for (const key of ['history', 'projectHistory', 'projectStats']) {
+        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: [key] });
+      }
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['canControl', { resourceId: 7 }] });
     });
 
     it('refetches only the session and "My sessions" when a session was extended', () => {

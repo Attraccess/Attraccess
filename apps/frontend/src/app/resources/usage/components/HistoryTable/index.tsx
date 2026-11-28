@@ -16,6 +16,10 @@ import de from './utils/translations/de.json';
 import { SimplePagination } from '../../../../../components/simplePagination/index';
 import { attributedOperatingDurationForUsage, useOperatingDuration } from '../../../operatingDuration';
 import { ProjectsSelect } from '../../../../../components/projectsSelect/index';
+import { useQueryClient } from '@tanstack/react-query';
+import { useLiveUpdates } from '../../../../../utils/live-updates';
+import { PROJECT_SWITCHED_EVENT } from '../../sessionEvents';
+import { invalidateSwitchedRecords } from '../ActiveSessionDisplay/invalidateSwitchedSession';
 
 export interface HistoryTableProps {
   resourceId: number;
@@ -82,6 +86,16 @@ export const HistoryTable = ({
 
   const [page, setPage] = useState(1);
   const [rowsPerPage] = useState(5);
+  const queryClient = useQueryClient();
+
+  // The history tab shows no session panel that would refresh it after a switch made elsewhere.
+  useLiveUpdates({
+    topic: 'resource',
+    resourceId,
+    onUpdate: (data: { eventType?: string }) => {
+      if (data.eventType === PROJECT_SWITCHED_EVENT) void invalidateSwitchedRecords(queryClient, resourceId);
+    },
+  });
 
   const handlePageChange = useCallback((newPage: number) => {
     setPage(newPage);

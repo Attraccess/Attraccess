@@ -14,6 +14,8 @@ const state = vi.hoisted(() => ({
   invalidate: vi.fn(),
   success: vi.fn(),
   toastError: vi.fn(),
+  live: undefined as
+    { topic: string; resourceId: number; onUpdate: (data: { eventType?: string }) => void } | undefined,
   callbacks: undefined as
     | {
         onSuccess: (usage: unknown) => void;
@@ -41,10 +43,17 @@ vi.mock('@attraccess/react-query-client', () => ({
   useGetOneResourceById: () => ({ data: { id: 7, type: state.type } }),
   UseResourceUsageGetHistoryKeyFn: (input: unknown) => ['history', input],
   UseResourceUsageGetSessionKeyFn: (input: unknown) => ['session', input],
+  UseResourceUsageGetActiveSessionKeyFn: (input: unknown) => ['active', input],
+  useGetProjectUsageStatsKey: 'project-stats',
   useGetProjectUsageHistoryKey: 'project-history',
   useResourceUsageUpdateSessionProject: (_mutationKey: unknown, callbacks: typeof state.callbacks) => {
     state.callbacks = callbacks;
     return { mutate: state.update };
+  },
+}));
+vi.mock('../../../utils/live-updates', () => ({
+  useLiveUpdates: (subscription: typeof state.live) => {
+    state.live = subscription;
   },
 }));
 vi.mock('../../../hooks/useAuth', () => ({
@@ -230,4 +239,20 @@ it('reports history loading errors', () => {
     </MemoryRouter>,
   );
   expect(screen.getByText('Error loading usage history. Please try again.')).toBeInTheDocument();
+});
+it('refreshes the history when a running session switches its project elsewhere', () => {
+  render(
+    <MemoryRouter>
+      <ResourceUsageHistory resourceId={7} />
+    </MemoryRouter>,
+  );
+  expect(state.live).toMatchObject({ topic: 'resource', resourceId: 7 });
+
+  state.live?.onUpdate({ eventType: 'resource.health_changed' });
+  expect(state.invalidate).not.toHaveBeenCalled();
+
+  state.live?.onUpdate({ eventType: 'resource.usage.project_switched' });
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['history'] });
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['project-history'] });
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['project-stats'] });
 });
