@@ -25,6 +25,7 @@ interface ResourceListServiceResourceListPayloadContext {
   readerTimeZone: ResourceListService['readerTimeZone'];
   rbacService: ResourceListService['rbacService'];
   licenseService: ResourceListService['licenseService'];
+  listVisibility: ResourceListService['listVisibility'];
   logger: ResourceListService['logger'];
 }
 /** What the reader's session list reads of a running usage session. */
@@ -204,6 +205,10 @@ export async function sendResourceListToSockets(
       permissions,
     );
     const maintenanceLicensed = await (maintenanceLicense ??= isMaintenanceLicensed(context.licenseService));
+    // Like the web: only who may see the machine may report a problem with it.
+    const visibleIds = maintenanceLicensed
+      ? new Set(await context.listVisibility.filterVisible({ id: userId, effectivePermissions: permissions }, resourceIds))
+      : new Set<number>();
     const personalized = await Promise.all(
       resources.map(async (resource, index) => {
         const hasIntroduction = await context.resourceUsageService.canControllResource(resource.id, user);
@@ -213,8 +218,9 @@ export async function sendResourceListToSockets(
         const ownUsageSession = own ? toReaderSession(own, offsetMinutes) : null;
         const canManageResource = permissions.has('resources.update');
         const canManageMaintenance = maintenanceManagedResourceIds.has(resource.id);
-        // The web's "Report a problem" rule: licensed, and not somebody who manages the maintenance anyway.
-        const canRequestMaintenance = maintenanceLicensed && !canManageMaintenance;
+        // The web's "Report a problem" rule: licensed, the machine visible, and not somebody who manages the
+        // maintenance anyway.
+        const canRequestMaintenance = visibleIds.has(resource.id) && !canManageMaintenance;
         return {
           ...base,
           // At limit 1 this is today's single session; with several sessions the caller's own comes first.

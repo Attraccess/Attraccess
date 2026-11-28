@@ -47,6 +47,18 @@ describe('ResourceListService maintenance flags', () => {
     expect(fixture.licenseService.verifyLicense).toHaveBeenCalledWith({ modules: ['maintenance'] });
   });
 
+  it('offers neither on a machine the card holder may not see, like the web', async () => {
+    fixture.listVisibility.filterVisible.mockImplementation(async (viewer, resourceIds: number[]) => {
+      expect(viewer).toEqual({ id: 1, effectivePermissions: expect.any(Set) });
+      return resourceIds.filter((id) => id !== 10);
+    });
+    expect(flags(await listFor(1))).toEqual([
+      [false, false],
+      [true, false],
+      [false, false],
+    ]);
+  });
+
   it('sends no flags and checks no license while nobody is signed in', async () => {
     const [first] = await listFor(null);
     expect(first).not.toHaveProperty('canRequestMaintenance');

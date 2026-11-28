@@ -7,6 +7,8 @@ export function registerResourceListServiceFixture() {
 
   let licenseService: { verifyLicense: jest.Mock };
 
+  let listVisibility: { filterVisible: jest.Mock };
+
   let websocketService: { sockets: Map<string, any> };
 
   let attractapService: { findReaderById: jest.Mock };
@@ -100,6 +102,9 @@ export function registerResourceListServiceFixture() {
     (service as any).readerTimeZone = readerTimeZoneStub();
     licenseService = { verifyLicense: jest.fn().mockResolvedValue({}) };
     (service as any).licenseService = licenseService;
+    // Everybody sees every machine unless a test narrows it.
+    listVisibility = { filterVisible: jest.fn(async (_viewer, resourceIds: number[]) => resourceIds) };
+    (service as any).listVisibility = listVisibility;
     (service as any).rbacService = { getEffectivePermissions: jest.fn().mockResolvedValue(new Set()) };
     (service as any).websocketService = websocketService;
     (service as any).attractapService = attractapService;
@@ -125,6 +130,9 @@ export function registerResourceListServiceFixture() {
     },
     get licenseService() {
       return licenseService;
+    },
+    get listVisibility() {
+      return listVisibility;
     },
     get resourceUsageService() {
       return resourceUsageService;

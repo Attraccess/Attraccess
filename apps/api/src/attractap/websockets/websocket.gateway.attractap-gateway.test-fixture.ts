@@ -50,6 +50,7 @@ import { AttractapSessionHandler } from './handlers/session/session.handler';
 import { AttractapMaintenanceRequestHandler } from './handlers/maintenance/maintenance-request.handler';
 import { SessionEndMaintenanceRequests } from '../../resources/usage/sessions/session-end-maintenance-requests';
 import { MaintenanceRequestService } from '../../resources/maintenances/maintenance-request.service';
+import { ResourceListVisibilityService } from '../../resources/visibility/resource-list-visibility.service';
 import { PairingService } from '../security/pairing.service';
 import { ReaderSessionService } from '../security/reader-session.service';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
@@ -188,6 +189,10 @@ export function gatewayProviders(
     { provide: SessionEndMaintenanceRequests, useValue: { fileAfterEnd: jest.fn() } },
     AttractapMaintenanceRequestHandler,
     { provide: MaintenanceRequestService, useValue: { createRequest: jest.fn() } },
+    {
+      provide: ResourceListVisibilityService,
+      useValue: { canSee: jest.fn().mockResolvedValue(true), filterVisible: jest.fn(async (_viewer, ids) => ids) },
+    },
     { provide: ResourceMeteringService, useValue: { getLive: jest.fn() } },
     { provide: ResourceOperatingAttributionService, useValue: { getForResource: jest.fn() } },
     AttractapBillingHandler,

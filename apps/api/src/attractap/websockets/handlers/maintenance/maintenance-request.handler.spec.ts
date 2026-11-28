@@ -2,6 +2,8 @@
 import { Test } from '@nestjs/testing';
 import { LicenseError, LicenseService } from '../../../../license/license.service';
 import { MaintenanceRequestService } from '../../../../resources/maintenances/maintenance-request.service';
+import { ResourceListVisibilityService } from '../../../../resources/visibility/resource-list-visibility.service';
+import { RbacService } from '../../../../users-and-auth/rbac/rbac.service';
 import { UsersService } from '../../../../users-and-auth/users/users.service';
 import { AttractapService } from '../../../attractap.service';
 import { AttractapEventType } from '../../websocket.types';
@@ -13,11 +15,13 @@ describe('AttractapMaintenanceRequestHandler', () => {
   let handler: AttractapMaintenanceRequestHandler;
   let createRequest: jest.Mock;
   let verifyLicense: jest.Mock;
+  let canSee: jest.Mock;
   let socket: any;
 
   beforeEach(async () => {
     createRequest = jest.fn().mockResolvedValue({ id: 1 });
     verifyLicense = jest.fn().mockResolvedValue({});
+    canSee = jest.fn().mockResolvedValue(true);
     const moduleRef = await Test.createTestingModule({
       providers: [
         AttractapMaintenanceRequestHandler,
@@ -31,6 +35,11 @@ describe('AttractapMaintenanceRequestHandler', () => {
         { provide: UsersService, useValue: { findOne: jest.fn().mockResolvedValue({ id: 7 }) } },
         { provide: MaintenanceRequestService, useValue: { createRequest } },
         { provide: LicenseService, useValue: { verifyLicense } },
+        { provide: ResourceListVisibilityService, useValue: { canSee } },
+        {
+          provide: RbacService,
+          useValue: { getEffectivePermissions: jest.fn().mockResolvedValue(new Set(['resources.read'])) },
+        },
       ],
     }).compile();
     handler = moduleRef.get(AttractapMaintenanceRequestHandler);
@@ -80,6 +89,15 @@ describe('AttractapMaintenanceRequestHandler', () => {
 
     expect(createRequest).not.toHaveBeenCalled();
     expect(replies()[0].payload).toEqual({ error: 'MAINTENANCE_NOT_LICENSED', requestId: 3 });
+  });
+
+  it('refuses a machine the card holder may not see, like the web route', async () => {
+    canSee.mockResolvedValue(false);
+    await send({ resourceId: 5, reason: 'Blade is dull', requestId: 3 });
+
+    expect(canSee).toHaveBeenCalledWith({ id: 7, effectivePermissions: new Set(['resources.read']) }, 5);
+    expect(createRequest).not.toHaveBeenCalled();
+    expect(replies()[0].payload).toEqual({ error: 'RESOURCE_NOT_FOUND', requestId: 3 });
   });
 
   it.each(['ab', 'x'.repeat(2001), undefined])('refuses the reason %#', async (reason) => {

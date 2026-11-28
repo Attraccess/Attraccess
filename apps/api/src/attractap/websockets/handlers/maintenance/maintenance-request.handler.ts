@@ -5,6 +5,8 @@ import { LicenseService } from '../../../../license/license.service';
 import { CreateMaintenanceRequestDto } from '../../../../resources/maintenances/dtos/create-maintenance-request.dto';
 import { isMaintenanceLicensed } from '../../../../resources/maintenances/maintenance-license';
 import { MaintenanceRequestService } from '../../../../resources/maintenances/maintenance-request.service';
+import { ResourceListVisibilityService } from '../../../../resources/visibility/resource-list-visibility.service';
+import { RbacService } from '../../../../users-and-auth/rbac/rbac.service';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
 import { ResourceActionGuard } from '../resource-action.guard';
 import { CardSessionService } from '../ui/card-session.service';
@@ -25,6 +27,12 @@ export class AttractapMaintenanceRequestHandler {
 
   @Inject(CardSessionService)
   private cardSessions: CardSessionService;
+
+  @Inject(ResourceListVisibilityService)
+  private listVisibility: ResourceListVisibilityService;
+
+  @Inject(RbacService)
+  private rbacService: RbacService;
 
   public async handleCreateMaintenanceRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
@@ -53,6 +61,12 @@ export class AttractapMaintenanceRequestHandler {
     try {
       if (!(await isMaintenanceLicensed(this.licenseService))) {
         await reply({ error: 'MAINTENANCE_NOT_LICENSED' });
+        return;
+      }
+      // The web route answers 404 for a machine the user may not see; so does the reader.
+      const effectivePermissions = await this.rbacService.getEffectivePermissions(userId);
+      if (!(await this.listVisibility.canSee({ id: userId, effectivePermissions }, resourceId))) {
+        await reply({ error: 'RESOURCE_NOT_FOUND' });
         return;
       }
       const dto = plainToInstance(CreateMaintenanceRequestDto, { reason });
