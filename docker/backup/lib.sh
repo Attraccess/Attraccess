@@ -30,6 +30,16 @@ fail() {
   exit 1
 }
 
+# For scripts with an EXIT trap (it removes the plaintext dump): busybox sh does not run that trap when a signal ends
+# the script (Ctrl-C on a manual run, kill, a closed terminal), so exit on those signals. The trap waits for the command
+# that is running. SIGKILL (the container stops or restarts) cannot be caught.
+exit_on_signals() {
+  for signal in HUP:129 INT:130 TERM:143; do
+    # shellcheck disable=SC2064 # the exit code is set now, per signal
+    trap "log 'ERROR: the run was interrupted' >&2; exit ${signal#*:}" "${signal%:*}"
+  done
+}
+
 # Maps the BACKUP_* settings to restic's environment. Credentials of the target (AWS_ACCESS_KEY_ID, B2_*, ...) pass through.
 configure_restic() {
   [ -n "${BACKUP_REPOSITORY:-}" ] || return 1

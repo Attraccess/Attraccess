@@ -79,7 +79,9 @@ A run logs `backup started`, then either `backup SUCCEEDED in …s` or `BACKUP F
 and removes the file.
 
 Files are created with `umask 077`. The plaintext dump exists only while a run is busy: it is deleted when the run
-ends (also when it fails); a restore deletes its copy of the dump as well.
+ends, also when it fails or is interrupted (Ctrl-C, `kill`; that counts as a failed run); a restore deletes its copy of
+the dump as well. A container that stops or restarts in the middle of a run cannot clean up: the dump (readable by root
+only) then stays until the next run, and the interrupted run is not recorded.
 
 `pg_dump` holds share locks on every table until the dump is complete. Changes to the schema during that time (plugin
 installs and upgrades, Attraccess updates) wait and can fail with a lock timeout: retry after the backup.

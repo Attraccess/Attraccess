@@ -290,6 +290,40 @@ expect_failed_run "no password" 'BACKUP_PASSWORD is required' env -u BACKUP_PASS
 expect_failed_run "no repository" 'BACKUP_REPOSITORY is not set' env -u BACKUP_REPOSITORY
 pass "a run that fails on its settings is recorded as a failed run"
 
+# 9f. An interrupted run (kill, Ctrl-C, a closed terminal) is a failed run too and removes the plaintext dump. busybox
+#     sh does not run the EXIT trap on a signal by itself. (INT cannot be sent here: background jobs ignore it.)
+for signal in TERM HUP; do
+  sh "$lib/backup.sh" >/dev/null 2>&1 || die "interrupted ($signal): the backup before it failed"
+  BACKUP_REPOSITORY="rest:http://127.0.0.1:1/" BACKUP_CONNECT_TIMEOUT_SECONDS=5 sh "$lib/backup.sh" >"$work/signal.log" 2>&1 &
+  run_pid=$!
+  for _ in $(seq 1 40); do grep -q 'checking the restic repository' "$work/signal.log" && break; sleep 0.5; done
+  [ -s "$work/state/dump/attraccess.dump" ] || die "interrupted ($signal): the run did not reach the point with a dump"
+  kill -"$signal" "$run_pid"
+  rc=0
+  wait "$run_pid" || rc=$?
+  [ "$rc" -ne 0 ] || die "interrupted ($signal): the run must exit with an error"
+  grep -q 'the run was interrupted' "$work/signal.log" || { cat "$work/signal.log"; die "interrupted ($signal): missing the message"; }
+  grep -q '^backup_last_run_success 0$' "$work/status/backup.prom" || die "interrupted ($signal): the run must be recorded as failed"
+  [ ! -e "$work/state/dump/attraccess.dump" ] || die "interrupted ($signal): the plaintext dump was left behind"
+done
+pass "an interrupted run is recorded as failed and removes the dump"
+
+# 9g. An interrupted restore removes its copy of the plaintext dump.
+mkdir -p "$work/bin4"
+real_pg_restore="$(command -v pg_restore)"
+printf '#!/bin/sh\ntouch "%s"\nsleep 3\nexec "%s" "$@"\n' "$work/pg_restore-started" "$real_pg_restore" >"$work/bin4/pg_restore"
+chmod 0755 "$work/bin4/pg_restore"
+PATH="$work/bin4:$PATH" DATABASE_URL="$(url_for "$db_dst")" sh "$lib/restore.sh" --force >"$work/restore-signal.log" 2>&1 &
+restore_pid=$!
+for _ in $(seq 1 60); do [ -e "$work/pg_restore-started" ] && break; sleep 0.5; done
+[ -s "$work/state/restore$work/state/dump/attraccess.dump" ] || { cat "$work/restore-signal.log"; die "the restore did not reach the point with a dump"; }
+kill -TERM "$restore_pid"
+rc=0
+wait "$restore_pid" || rc=$?
+[ "$rc" -ne 0 ] || die "an interrupted restore must exit with an error"
+[ ! -e "$work/state/restore" ] || die "an interrupted restore left the plaintext dump behind"
+pass "an interrupted restore removes its copy of the dump"
+
 # 10. An invalid BACKUP_SCHEDULE refuses the start (crond would skip such a line silently).
 for bad in 'bad' '* * * *' '61 25 * * *' '0 24 * * *' '0 3 32 * *' '0 3 * 13 *' '0 3 * * 8'; do
   out="$(BACKUP_SCHEDULE="$bad" timeout 3 "$lib/entrypoint.sh" run 2>&1 || true)"

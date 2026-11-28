@@ -15,6 +15,7 @@ started=$(date +%s)
 log "backup started"
 remove_dump() { rm -f "$DUMP_FILE" "$DUMP_FILE.partial"; }
 trap 'remove_dump; record_run 0; log "BACKUP FAILED (see the messages above)" >&2' EXIT
+exit_on_signals
 
 configure_restic || fail "BACKUP_REPOSITORY is not set"
 connect_database
