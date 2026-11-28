@@ -107,6 +107,62 @@ describe('Metering a project switch', () => {
       expect(await charged(first.id)).toBe(5 * 30);
     });
 
+    it('names the meter and the reason once in the refusal', async () => {
+      await setUpMeter();
+      await start();
+      scope.onCollect = async () => {
+        throw new Error('meter offline');
+      };
+      const [{ meterName }] = await meterSessions();
+
+      await expect(switchProject()).rejects.toMatchObject({
+        response: {
+          statusCode: 400,
+          error: 'Bad Request',
+          message: `METER_SWITCH_FAILED: "${meterName}": meter offline`,
+        },
+      });
+    });
+
+    it('says why a tracking-only reading is missing when the meter cannot be read at the switch', async () => {
+      await setUpMeter();
+      await scope.metering.setRate(1, 1, 0);
+      const first = await start();
+      counter = 105;
+      scope.onCollect = async () => {
+        throw new Error('meter offline');
+      };
+
+      const second = await switchProject();
+
+      readCounter();
+      counter = 112;
+      await end();
+      expect(
+        (await meterSessions()).map(({ usageId, status, consumedValue, failureReason }) => ({
+          usageId,
+          status,
+          consumedValue,
+          failureReason,
+        })),
+      ).toEqual([
+        {
+          usageId: first.id,
+          status: ResourceMeteringSessionStatus.Failed,
+          consumedValue: null,
+          failureReason:
+            'The meter could not be read at the project switch (meter offline); ' +
+            'consumption since its last reading is counted after the switch',
+        },
+        {
+          usageId: second.id,
+          status: ResourceMeteringSessionStatus.Settled,
+          consumedValue: '12000000000',
+          failureReason: null,
+        },
+      ]);
+    });
+
     it('keeps the whole consumption on the session when the switch flow fails after the reading', async () => {
       await setUpMeter();
       const first = await start();

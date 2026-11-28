@@ -76,9 +76,10 @@ export async function handOverMeters(
     }
     // A compromised session cannot be billed whenever it ends, so it does not hold the switch back.
     if (final.status === 'unavailable' && session.creditsPerUnit > 0 && !session.compromisedReason) {
-      throw new MeteringOperationError(`The meter "${session.meterName}" could not be read: ${final.reason}`);
+      // Behind the METER_SWITCH_FAILED code, whose translations say that the meter could not be read.
+      throw new MeteringOperationError(`"${session.meterName}": ${final.reason}`);
     }
-    meters[session.id] = final;
+    meters[session.id] = final.status === 'unavailable' ? { ...final, atProjectSwitch: true } : final;
     if (session.accounting === 'segmented' && !session.compromisedReason) continue;
     // Read again: the reading just taken moved the old total.
     const read = (await hooks.store.findSession(session.id)) ?? session;

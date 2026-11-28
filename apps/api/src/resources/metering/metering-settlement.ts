@@ -19,7 +19,12 @@ import { sessionShare } from './segment-charges';
 
 const REINITIALIZED = 'The meter was re-initialized for a later session before the final reading was collected';
 
-export type MeterFinal = { status: 'ready'; operationId: string } | { status: 'unavailable'; reason: string };
+/** Why a reading missed at a project switch stays missing: the measurement goes on with the continuation. */
+const unreadAtProjectSwitch = (reason: string) =>
+  `The meter could not be read at the project switch (${reason}); consumption since its last reading is counted after the switch`;
+
+export type MeterFinal =
+  { status: 'ready'; operationId: string } | { status: 'unavailable'; reason: string; atProjectSwitch?: boolean };
 
 export type FinalCollection = { status: 'not-metered' } | { status: 'collected'; meters: Record<string, MeterFinal> };
 
@@ -373,17 +378,22 @@ export class MeteringSettlement {
           ? false
           : await this.store.hasLaterSession(session.resourceId, session.meterId, usageId, context);
       const unrecoverable = superseded || !!session.compromisedReason;
+      // At a project switch the later session is the continuation: nothing was initialized again.
+      const switched = final.status === 'unavailable' && final.atProjectSwitch;
       await this.store.updateSession(
         session.id,
         {
           status: unrecoverable ? ResourceMeteringSessionStatus.Failed : ResourceMeteringSessionStatus.Pending,
-          failureReason: superseded
-            ? REINITIALIZED
-            : session.compromisedReason
-              ? session.compromisedReason
-              : final.status === 'unavailable'
-                ? final.reason
-                : 'No final reading was collected',
+          failureReason:
+            superseded && !switched
+              ? REINITIALIZED
+              : session.compromisedReason
+                ? session.compromisedReason
+                : final.status !== 'unavailable'
+                  ? 'No final reading was collected'
+                  : superseded
+                    ? unreadAtProjectSwitch(final.reason)
+                    : final.reason,
         },
         context,
       );
