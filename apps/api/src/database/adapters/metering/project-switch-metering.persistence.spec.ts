@@ -181,6 +181,32 @@ describe('Metering a project switch', () => {
       expect(await scope.source.getRepository(BillingTransaction).count()).toBe(1);
     });
 
+    it('gives a reading the switch flow pushed back to the session when the switch is rolled back', async () => {
+      await setUpMeter();
+      const first = await start();
+      counter = 102;
+      const real = scope.flows.runFlow.getMockImplementation() as (...args: unknown[]) => Promise<unknown[]>;
+      scope.flows.runFlow.mockImplementation(async (...args: unknown[]) => {
+        if (args[1] !== ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_SWITCHED) return real(...args);
+        // A Report meter node of the switch flow, then a node that fails.
+        counter = 104;
+        const { lifecycleAttemptId } = args[4] as { lifecycleAttemptId: string };
+        await scope.metering.report(1, 1, { kind: 'reading', value: String(counter) }, undefined, lifecycleAttemptId);
+        throw new FlowExecutionError('relay offline');
+      });
+
+      await expect(switchProject()).rejects.toThrow('relay offline');
+
+      scope.flows.runFlow.mockImplementation(real);
+      expect(await meterSessions()).toEqual([
+        expect.objectContaining({ usageId: first.id, latestValue: '4000000000' }),
+      ]);
+      counter = 105;
+      await end();
+      // 100 to 105: none of it is lost with the continuation.
+      expect(await charged(first.id)).toBe(5 * 30);
+    });
+
     it('keeps counting correctly over several switches', async () => {
       await setUpMeter();
       const first = await start();

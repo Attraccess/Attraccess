@@ -5,6 +5,7 @@ import {
   ResourceMeteringSessionStatus,
 } from '@attraccess/application-models';
 
+import type { TransactionContext } from '../../database/transaction-context';
 import type { meterDefinitionFromFlow } from './metering-definition';
 import { MeteringOperationError } from './metering-readings';
 import type { MeteringSegments } from './metering-segments';
@@ -93,4 +94,37 @@ export async function handOverMeters(
     });
   }
   return { status: 'collected', meters };
+}
+
+/** The later of two observation times; null when neither is known. */
+const later = (left: Date | null, right: Date | null) => (left && right && left > right ? left : (right ?? left));
+
+/**
+ * A project switch that is rolled back deletes the metering sessions of the continuation. A flow of the switch may
+ * have pushed a reading in the meantime (a Report meter node): it was booked to the continuation and moved the
+ * meter's counter, so what it measured goes back to the session that keeps running, or it would be billed to nobody.
+ * Only a session with a total of its own carries it; shared segments are measured by their boundary readings. Any
+ * other tentative session (a start or takeover) continues no session and is left alone.
+ */
+export async function returnToSwitchedSession(
+  store: MeteringStore,
+  context: TransactionContext,
+  candidateUsageId: number,
+): Promise<void> {
+  const previousUsageId = (await store.findUsage(candidateUsageId, context))?.previousUsageId;
+  if (previousUsageId == null) return;
+  for (const session of await store.findSessionsOfUsage(candidateUsageId, context)) {
+    const consumed = BigInt(session.latestValue ?? '0');
+    if (session.accounting === 'segmented' || consumed === BigInt(0)) continue;
+    const previous = await store.findRunningSession(session.resourceId, session.meterId, previousUsageId, context);
+    if (!previous) continue;
+    await store.updateSession(
+      previous.id,
+      {
+        latestValue: (BigInt(previous.latestValue ?? '0') + consumed).toString(),
+        latestObservedAt: later(previous.latestObservedAt, session.latestObservedAt),
+      },
+      context,
+    );
+  }
 }

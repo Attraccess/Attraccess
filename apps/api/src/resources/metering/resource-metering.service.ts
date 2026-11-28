@@ -43,7 +43,7 @@ import { findActiveMeterSessions, getMeteringSessionLimit } from './meter-sessio
 
 import { MeteringSegments } from './metering-segments';
 
-import { handOverMeters } from './metering-handover';
+import { handOverMeters, returnToSwitchedSession } from './metering-handover';
 
 import { recordMeterUpdate } from './meter-audit';
 import { sleepSeconds } from './sleep-seconds';
@@ -375,6 +375,7 @@ export class ResourceMeteringService implements OnModuleInit {
 
   /** Removes the metering of a tentative usage that is being rolled back. */
   async discardCandidate(context: TransactionContext, usageId: number): Promise<void> {
+    await returnToSwitchedSession(this.store, context, usageId);
     await this.segments.withdraw(context, usageId);
     await this.store.deleteSessionsOfUsage(usageId, context);
   }
