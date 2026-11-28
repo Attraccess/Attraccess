@@ -9,7 +9,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 
-import { NotificationCategory } from '../../notifications/notification-types';
+import { notifyAccessChange } from '../access-change-notification';
 
 import { ResourceIntroducerChangedEvent } from './events/resource-introducer-changed.event';
 
@@ -107,7 +107,6 @@ export class ResourceIntroducersService {
     type: ResourceIntroducerType,
     granted: boolean,
   ): void {
-    const url = `/resources/${resourceId}`;
     const bodyKey =
       type === ResourceIntroducerType.MAINTAINER
         ? granted
@@ -117,25 +116,18 @@ export class ResourceIntroducersService {
           ? 'grantedIntroducer'
           : 'revokedIntroducer';
 
-    void this.notifications
-      .dispatchToUser(userId, {
-        category: NotificationCategory.ACCESS_CHANGES,
-        title: (r) => t(r.locale, 'title'),
-        body: (r) => t(r.locale, bodyKey, { resourceId }),
-        url,
+    notifyAccessChange(
+      this.notifications,
+      this.logger,
+      { kind: 'resource', id: resourceId, findName: (id) => this.store.findResourceName(id) },
+      {
+        userId,
+        title: (language) => t(language, 'title'),
+        body: (language, resourceName) => t(language, bodyKey, { resourceName }),
+        url: `/resources/${resourceId}`,
         dedupeKey: `resource-access-${resourceId}-${userId}-${bodyKey}`,
-        sendEmail: (r) =>
-          this.notifications.sendEmailTemplate(r, NotificationCategory.ACCESS_CHANGES, {
-            accessChange: {
-              title: t(r.locale, 'title'),
-              body: t(r.locale, bodyKey, { resourceId }),
-              url,
-            },
-          }),
-      })
-      .catch((error) => {
-        this.logger.error(`Failed to notify user ${userId} about resource access changes: ${(error as Error).message}`);
-      });
+      },
+    );
   }
 
   public async grant(

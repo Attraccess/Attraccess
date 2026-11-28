@@ -3,6 +3,7 @@ import type { DataSource } from 'typeorm';
 import { Resource, ResourceGroup, ResourceIntroductionHistoryItem, User } from '@attraccess/database-entities';
 import { IntroductionHistoryAction, ResourceType } from '@attraccess/application-models';
 import { TypeOrmResourceIntroductionStore } from './resource-introduction-store.adapter';
+import { TypeOrmResourceIntroducerStore } from './resource-introducer-store.adapter';
 import { TypeOrmMassIntroductionTargetStore, TypeOrmRetrainingStore } from './retraining-store.adapter';
 import { legacyEngineTransactionScope } from '../common/legacy-engine-transaction';
 
@@ -108,6 +109,18 @@ describe('introduction stores on real PostgreSQL', () => {
     expect(await targets.resourceIdsOfGroup(group.id)).toEqual([resourceId]);
     expect(await targets.findResourceName(resourceId)).toEqual({ id: resourceId, name: 'Laser' });
     expect(await targets.findGroupName(999)).toBeNull();
+    expect(await store.findResourceName(resourceId)).toBe('Laser');
+    expect(await store.findResourceName(999)).toBeNull();
+    expect(await store.findGroupName(group.id)).toBe('Wood shop');
+    expect(await store.findGroupName(999)).toBeNull();
+    const introducers = new TypeOrmResourceIntroducerStore(source);
+    expect(await introducers.findResourceName(resourceId)).toBe('Laser');
+    expect(await introducers.findResourceName(999)).toBeNull();
+
+    // A soft-deleted resource has no name for access-change texts; they fall back to #<id>.
+    await source.getRepository(Resource).softDelete(resourceId);
+    expect(await store.findResourceName(resourceId)).toBeNull();
+    expect(await introducers.findResourceName(resourceId)).toBeNull();
   });
 
   it('reads retraining data and the latest grant on the connection of the caller transaction', async () => {

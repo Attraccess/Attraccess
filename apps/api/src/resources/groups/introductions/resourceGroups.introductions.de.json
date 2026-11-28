@@ -1,0 +1,5 @@
+{
+  "title": "Dein Gruppenzugriff hat sich geändert",
+  "granted": "Du hast eine Einweisung für die Gruppe „{groupName}“ erhalten.",
+  "revoked": "Deine Einweisung für die Gruppe „{groupName}“ wurde widerrufen."
+}

@@ -1,7 +1,7 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In } from 'typeorm';
-import { ResourceIntroducer } from '@attraccess/database-entities';
+import { Resource, ResourceIntroducer } from '@attraccess/database-entities';
 import type { ResourceIntroducerRecord, ResourceIntroducerType } from '@attraccess/application-models';
 import type { ResourcePersistenceContext } from '../../../resources/resource-persistence-context';
 import type { ResourceIntroducerStore } from '../../../resources/introducers/resource-introducer-store.port';
@@ -120,5 +120,12 @@ export class TypeOrmResourceIntroducerStore implements ResourceIntroducerStore {
 
   async remove(grantId: number): Promise<void> {
     await this.repository().delete({ id: grantId });
+  }
+
+  async findResourceName(resourceId: number): Promise<string | null> {
+    const resource = await this.dataSource
+      .getRepository(Resource)
+      .findOne({ where: { id: resourceId }, select: { id: true, name: true } });
+    return resource?.name ?? null;
   }
 }

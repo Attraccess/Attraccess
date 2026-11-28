@@ -23,10 +23,12 @@ const introduction = (overrides: Partial<IntroductionRecord> = {}): Introduction
   ...overrides,
 });
 
+const flushNotifications = () => new Promise((resolve) => setImmediate(resolve));
+
 describe('ResourceIntroductionsService notifications', () => {
   let service: ResourceIntroductionsService;
   let store: { [K in keyof ResourceIntroductionStore]: jest.Mock };
-  let notifications: { dispatchToUser: jest.Mock };
+  let notifications: { dispatchToUser: jest.Mock; sendEmailTemplate: jest.Mock };
   let retraining: { getIntroductionRetrainingStatus: jest.Mock };
   let audit: { record: jest.Mock };
 
@@ -52,8 +54,10 @@ describe('ResourceIntroductionsService notifications', () => {
       listWithRetrainingRule: jest.fn(),
       markRetrainingRequiredAudited: jest.fn(),
       markRetrainingNotified: jest.fn(),
+      findResourceName: jest.fn().mockResolvedValue('Laser Cutter'),
+      findGroupName: jest.fn(),
     };
-    notifications = { dispatchToUser: jest.fn().mockResolvedValue(undefined) };
+    notifications = { dispatchToUser: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
     retraining = { getIntroductionRetrainingStatus: jest.fn().mockResolvedValue({ isDue: false }) };
     audit = { record: jest.fn().mockResolvedValue(undefined) };
 
@@ -73,18 +77,63 @@ describe('ResourceIntroductionsService notifications', () => {
     audit.record.mockClear();
   });
 
-  it('notifies the user when a resource introduction is granted', async () => {
-    await service.grant(7, 3);
+  const texts = (locale: string | null) => {
+    const request = notifications.dispatchToUser.mock.calls[0][1];
+    return { title: request.title({ locale }), body: request.body({ locale }) };
+  };
 
+  it('notifies the user with the resource name when a resource introduction is granted', async () => {
+    await service.grant(7, 3);
+    await flushNotifications();
+
+    expect(store.findResourceName).toHaveBeenCalledWith(7);
     expect(notifications.dispatchToUser).toHaveBeenCalledWith(
       3,
       expect.objectContaining({
         category: NotificationCategory.ACCESS_CHANGES,
-        title: 'Your resource access changed',
-        body: 'You received an introduction for resource #7.',
         url: '/resources/7',
+        dedupeKey: 'resource-introduction-7-3-granted',
       }),
     );
+    expect(texts('en')).toEqual({
+      title: 'Your resource access changed',
+      body: 'You received an introduction for resource "Laser Cutter".',
+    });
+
+    const request = notifications.dispatchToUser.mock.calls[0][1];
+    await request.sendEmail({ id: 3, locale: 'en' }, 'en');
+    expect(notifications.sendEmailTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 3 }),
+      NotificationCategory.ACCESS_CHANGES,
+      {
+        accessChange: {
+          title: 'Your resource access changed',
+          body: 'You received an introduction for resource "Laser Cutter".',
+          url: '/resources/7',
+        },
+      },
+    );
+  });
+
+  it('writes the notification in German for German recipients', async () => {
+    await service.grant(7, 3);
+    await flushNotifications();
+
+    expect(texts('de')).toEqual({
+      title: 'Dein Ressourcenzugriff hat sich geändert',
+      body: 'Du hast eine Einweisung für die Ressource „Laser Cutter“ erhalten.',
+    });
+    expect(texts('fr').body).toBe('You received an introduction for resource "Laser Cutter".');
+    expect(texts(null).body).toBe('You received an introduction for resource "Laser Cutter".');
+  });
+
+  it('falls back to #<id> when the resource name cannot be looked up, without failing the grant', async () => {
+    store.findResourceName.mockRejectedValue(new Error('database down'));
+
+    await expect(service.grant(7, 3)).resolves.toEqual(expect.objectContaining({ id: 20 }));
+    await flushNotifications();
+
+    expect(texts('en').body).toBe('You received an introduction for resource "#7".');
   });
 
   it('creates the introduction with its tutor on the first grant and changes a different tutor later', async () => {
@@ -160,23 +209,24 @@ describe('ResourceIntroductionsService notifications', () => {
     store.lastHistoryItem.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });
 
     await service.grant(7, 3);
+    await flushNotifications();
 
     expect(notifications.dispatchToUser).not.toHaveBeenCalled();
+    expect(store.findResourceName).not.toHaveBeenCalled();
   });
 
   it('notifies the user when a resource introduction is revoked', async () => {
     store.findOfUser.mockResolvedValue(introduction());
     store.lastHistoryItem.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.GRANT });
     await service.revoke(7, 3);
+    await flushNotifications();
 
     expect(notifications.dispatchToUser).toHaveBeenCalledWith(
       3,
-      expect.objectContaining({
-        category: NotificationCategory.ACCESS_CHANGES,
-        body: 'Your introduction for resource #7 was revoked.',
-        url: '/resources/7',
-      }),
+      expect.objectContaining({ category: NotificationCategory.ACCESS_CHANGES, url: '/resources/7' }),
     );
+    expect(texts('en').body).toBe('Your introduction for resource "Laser Cutter" was revoked.');
+    expect(texts('de').body).toBe('Deine Einweisung für die Ressource „Laser Cutter“ wurde widerrufen.');
   });
 
   it('does not notify when a resource introduction is revoked twice without an effective access change', async () => {
@@ -184,14 +234,18 @@ describe('ResourceIntroductionsService notifications', () => {
     store.lastHistoryItem.mockResolvedValue({ id: 19, action: IntroductionHistoryAction.REVOKE });
 
     await service.revoke(7, 3);
+    await flushNotifications();
 
     expect(notifications.dispatchToUser).not.toHaveBeenCalled();
+    expect(store.findResourceName).not.toHaveBeenCalled();
   });
 
   it('does not notify when revoking a resource introduction that was never granted', async () => {
     await service.revoke(7, 3);
+    await flushNotifications();
 
     expect(notifications.dispatchToUser).not.toHaveBeenCalled();
+    expect(store.findResourceName).not.toHaveBeenCalled();
   });
 
   it('answers validity from the newest history item, inside the caller transaction when one is given', async () => {

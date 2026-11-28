@@ -1,0 +1,5 @@
+{
+  "title": "Your resource access changed",
+  "granted": "You received an introduction for resource \"{resourceName}\".",
+  "revoked": "Your introduction for resource \"{resourceName}\" was revoked."
+}

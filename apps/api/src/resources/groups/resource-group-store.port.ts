@@ -86,4 +86,7 @@ export interface ResourceGroupIntroducerStore {
   insert(groupId: number, userId: number, type: ResourceIntroducerType): Promise<ResourceIntroducerRecord>;
 
   remove(grantId: number): Promise<void>;
+
+  /** The group's name, or null when it does not exist. */
+  findGroupName(groupId: number): Promise<string | null>;
 }

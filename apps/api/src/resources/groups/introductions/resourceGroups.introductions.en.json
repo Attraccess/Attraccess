@@ -1,0 +1,5 @@
+{
+  "title": "Your group access changed",
+  "granted": "You received an introduction for group \"{groupName}\".",
+  "revoked": "Your introduction for group \"{groupName}\" was revoked."
+}

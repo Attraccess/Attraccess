@@ -14,6 +14,7 @@ import { createTestDataSource, closeTestDataSource } from '../../test-utils/test
 describe('persisted resource introducer aggregation', () => {
   let source: DataSource;
   let service: ResourceIntroducersService;
+  let dispatchToUser: jest.Mock;
   // Migrating is the slow part (every migration, on a busy coverage run): do it once per file.
   beforeAll(async () => {
     source = await createTestDataSource();
@@ -35,8 +36,9 @@ describe('persisted resource introducer aggregation', () => {
     ]) {
       await source.query(`DELETE FROM "${metadata.tableName}"`);
     }
+    dispatchToUser = jest.fn().mockResolvedValue(undefined);
     service = new ResourceIntroducersService(new TypeOrmResourceIntroducerStore(source), new EventEmitter2(), {
-      dispatchToUser: jest.fn(),
+      dispatchToUser,
     } as unknown as NotificationDispatchService);
     await source.getRepository(User).insert(
       Array.from({ length: 6 }, (_, index) => ({
@@ -148,5 +150,17 @@ describe('persisted resource introducer aggregation', () => {
     expect((await service.getMany(1, ResourceIntroducerType.INTRODUCER)).map((row) => row.userId).sort()).toEqual([
       1, 3, 4,
     ]);
+  });
+
+  it('names the persisted resource in the access-change notification (#2313)', async () => {
+    await service.grant(2, 99, ResourceIntroducerType.MAINTAINER);
+    // The name is read from the database after the grant returns.
+    for (let attempt = 0; attempt < 500 && dispatchToUser.mock.calls.length === 0; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(dispatchToUser).toHaveBeenCalledTimes(1);
+    const request = dispatchToUser.mock.calls[0][1];
+    expect(request.body({ locale: 'en' })).toBe('You were made a maintainer for resource "Mill".');
   });
 });

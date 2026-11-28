@@ -34,6 +34,7 @@ export function registerResourceIntroducersServiceFixture() {
       listViaGroupsForResources: jest.fn().mockResolvedValue([]),
       insert: jest.fn(),
       remove: jest.fn().mockResolvedValue(undefined),
+      findResourceName: jest.fn().mockResolvedValue('Laser Cutter'),
     };
     eventEmitter = { emit: jest.fn() };
     notifications = { dispatchToUser: jest.fn().mockResolvedValue(undefined), sendEmailTemplate: jest.fn() };
