@@ -233,6 +233,45 @@ describe('reader session through the real gateway', () => {
     expect(again.frames.filter((f) => f.type === FrameType.JSON)).toHaveLength(0);
   });
 
+  // ATT-1426: a reader that restarts (crash, power cut) never closes its connection; the server keeps it open.
+  it('drops the older connection of a reader that signs in again, so its armed enrollment does not keep it busy', async () => {
+    const cards = gateway['cardHandler'] as unknown as {
+      armEnrollmentLocally(payload: Record<string, unknown>): Promise<boolean>;
+    };
+    const enrollment = {
+      readerId: 22,
+      userId: 3,
+      auditPrincipal: { userId: 3, authenticationMethod: 'session' },
+      username: 'bob',
+      displayName: 'Bob',
+    };
+    const arm = async ({ reader, socket }: Awaited<ReturnType<typeof signedIn>>) => {
+      socket.state.cardRelay = true;
+      const armed = cards.armEnrollmentLocally(enrollment);
+      armed.catch(() => undefined);
+      await Promise.race([
+        armed,
+        reader.nextFrame(
+          (f) => f.type === FrameType.JSON && json(f).data?.type === 'ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO',
+        ),
+      ]);
+      const ack = { type: 'ACK_ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO' };
+      reader.send(FrameType.JSON, JSON.stringify({ event: 'EVENT', data: ack }));
+      return armed;
+    };
+    const before = await signedIn(22);
+    await expect(arm(before)).resolves.toBe(true);
+
+    // The reader restarts and signs in again. The old connection stays silent and open on its side.
+    const after = await signedIn(22);
+
+    expect(before.socket.state.enrollment).toBeNull();
+    await expect(arm(after)).resolves.toBe(true);
+    await before.reader.closed;
+    const open = [...app.get(WebsocketService).sockets.values()].filter((socket) => socket.readerId === 22);
+    expect(open).toEqual([after.socket]);
+  });
+
   it('ends a card conversation and the verified user as soon as the credential changes', async () => {
     const { reader, socket } = await signedIn(20);
     socket.state.verifiedUserId = 3;

@@ -190,7 +190,8 @@ describe('AttractapCardHandler', () => {
 
     it('refuses to arm a reset while another connection of the reader is busy', async () => {
       const idle = scope.createMockSocket();
-      const busy = scope.createMockSocket({ id: 'socket-2', state: { cardRelay: true, enrollment: { userId: 3 } } });
+      const enrollment = { userId: 3, armedAt: Date.now() };
+      const busy = scope.createMockSocket({ id: 'socket-2', state: { cardRelay: true, enrollment } });
       scope.websocketService.sockets.set(idle.id, idle);
       scope.websocketService.sockets.set(busy.id, busy);
 
