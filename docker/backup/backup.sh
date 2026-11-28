@@ -14,7 +14,8 @@ flock -n 9 || fail "another backup or restore is already running"
 started=$(date +%s)
 log "backup started"
 remove_dump() { rm -f "$DUMP_FILE" "$DUMP_FILE.partial"; }
-trap 'remove_dump; record_run 0; log "BACKUP FAILED (see the messages above)" >&2' EXIT
+# set +e: every step runs, also when one fails (no stderr, disk full); the exit code stays the failed run's.
+trap 'set +e; log "BACKUP FAILED (see the messages above)" >&2; remove_dump; record_run 0' EXIT
 exit_on_signals
 
 configure_restic || fail "BACKUP_REPOSITORY is not set"
@@ -43,6 +44,9 @@ case "$backed_up" in
   *) fail "restic backup failed with exit code $backed_up" ;;
 esac
 remove_dump
+# The snapshot is saved: it is the last successful backup, also if the retention step below fails (that run still
+# counts as failed, so BackupFailed fires, but BackupTooOld does not while snapshots keep arriving).
+set_state last_success "$(date +%s)"
 
 log "applying the retention policy"
 restic forget --prune --host "$RESTIC_HOST" --tag attraccess \

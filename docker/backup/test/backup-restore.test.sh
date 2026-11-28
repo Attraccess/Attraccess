@@ -58,6 +58,8 @@ echo "plugin-bytes" >"$work/data/storage/plugin.txt"
 export BACKUP_REPOSITORY="$work/repo" BACKUP_PASSWORD="test-password"
 export BACKUP_DATA_DIR="$work/data" BACKUP_STATE_DIR="$work/state" BACKUP_STATUS_DIR="$work/status"
 export BACKUP_KEEP_DAILY=2 BACKUP_PG_WAIT_SECONDS=10
+# The schedulers this test starts must not start a backup of their own (31 February never comes).
+export BACKUP_SCHEDULE='0 0 31 2 *'
 export DATABASE_URL
 DATABASE_URL="$(url_for "$db_src")"
 
@@ -131,12 +133,15 @@ expect_refused() {
   name="$1"
   shift
   mkdir -p "$work/status" && echo enabled >"$work/status/status"
+  # No metrics left over from the case before: this start must write backup_configured 0 itself.
+  rm -f "$work/status/backup.prom"
   rc=0
   out="$("$@" timeout 20 "$lib/entrypoint.sh" run 2>&1)" || rc=$?
   [ "$rc" -eq 1 ] || die "$name: run must exit with an error, got exit code $rc: $out"
   printf '%s\n' "$out" | grep -q 'backups are NOT set up' || die "$name: missing the not-set-up message, got: $out"
   [ ! -e "$work/status/status" ] || die "$name: a refused start must remove the status"
   grep -q '^backup_configured 0$' "$work/status/backup.prom" || die "$name: a refused start must report backup_configured 0"
+  if printf '%s\n' "$out" | grep -q 'url-secret'; then die "$name: a refused database URL must not be logged"; fi
 }
 expect_refused "no repository" env -u BACKUP_REPOSITORY
 expect_refused "no password" env -u BACKUP_PASSWORD
@@ -155,7 +160,6 @@ expect_refused "bad database override" env BACKUP_DATABASE_URL="postgres:/user:u
 grep -q 'BACKUP_DATABASE_URL must be a postgres' <<OUT || die "the refused override must be named, got: $out"
 $out
 OUT
-if printf '%s\n' "$out" | grep -q 'url-secret'; then die "a refused database URL must not be logged"; fi
 for bad in soon 0 00 -5 1.5; do
   expect_refused "connect timeout $bad" env BACKUP_CONNECT_TIMEOUT_SECONDS="$bad"
   printf '%s\n' "$out" | grep -q 'BACKUP_CONNECT_TIMEOUT_SECONDS must be' || die "connect timeout '$bad' must be named, got: $out"
@@ -172,6 +176,7 @@ unreachable_pid=$!
 for _ in $(seq 1 20); do [ -s "$work/status/status" ] && break; sleep 0.5; done
 [ "$(cat "$work/status/status" 2>/dev/null)" = "enabled" ] || { cat "$work/unreachable.log"; die "the start must not depend on the repository"; }
 if grep -q 'checking the restic repository' "$work/unreachable.log"; then die "the start must not open the repository"; fi
+if grep -q '127.0.0.1:1/none' "$work/argv.log"; then die "the start must not contact the database"; fi
 kill -TERM "$unreachable_pid"; wait "$unreachable_pid" || true
 pass "the start checks only the settings, not the repository or the database"
 
@@ -200,6 +205,9 @@ enabled_pid=$!
 for _ in $(seq 1 40); do [ -s "$work/status/status" ] && break; sleep 0.5; done
 [ "$(cat "$work/status/status" 2>/dev/null)" = "enabled" ] || { cat "$work/enabled.log"; die "a working configuration must report enabled"; }
 grep -q 'backups enabled' "$work/enabled.log" || die "missing the enabled line"
+# cron reads the settings from /etc/backup.env: private, and without PGPASSWORD (only a run derives it from the URL).
+[ "$(stat -c %a /etc/backup.env)" = 600 ] || die "/etc/backup.env must be readable by root only"
+if grep -q PGPASSWORD /etc/backup.env; then die "the start must not put PGPASSWORD into /etc/backup.env"; fi
 grep -q '^backup_configured 1$' "$work/status/backup.prom" || die "a working configuration must report backup_configured 1"
 grep -q '^backup_max_age_seconds 108000$' "$work/status/backup.prom" || die "the default max age must be 30 hours"
 grep -q '^backup_scheduler_start_timestamp_seconds [0-9]' "$work/status/backup.prom" || die "missing the scheduler start"
@@ -224,7 +232,8 @@ for case in 08:28800 010:36000 0009:32400; do
 done
 pass "leading zeros in BACKUP_MAX_AGE_HOURS are read as decimal"
 
-# 9. A wrong password fails loudly and reports failure.
+# 9. A wrong password fails loudly and reports failure. (No metrics left over: the run must write the 0 itself.)
+rm -f "$work/status/backup.prom"
 if BACKUP_PASSWORD=wrong sh "$lib/backup.sh" >"$work/wrong.log" 2>&1; then die "wrong password must fail"; fi
 grep -q 'BACKUP FAILED' "$work/wrong.log" || die "missing failure line"
 grep -q 'wrong BACKUP_PASSWORD' "$work/wrong.log" || die "a wrong password must be named as the cause"
@@ -236,6 +245,7 @@ pass "a failing backup logs BACKUP FAILED, names the wrong password and removes 
 
 # 9b. An unreachable target (internet down) fails after BACKUP_CONNECT_TIMEOUT_SECONDS, not after restic's ~15
 #     minutes of retries, and counts as a failed run.
+rm -f "$work/status/backup.prom"
 started_at=$(date +%s)
 if BACKUP_REPOSITORY="rest:http://127.0.0.1:1/" BACKUP_CONNECT_TIMEOUT_SECONDS=3 timeout 60 sh "$lib/backup.sh" >"$work/unreachable-run.log" 2>&1; then
   die "a backup to an unreachable target must fail"
@@ -297,15 +307,17 @@ pass "a run that fails on its settings is recorded as a failed run"
 #     sh does not run the EXIT trap on a signal by itself. (INT cannot be sent here: background jobs ignore it.)
 for signal in TERM HUP; do
   sh "$lib/backup.sh" >/dev/null 2>&1 || die "interrupted ($signal): the backup before it failed"
-  BACKUP_REPOSITORY="rest:http://127.0.0.1:1/" BACKUP_CONNECT_TIMEOUT_SECONDS=5 sh "$lib/backup.sh" >"$work/signal.log" 2>&1 &
+  # One log per signal: the child truncates its log only after the fork, so a shared one could still show the last pass.
+  signal_log="$work/signal-$signal.log"
+  BACKUP_REPOSITORY="rest:http://127.0.0.1:1/" BACKUP_CONNECT_TIMEOUT_SECONDS=5 sh "$lib/backup.sh" >"$signal_log" 2>&1 &
   run_pid=$!
-  for _ in $(seq 1 40); do grep -q 'checking the restic repository' "$work/signal.log" && break; sleep 0.5; done
+  for _ in $(seq 1 40); do grep -q 'checking the restic repository' "$signal_log" 2>/dev/null && break; sleep 0.5; done
   [ -s "$work/state/dump/attraccess.dump" ] || die "interrupted ($signal): the run did not reach the point with a dump"
   kill -"$signal" "$run_pid"
   rc=0
   wait "$run_pid" || rc=$?
   [ "$rc" -ne 0 ] || die "interrupted ($signal): the run must exit with an error"
-  grep -q 'the run was interrupted' "$work/signal.log" || { cat "$work/signal.log"; die "interrupted ($signal): missing the message"; }
+  grep -q 'the run was interrupted' "$signal_log" || { cat "$signal_log"; die "interrupted ($signal): missing the message"; }
   grep -q '^backup_last_run_success 0$' "$work/status/backup.prom" || die "interrupted ($signal): the run must be recorded as failed"
   [ ! -e "$work/state/dump/attraccess.dump" ] || die "interrupted ($signal): the plaintext dump was left behind"
 done
@@ -327,6 +339,24 @@ wait "$restore_pid" || rc=$?
 [ ! -e "$work/state/restore" ] || die "an interrupted restore left the plaintext dump behind"
 pass "an interrupted restore removes its copy of the dump"
 
+# 9h. A run whose snapshot was saved but whose retention step failed counts as failed (BackupFailed), but the snapshot
+#     is the last successful backup (no BackupTooOld while snapshots keep arriving).
+mkdir -p "$work/bin5"
+# shellcheck disable=SC2016 # the $ belong to the generated script
+printf '#!/bin/sh\n[ "$1" = forget ] && { echo "forget refused" >&2; exit 1; }\nexec "%s" "$@"\n' "$real_restic" >"$work/bin5/restic"
+chmod 0755 "$work/bin5/restic"
+echo 1000 >"$work/state/last_success"
+if PATH="$work/bin5:$PATH" sh "$lib/backup.sh" >"$work/prune.log" 2>&1; then die "a failed retention step must fail the run"; fi
+grep -q 'BACKUP FAILED' "$work/prune.log" || { cat "$work/prune.log"; die "a failed retention step: missing the failure line"; }
+grep -q '^backup_last_run_success 0$' "$work/status/backup.prom" || die "a failed retention step must be recorded as a failed run"
+[ "$(cat "$work/state/last_success")" -gt 1000 ] || die "the saved snapshot must count as the last successful backup"
+pass "a failed retention step fails the run but keeps the saved snapshot as the last success"
+
+# 9i. A manual run checks BACKUP_CONNECT_TIMEOUT_SECONDS too (the start check does not cover docker exec).
+if BACKUP_CONNECT_TIMEOUT_SECONDS=soon sh "$lib/backup.sh" >"$work/timeout-run.log" 2>&1; then die "an invalid timeout must fail the run"; fi
+grep -q 'BACKUP_CONNECT_TIMEOUT_SECONDS must be' "$work/timeout-run.log" || { cat "$work/timeout-run.log"; die "an invalid timeout must be named"; }
+pass "a run names an invalid BACKUP_CONNECT_TIMEOUT_SECONDS"
+
 # 10. An invalid BACKUP_SCHEDULE refuses the start (crond would skip such a line silently).
 for bad in 'bad' '* * * *' '61 25 * * *' '0 24 * * *' '0 3 32 * *' '0 3 * 13 *' '0 3 * * 8'; do
   out="$(BACKUP_SCHEDULE="$bad" timeout 3 "$lib/entrypoint.sh" run 2>&1 || true)"
@@ -334,6 +364,6 @@ for bad in 'bad' '* * * *' '61 25 * * *' '0 24 * * *' '0 3 32 * *' '0 3 * 13 *' 
 done
 for good in '0 3 * * *' '*/5 * * * *' '0,30 6-18 * * 1-5' '15 2 1 jan mon'; do
   out="$(BACKUP_SCHEDULE="$good" timeout 5 "$lib/entrypoint.sh" run 2>&1 || true)"
-  if printf '%s\n' "$out" | grep -q 'BACKUP_SCHEDULE must be'; then die "schedule '$good' must be accepted, got: $out"; fi
+  printf '%s\n' "$out" | grep -qF "backups enabled: schedule '$good'" || die "schedule '$good' must be accepted, got: $out"
 done
 pass "an invalid BACKUP_SCHEDULE is rejected, valid ones are accepted"

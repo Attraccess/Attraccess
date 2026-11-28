@@ -55,16 +55,25 @@ configure_restic() {
 # BACKUP_CONNECT_TIMEOUT_SECONDS (default 120): restic itself retries an unreachable target for about 15 minutes, which
 # would delay the failure (and its alert) for that long. Call configure_restic first.
 open_repository() {
+  # The start checks it too; a manual run (docker exec) of a container that never started does not.
+  connect_timeout_valid ||
+    fail "BACKUP_CONNECT_TIMEOUT_SECONDS must be a whole number of seconds above 0, got: ${BACKUP_CONNECT_TIMEOUT_SECONDS:-}"
   probe=0
   limit="${BACKUP_CONNECT_TIMEOUT_SECONDS:-120}"
   probe_started=$(date +%s)
   # 9>&-: busybox timeout leaves a watcher process behind, which must not inherit the run lock (fd 9 in backup.sh).
   timeout "$limit" restic cat config >/dev/null 2>"$STATE_DIR/restic-probe.err" 9>&- || probe=$?
-  # restic handles the SIGTERM of timeout itself and exits with 1, so a timeout shows only in the elapsed time.
-  if [ "$probe" -ne 0 ] && [ $(($(date +%s) - probe_started)) -ge "$limit" ]; then
-    tail -n 3 "$STATE_DIR/restic-probe.err" >&2
-    fail "cannot reach the restic repository within ${limit}s (network down, wrong address?)"
-  fi
+  # restic handles the SIGTERM of timeout itself and exits with 1, so a timeout shows only in the elapsed time. The
+  # answers "no repository yet" (10) and "wrong password" (12) are real answers, also when they came late.
+  case "$probe" in
+    0 | 10 | 12) ;;
+    *)
+      if [ $(($(date +%s) - probe_started)) -ge "$limit" ]; then
+        tail -n 3 "$STATE_DIR/restic-probe.err" >&2
+        fail "cannot reach the restic repository within ${limit}s (network down, wrong address?)"
+      fi
+      ;;
+  esac
   case "$probe" in
     0) ;;
     10)

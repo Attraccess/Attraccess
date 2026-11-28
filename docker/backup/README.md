@@ -20,8 +20,12 @@ services in order.
 Problems with the target show up in the runs. The first run initialises the repository (`restic init`, also creates a
 missing bucket). A run fails when the repository cannot be opened (wrong password, address or credentials) or does not
 answer within `BACKUP_CONNECT_TIMEOUT_SECONDS`. Every run that fails, also one that fails on its settings, sets
-`backup_last_run_success` to 0; a run skipped because another backup or restore is running records nothing. Files that vanish while they are read (restic exit code 3, e.g. journals
-of running services) are skipped with a warning; the run still succeeds.
+`backup_last_run_success` to 0; a run skipped because another backup or restore is running records nothing. A run
+whose snapshot was saved but whose retention step (`restic forget --prune`) failed also counts as failed, but its
+snapshot moves `backup_last_success_timestamp_seconds`, so only `BackupFailed` fires, not `BackupTooOld`. Files
+restic cannot read (restic exit code 3) are skipped with a warning naming them, and the run still succeeds: usually
+journals of running services that vanish while they are read, but also files that are never readable (permissions, a
+failing disk). No metric or alert shows skipped files, so look for that warning in the log now and then.
 
 ## Metrics and alerts
 
@@ -37,7 +41,7 @@ live in `BACKUP_STATE_DIR`, so they survive restarts.
 | `backup_scheduler_start_timestamp_seconds` | start of the scheduler (the reference for `BackupTooOld` before any success) |
 | `backup_last_run_timestamp_seconds`        | end of the last run                                                          |
 | `backup_last_run_success`                  | 1 the last run succeeded, 0 it failed (absent while disabled)                |
-| `backup_last_success_timestamp_seconds`    | end of the last successful run                                               |
+| `backup_last_success_timestamp_seconds`    | the last saved snapshot (also of a run whose retention step then failed)     |
 
 The Grafana rules `BackupNotConfigured`, `BackupFailed`, `BackupTooOld` and `BackupsDisabled`
 (`monitoring/grafana/provisioning/alerting/rules.yaml`) read them; `apps/api/src/metrics/alerting/backup-alerts.alerting.spec.ts`
