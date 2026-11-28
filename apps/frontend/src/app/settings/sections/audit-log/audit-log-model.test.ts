@@ -220,6 +220,7 @@ describe('project switch audit entry', () => {
     ['de', de],
   ])('names the action and its details in %s', (_language, translations) => {
     expect(translations.events).toHaveProperty(['usage_session.project_switched']);
+    expect(translations.events).toHaveProperty(['usage_session.project_reassigned']);
     expect(translations.fields).toHaveProperty('newUsageId');
     expect(translations.fields).toHaveProperty('previousProjectId');
   });

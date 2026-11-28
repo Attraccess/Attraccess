@@ -35,6 +35,7 @@ const flags = (start: boolean, takeover: boolean, end: boolean) => ({
   isRequiredOnResourceUsageTakeOver: takeover,
   isRequiredOnResourceUsageEnd: end,
   isRequiredOnResourceUsageProjectSwitch: false,
+  isRequiredOnResourceUsageProjectReassign: false,
 });
 const applicable = (id: number, name: string, source: string, extra: Record<string, unknown> = {}) => ({
   form: { id, name, scope: source, fields: [], ...flags(false, false, true) },
@@ -58,6 +59,7 @@ beforeEach(() => {
         ...flags(false, false, false),
         isRequiredOnResourceUsageTakeOver: null,
         isRequiredOnResourceUsageProjectSwitch: null,
+        isRequiredOnResourceUsageProjectReassign: null,
       },
     }),
     applicable(3, 'Own checklist', 'resource', {
@@ -67,6 +69,7 @@ beforeEach(() => {
         isRequiredOnResourceUsageTakeOver: null,
         isRequiredOnResourceUsageEnd: null,
         isRequiredOnResourceUsageProjectSwitch: null,
+        isRequiredOnResourceUsageProjectReassign: null,
       },
       effective: flags(true, false, true),
     }),
@@ -106,6 +109,7 @@ it('switches an inherited form off and on, keeping other overrides', async () =>
       isRequiredOnResourceUsageTakeOver: null,
       isRequiredOnResourceUsageEnd: null,
       isRequiredOnResourceUsageProjectSwitch: null,
+      isRequiredOnResourceUsageProjectReassign: null,
     },
   });
   // Switching the disabled one back on keeps its flag overrides.
@@ -118,6 +122,7 @@ it('switches an inherited form off and on, keeping other overrides', async () =>
       isRequiredOnResourceUsageTakeOver: null,
       isRequiredOnResourceUsageEnd: false,
       isRequiredOnResourceUsageProjectSwitch: null,
+      isRequiredOnResourceUsageProjectReassign: null,
     },
   });
 });
@@ -134,6 +139,7 @@ it('overrides a flag, and removes an override that only inherits', async () => {
       isRequiredOnResourceUsageTakeOver: true,
       isRequiredOnResourceUsageEnd: null,
       isRequiredOnResourceUsageProjectSwitch: null,
+      isRequiredOnResourceUsageProjectReassign: null,
     },
   });
 
@@ -167,6 +173,7 @@ it('stores "Not required" as false, and keeps an override that still changes ano
       isRequiredOnResourceUsageTakeOver: null,
       isRequiredOnResourceUsageEnd: false,
       isRequiredOnResourceUsageProjectSwitch: null,
+      isRequiredOnResourceUsageProjectReassign: null,
     },
   });
 
@@ -179,6 +186,7 @@ it('stores "Not required" as false, and keeps an override that still changes ano
         ...flags(true, false, false),
         isRequiredOnResourceUsageTakeOver: null,
         isRequiredOnResourceUsageProjectSwitch: null,
+        isRequiredOnResourceUsageProjectReassign: null,
       },
     }),
   ];
@@ -195,6 +203,7 @@ it('stores "Not required" as false, and keeps an override that still changes ano
       isRequiredOnResourceUsageTakeOver: null,
       isRequiredOnResourceUsageEnd: null,
       isRequiredOnResourceUsageProjectSwitch: null,
+      isRequiredOnResourceUsageProjectReassign: null,
     },
   });
 });

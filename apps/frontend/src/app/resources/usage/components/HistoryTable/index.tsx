@@ -18,7 +18,7 @@ import { attributedOperatingDurationForUsage, useOperatingDuration } from '../..
 import { ProjectsSelect } from '../../../../../components/projectsSelect/index';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLiveUpdates } from '../../../../../utils/live-updates';
-import { PROJECT_SWITCHED_EVENT } from '../../sessionEvents';
+import { PROJECT_CHANGE_EVENTS } from '../../sessionEvents';
 import { invalidateSwitchedRecords } from '../../invalidateSwitchedSession';
 
 export interface HistoryTableProps {
@@ -93,7 +93,7 @@ export const HistoryTable = ({
     topic: 'resource',
     resourceId,
     onUpdate: (data: { eventType?: string }) => {
-      if (data.eventType === PROJECT_SWITCHED_EVENT) void invalidateSwitchedRecords(queryClient, resourceId);
+      if (PROJECT_CHANGE_EVENTS.has(data.eventType ?? '')) void invalidateSwitchedRecords(queryClient, resourceId);
     },
   });
 

@@ -10,6 +10,7 @@ const cases: Array<[ResourceFlowNodeType, Domain]> = [
   [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED, 'usage-sessions'],
   [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER, 'usage-sessions'],
   [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_SWITCHED, 'usage-sessions'],
+  [ResourceFlowNodeType.INPUT_RESOURCE_USAGE_PROJECT_REASSIGNED, 'usage-sessions'],
   [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION, 'usage-sessions'],
   [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING, 'operation-activity'],
   [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE, 'operation-activity'],

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { ApiError, useResourceUsageSwitchSessionProject } from '@attraccess/react-query-client';
+import { ApiError, ProjectChangeMode, useResourceUsageSwitchSessionProject } from '@attraccess/react-query-client';
 import { recordUsefulAction } from '../../../../../components/DonationPrompt/usefulAction';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import { useRefreshNetworkRestrictionOnError } from '../../../../../hooks/useRefreshNetworkRestrictionOnError';
@@ -12,7 +12,7 @@ import { switchErrorFallbackKey } from './switchErrorFallbackKey';
 import en from './switchProject/en.json';
 import de from './switchProject/de.json';
 
-/** The project switch of a running session: the request, what it refreshes and how it reports. */
+/** The project change of a running session: the request, what it refreshes and how it reports. */
 export function useSwitchSessionProject(resourceId: number, onSwitched: () => void) {
   // The switch's own wording of a refusal wins over the general one: it has to say what became of the project.
   const { t, tExists } = useTranslations({
@@ -35,14 +35,15 @@ export function useSwitchSessionProject(resourceId: number, onSwitched: () => vo
   const reportError = useCallback((error: unknown) => showError(error, 'PROJECT_SWITCH_FAILED'), [showError]);
 
   const mutation = useResourceUsageSwitchSessionProject(undefined, {
-    onSuccess: async (continuation) => {
+    onSuccess: async (running, { body }) => {
       recordUsefulAction();
       onSwitched();
+      const outcome = body?.mode === ProjectChangeMode.WHOLE_SESSION ? 'success.whole' : 'success.split';
       toast.success({
         title: t('success.title'),
-        description: continuation.project
-          ? t('success.project', { name: continuation.project.name })
-          : t('success.noProject'),
+        description: running.project
+          ? t(`${outcome}.project`, { name: running.project.name })
+          : t(`${outcome}.noProject`),
       });
       await invalidateSwitchedSession(queryClient, resourceId);
     },

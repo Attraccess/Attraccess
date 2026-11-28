@@ -4,7 +4,8 @@
       "start": "Formulare vor dem Start ausfüllen",
       "takeover": "Formulare vor der Übernahme ausfüllen",
       "end": "Formulare vor dem Beenden ausfüllen",
-      "projectSwitch": "Formulare vor dem Projektwechsel ausfüllen"
+      "projectSwitch": "Formulare vor dem Aufteilen der Sitzung ausfüllen",
+      "projectReassign": "Formulare vor der Projektänderung ausfüllen"
     },
     "description": "Bitte fülle die erforderlichen Felder aus, um fortzufahren.",
     "submit": "Formulare senden",

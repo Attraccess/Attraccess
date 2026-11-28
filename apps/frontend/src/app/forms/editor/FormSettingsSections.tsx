@@ -66,6 +66,15 @@ export function FormSettingsSections({ form, setForm }: Readonly<FormSettingsSec
               {t('editor.resourceUsageProjectSwitch')}
             </LabeledSwitch>
           </div>
+          <div className="px-4 py-3">
+            <LabeledSwitch
+              isSelected={form.isRequiredOnResourceUsageProjectReassign}
+              onChange={(value) => setForm((prev) => ({ ...prev, isRequiredOnResourceUsageProjectReassign: value }))}
+              data-cy="form-editor-required-project-reassign"
+            >
+              {t('editor.resourceUsageProjectReassign')}
+            </LabeledSwitch>
+          </div>
         </div>
       </section>
     </>

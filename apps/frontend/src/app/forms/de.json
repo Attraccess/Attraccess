@@ -14,7 +14,8 @@
     "resourceUsageStart": "Standardmäßig erforderlich bei Sitzungsstart",
     "resourceUsageTakeover": "Standardmäßig erforderlich bei Übernahme",
     "resourceUsageEnd": "Standardmäßig erforderlich bei Sitzungsende",
-    "resourceUsageProjectSwitch": "Standardmäßig erforderlich bei Projektwechsel",
+    "resourceUsageProjectSwitch": "Standardmäßig erforderlich bei Projektwechsel (Aufteilung)",
+    "resourceUsageProjectReassign": "Standardmäßig erforderlich bei Projektänderung (ganze Sitzung)",
     "addField": "Feld hinzufügen",
     "reorderField": "Feld verschieben",
     "emptyFieldsTitle": "Keine Felder",
@@ -148,7 +149,8 @@
       "start": "Beim Start",
       "takeover": "Bei Übernahme",
       "end": "Beim Beenden",
-      "projectSwitch": "Bei Projektwechsel"
+      "projectSwitch": "Bei Projektwechsel (Aufteilung)",
+      "projectReassign": "Bei Projektänderung (ganze Sitzung)"
     },
     "switchedOff": "{{count}} ausgeschaltet"
   },
@@ -169,7 +171,8 @@
       "start": "Start",
       "takeover": "Übernahme",
       "end": "Ende",
-      "project-switch": "Projektwechsel"
+      "project-switch": "Projektwechsel (Aufteilung)",
+      "project-reassign": "Projektänderung (ganze Sitzung)"
     },
     "showAnswers": "Antworten anzeigen",
     "hideAnswers": "Antworten ausblenden",
@@ -190,7 +193,8 @@
       "start": "Start",
       "takeover": "Übernahme",
       "end": "Ende",
-      "projectSwitch": "Projektwechsel"
+      "projectSwitch": "Projektwechsel (Aufteilung)",
+      "projectReassign": "Projektänderung (ganze Sitzung)"
     },
     "toggle": "{{name}} für diese Ressource verwenden",
     "override": {

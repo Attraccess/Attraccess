@@ -30,17 +30,17 @@
       }
     },
     "projectSwitchCharging": {
-      "label": "Charging on project switch",
-      "description": "How a running session is charged when its owner changes its project. Each part is billed separately and counted for its own project.",
+      "label": "Charging when a session is split between projects",
+      "description": "How a running session is charged when its owner splits it between projects. Each part is billed separately and counted for its own project. Moving a whole session to another project charges nothing.",
       "options": {
         "continue": "Continue the session",
         "continue-per-part-rounding": "Continue, round each part",
         "new-session": "Treat as a new session"
       },
       "descriptions": {
-        "continue": "No new fee per usage. Minutes are rounded across all parts, so together they cost no more than one session without a switch.",
-        "continue-per-part-rounding": "No new fee per usage. Every part rounds up its own minutes, so each switch can add one minute.",
-        "new-session": "Every part is billed like a new session: fee per usage, its own rounding and a balance check before the switch."
+        "continue": "No new fee per usage. Minutes are rounded across all parts, so together they cost no more than one session that was not split.",
+        "continue-per-part-rounding": "No new fee per usage. Every part rounds up its own minutes, so each split can add one minute.",
+        "new-session": "Every part is billed like a new session: fee per usage, its own rounding and a balance check before the split."
       }
     }
   },

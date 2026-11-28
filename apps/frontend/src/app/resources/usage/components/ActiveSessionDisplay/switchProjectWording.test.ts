@@ -11,9 +11,13 @@ describe.each([
   ['en', en, summaryEn, historyEn],
   ['de', de, summaryDe, historyDe],
 ])('the wording of a project change (%s)', (_language, texts, summary, history) => {
-  it('names the action the same on the session, in the dialog title and on its confirm button', () => {
+  it('names the action the same on the session and in the dialog title', () => {
     expect(texts.dialog.title).toBe(texts.change);
-    expect(texts.dialog.confirm).toBe(texts.change);
+  });
+
+  it('offers both ways of changing the project, each with its own confirm button', () => {
+    expect(Object.keys(texts.mode.options)).toEqual(['whole-session', 'split']);
+    expect(Object.keys(texts.dialog.confirm)).toEqual(['whole-session', 'split']);
   });
 
   it('names the result the same in the notice and in the charge popup', () => {

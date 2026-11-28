@@ -49,10 +49,11 @@ export interface EditableForm {
   isRequiredOnResourceUsageTakeOver: boolean;
   isRequiredOnResourceUsageEnd: boolean;
   isRequiredOnResourceUsageProjectSwitch: boolean;
+  isRequiredOnResourceUsageProjectReassign: boolean;
   fields: EditableFormField[];
 }
 
-export type ResourceFormAction = 'start' | 'takeover' | 'end' | 'project-switch';
+export type ResourceFormAction = 'start' | 'takeover' | 'end' | 'project-switch' | 'project-reassign';
 
 export const defaultFieldOptions: Record<FormFieldType, FieldOptions> = {
   [FormFieldType.TEXT]: {

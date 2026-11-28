@@ -132,6 +132,7 @@ export function ResourceFormsTab() {
                 <TableColumn className="px-2">{t('resourceTab.columns.takeover')}</TableColumn>
                 <TableColumn className="px-2">{t('resourceTab.columns.end')}</TableColumn>
                 <TableColumn className="px-2">{t('resourceTab.columns.projectSwitch')}</TableColumn>
+                <TableColumn className="px-2">{t('resourceTab.columns.projectReassign')}</TableColumn>
                 <TableColumn>
                   <TableActionsColumnHeader />
                 </TableColumn>

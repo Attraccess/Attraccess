@@ -4,11 +4,14 @@
   "change": "Projekt wechseln",
   "dialog": {
     "title": "Projekt wechseln",
-    "description": "Die Maschine läuft weiter. Die Nutzung bis jetzt wird dem aktuellen Projekt zugeordnet, alles danach dem neuen.",
+    "description": "Die Maschine läuft weiter. Wähle das neue Projekt und worauf sich der Wechsel bezieht.",
     "select": "Neues Projekt",
     "placeholder": "Projekt wählen",
     "cancel": "Abbrechen",
-    "confirm": "Projekt wechseln",
+    "confirm": {
+      "whole-session": "Ganze Sitzung wechseln",
+      "split": "Sitzung aufteilen"
+    },
     "replaced": {
       "title": "Diese Sitzung hat sich geändert",
       "description": "Sie wurde beendet oder ihr Projekt wurde anderswo gewechselt, während dieser Dialog offen war. Schließe den Dialog und prüfe deine Sitzung."
@@ -16,8 +19,14 @@
   },
   "success": {
     "title": "Projekt gewechselt",
-    "project": "Die Nutzung wird jetzt {{name}} zugeordnet.",
-    "noProject": "Die Nutzung wird keinem Projekt mehr zugeordnet."
+    "whole": {
+      "project": "Die Sitzung wird jetzt {{name}} zugeordnet.",
+      "noProject": "Die Sitzung wird keinem Projekt mehr zugeordnet."
+    },
+    "split": {
+      "project": "Die Nutzung wird jetzt {{name}} zugeordnet.",
+      "noProject": "Die Nutzung wird keinem Projekt mehr zugeordnet."
+    }
   },
   "projects": {
     "loading": "Projekte werden geladen…",
@@ -53,7 +62,7 @@
       "title": "Projekt nicht gewechselt",
       "description": "Das Projekt wurde nicht gewechselt: Die Sitzung gehört bereits zu diesem Projekt."
     },
-    "Only the owner of a running session can switch its project": {
+    "Only the owner of a running session can change its project": {
       "title": "Projekt nicht gewechselt",
       "description": "Das Projekt wurde nicht gewechselt. Nur die Person, der die Sitzung gehört, kann ihr Projekt wechseln."
     },
@@ -85,5 +94,19 @@
       "title": "Projekt nicht gewechselt",
       "description": "Das Projekt wurde nicht gewechselt, weil sich die Sitzung inzwischen geändert hat. Prüfe deine Sitzung und versuche es erneut."
     }
+  },
+  "mode": {
+    "label": "Gilt für",
+    "options": {
+      "whole-session": "Ganze Sitzung",
+      "split": "Ab jetzt aufteilen"
+    },
+    "descriptions": {
+      "whole": "Alles, was in dieser Sitzung bisher genutzt wurde, und alles ab jetzt wird dem neuen Projekt zugeordnet.",
+      "wholeSinceChange": "Alles seit dem letzten Projektwechsel um {{time}} und alles ab jetzt wird dem neuen Projekt zugeordnet. Frühere Abschnitte behalten ihre Projekte.",
+      "split": "Die bisherige Nutzung bleibt bei {{project}} und wird jetzt abgerechnet; die Sitzung läuft unter dem neuen Projekt weiter.",
+      "splitUnassigned": "Die bisherige Nutzung bleibt ohne Projekt und wird jetzt abgerechnet; die Sitzung läuft unter dem neuen Projekt weiter."
+    },
+    "newSessionFee": "An dieser Maschine wird der neue Abschnitt wie eine neue Sitzung abgerechnet, einschließlich einer Gebühr pro Nutzung."
   }
 }

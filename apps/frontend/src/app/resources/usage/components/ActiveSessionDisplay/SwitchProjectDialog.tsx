@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { Button, StandardModal, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { FormSubmissionRequestDto, ResourceUsage } from '@attraccess/react-query-client';
+import { FormSubmissionRequestDto, ProjectChangeMode, ResourceUsage } from '@attraccess/react-query-client';
 import { ProjectsSelect } from '../../../../../components/projectsSelect';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
 import { useSwitchSessionProject } from './useSwitchSessionProject';
 import { useSessionEndedNotice } from './useSessionEndedNotice';
 import { ProjectListStatus } from './ProjectListStatus';
+import { ProjectChangeModeField } from './ProjectChangeModeField';
 import en from './switchProject/en.json';
 import de from './switchProject/de.json';
 
@@ -16,7 +17,16 @@ interface SwitchProjectDialogProps {
   onClose: () => void;
 }
 
-/** Picks the project the running session continues under; "No project" is a choice of its own. */
+/** The forms each way of changing the project asks for. */
+const FORM_ACTION = {
+  [ProjectChangeMode.WHOLE_SESSION]: 'project-reassign',
+  [ProjectChangeMode.SPLIT]: 'project-switch',
+} as const;
+
+/**
+ * Picks the new project of the running session ("No project" is a choice of its own) and whether the whole session
+ * moves there or is split at this moment.
+ */
 export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<SwitchProjectDialogProps>) {
   const { t } = useTranslations({ en, de });
   // The session the dialog was opened for; `usage` follows whichever record runs now.
@@ -24,6 +34,7 @@ export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<Swi
   const currentProjectId = openedFor.project?.id ?? null;
   // Undefined until something is picked.
   const [selected, setSelected] = useState<number | null | undefined>(undefined);
+  const [mode, setMode] = useState<ProjectChangeMode>(ProjectChangeMode.WHOLE_SESSION);
   const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(resourceId);
   const [isCollectingForms, setIsCollectingForms] = useState(false);
   const switchProject = useSwitchSessionProject(resourceId, () => {
@@ -34,7 +45,7 @@ export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<Swi
   // A switch cannot be taken back, so the dialog stays until its outcome is known.
   const isBusy = switchProject.isPending || isCollectingForms;
   // Not while busy: the live update of this dialog's own switch can arrive before its answer.
-  const isReplaced = !isBusy && usage.id !== openedFor.id;
+  const isReplaced = !isBusy && (usage.id !== openedFor.id || (usage.project?.id ?? null) !== currentProjectId);
 
   // The current project is not offered; nothing else is a switch either.
   const unchanged = selected === undefined || selected === currentProjectId;
@@ -44,7 +55,7 @@ export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<Swi
     setIsCollectingForms(true);
     let formSubmissions: FormSubmissionRequestDto[];
     try {
-      formSubmissions = await requestForms('project-switch');
+      formSubmissions = await requestForms(FORM_ACTION[mode]);
     } catch (error) {
       if ((error as Error).message === 'user_cancelled_forms') return;
       switchProject.reportError(error);
@@ -54,8 +65,8 @@ export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<Swi
     }
     switchProject.mutate({
       path: { resourceId },
-      // Naming the session keeps a switch from moving one that replaced it meanwhile.
-      body: { usageId: openedFor.id, projectId: selected, formSubmissions },
+      // Naming the session keeps the change from moving one that replaced it meanwhile.
+      body: { mode, usageId: openedFor.id, projectId: selected, formSubmissions },
     });
   };
 
@@ -90,6 +101,13 @@ export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<Swi
                 disabledKeys={[currentProjectId]}
               />
               <ProjectListStatus />
+              <ProjectChangeModeField
+                resourceId={resourceId}
+                usage={openedFor}
+                value={mode}
+                onChange={setMode}
+                isDisabled={isBusy}
+              />
             </>
           )}
         </ModalBody>
@@ -104,7 +122,7 @@ export function SwitchProjectDialog({ resourceId, usage, onClose }: Readonly<Swi
             onPress={() => void confirm()}
             data-cy="switch-project-confirm"
           >
-            {t('dialog.confirm')}
+            {t(`dialog.confirm.${mode}`)}
           </Button>
         </ModalFooter>
       </StandardModal>

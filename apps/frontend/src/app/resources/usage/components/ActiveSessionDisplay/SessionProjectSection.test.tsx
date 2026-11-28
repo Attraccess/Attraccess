@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
   mutate: vi.fn(),
   requestForms: vi.fn(),
   pending: false,
+  charging: 'continue',
   listState: 'ready' as 'ready' | 'loading' | 'error',
   refetch: vi.fn(),
   warning: vi.fn(),
@@ -29,6 +30,9 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
+  ProjectChangeMode: { WHOLE_SESSION: 'whole-session', SPLIT: 'split' },
+  ProjectSwitchCharging: { NEW_SESSION: 'new-session' },
+  useGetResourceBillingConfiguration: () => ({ data: { configuration: { projectSwitchCharging: state.charging } } }),
   useFindManyProjects: () => ({
     data: state.listState === 'ready' ? { data: state.projects } : undefined,
     isLoading: state.listState === 'loading',
@@ -78,7 +82,8 @@ const section = (session: ResourceUsage) => (
 );
 const mount = (project: { id: number; name: string } | null) => render(section(usage(project)));
 const current = { id: 7, name: 'Rocket' };
-const confirmButton = () => screen.getByRole('button', { name: 'dialog.confirm' });
+const confirmButton = (mode = 'whole-session') => screen.getByRole('button', { name: `dialog.confirm.${mode}` });
+const modeOption = (mode: string) => screen.getByRole('radio', { name: new RegExp(`mode\\.options\\.${mode}`) });
 
 describe('switching the project of the running session', () => {
   beforeEach(() => {
@@ -87,6 +92,7 @@ describe('switching the project of the running session', () => {
     state.mutate.mockReset();
     state.requestForms.mockReset().mockResolvedValue([]);
     state.pending = false;
+    state.charging = 'continue';
     state.listState = 'ready';
     state.refetch.mockReset();
     state.warning.mockReset();
@@ -140,24 +146,69 @@ describe('switching the project of the running session', () => {
     expect(state.selectProps.disabledKeys).toEqual([disabledKey]);
   });
 
+  it('preselects the whole session', async () => {
+    const user = userEvent.setup();
+    mount(current);
+    await user.click(screen.getByRole('button', { name: 'change' }));
+
+    expect(modeOption('whole-session')).toBeChecked();
+    expect(modeOption('split')).not.toBeChecked();
+    expect(screen.getByText('mode.descriptions.whole')).toBeInTheDocument();
+    expect(screen.getByText('mode.descriptions.split')).toBeInTheDocument();
+  });
+
+  it('says that the whole session of a continuation only reaches back to the last change', async () => {
+    const user = userEvent.setup();
+    render(section({ ...usage(current), previousUsageId: 21, startTime: new Date().toISOString() } as ResourceUsage));
+    await user.click(screen.getByRole('button', { name: 'change' }));
+
+    expect(screen.getByText('mode.descriptions.wholeSinceChange')).toBeInTheDocument();
+    expect(screen.queryByText('mode.descriptions.whole')).not.toBeInTheDocument();
+  });
+
+  it('warns about the new fee only for a split on a machine that charges it like a new session', async () => {
+    state.charging = 'new-session';
+    const user = userEvent.setup();
+    mount(current);
+    await user.click(screen.getByRole('button', { name: 'change' }));
+
+    expect(screen.queryByText('mode.newSessionFee')).not.toBeInTheDocument();
+    await user.click(modeOption('split'));
+    expect(screen.getByText('mode.newSessionFee')).toBeInTheDocument();
+  });
+
   it.each([
-    ['pick other', 8],
-    ['pick none', null],
-  ])('asks for the switch forms, then switches the named session (%s)', async (pick, projectId) => {
+    ['whole-session', 'project-reassign', 'pick other', 8],
+    ['whole-session', 'project-reassign', 'pick none', null],
+    ['split', 'project-switch', 'pick other', 8],
+    ['split', 'project-switch', 'pick none', null],
+  ])('asks for the forms of %s, then changes the named session', async (mode, formAction, pick, projectId) => {
     const forms = [{ formId: 3, answers: [] }];
     state.requestForms.mockResolvedValue(forms);
     const user = userEvent.setup();
     mount(current);
     await user.click(screen.getByRole('button', { name: 'change' }));
     await user.click(screen.getByRole('button', { name: pick }));
-    await user.click(confirmButton());
+    if (mode === 'split') await user.click(modeOption('split'));
+    await user.click(confirmButton(mode));
 
     await waitFor(() => expect(state.mutate).toHaveBeenCalledTimes(1));
-    expect(state.requestForms).toHaveBeenCalledWith('project-switch');
+    expect(state.requestForms).toHaveBeenCalledWith(formAction);
     expect(state.mutate).toHaveBeenCalledWith({
       path: { resourceId: 11 },
-      body: { usageId: 22, projectId, formSubmissions: forms },
+      body: { mode, usageId: 22, projectId, formSubmissions: forms },
     });
+  });
+
+  it('says so once the session was moved to another project elsewhere', async () => {
+    const user = userEvent.setup();
+    const view = mount(current);
+    await openAndPick(user);
+
+    view.rerender(section(usage({ id: 9, name: 'Plane' })));
+
+    expect(screen.getByText('dialog.replaced.title')).toBeInTheDocument();
+    expect(confirmButton()).toBeDisabled();
   });
 
   it('keeps the project when the forms are cancelled', async () => {

@@ -4,11 +4,14 @@
   "change": "Change project",
   "dialog": {
     "title": "Change project",
-    "description": "The machine keeps running. Usage up to now is booked to the current project, everything after it to the new one.",
+    "description": "The machine keeps running. Choose the new project and what the change applies to.",
     "select": "New project",
     "placeholder": "Choose a project",
     "cancel": "Cancel",
-    "confirm": "Change project",
+    "confirm": {
+      "whole-session": "Change whole session",
+      "split": "Split session"
+    },
     "replaced": {
       "title": "This session has changed",
       "description": "It ended or its project was changed elsewhere while this dialog was open. Close the dialog and check your session."
@@ -16,8 +19,14 @@
   },
   "success": {
     "title": "Project changed",
-    "project": "Usage is now booked to {{name}}.",
-    "noProject": "Usage is no longer booked to a project."
+    "whole": {
+      "project": "The session is now booked to {{name}}.",
+      "noProject": "The session is no longer booked to a project."
+    },
+    "split": {
+      "project": "Usage is now booked to {{name}}.",
+      "noProject": "Usage is no longer booked to a project."
+    }
   },
   "projects": {
     "loading": "Loading projects…",
@@ -53,7 +62,7 @@
       "title": "Project not changed",
       "description": "The project was not changed: the session already belongs to this project."
     },
-    "Only the owner of a running session can switch its project": {
+    "Only the owner of a running session can change its project": {
       "title": "Project not changed",
       "description": "The project was not changed. Only the person whose session it is can change its project."
     },
@@ -85,5 +94,19 @@
       "title": "Project not changed",
       "description": "The project was not changed because the session changed meanwhile. Check your session and try again."
     }
+  },
+  "mode": {
+    "label": "Apply to",
+    "options": {
+      "whole-session": "Whole session",
+      "split": "Split from now"
+    },
+    "descriptions": {
+      "whole": "Everything used in this session so far, and from now on, is booked to the new project.",
+      "wholeSinceChange": "Everything used since the last project change at {{time}}, and from now on, is booked to the new project. Earlier parts keep their projects.",
+      "split": "Usage so far stays on {{project}} and is billed now; the session continues under the new project.",
+      "splitUnassigned": "Usage so far stays without a project and is billed now; the session continues under the new project."
+    },
+    "newSessionFee": "On this machine, the new part is charged like a new session, including any fee per usage."
   }
 }

@@ -99,8 +99,15 @@
             }
           },
           "project-switched": {
-            "title": "Project switched",
-            "description": "Triggers when the owner of a running session switches its project. The machine keeps running: Usage started, Usage stopped and Usage taken over do not run. If this flow fails, the switch is refused. Billing items added here go to the part that ends.",
+            "title": "Project switched (split)",
+            "description": "Triggers when the owner of a running session splits it between projects (\"Split from now\"). The machine keeps running: Usage started, Usage stopped and Usage taken over do not run. If this flow fails, the switch is refused. Billing items added here go to the part that ends.",
+            "outputs": {
+              "output": "Output"
+            }
+          },
+          "project-reassigned": {
+            "title": "Project changed (whole session)",
+            "description": "Triggers when the owner of a running session moves the whole session to another project. The usage record keeps running and nothing is billed. If this flow fails, the change is refused.",
             "outputs": {
               "output": "Output"
             }

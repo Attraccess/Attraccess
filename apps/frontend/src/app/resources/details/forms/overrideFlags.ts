@@ -6,6 +6,7 @@ export const OVERRIDE_FLAGS = [
   ['takeover', 'isRequiredOnResourceUsageTakeOver'],
   ['end', 'isRequiredOnResourceUsageEnd'],
   ['projectSwitch', 'isRequiredOnResourceUsageProjectSwitch'],
+  ['projectReassign', 'isRequiredOnResourceUsageProjectReassign'],
 ] as const;
 export type OverrideAction = (typeof OVERRIDE_FLAGS)[number][0];
 export type OverrideFlag = (typeof OVERRIDE_FLAGS)[number][1];
@@ -25,6 +26,7 @@ export function currentOverride(item: ResourceApplicableFormDto): FormResourceOv
       isRequiredOnResourceUsageTakeOver: null,
       isRequiredOnResourceUsageEnd: null,
       isRequiredOnResourceUsageProjectSwitch: null,
+      isRequiredOnResourceUsageProjectReassign: null,
     }
   );
 }

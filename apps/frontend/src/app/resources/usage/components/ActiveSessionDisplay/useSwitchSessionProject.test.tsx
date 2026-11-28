@@ -52,7 +52,7 @@ const cases = [
   ['a flow that refused the switch', nest(422, 'FLOW_EXECUTION_ERROR: Door is open')],
   ['a meter that cannot be read', nest(400, 'METER_SWITCH_FAILED: "Energy": Request failed with status code 500')],
   ['the same project', nest(400, 'The session already belongs to this project')],
-  ["somebody else's session", nest(403, 'Only the owner of a running session can switch its project')],
+  ["somebody else's session", nest(403, 'Only the owner of a running session can change its project')],
   ['a session that is gone', nest(404, 'No active usage session found')],
   ['a project that is gone', nest(404, 'Project not found')],
   ['a pending session change', nest(409, 'A usage lifecycle operation is already in progress for this resource')],

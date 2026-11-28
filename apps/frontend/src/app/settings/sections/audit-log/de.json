@@ -117,6 +117,7 @@
     "usage_session.ended": "Nutzung beendet",
     "usage_session.extended": "Nutzung verlängert",
     "usage_session.project_switched": "Projekt der Nutzung gewechselt",
+    "usage_session.project_reassigned": "Projekt der Nutzung geändert (ganze Sitzung)",
     "energy_charge.waived": "Energiekosten erlassen",
     "retraining.required": "Erneute Einweisung erforderlich",
     "retraining.cleared": "Erneute Einweisung nicht mehr erforderlich",

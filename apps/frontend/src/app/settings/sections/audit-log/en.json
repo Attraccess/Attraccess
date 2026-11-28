@@ -117,6 +117,7 @@
     "usage_session.ended": "Usage ended",
     "usage_session.extended": "Usage extended",
     "usage_session.project_switched": "Usage project switched",
+    "usage_session.project_reassigned": "Usage project changed (whole session)",
     "energy_charge.waived": "Energy charge waived",
     "retraining.required": "Retraining required",
     "retraining.cleared": "Retraining requirement cleared",
