@@ -1205,7 +1205,7 @@ groups:
           severity: critical
         annotations:
           summary: 'The last backup failed'
-          description: 'The last backup run failed. The log of the backup service shows the cause after the line BACKUP FAILED (for example the backup target cannot be reached, wrong credentials or a wrong BACKUP_PASSWORD). The alert clears after the next successful run; run one by hand with: attraccess-backup backup.'
+          description: 'The last backup run failed. The log of the backup service shows the cause in the lines before BACKUP FAILED (for example the backup target cannot be reached, wrong credentials or a wrong BACKUP_PASSWORD). The alert clears after the next successful run; run one by hand with: attraccess-backup backup.'
         data:
           - refId: A
             relativeTimeRange:
