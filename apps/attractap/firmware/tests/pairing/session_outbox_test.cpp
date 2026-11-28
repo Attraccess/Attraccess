@@ -22,6 +22,8 @@ namespace
 
     using Result = SessionOutbox::Result;
 
+    using Budget = heap_guard::TestBudget;
+
     std::vector<uint8_t> bytes(const std::string &text) { return std::vector<uint8_t>(text.begin(), text.end()); }
 
     void refusedRecordsWaitInOrder()
@@ -94,11 +96,55 @@ namespace
 
         // A short heap: the record is refused (TLS fails the session) instead of the reader aborting.
         SessionOutbox shortHeap;
-        heap_guard::setTestBudget(heap_guard::CRITICAL_RESERVE_BYTES + 100);
+        Budget budget(heap_guard::CRITICAL_RESERVE_BYTES + 100);
         std::vector<uint8_t> record(512);
         expect(!shortHeap.append(record.data(), record.size()), "no room for the record: refused");
-        heap_guard::setTestBudget(SIZE_MAX);
+        budget.set(SIZE_MAX);
         expect(shortHeap.append(record.data(), record.size()), "with room: taken");
+    }
+
+    // ATT-1394, the QA case on the BLE bridge: 6 KiB wait and a 200 B record arrives. The old check asked for 6.2 KiB
+    // and passed, then `insert` grew the buffer to about 12 KiB, more than the largest free block, and the reader
+    // aborted. Now the outbox grows to what fits (or refuses), and the insert never allocates again.
+    void growthIsCheckedAtTheSizeItAllocates()
+    {
+        constexpr size_t WAITING = 6 * 1024;
+        constexpr size_t RECORD = 200;
+        constexpr size_t NEEDED = WAITING + RECORD;
+        const std::vector<uint8_t> waiting(WAITING, 'a');
+        const std::vector<uint8_t> record(RECORD, 'b');
+
+        SessionOutbox outbox;
+        Budget budget(SIZE_MAX);
+        expect(outbox.append(waiting.data(), waiting.size()), "6 KiB taken");
+        expect(outbox.capacity() == WAITING, "an empty outbox grows to the record");
+
+        budget.set(heap_guard::CRITICAL_RESERVE_BYTES + NEEDED - 1);
+        expect(!outbox.append(record.data(), record.size()), "no heap for 6.2 KiB: refused, TLS fails the session");
+        expect(outbox.size() == WAITING && outbox.capacity() == WAITING, "the waiting records are untouched");
+
+        // What the old check let through: room for 6.2 KiB, not for the 12 KiB `insert` would have taken.
+        budget.set(heap_guard::CRITICAL_RESERVE_BYTES + NEEDED);
+        expect(outbox.append(record.data(), record.size()), "room for 6.2 KiB: taken");
+        expect(outbox.capacity() == NEEDED, "grown to exactly 6.2 KiB, not doubled");
+
+        budget.set(SIZE_MAX);
+        std::string frame;
+        outbox.flush(0, [&](const uint8_t *data, size_t length) {
+            frame.assign(reinterpret_cast<const char *>(data), length);
+            return true;
+        });
+        expect(frame == std::string(WAITING, 'a') + std::string(RECORD, 'b'), "both records, intact and in order");
+
+        // With heap to spare the outbox doubles as before, but never past MAX_BYTES: it can never hold more.
+        SessionOutbox roomy;
+        expect(roomy.append(waiting.data(), waiting.size()), "setup: 6 KiB taken");
+        expect(roomy.append(record.data(), record.size()) && roomy.capacity() == 2 * WAITING, "doubled");
+        SessionOutbox capped;
+        const std::vector<uint8_t> large(10 * 1024, 'c');
+        expect(capped.append(large.data(), large.size()), "setup: 10 KiB taken");
+        expect(capped.append(record.data(), record.size()) && capped.capacity() == SessionOutbox::MAX_BYTES,
+               "the doubling stops at MAX_BYTES");
     }
 
     // The QA sequence: a long BLE transfer sends a session message for every write answer and notification; the
@@ -187,6 +233,7 @@ int main()
     refusedRecordsWaitInOrder();
     aWebsocketThatNeverTakesThemEndsTheStream();
     theBacklogIsBounded();
+    growthIsCheckedAtTheSizeItAllocates();
     aStalledWebsocketHoldsSendersBackWithoutLosingTheStream();
     if (failures)
     {

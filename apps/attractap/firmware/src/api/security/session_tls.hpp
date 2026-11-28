@@ -62,6 +62,8 @@ public:
     const std::string &serverInstallationId() const { return verifiedInstallationId; }
     // mbedTLS error of the last failure (0 when none); safe to log.
     int lastError() const { return error; }
+    // Bytes the received-record buffer can hold without growing (host tests check the growth, ATT-1394).
+    size_t inboundCapacity() const;
 
     // Public for the verification callback.
     int verifyServerCertificate(void *crt, int depth, uint32_t *flags);

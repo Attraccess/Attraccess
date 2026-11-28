@@ -38,8 +38,8 @@ public:
     bool append(const uint8_t *data, size_t length)
     {
         if (records.size() + length > MAX_BYTES) return false;
-        if (records.capacity() - records.size() < length &&
-            !heap_guard::fits(records.size() + length, heap_guard::CRITICAL_RESERVE_BYTES))
+        // Never past MAX_BYTES: the doubling must not reserve room the outbox can never use.
+        if (!heap_guard::reserveFor(records, records.size() + length, heap_guard::CRITICAL_RESERVE_BYTES, MAX_BYTES))
             return false;
         records.insert(records.end(), data, data + length);
         return true;
@@ -47,6 +47,7 @@ public:
 
     bool empty() const { return records.empty(); }
     size_t size() const { return records.size(); }
+    size_t capacity() const { return records.capacity(); }
 
     // Whether a sender may encrypt a new message now: nothing refused is still waiting.
     bool accepting() const { return !refused; }
