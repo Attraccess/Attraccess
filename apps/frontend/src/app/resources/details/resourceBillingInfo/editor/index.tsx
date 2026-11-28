@@ -297,6 +297,7 @@ export function ResourceBillingInfoEditor(props: Readonly<ResourceBillingInfoEdi
                 <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
               </NumberFieldGroup>
             </NumberField>
+            <ProjectSwitchChargingField value={projectSwitchCharging} onChange={setProjectSwitchCharging} />
             {meters.map((meter) => {
               const value =
                 rates[meter.id] ?? formatCredits(meter.creditsPerUnit, configuration.minorUnit, { useGrouping: false });
@@ -346,7 +347,6 @@ export function ResourceBillingInfoEditor(props: Readonly<ResourceBillingInfoEdi
                 </div>
               );
             })}
-            <ProjectSwitchChargingField value={projectSwitchCharging} onChange={setProjectSwitchCharging} />
             <MeterNameEditor resourceId={resourceId} />
             <MeterSetupNotice resourceId={resourceId} />
             <input hidden type="submit" />

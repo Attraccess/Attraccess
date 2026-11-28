@@ -143,3 +143,11 @@ it('forgets unsaved choices when the editor is closed and opened again', async (
     projectSwitchCharging: 'continue',
   });
 });
+it('places the project switch charging with the session prices, before the meters', async () => {
+  const firstMeter = await openEditor();
+  const perMinute = screen.getByRole('textbox', { name: /inputs.creditsPerMinute.label/ });
+  const charging = screen.getByRole('radiogroup', { name: /inputs.projectSwitchCharging.label/ });
+
+  expect(perMinute.compareDocumentPosition(charging) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(charging.compareDocumentPosition(firstMeter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
