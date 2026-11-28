@@ -14,7 +14,7 @@
     "resourceUsageStart": "Required by default at session start",
     "resourceUsageTakeover": "Required by default at takeover",
     "resourceUsageEnd": "Required by default at session end",
-    "resourceUsageProjectSwitch": "Required by default when switching the project",
+    "resourceUsageProjectSwitch": "Required by default at project switch",
     "addField": "Add field",
     "reorderField": "Reorder field",
     "emptyFieldsTitle": "No fields",

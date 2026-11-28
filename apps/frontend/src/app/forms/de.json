@@ -14,7 +14,7 @@
     "resourceUsageStart": "Standardmäßig erforderlich bei Sitzungsstart",
     "resourceUsageTakeover": "Standardmäßig erforderlich bei Übernahme",
     "resourceUsageEnd": "Standardmäßig erforderlich bei Sitzungsende",
-    "resourceUsageProjectSwitch": "Standardmäßig erforderlich beim Projektwechsel",
+    "resourceUsageProjectSwitch": "Standardmäßig erforderlich bei Projektwechsel",
     "addField": "Feld hinzufügen",
     "reorderField": "Feld verschieben",
     "emptyFieldsTitle": "Keine Felder",
